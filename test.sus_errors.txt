@@ -5,6 +5,13 @@ Warning: The result of this expression is not used. Only function calls can retu
     │     ────────────────────┬────────────────────  
     │                         ╰────────────────────── The result of this expression is not used. Only function calls can return nothing. 
 ────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+     ╭─[ util.sus:221:4 ]
+     │
+ 221 │          assert#(C: false)
+     │          ────────┬────────  
+     │                  ╰────────── The result of this expression is not used. Only function calls can return nothing. 
+─────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
@@ -2204,7 +2211,7 @@ Error: Out of bounds! The array is of size 20, but the index has bounds 29..29
 Error: This instruction is part of a net-positive latency cycle of +5
 
 test'5
--> _4_i'0 (-5)
+-> __4_i'0 (-5)
 -> test'10 (+10)
 
 Which conflicts with the starting latency
@@ -2215,7 +2222,7 @@ Which conflicts with the starting latency
      │                       ╰────────────── This instruction is part of a net-positive latency cycle of +5
 
 test'5
--> _4_i'0 (-5)
+-> __4_i'0 (-5)
 -> test'10 (+10)
 
 Which conflicts with the starting latency
@@ -2223,7 +2230,7 @@ Which conflicts with the starting latency
 Error: This instruction is part of a net-positive latency cycle of +5
 
 test'5
--> _4_i'0 (-5)
+-> __4_i'0 (-5)
 -> test'10 (+10)
 
 Which conflicts with the starting latency
@@ -2234,7 +2241,7 @@ Which conflicts with the starting latency
      │                         ╰────────────── This instruction is part of a net-positive latency cycle of +5
 
 test'5
--> _4_i'0 (-5)
+-> __4_i'0 (-5)
 -> test'10 (+10)
 
 Which conflicts with the starting latency
@@ -2292,46 +2299,7 @@ Error: 'contains_submodule_submodule' conflicts with other declarations:
      │        ──────────────┬─────────────  
      │                      ╰─────────────── Conflicts with
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:442:126 ]
-     │
- 442 │     interface contains_submodule_submodule : int#(MIN: 0, MAX: 100) a, int#(MIN: 0, MAX: 100) b, int#(MIN: 0, MAX: 100) c -> int r
-     │                                                                                                                              ──┬──  
-     │                                                                                                                                ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:444:5 ]
-     │
- 444 │     int tmp = submodule(a, b)
-     │     ───┬───  
-     │        ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:444:15 ]
-     │
- 444 │     int tmp = submodule(a, b)
-     │               ───────┬───────  
-     │                      ╰───────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: TODO: Using empty interface 'doNothing' (This is a TODO with Actions etc)
+Error: A Function call expects this to be a callable interface, the interface `doNothing` is not callable
      ╭─[ test.sus:445:2 ]
      │
  431 │ module doNothing {}
@@ -2340,33 +2308,7 @@ Error: TODO: Using empty interface 'doNothing' (This is a TODO with Actions etc)
      │ 
  445 │     doNothing()
      │     ────┬────  
-     │         ╰────── TODO: Using empty interface 'doNothing' (This is a TODO with Actions etc)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:446:10 ]
-     │
- 446 │     reg r = tmp + c
-     │             ─┬─  
-     │              ╰─── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:446:10 ]
-     │
- 446 │     reg r = tmp + c
-     │             ───┬───  
-     │                ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
+     │         ╰────── A Function call expects this to be a callable interface, the interface `doNothing` is not callable
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:462:7 ]
@@ -2425,46 +2367,7 @@ Error: 'contains_submodule_submodule' conflicts with other declarations:
      │        ──────────────┬─────────────  
      │                      ╰─────────────── 'contains_submodule_submodule' conflicts with other declarations:
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:598:126 ]
-     │
- 598 │     interface contains_submodule_submodule : int#(MIN: 0, MAX: 100) a, int#(MIN: 0, MAX: 100) b, int#(MIN: 0, MAX: 100) c -> int r
-     │                                                                                                                              ──┬──  
-     │                                                                                                                                ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:600:5 ]
-     │
- 600 │     int tmp = submodule(a, b)
-     │     ───┬───  
-     │        ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:600:15 ]
-     │
- 600 │     int tmp = submodule(a, b)
-     │               ───────┬───────  
-     │                      ╰───────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: TODO: Using empty interface 'doNothing' (This is a TODO with Actions etc)
+Error: A Function call expects this to be a callable interface, the interface `doNothing` is not callable
      ╭─[ test.sus:601:2 ]
      │
  431 │ module doNothing {}
@@ -2473,33 +2376,7 @@ Error: TODO: Using empty interface 'doNothing' (This is a TODO with Actions etc)
      │ 
  601 │     doNothing()
      │     ────┬────  
-     │         ╰────── TODO: Using empty interface 'doNothing' (This is a TODO with Actions etc)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:602:10 ]
-     │
- 602 │     reg r = tmp + c
-     │             ─┬─  
-     │              ╰─── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:602:10 ]
-     │
- 602 │     reg r = tmp + c
-     │             ───┬───  
-     │                ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
+     │         ╰────── A Function call expects this to be a callable interface, the interface `doNothing` is not callable
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:608:22 ]
@@ -2629,16 +2506,16 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                             ───┬──  
      │                                ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Excess output targets. Function returns 0 results, but 1 targets were given.
-     ╭─[ test.sus:681:2 ]
+Error: A Function call expects this to be a callable interface, the interface `no_port_module` is not callable
+     ╭─[ test.sus:678:2 ]
      │
  675 │ module no_port_module {}
      │        ───────┬──────  
-     │               ╰──────── Interface 'no_port_module' defined here
+     │               ╰──────── Interface 'no_port_module' declared here
      │ 
- 681 │     int x = no_port()
-     │     ──┬──  
-     │       ╰──── Excess output targets. Function returns 0 results, but 1 targets were given.
+ 678 │     no_port_module()
+     │     ───────┬──────  
+     │            ╰──────── A Function call expects this to be a callable interface, the interface `no_port_module` is not callable
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:681:6 ]
@@ -2646,6 +2523,17 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  681 │     int x = no_port()
      │         ┬  
      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: A Function call expects this to be a callable interface, the interface `no_port_module` is not callable
+     ╭─[ test.sus:681:10 ]
+     │
+ 675 │ module no_port_module {}
+     │        ───────┬──────  
+     │               ╰──────── Interface 'no_port_module' declared here
+     │ 
+ 681 │     int x = no_port()
+     │             ───┬───  
+     │                ╰───── A Function call expects this to be a callable interface, the interface `no_port_module` is not callable
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:686:40 ]
@@ -10735,17 +10623,6 @@ Error: Excess output targets. Function returns 0 results, but 1 targets were giv
      │          ─────────┬────────  
      │                   ╰────────── Excess output targets. Function returns 0 results, but 1 targets were given.
 ─────╯
-Error: Excess output targets. Function returns 0 results, but 1 targets were given.
-     ╭─[ test.sus:913:2 ]
-     │
- 906 │ module no_main_interface {
-     │        ────────┬────────  
-     │                ╰────────── Interface 'no_main_interface' defined here
-     │ 
- 913 │     int x = no_interface_named()
-     │     ──┬──  
-     │       ╰──── Excess output targets. Function returns 0 results, but 1 targets were given.
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:913:6 ]
      │
@@ -10753,16 +10630,16 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │         ┬  
      │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Excess output targets. Function returns 0 results, but 1 targets were given.
-     ╭─[ test.sus:914:2 ]
+Error: A Function call expects this to be a callable interface, the interface `no_main_interface` is not callable
+     ╭─[ test.sus:913:10 ]
      │
  906 │ module no_main_interface {
      │        ────────┬────────  
-     │                ╰────────── Interface 'no_main_interface' defined here
+     │                ╰────────── Interface 'no_main_interface' declared here
      │ 
- 914 │     int y = no_main_interface()
-     │     ──┬──  
-     │       ╰──── Excess output targets. Function returns 0 results, but 1 targets were given.
+ 913 │     int x = no_interface_named()
+     │             ─────────┬────────  
+     │                      ╰────────── A Function call expects this to be a callable interface, the interface `no_main_interface` is not callable
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:914:6 ]
@@ -10770,6 +10647,17 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  914 │     int y = no_main_interface()
      │         ┬  
      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: A Function call expects this to be a callable interface, the interface `no_main_interface` is not callable
+     ╭─[ test.sus:914:10 ]
+     │
+ 906 │ module no_main_interface {
+     │        ────────┬────────  
+     │                ╰────────── Interface 'no_main_interface' declared here
+     │ 
+ 914 │     int y = no_main_interface()
+     │             ────────┬────────  
+     │                     ╰────────── A Function call expects this to be a callable interface, the interface `no_main_interface` is not callable
 ─────╯
 Error: Typing Error: array size expects a int but was given a bool
      ╭─[ test.sus:918:6 ]

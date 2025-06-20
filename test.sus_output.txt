@@ -605,8 +605,7 @@ Checking array accesses submodule
 Instantiating doNothing
 Concrete Typechecking doNothing
 Checking array accesses doNothing
-Instantiating contains_submodule_submodule
-Concrete Typechecking contains_submodule_submodule
+Not Instantiating contains_submodule_submodule due to flattening errors
 Instantiating xor
 Concrete Typechecking xor
 Checking array accesses xor
@@ -633,8 +632,7 @@ Concrete Typechecking submodule_named_ports
 Checking array accesses submodule_named_ports
 Instantiating use_submodule_named_ports
 Concrete Typechecking use_submodule_named_ports
-Instantiating contains_submodule_submodule
-Concrete Typechecking contains_submodule_submodule
+Not Instantiating contains_submodule_submodule due to flattening errors
 Instantiating cross_bool
 Concrete Typechecking cross_bool
 Checking array accesses cross_bool

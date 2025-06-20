@@ -195,19 +195,7 @@ impl InterfaceKind {
 pub struct Interface {
     pub name_span: Span,
     pub name: String,
-    pub interface_kind: InterfaceKind,
-    /// All the interface's ports have this domain too
-    pub domain: DomainID,
-    pub func_call_inputs: PortIDRange,
-    pub func_call_outputs: PortIDRange,
-    pub declaration_instruction: FlatID,
-}
-
-impl Interface {
-    pub fn all_ports(&self) -> PortIDRange {
-        assert_eq!(self.func_call_inputs.1, self.func_call_outputs.0);
-        PortIDRange::new(self.func_call_inputs.0, self.func_call_outputs.1)
-    }
+    pub declaration_instruction: Option<FlatID>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -868,6 +856,13 @@ pub struct InterfaceDeclaration {
     pub domain: DomainType,
 }
 
+impl InterfaceDeclaration {
+    pub fn all_ports(&self) -> PortIDRange {
+        assert_eq!(self.inputs.1, self.outputs.0);
+        PortIDRange::new(self.inputs.0, self.outputs.1)
+    }
+}
+
 /// When a module has been parsed and flattened, it is turned into a large list of instructions,
 /// These are stored in [LinkInfo::instructions]`: FlatAlloc<Instruction, FlatIDMarker>`
 ///
@@ -924,6 +919,13 @@ impl Instruction {
             panic!("unwrap_declaration on not a Declaration! Found {self:?}")
         };
         decl
+    }
+    #[track_caller]
+    pub fn unwrap_interface(&self) -> &InterfaceDeclaration {
+        let Self::Interface(interf) = self else {
+            panic!("unwrap_declaration on not a Declaration! Found {self:?}")
+        };
+        interf
     }
     #[track_caller]
     pub fn unwrap_submodule(&self) -> &SubModuleInstance {

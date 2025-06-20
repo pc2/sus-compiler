@@ -5,7 +5,9 @@ use std::cell::Cell;
 
 use crate::{alloc::ArenaAllocator, typing::template::Parameter};
 
-use crate::flattening::{Declaration, DomainInfo, Instruction, Module, Port, SubModuleInstance};
+use crate::flattening::{
+    Declaration, DomainInfo, Instruction, Interface, Module, Port, SubModuleInstance,
+};
 use crate::linker::{checkpoint::ErrorCheckpoint, FileData, LinkInfo};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -370,6 +372,15 @@ impl ErrorInfoObject for Port {
             position: self.name_span,
             file,
             info: format!("Port '{}' declared here", &self.name),
+        })
+    }
+}
+impl ErrorInfoObject for Interface {
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+        Some(ErrorInfo {
+            position: self.name_span,
+            file,
+            info: format!("Interface '{}' declared here", &self.name),
         })
     }
 }

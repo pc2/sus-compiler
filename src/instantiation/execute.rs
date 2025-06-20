@@ -865,7 +865,7 @@ impl<'l> ExecutionContext<'l> {
                 typ,
                 name: self
                     .unique_name_producer
-                    .get_unique_name(format!("{}_{}", submod_instance.name, port_data.name)),
+                    .get_unique_name(format!("_{}_{}", submod_instance.name, port_data.name)),
                 specified_latency: CALCULATE_LATENCY_LATER,
                 absolute_latency: CALCULATE_LATENCY_LATER,
                 is_port: None,
@@ -884,6 +884,16 @@ impl<'l> ExecutionContext<'l> {
             new_wire
         }
     }
+    fn get_submodule_interface(
+        &self,
+        submod_id: SubModuleID,
+        interface_id: InterfaceID,
+    ) -> Option<&'l InterfaceDeclaration> {
+        let md = &self.linker.modules[self.submodules[submod_id].refers_to.id];
+        let interface = &md.interfaces[interface_id];
+        Some(md.link_info.instructions[interface.declaration_instruction?].unwrap_interface())
+    }
+
     /// Allocates ports on first use, to see which ports are used, and to determine instantiation based on this
     fn get_submodule_condition(
         &mut self,
@@ -892,6 +902,9 @@ impl<'l> ExecutionContext<'l> {
         interface_name_span: Span,
         domain: DomainID,
     ) -> WireID {
+        let interface = self
+            .get_submodule_interface(sub_module_id, interface_id)
+            .unwrap();
         let submod_instance = &mut self.submodules[sub_module_id]; // Separately grab the same submodule every time because we take a &mut in for get_wire_or_constant_as_wire
 
         if let Some(wire_found) = &mut submod_instance.interface_map[interface_id] {
@@ -900,14 +913,12 @@ impl<'l> ExecutionContext<'l> {
 
             wire_found.maps_to_wire
         } else {
-            let submod_md = &self.linker.modules[submod_instance.refers_to.id];
-            let interface_data = &submod_md.interfaces[interface_id];
             let name = self
                 .unique_name_producer
-                .get_unique_name(format!("{}_{}", submod_instance.name, interface_data.name));
+                .get_unique_name(format!("_{}_{}", submod_instance.name, interface.name));
             let submod_instruction = submod_instance.original_instruction;
             let original_submod_span = self.link_info.instructions[submod_instruction].get_span();
-            let source = match interface_data.interface_kind {
+            let source = match interface.interface_kind {
                 InterfaceKind::Action => {
                     let false_wire = self
                         .alloc_wire_for_const(
@@ -1026,8 +1037,9 @@ impl<'l> ExecutionContext<'l> {
                 let (submod_id, interface_id, interface_span) =
                     self.get_func_interface(&fc.func, original_instruction, domain)?;
 
-                let md = &self.linker.modules[self.submodules[submod_id].refers_to.id];
-                let interface = &md.interfaces[interface_id];
+                let interface = self
+                    .get_submodule_interface(submod_id, interface_id)
+                    .unwrap();
 
                 add_to_small_set(
                     &mut self.submodules[submod_id].interface_call_sites[interface_id],
@@ -1057,7 +1069,7 @@ impl<'l> ExecutionContext<'l> {
                     );
                 }
 
-                for (port, arg) in zip_eq(interface.func_call_inputs, &fc.arguments) {
+                for (port, arg) in zip_eq(interface.inputs, &fc.arguments) {
                     let arg_span = self.link_info.instructions[*arg].get_span();
                     let from = self.get_wire_or_constant_as_wire(*arg, domain)?;
                     let port_wire = self.get_submodule_port(submod_id, port, None, domain);
@@ -1065,7 +1077,7 @@ impl<'l> ExecutionContext<'l> {
                 }
 
                 return Ok(interface
-                    .func_call_outputs
+                    .outputs
                     .iter()
                     .map(|port_id| self.get_submodule_port(submod_id, port_id, None, domain))
                     .collect());

@@ -1174,14 +1174,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 else_block: FlatIDRange::EMPTY,
             }));
 
-        self.alloc_interface(
-            name,
-            name_span,
-            interface_kind,
-            inputs,
-            outputs,
-            interface_id,
-        );
+        self.alloc_interface(name, name_span, interface_id);
 
         let (then_block, else_block, then_block_span, else_span) = self.flatten_then_else_blocks(
             cursor,
@@ -1240,31 +1233,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         );
     }
 
-    fn alloc_interface(
-        &mut self,
-        name: String,
-        name_span: Span,
-        interface_kind: InterfaceKind,
-        func_call_inputs: PortIDRange,
-        func_call_outputs: PortIDRange,
-        declaration_instruction: FlatID,
-    ) {
+    fn alloc_interface(&mut self, name: String, name_span: Span, declaration_instruction: FlatID) {
         if name == self.name {
             let main_interface = &mut self.interfaces[InterfaceID::MAIN_INTERFACE];
-            main_interface.func_call_inputs = func_call_inputs;
-            main_interface.func_call_outputs = func_call_outputs;
-            main_interface.interface_kind = interface_kind;
-            main_interface.domain = self.current_domain;
             main_interface.name_span = name_span;
+            assert!(main_interface.declaration_instruction.is_none());
+            main_interface.declaration_instruction = Some(declaration_instruction);
         } else {
             self.interfaces.alloc(Interface {
-                func_call_inputs,
-                func_call_outputs,
-                interface_kind,
-                domain: self.current_domain,
                 name_span,
                 name,
-                declaration_instruction,
+                declaration_instruction: Some(declaration_instruction),
             });
         }
     }
@@ -1526,11 +1505,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         self.interfaces.alloc(Interface {
             name_span,
             name: name.to_owned(),
-            interface_kind: InterfaceKind::RegularInterface,
-            domain: DomainID::MAIN_DOMAIN,
-            func_call_inputs: PortIDRange::EMPTY,
-            func_call_outputs: PortIDRange::EMPTY,
-            declaration_instruction: UUID::PLACEHOLDER,
+            declaration_instruction: None,
         });
 
         cursor.field(field!("block"));

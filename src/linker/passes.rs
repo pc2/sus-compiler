@@ -1,7 +1,9 @@
 use super::*;
 use crate::{
     errors::{ErrorInfoObject, FileKnowingErrorInfoObject},
-    flattening::{Declaration, GlobalReference, Interface, Port, SubModuleInstance},
+    flattening::{
+        Declaration, GlobalReference, Interface, InterfaceDeclaration, Port, SubModuleInstance,
+    },
     linker::checkpoint::ResolvedGlobalsCheckpoint,
     typing::abstract_type::{AbstractGlobalReference, AbstractInnerType, AbstractRankedType},
 };
@@ -244,7 +246,7 @@ impl<'linker, 'from> GlobalResolver<'linker, 'from> {
         &self,
         submod_instr: &'linker SubModuleInstance,
     ) -> RemoteSubModule<'linker> {
-        let AbstractInnerType::Interface(md_ref, _interface) = &submod_instr.typ.inner else {
+        let AbstractInnerType::Interface(md_ref, _) = &submod_instr.typ.inner else {
             unreachable!("Must be an interface!")
         };
         RemoteSubModule {
@@ -289,18 +291,26 @@ impl<'l> RemoteSubModule<'l> {
             port: &self.md.ports[port_id],
         }
     }
-    pub fn get_interface_reference(self, interface_id: InterfaceID) -> RemoteInterface<'l> {
+    pub fn get_callable_interface(
+        self,
+        interface_id: InterfaceID,
+    ) -> Result<RemoteInterface<'l>, &'l Interface> {
         let interface = &self.md.interfaces[interface_id];
-        RemoteInterface {
-            parent: self,
-            interface,
+        if let Some(decl_instr) = interface.declaration_instruction {
+            let interface = self.md.link_info.instructions[decl_instr].unwrap_interface();
+            Ok(RemoteInterface {
+                parent: self,
+                interface,
+            })
+        } else {
+            Err(interface)
         }
     }
 }
 #[derive(Clone, Copy)]
 pub struct RemoteInterface<'l> {
     pub parent: RemoteSubModule<'l>,
-    pub interface: &'l Interface,
+    pub interface: &'l InterfaceDeclaration,
 }
 impl<'l> RemoteInterface<'l> {
     pub fn get_port(self, port_id: PortID) -> RemotePort<'l> {

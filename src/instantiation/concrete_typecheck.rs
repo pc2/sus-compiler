@@ -370,12 +370,14 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     for (_interface_id, interface_references, sm_interface) in
                         zip_eq(&sm.interface_call_sites, &sub_module.interfaces)
                     {
+                        let Some(sm_interface_decl) = sm_interface.declaration_instruction else {continue};
+                        let sm_interface_decl = sub_module.link_info.instructions[sm_interface_decl].unwrap_interface();
                         if !interface_references.is_empty() {
                             let interface_name = &sm_interface.name;
-                            if let Some(representative_port) = sm_interface
-                                .func_call_inputs
+                            if let Some(representative_port) = sm_interface_decl
+                                .inputs
                                 .first()
-                                .or(sm_interface.func_call_outputs.first())
+                                .or(sm_interface_decl.outputs.first())
                             {
                                 if instance.interface_ports[representative_port].is_none() {
                                     for span in interface_references {
@@ -391,7 +393,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                                     .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
                                 }
                             }
-                            if sm_interface
+                            if sm_interface_decl
                                 .all_ports()
                                 .iter()
                                 .any(|port_id| instance.interface_ports[port_id].is_none())

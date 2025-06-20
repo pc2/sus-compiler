@@ -293,19 +293,19 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
 
                     let target = match refers_to {
                         PathElemRefersTo::Interface(interface) => {
-                            let_unwrap!(AbstractInnerType::Interface(module, _), &input_typ.inner);
-                            let submodule = &self.linker.modules[module.id];
+                            let_unwrap!(AbstractInnerType::Interface(md_ref, _), &input_typ.inner);
+                            let submodule = &self.linker.modules[md_ref.id];
                             LocationInfo::Interface(
-                                module.id,
+                                md_ref.id,
                                 submodule,
                                 *interface,
                                 &submodule.interfaces[*interface],
                             )
                         }
                         PathElemRefersTo::Port(port) => {
-                            let_unwrap!(AbstractInnerType::Interface(module, _), &input_typ.inner);
-                            let submodule = &self.linker.modules[module.id];
-                            LocationInfo::Port(module.id, submodule, *port)
+                            let_unwrap!(AbstractInnerType::Interface(md_ref, _), &input_typ.inner);
+                            let submodule = &self.linker.modules[md_ref.id];
+                            LocationInfo::Port(md_ref.id, submodule, *port)
                         }
                     };
                     self.visit(*name_span, target);

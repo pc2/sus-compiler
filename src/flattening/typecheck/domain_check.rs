@@ -238,9 +238,11 @@ impl<'l> TypeCheckingContext<'l> {
                         return match refers_to.get() {
                             Some(PathElemRefersTo::Interface(interface)) => Some(
                                 submod.local_interface_domains[submod_ref
-                                    .get_interface_reference(*interface)
+                                    .get_callable_interface(*interface)
+                                    .ok()?
                                     .interface
-                                    .domain],
+                                    .domain
+                                    .unwrap_physical()],
                             ),
                             Some(PathElemRefersTo::Port(port)) => Some(
                                 submod.local_interface_domains

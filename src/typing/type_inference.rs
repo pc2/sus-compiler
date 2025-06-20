@@ -324,8 +324,8 @@ impl HindleyMilner for AbstractInnerType {
             AbstractInnerType::Named(named_id) => {
                 HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Named(*named_id))
             }
-            AbstractInnerType::Interface(md_id, interface_id) => {
-                HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Interface(md_id.id, *interface_id))
+            AbstractInnerType::Interface(md_ref, interface) => {
+                HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Interface(md_ref.id, *interface))
             }
         }
     }
@@ -348,11 +348,15 @@ impl HindleyMilner for AbstractInnerType {
         }
     }
 
+    /// Doesn't cover the PeanoType Unknowns
     fn for_each_unknown(&self, f: &mut impl FnMut(InnerTypeVariableID)) {
         match self {
-            AbstractInnerType::Template(_)
-            | AbstractInnerType::Named(_)
-            | AbstractInnerType::Interface(_, _) => {}
+            AbstractInnerType::Template(_) | AbstractInnerType::Named(_) => {}
+            AbstractInnerType::Interface(md_ref, _) => {
+                for (_, arg) in &md_ref.template_arg_types {
+                    arg.inner.for_each_unknown(f);
+                }
+            }
             AbstractInnerType::Unknown(uuid) => f(*uuid),
         }
     }
@@ -522,9 +526,17 @@ impl PeanoType {
 impl AbstractRankedType {
     pub fn fully_substitute(&mut self, substitutor: &AbstractTypeSubstitutor) -> bool {
         let inner_success = match &mut self.inner {
-            AbstractInnerType::Named(_)
-            | AbstractInnerType::Template(_)
-            | AbstractInnerType::Interface(_, _) => true, // Template Name & Name is included in get_hm_info
+            // Template Name & Name is included in get_hm_info
+            AbstractInnerType::Named(_) | AbstractInnerType::Template(_) => true,
+            AbstractInnerType::Interface(md_ref, _) => {
+                let mut success = true;
+                for (_, arg) in &mut md_ref.template_arg_types {
+                    if !arg.fully_substitute(substitutor) {
+                        success = false;
+                    }
+                }
+                success
+            }
             AbstractInnerType::Unknown(var) => {
                 if let Some(replacement) = substitutor.inner_substitutor[*var].get() {
                     assert!(!std::ptr::eq(&self.inner, replacement));

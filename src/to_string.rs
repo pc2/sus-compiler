@@ -8,7 +8,9 @@ use crate::typing::set_unifier::Unifyable;
 use crate::typing::template::{Parameter, TVec, TemplateKind};
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
-use crate::flattening::{DomainInfo, Interface, InterfaceToDomainMap, Module, WrittenType};
+use crate::flattening::{
+    DomainInfo, InterfaceDeclaration, InterfaceToDomainMap, Module, WrittenType,
+};
 use crate::linker::{FileData, GlobalUUID, LinkInfo, LinkerGlobals};
 use crate::typing::{abstract_type::AbstractRankedType, concrete_type::ConcreteType};
 
@@ -244,22 +246,13 @@ impl Module {
 
     pub fn make_interface_info_fmt(
         &self,
-        interface: &Interface,
+        interface: &InterfaceDeclaration,
         file_text: &FileText,
         result: &mut String,
     ) {
         for port_id in interface.all_ports() {
             self.make_port_info_fmt(port_id, file_text, result);
         }
-    }
-    pub fn make_interface_info_string(
-        &self,
-        interface: &Interface,
-        file_text: &FileText,
-    ) -> String {
-        let mut r = String::new();
-        self.make_interface_info_fmt(interface, file_text, &mut r);
-        r
     }
 
     pub fn make_all_ports_info_string(

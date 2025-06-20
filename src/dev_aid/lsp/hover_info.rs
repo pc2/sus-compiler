@@ -249,12 +249,17 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             );
         }
         LocationInfo::Interface(_md_uuid, md, _, interface) => {
-            hover.sus_code(
-                md.make_interface_info_string(
-                    interface,
-                    &linker.files[md.link_info.file].file_text,
-                ),
+            let interface_decl = md.link_info.instructions
+                [interface.declaration_instruction.unwrap()]
+            .unwrap_interface();
+
+            let mut result = String::new();
+            md.make_interface_info_fmt(
+                interface_decl,
+                &linker.files[md.link_info.file].file_text,
+                &mut result,
             );
+            hover.sus_code(result);
         }
     };
 

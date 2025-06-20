@@ -324,13 +324,14 @@ impl Executed {
             })
         });
         let interfaces = md.interfaces.map(|(_, interface)| {
-            let is_input = match interface.interface_kind {
+            let interface_decl_id = interface.declaration_instruction?;
+            let interface_decl = md.link_info.instructions[interface_decl_id].unwrap_interface();
+            let is_input = match interface_decl.interface_kind {
                 InterfaceKind::RegularInterface => return None,
                 InterfaceKind::Action => true,
                 InterfaceKind::Trigger => false,
             };
-            let port_decl_id = interface.declaration_instruction;
-            let SubModuleOrWire::Wire(wire_id) = &self.generation_state[port_decl_id] else {
+            let SubModuleOrWire::Wire(wire_id) = &self.generation_state[interface_decl_id] else {
                 return None;
             };
             let wire = &self.wires[*wire_id];
