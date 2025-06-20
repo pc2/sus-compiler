@@ -484,6 +484,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
             let documentation = cursor.extract_gathered_comments();
 
+            let declaration_instruction = self.instructions.get_next_alloc_id();
+
             let typ_expr = match typ_or_module_expr {
                 ModuleOrWrittenType::WrittenType(typ) => typ,
                 ModuleOrWrittenType::Module(module_ref) => {
@@ -512,32 +514,39 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         self.forbid_keyword(output_kw, "on a generative declaration.");
                         self.forbid_keyword(state_kw, "on a generative declaration.");
                         DeclarationKind::RegularGenerative { read_only: false }
-                    } else if input_kw.is_some() {
-                        self.forbid_keyword(
-                            output_kw,
-                            "on a port which has already been declared an input",
-                        );
-                        self.forbid_keyword(state_kw, "on an input port, because it is read-only");
+                    } else if input_kw.is_some() | output_kw.is_some() {
+                        let (is_input, is_state) = if input_kw.is_some() {
+                            self.forbid_keyword(
+                                output_kw,
+                                "on a port which has already been declared an input",
+                            );
+                            self.forbid_keyword(
+                                state_kw,
+                                "on an input port, because it is read-only",
+                            );
+                            (true, false)
+                        } else {
+                            (false, state_kw.is_some())
+                        };
+                        let port_id = self.ports.alloc(Port {
+                            name: name.to_owned(),
+                            name_span,
+                            decl_span,
+                            is_input,
+                            domain: self.current_domain,
+                            declaration_instruction,
+                        });
                         DeclarationKind::Port {
-                            is_input: true,
-                            is_state: false,
-                            port_id: self.ports.get_next_alloc_id(),
+                            is_input,
+                            is_state,
+                            port_id,
                             domain: self.current_domain,
                         }
                     } else {
                         let is_state = state_kw.is_some();
-                        if output_kw.is_some() {
-                            DeclarationKind::Port {
-                                is_input: false,
-                                is_state,
-                                port_id: self.ports.get_next_alloc_id(),
-                                domain: self.current_domain,
-                            }
-                        } else {
-                            DeclarationKind::RegularWire {
-                                is_state,
-                                read_only: false,
-                            }
+                        DeclarationKind::RegularWire {
+                            is_state,
+                            read_only: false,
                         }
                     }
                 }
@@ -548,7 +557,12 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     if gen_kw.is_some() {
                         DeclarationKind::RegularGenerative { read_only: false }
                     } else {
-                        DeclarationKind::StructField(self.fields.get_next_alloc_id())
+                        DeclarationKind::StructField(self.fields.alloc(StructField {
+                            name: name.to_owned(),
+                            name_span,
+                            decl_span,
+                            declaration_instruction,
+                        }))
                     }
                 }
                 DeclarationKind::ConditionalBinding {
@@ -589,10 +603,18 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     } else {
                         state_kw.is_some()
                     };
+                    let port_id = self.ports.alloc(Port {
+                        name: name.to_owned(),
+                        name_span,
+                        decl_span,
+                        is_input,
+                        domain,
+                        declaration_instruction,
+                    });
                     DeclarationKind::Port {
                         is_input,
                         is_state,
-                        port_id: self.ports.get_next_alloc_id(),
+                        port_id,
                         domain,
                     }
                 }
@@ -618,58 +640,31 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 }
             };
 
-            let decl_id = self
-                .instructions
-                .alloc(Instruction::Declaration(Declaration {
-                    parent_condition: self.current_parent_condition,
-                    typ_expr,
-                    typ: TyCell::new(),
-                    domain: Cell::new(DomainType::PLACEHOLDER),
-                    declaration_itself_is_not_written_to,
-                    decl_kind,
-                    name: name.to_owned(),
-                    name_span,
-                    decl_span,
-                    latency_specifier: span_latency_specifier.map(|(ls, _)| ls),
-                    documentation,
-                }));
+            assert_eq!(
+                declaration_instruction,
+                self.instructions
+                    .alloc(Instruction::Declaration(Declaration {
+                        parent_condition: self.current_parent_condition,
+                        typ_expr,
+                        typ: TyCell::new(),
+                        domain: Cell::new(DomainType::PLACEHOLDER),
+                        declaration_itself_is_not_written_to,
+                        decl_kind,
+                        name: name.to_owned(),
+                        name_span,
+                        decl_span,
+                        latency_specifier: span_latency_specifier.map(|(ls, _)| ls),
+                        documentation,
+                    }))
+            );
 
-            match decl_kind {
-                DeclarationKind::StructField(field_id) => {
-                    assert_eq!(
-                        self.fields.alloc(StructField {
-                            name: name.to_owned(),
-                            name_span,
-                            decl_span,
-                            declaration_instruction: decl_id,
-                        }),
-                        field_id
-                    );
-                }
-                DeclarationKind::Port {
-                    is_input,
-                    port_id,
-                    domain,
-                    ..
-                } => {
-                    assert_eq!(
-                        self.ports.alloc(Port {
-                            name: name.to_owned(),
-                            name_span,
-                            decl_span,
-                            is_input,
-                            domain,
-                            declaration_instruction: decl_id,
-                        }),
-                        port_id
-                    );
-                }
-                _ => {}
-            }
+            self.alloc_local_name(
+                name_span,
+                name,
+                NamedLocal::Declaration(declaration_instruction),
+            );
 
-            self.alloc_local_name(name_span, name, NamedLocal::Declaration(decl_id));
-
-            decl_id
+            declaration_instruction
         })
     }
 
