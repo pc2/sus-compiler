@@ -97,7 +97,7 @@ impl Instantiator {
             let result = perform_instantiation(linker, object_id.clone());
 
             if crate::debug::is_enabled("dot-concrete-module") {
-                crate::dev_aid::dot_graphs::display_generated_hardware_structure(&result, linker);
+                crate::dev_aid::dot_graphs::display_generated_hardware_structure(&result);
             }
 
             let result_ref = Rc::new(result);
