@@ -3,6 +3,7 @@ use sus_proc_macro::get_builtin_const;
 use crate::flattening::WriteModifiers;
 use crate::linker::{GlobalRef, IsExtern};
 use crate::prelude::*;
+use crate::typing::abstract_type::AbstractInnerType;
 use crate::typing::template::TemplateKind;
 
 use super::*;
@@ -91,15 +92,9 @@ impl LintContext<'_> {
             WireReferenceRoot::Error => {}
         }
     }
-    fn lint_expr_source(&self, expr_source: &ExpressionSource) {
-        match expr_source {
-            ExpressionSource::WireRef(wire_ref) => {
-                self.lint_wire_ref(wire_ref, false);
-            }
-            ExpressionSource::FuncCall(func_call) => {
-                self.lint_wire_ref(&func_call.func, false);
-            }
-            _ => {}
+    fn cant_be_interface(&self, operation: &'static str, wire_ref: &WireReference) {
+        if let AbstractInnerType::Interface(_, _) = &wire_ref.output_typ.inner {
+            self.errors.error(wire_ref.get_total_span(), format!("Can't {operation} an interface. Use a function call or interface connector instead"));
         }
     }
     fn lint_instructions(&self) {
@@ -107,26 +102,30 @@ impl LintContext<'_> {
             match instr {
                 Instruction::SubModule(_) => {}
                 Instruction::Declaration(_) => {}
-                Instruction::Expression(Expression {
-                    output: ExpressionOutput::SubExpression(_),
-                    source,
-                    ..
-                }) => {
-                    self.lint_expr_source(source);
-                }
-                Instruction::Expression(Expression {
-                    output: ExpressionOutput::MultiWrite(writes),
-                    parent_condition,
-                    source,
-                    ..
-                }) => {
-                    self.lint_expr_source(source);
-                    for wr in writes {
-                        self.lint_wire_ref(&wr.to, true);
-                        if let WireReferenceRoot::LocalDecl(decl_id) = &wr.to.root {
-                            let decl = self.working_on.instructions[*decl_id].unwrap_declaration();
-                            self.lint_write(parent_condition, wr, decl);
+                Instruction::Expression(expr) => {
+                    match &expr.source {
+                        ExpressionSource::WireRef(wire_ref) => {
+                            self.lint_wire_ref(wire_ref, false);
+                            self.cant_be_interface("read from", wire_ref);
                         }
+                        ExpressionSource::FuncCall(func_call) => {
+                            self.lint_wire_ref(&func_call.func, false);
+                        }
+                        _ => {}
+                    }
+                    match &expr.output {
+                        ExpressionOutput::MultiWrite(writes) => {
+                            for wr in writes {
+                                self.lint_wire_ref(&wr.to, true);
+                                self.cant_be_interface("write to", &wr.to);
+                                if let WireReferenceRoot::LocalDecl(decl_id) = &wr.to.root {
+                                    let decl =
+                                        self.working_on.instructions[*decl_id].unwrap_declaration();
+                                    self.lint_write(&expr.parent_condition, wr, decl);
+                                }
+                            }
+                        }
+                        ExpressionOutput::SubExpression(_) => {}
                     }
                 }
                 Instruction::IfStatement(_)
