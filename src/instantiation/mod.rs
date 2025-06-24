@@ -15,9 +15,7 @@ use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
 use std::cell::OnceCell;
 use std::rc::Rc;
 
-use crate::flattening::{
-    BinaryOperator, ExpressionSource, Instruction, InterfaceKind, Module, UnaryOperator,
-};
+use crate::flattening::{BinaryOperator, ExpressionSource, Instruction, Module, UnaryOperator};
 use crate::{errors::ErrorStore, value::Value};
 
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
@@ -122,7 +120,6 @@ pub struct SubModule {
     pub instance: OnceCell<Rc<InstantiatedModule>>,
     pub refers_to: ConcreteGlobalReference<ModuleUUID>,
     pub port_map: FlatAlloc<Option<SubModulePort>, PortIDMarker>,
-    pub interface_map: FlatAlloc<Option<SubModulePort>, InterfaceIDMarker>,
     pub interface_call_sites: FlatAlloc<Vec<Span>, InterfaceIDMarker>,
     pub name: String,
 }
@@ -167,8 +164,6 @@ pub struct InstantiatedModule {
     pub errors: ErrorStore,
     /// This matches the ports in [Module::ports]. Ports are not `None` when they are not part of this instantiation.
     pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
-    /// This matches the interfaces in [Module::interfaces]. Only
-    pub used_interfaces: FlatAlloc<Option<InstantiatedPort>, InterfaceIDMarker>,
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
     pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
     /// See [GenerationState]
@@ -182,7 +177,7 @@ pub enum SubModuleOrWire {
     Wire(WireID),
     CompileTimeValue(Value),
     // Variable doesn't exist yet
-    Unnasigned,
+    Unassigned,
 }
 
 impl SubModuleOrWire {
@@ -302,14 +297,8 @@ struct Executed {
 }
 
 impl Executed {
-    fn make_interface(
-        &self,
-        md: &Module,
-    ) -> (
-        FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
-        FlatAlloc<Option<InstantiatedPort>, InterfaceIDMarker>,
-    ) {
-        let interface_ports = md.ports.map(|(_, port)| {
+    fn make_interface(&self, md: &Module) -> FlatAlloc<Option<InstantiatedPort>, PortIDMarker> {
+        md.ports.map(|(_, port)| {
             let port_decl_id = port.declaration_instruction;
             let SubModuleOrWire::Wire(wire_id) = &self.generation_state[port_decl_id] else {
                 return None;
@@ -322,28 +311,7 @@ impl Executed {
                 typ: wire.typ.clone(),
                 domain: wire.domain,
             })
-        });
-        let interfaces = md.interfaces.map(|(_, interface)| {
-            let interface_decl_id = interface.declaration_instruction?;
-            let interface_decl = md.link_info.instructions[interface_decl_id].unwrap_interface();
-            let is_input = match interface_decl.interface_kind {
-                InterfaceKind::RegularInterface => return None,
-                InterfaceKind::Action => true,
-                InterfaceKind::Trigger => false,
-            };
-            let SubModuleOrWire::Wire(wire_id) = &self.generation_state[interface_decl_id] else {
-                return None;
-            };
-            let wire = &self.wires[*wire_id];
-            Some(InstantiatedPort {
-                wire: *wire_id,
-                is_input,
-                absolute_latency: CALCULATE_LATENCY_LATER,
-                typ: wire.typ.clone(),
-                domain: wire.domain,
-            })
-        });
-        (interface_ports, interfaces)
+        })
     }
 
     pub fn into_module_typing_context<'l>(
@@ -352,7 +320,7 @@ impl Executed {
         md: &'l Module,
         global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
     ) -> (ModuleTypingContext<'l>, ValueUnifierAlloc) {
-        let (interface_ports, interfaces) = self.make_interface(md);
+        let interface_ports = self.make_interface(md);
         let errors = ErrorCollector::new_empty(md.link_info.file, &linker.files);
         if let Err((position, reason)) = self.execution_status {
             errors.error(position, reason);
@@ -367,7 +335,6 @@ impl Executed {
             linker,
             errors,
             interface_ports,
-            interfaces,
         };
         (ctx, self.type_var_alloc)
     }
@@ -379,7 +346,6 @@ pub struct ModuleTypingContext<'l> {
     pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
     pub generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
     pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
-    pub interfaces: FlatAlloc<Option<InstantiatedPort>, InterfaceIDMarker>,
     pub link_info: &'l LinkInfo,
     /// Yes I know it's redundant, but it's easier to both have link_info and md
     pub linker: &'l Linker,
@@ -396,7 +362,6 @@ impl<'l> ModuleTypingContext<'l> {
             mangled_name,
             errors: self.errors.into_storage(),
             interface_ports: self.interface_ports,
-            used_interfaces: self.interfaces,
             wires: self.wires,
             submodules: self.submodules,
             generation_state: self.generation_state,
@@ -435,13 +400,12 @@ fn perform_instantiation(
             name,
             errors: ErrorStore::new_did_error(),
             interface_ports: Default::default(),
-            used_interfaces: Default::default(),
             wires: Default::default(),
             submodules: Default::default(),
             generation_state: md
                 .link_info
                 .instructions
-                .map(|_| SubModuleOrWire::Unnasigned),
+                .map(|_| SubModuleOrWire::Unassigned),
         };
     }
 

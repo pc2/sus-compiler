@@ -39,6 +39,9 @@ impl LintContext<'_> {
                 }
             }
             WireReferenceRoot::LocalSubmodule(submod_decl_id) => {
+                let submod = self.globals.get_declared_submodule(
+                    self.working_on.instructions[*submod_decl_id].unwrap_submodule(),
+                );
                 for p in &wire_ref.path {
                     if let WireReferencePathElement::FieldAccess {
                         name_span,
@@ -46,26 +49,27 @@ impl LintContext<'_> {
                         ..
                     } = p
                     {
-                        if let Some(PathElemRefersTo::Port(port)) = refers_to.get() {
-                            let module_port_decl = self
-                                .globals
-                                .get_declared_submodule(
-                                    self.working_on.instructions[*submod_decl_id]
-                                        .unwrap_submodule(),
-                                )
-                                .get_port(*port);
-
-                            match (is_writing_to, module_port_decl.port.is_input) {
-                                (true, true) | (false, false) => {}
-                                (true, false) => {
-                                    self.errors
-                                        .error(*name_span, "Cannot write to an output port")
-                                        .info_obj(&module_port_decl);
-                                }
-                                (false, true) => {
-                                    self.errors
-                                        .error(*name_span, "Cannot read from an input port")
-                                        .info_obj(&module_port_decl);
+                        if let Some(PathElemRefersTo::Interface(port)) = refers_to.get() {
+                            if let Some(InterfaceDeclKind::SinglePort(port_decl)) =
+                                submod.md.interfaces[*port].declaration_instruction
+                            {
+                                let module_port_decl = submod.get_decl(port_decl);
+                                let_unwrap!(
+                                    DeclarationKind::Port { is_input, .. },
+                                    module_port_decl.remote_decl.decl_kind
+                                );
+                                match (is_writing_to, is_input) {
+                                    (true, true) | (false, false) => {}
+                                    (true, false) => {
+                                        self.errors
+                                            .error(*name_span, "Cannot write to an output port")
+                                            .info_obj(&module_port_decl);
+                                    }
+                                    (false, true) => {
+                                        self.errors
+                                            .error(*name_span, "Cannot read from an input port")
+                                            .info_obj(&module_port_decl);
+                                    }
                                 }
                             }
                         }
@@ -164,10 +168,10 @@ impl LintContext<'_> {
                                     Instruction::Interface(interface_declaration) => {
                                         let msg = match interface_declaration.interface_kind {
                                             InterfaceKind::RegularInterface => unreachable!(),
-                                            InterfaceKind::Action => {
+                                            InterfaceKind::Action(_) => {
                                                 "Assignment passes through this 'action'"
                                             }
-                                            InterfaceKind::Trigger => {
+                                            InterfaceKind::Trigger(_) => {
                                                 "Assignment passes through this 'trigger'"
                                             }
                                         };

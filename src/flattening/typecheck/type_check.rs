@@ -1,9 +1,11 @@
+use std::fmt::Write;
 use std::ops::Deref;
 
 use crate::alloc::UUID;
 use crate::errors::ErrorInfo;
-use crate::linker::passes::{RemoteDeclaration, RemoteInterface};
+use crate::linker::passes::{RemoteDeclaration, RemoteFn};
 use crate::prelude::*;
+use crate::to_string::join_string_iter;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType};
 use crate::typing::template::TVec;
 use crate::typing::type_inference::{AbstractTypeSubstitutor, TypeUnifier, UnifyErrorReport};
@@ -82,14 +84,14 @@ impl<'l> TypeCheckingContext<'l> {
                         AbstractInnerType::Template(template_id) => {
                             let template_arg = &self.template_args[*template_id];
                             self.errors
-                                            .error(
-                                                *name_span,
-                                                format!(
-                                                    "The type of this object is the template parameter '{}'. You cannot use struct fields on template args",
-                                                    template_arg.name
-                                                ),
-                                            )
-                                            .info_obj_same_file(template_arg);
+                                .error(
+                                    *name_span,
+                                    format!(
+                                        "The type of this object is the template parameter '{}'. You cannot use struct fields on template args",
+                                        template_arg.name
+                                    ),
+                                )
+                                .info_obj_same_file(template_arg);
                             self.type_checker.alloc_unknown()
                         }
                         AbstractInnerType::Named(_) => todo!("Structs"),
@@ -105,27 +107,38 @@ impl<'l> TypeCheckingContext<'l> {
                                     .set(PathElemRefersTo::Interface(interface))
                                     .unwrap();
 
-                                AbstractRankedType {
-                                    inner: AbstractInnerType::Interface(md_ref.clone(), interface),
-                                    rank: PeanoType::Zero,
+                                if let Some(InterfaceDeclKind::SinglePort(port_decl)) =
+                                    md.md.interfaces[interface].declaration_instruction
+                                {
+                                    md.get_decl(port_decl)
+                                        .get_local_type(&mut self.type_checker)
+                                } else {
+                                    AbstractRankedType {
+                                        inner: AbstractInnerType::Interface(
+                                            md_ref.clone(),
+                                            interface,
+                                        ),
+                                        rank: PeanoType::Zero,
+                                    }
                                 }
-                            } else if let Some(port) =
-                                md.md.ports.find(|_, interface| &interface.name == name)
-                            {
-                                refers_to.set(PathElemRefersTo::Port(port)).unwrap();
-
-                                let port_decl = md.get_port(port).get_decl();
-
-                                if port_decl.remote_decl.domain.get() == DomainType::Generative {
-                                    self.errors
-                                        .error(
-                                            wire_ref.root_span,
-                                            "Invalid Submodule port: It is marked as generative!",
-                                        )
-                                        .info_obj(&port_decl);
-                                }
-                                port_decl.get_local_type(&mut self.type_checker)
                             } else {
+                                let obj = self.globals.get_module(md_ref.id);
+                                let obj_name =
+                                    md_ref.display(self.globals.globals, self.template_args);
+                                let mut field_names = String::new();
+                                join_string_iter(
+                                    &mut field_names,
+                                    ", ",
+                                    obj.interfaces.iter(),
+                                    |f, (_, v)| f.write_fmt(format_args!("'{}'", v.name)).unwrap(),
+                                );
+                                self.errors
+                                    .error(
+                                        *name_span,
+                                        format!("No such field '{name}' on {obj_name}. Available fields are {field_names}"),
+                                    )
+                                    .info_obj(obj);
+
                                 self.type_checker.alloc_unknown()
                             };
 
@@ -242,12 +255,12 @@ impl<'l> TypeCheckingContext<'l> {
     fn report_errors_for_bad_function_call(
         &self,
         func_call: &FuncCall,
-        interface: &RemoteInterface<'l>,
+        interface: &RemoteFn<'l, &'l TVec<AbstractRankedType>>,
         whole_func_span: Span,
         mut to_spans_iter: impl ExactSizeIterator<Item = Span>,
     ) {
         let arg_count = func_call.arguments.len();
-        let expected_arg_count = interface.interface.inputs.len();
+        let expected_arg_count = interface.fn_decl.inputs.len();
 
         if arg_count != expected_arg_count {
             if arg_count > expected_arg_count {
@@ -272,7 +285,7 @@ impl<'l> TypeCheckingContext<'l> {
             }
         }
 
-        let num_func_outputs = interface.interface.outputs.len();
+        let num_func_outputs = interface.fn_decl.outputs.len();
         let num_targets = to_spans_iter.size_hint().0;
         if num_targets != num_func_outputs {
             if num_targets > num_func_outputs {
@@ -294,21 +307,24 @@ impl<'l> TypeCheckingContext<'l> {
         }
     }
 
-    fn typecheck_func_func(&mut self, wire_ref: &'l WireReference) -> Option<RemoteInterface<'l>> {
+    fn typecheck_func_func(
+        &mut self,
+        wire_ref: &'l WireReference,
+    ) -> Option<RemoteFn<'l, &'l TVec<AbstractRankedType>>> {
         self.typecheck_wire_reference(wire_ref);
         if let AbstractInnerType::Interface(sm_ref, interface) = &wire_ref.output_typ.inner {
             let submod = self.globals.get_submodule(sm_ref);
-            match submod.get_callable_interface(*interface) {
-                Ok(interface) => Some(interface),
-                Err(non_targetable_interface) => {
-                    let name = &non_targetable_interface.name;
-                    self.errors.error(
+            let interface = &submod.md.interfaces[*interface];
+            let Some(interface) = interface.declaration_instruction else {
+                let name = &interface.name;
+                self.errors.error(
                         wire_ref.get_total_span(),
                         format!("A Function call expects this to be a callable interface, the interface `{name}` is not callable"),
-                    ).info_obj_different_file(non_targetable_interface, submod.md.link_info.file);
-                    None
-                }
-            }
+                    ).info_obj_different_file(interface, submod.md.link_info.file);
+                return None;
+            };
+            let_unwrap!(InterfaceDeclKind::Interface(interface), interface);
+            Some(submod.get_fn(interface))
         } else {
             self.errors.error(
                 wire_ref.get_total_span(),
@@ -318,8 +334,12 @@ impl<'l> TypeCheckingContext<'l> {
         }
     }
 
-    fn typecheck_func_call_args(&mut self, func_call: &FuncCall, interface: RemoteInterface<'l>) {
-        for (port, arg) in std::iter::zip(interface.interface.inputs, &func_call.arguments) {
+    fn typecheck_func_call_args(
+        &mut self,
+        func_call: &FuncCall,
+        interface: RemoteFn<'l, &'l TVec<AbstractRankedType>>,
+    ) {
+        for (port, arg) in std::iter::zip(interface.fn_decl.inputs, &func_call.arguments) {
             let port_decl = interface.get_port(port).get_decl();
             let port_type = port_decl.get_local_type(&mut self.type_checker);
 
@@ -378,7 +398,7 @@ impl<'l> TypeCheckingContext<'l> {
                         std::iter::once(expr.span),
                     );
 
-                    if let Some(first_output) = interface.interface.outputs.first() {
+                    if let Some(first_output) = interface.fn_decl.outputs.first() {
                         let port_decl = interface.get_port(first_output).get_decl();
 
                         port_decl.get_local_type(&mut self.type_checker)
@@ -441,7 +461,7 @@ impl<'l> TypeCheckingContext<'l> {
                         multi_write.iter().map(|v| v.to_span),
                     );
 
-                    for (port, to) in std::iter::zip(interface.interface.outputs, multi_write) {
+                    for (port, to) in std::iter::zip(interface.fn_decl.outputs, multi_write) {
                         let port_decl = interface.get_port(port).get_decl();
                         let port_type = port_decl.get_local_type(&mut self.type_checker);
 
@@ -540,7 +560,7 @@ impl<'l> TypeCheckingContext<'l> {
     }
 }
 
-impl<'l> RemoteDeclaration<'l> {
+impl<'l> RemoteDeclaration<'l, &'l TVec<AbstractRankedType>> {
     fn get_local_type(&self, type_checker: &mut AbstractTypeSubstitutor) -> AbstractRankedType {
         type_checker.written_to_abstract_type_substitute_templates(
             &self.remote_decl.typ_expr,

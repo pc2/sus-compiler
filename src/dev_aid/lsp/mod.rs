@@ -406,9 +406,6 @@ fn handle_request(
                         let link_info = &linker.globals[id];
                         goto_definition_list.push((link_info.name_span, link_info.file));
                     }
-                    LocationInfo::Port(_sm, md, port_id) => {
-                        goto_definition_list.push((md.ports[port_id].name_span, md.link_info.file));
-                    }
                     LocationInfo::Interface(_md_uuid, md, _interface_id, interface) => {
                         goto_definition_list.push((interface.name_span, md.link_info.file));
                     }

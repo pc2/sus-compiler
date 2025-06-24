@@ -30,9 +30,6 @@ pub enum LocationInfo<'linker> {
     ),
     Type(&'linker WrittenType, &'linker LinkInfo),
     Global(GlobalUUID),
-    /// The contained module only refers to the module on which the port is defined
-    /// No reference to the module in which the reference was found is provided
-    Port(ModuleUUID, &'linker Module, PortID),
     Interface(ModuleUUID, &'linker Module, InterfaceID, &'linker Interface),
 }
 
@@ -41,7 +38,6 @@ pub enum LocationInfo<'linker> {
 pub struct RefersTo {
     pub local: Option<(GlobalUUID, FlatID)>,
     pub global: Option<GlobalUUID>,
-    pub port: Option<(ModuleUUID, PortID)>,
     pub interface: Option<(ModuleUUID, InterfaceID)>,
     pub parameter: Option<(GlobalUUID, TemplateID)>,
 }
@@ -51,7 +47,6 @@ impl From<LocationInfo<'_>> for RefersTo {
         let mut result = RefersTo {
             local: None,
             global: None,
-            port: None,
             interface: None,
             parameter: None,
         };
@@ -64,8 +59,10 @@ impl From<LocationInfo<'_>> for RefersTo {
                         | DeclarationKind::ConditionalBinding { .. }
                         | DeclarationKind::RegularWire { .. }
                         | DeclarationKind::StructField(..) => {}
-                        DeclarationKind::Port { port_id, .. } => {
-                            result.port = Some((obj_id.unwrap_module(), port_id));
+                        DeclarationKind::Port {
+                            parent_interface, ..
+                        } => {
+                            result.interface = Some((obj_id.unwrap_module(), parent_interface));
                         }
                         DeclarationKind::TemplateParameter(template_id) => {
                             result.parameter = Some((obj_id, template_id))
@@ -94,15 +91,13 @@ impl From<LocationInfo<'_>> for RefersTo {
             LocationInfo::Global(name_elem) => {
                 result.global = Some(name_elem);
             }
-            LocationInfo::Port(md_id, md, p_id) => {
-                result.local = Some((
-                    GlobalUUID::Module(md_id),
-                    md.ports[p_id].declaration_instruction,
-                ));
-                result.port = Some((md_id, p_id))
-            }
-            LocationInfo::Interface(md_id, _md, i_id, _interface) => {
-                result.interface = Some((md_id, i_id))
+            LocationInfo::Interface(md_id, _md, i_id, interface) => {
+                result.interface = Some((md_id, i_id));
+                if let InterfaceDeclKind::SinglePort(port_decl) =
+                    interface.declaration_instruction.unwrap()
+                {
+                    result.local = Some((GlobalUUID::Module(md_id), port_decl));
+                }
             }
         }
         result
@@ -118,15 +113,11 @@ impl RefersTo {
             }
             LocationInfo::Type(_, _) => false,
             LocationInfo::Global(ne) => self.global == Some(ne),
-            LocationInfo::Port(md_id, _, p_id) => self.port == Some((md_id, p_id)),
             LocationInfo::Interface(md_id, _, i_id, _) => self.interface == Some((md_id, i_id)),
         }
     }
     pub fn is_global(&self) -> bool {
-        self.global.is_some()
-            | self.port.is_some()
-            | self.interface.is_some()
-            | self.parameter.is_some()
+        self.global.is_some() | self.interface.is_some() | self.parameter.is_some()
     }
 }
 
@@ -302,11 +293,6 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                                 &submodule.interfaces[*interface],
                             )
                         }
-                        PathElemRefersTo::Port(port) => {
-                            let_unwrap!(AbstractInnerType::Interface(md_ref, _), &input_typ.inner);
-                            let submodule = &self.linker.modules[md_ref.id];
-                            LocationInfo::Port(md_ref.id, submodule, *port)
-                        }
                     };
                     self.visit(*name_span, target);
                 }
@@ -444,10 +430,12 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
             GlobalUUID::Module(md_id) => {
                 let md = &self.linker.modules[md_id];
                 for (interface_id, interface) in &md.interfaces {
-                    self.visit(
-                        interface.name_span,
-                        LocationInfo::Interface(md_id, md, interface_id, interface),
-                    );
+                    if interface.declaration_instruction.is_some() {
+                        self.visit(
+                            interface.name_span,
+                            LocationInfo::Interface(md_id, md, interface_id, interface),
+                        );
+                    }
                 }
             }
             GlobalUUID::Type(_typ_id) => {} // These cases are covered by walk_link_info

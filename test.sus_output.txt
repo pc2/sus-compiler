@@ -630,8 +630,7 @@ Checking array accesses use_my_mod
 Instantiating submodule_named_ports
 Concrete Typechecking submodule_named_ports
 Checking array accesses submodule_named_ports
-Instantiating use_submodule_named_ports
-Concrete Typechecking use_submodule_named_ports
+Not Instantiating use_submodule_named_ports due to flattening errors
 Not Instantiating contains_submodule_submodule due to flattening errors
 Instantiating cross_bool
 Concrete Typechecking cross_bool
@@ -645,14 +644,10 @@ Checking array accesses cross_memory
 Instantiating offset_backwards
 Concrete Typechecking offset_backwards
 Checking array accesses offset_backwards
-Instantiating dual_port_mem
-Concrete Typechecking dual_port_mem
-Checking array accesses dual_port_mem
+Not Instantiating dual_port_mem due to flattening errors
 Instantiating use_fifo
 Concrete Typechecking use_fifo
-Instantiating test_separated_domain
-Concrete Typechecking test_separated_domain
-Checking array accesses test_separated_domain
+Not Instantiating test_separated_domain due to flattening errors
 Instantiating no_port_module
 Concrete Typechecking no_port_module
 Checking array accesses no_port_module
@@ -662,8 +657,7 @@ Concrete Typechecking mod_with_unused_interface
 Checking array accesses mod_with_unused_interface
 Not Instantiating test_write_to_gen_var due to flattening errors
 Not Instantiating use_bad_interface due to flattening errors
-Instantiating sequenceDownFrom
-Concrete Typechecking sequenceDownFrom
+Not Instantiating sequenceDownFrom due to flattening errors
 Instantiating sumUpTo
 Concrete Typechecking sumUpTo
 Not Instantiating use_test due to flattening errors
@@ -717,8 +711,7 @@ Not Instantiating moduleWithBadDeclaration due to flattening errors
 Not Instantiating moduleWithBadInterface due to flattening errors
 Not Instantiating useModuleWithBadInterface due to flattening errors
 Not Instantiating m due to flattening errors
-Instantiating xyz
-Concrete Typechecking xyz
+Not Instantiating xyz due to flattening errors
 Instantiating numbersToAddUp
 Concrete Typechecking numbersToAddUp
 Instantiating TreeAdd #(WIDTH: 5, MIN: 3, MAX: 3)
@@ -754,12 +747,7 @@ Not Instantiating conflicting_domain_with_port_name due to flattening errors
 Not Instantiating make_infinite_type due to flattening errors
 Instantiating UseDualPortMem
 Concrete Typechecking UseDualPortMem
-Instantiating DualPortMem #(T: type bool[500], MAX: 128)
-Concrete Typechecking DualPortMem #(T: type bool[500], MAX: 128)
-Instantiating CrossDomain #(T: type bool[500][129])
-Concrete Typechecking CrossDomain #(T: type bool[500][129])
-Checking array accesses CrossDomain #(T: type bool[500][129])
-Checking array accesses DualPortMem #(T: type bool[500], MAX: 128)
+Not Instantiating DualPortMem #(T: type bool[500], MAX: 128) due to flattening errors
 Instantiating example_FIFO
 Concrete Typechecking example_FIFO
 Not Instantiating use_Iterator due to flattening errors
@@ -816,19 +804,7 @@ Concrete Typechecking testInts
 Checking array accesses testInts
 Instantiating use_FIFO
 Concrete Typechecking use_FIFO
-Instantiating FIFO #(T: type int #(MIN: 3, MAX: 3), DEPTH: 53, READY_SLACK: 3)
-Concrete Typechecking FIFO #(T: type int #(MIN: 3, MAX: 3), DEPTH: 53, READY_SLACK: 3)
-Instantiating CrossDomain #(T: type int #(MIN: 0, MAX: 52))
-Concrete Typechecking CrossDomain #(T: type int #(MIN: 0, MAX: 52))
-Checking array accesses CrossDomain #(T: type int #(MIN: 0, MAX: 52))
-Instantiating CrossDomain #(T: type int #(MIN: 3, MAX: 3)[53])
-Concrete Typechecking CrossDomain #(T: type int #(MIN: 3, MAX: 3)[53])
-Checking array accesses CrossDomain #(T: type int #(MIN: 3, MAX: 3)[53])
-Instantiating LatencyOffset #(T: type bool, OFFSET: -4)
-Concrete Typechecking LatencyOffset #(T: type bool, OFFSET: -4)
-Checking array accesses LatencyOffset #(T: type bool, OFFSET: -4)
-Checking array accesses FIFO #(T: type int #(MIN: 3, MAX: 3), DEPTH: 53, READY_SLACK: 3)
-Checking array accesses use_FIFO
+Not Instantiating FIFO #(T: type int #(MIN: 3, MAX: 3), DEPTH: 53, READY_SLACK: 3) due to flattening errors
 Not Instantiating write_to_generative_through_when due to flattening errors
 Instantiating InstantiateTransmutes
 Concrete Typechecking InstantiateTransmutes

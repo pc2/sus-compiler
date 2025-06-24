@@ -8,7 +8,7 @@ impl FinalizationContext {
         for (_, instr) in instructions {
             match instr {
                 Instruction::SubModule(sm) => {
-                    for (_, d) in sm.local_interface_domains.get_mut() {
+                    for (_, d) in sm.local_domain_map.get_mut() {
                         assert!(d.fully_substitute(&self.domain_checker));
                     }
                 }
@@ -42,7 +42,7 @@ impl<'l> TypeCheckingContext<'l> {
     pub fn domain_check_instr(&mut self, instr: &Instruction) {
         match instr {
             Instruction::SubModule(sub_module_instance) => {
-                sub_module_instance.local_interface_domains.set(
+                sub_module_instance.local_domain_map.set(
                     self.globals
                         .get_module(sub_module_instance.module_ref.id)
                         .domains
@@ -228,27 +228,22 @@ impl<'l> TypeCheckingContext<'l> {
             WireReferenceRoot::LocalSubmodule(local_submod) => {
                 let submod = self.instructions[*local_submod].unwrap_submodule();
                 let submod_ref = self.globals.get_declared_submodule(submod);
-                if submod.local_interface_domains.len() == 1 {
-                    let [singular_domain] = submod.local_interface_domains.cast_to_array();
+                if submod.local_domain_map.len() == 1 {
+                    let [singular_domain] = submod.local_domain_map.cast_to_array();
                     return Some(*singular_domain);
                 }
 
                 for p in &wire_ref.path {
                     if let WireReferencePathElement::FieldAccess { refers_to, .. } = p {
-                        return match refers_to.get() {
-                            Some(PathElemRefersTo::Interface(interface)) => Some(
-                                submod.local_interface_domains[submod_ref
-                                    .get_callable_interface(*interface)
-                                    .ok()?
-                                    .interface
-                                    .domain
-                                    .unwrap_physical()],
-                            ),
-                            Some(PathElemRefersTo::Port(port)) => Some(
-                                submod.local_interface_domains
-                                    [submod_ref.get_port(*port).port.domain],
-                            ),
-                            None => None,
+                        match refers_to.get() {
+                            Some(PathElemRefersTo::Interface(interface)) => {
+                                if let Some(local_domain) =
+                                    submod_ref.md.interfaces[*interface].domain
+                                {
+                                    return Some(submod.local_domain_map[local_domain]);
+                                }
+                            }
+                            None => {}
                         };
                     }
                 }

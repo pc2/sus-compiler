@@ -8,7 +8,7 @@ use crate::typing::template::TemplateKind;
 
 use lsp_types::{LanguageString, MarkedString};
 
-use crate::flattening::{DeclarationKind, InterfaceToDomainMap, Module};
+use crate::flattening::{DeclarationKind, InterfaceDeclKind, InterfaceToDomainMap, Module};
 use crate::instantiation::SubModuleOrWire;
 use crate::linker::{Documentation, FileData, GlobalUUID, LinkInfo};
 
@@ -55,7 +55,7 @@ impl HoverCollector<'_> {
                             unreachable!()
                         }
                         SubModuleOrWire::CompileTimeValue(v) => format!(" = {}", v),
-                        SubModuleOrWire::Unnasigned => "never assigned to".to_string(),
+                        SubModuleOrWire::Unassigned => "never assigned to".to_string(),
                     };
                     self.monospace(value_str);
                 } else {
@@ -164,7 +164,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.sus_code(submodule.make_all_ports_info_string(
                 &linker.files[submodule.link_info.file].file_text,
                 Some(InterfaceToDomainMap {
-                    local_domain_map: &submod.local_interface_domains,
+                    local_domain_map: &submod.local_domain_map,
                     domains: &md.domains,
                 }),
             ));
@@ -243,23 +243,31 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 GlobalUUID::Constant(_) => {}
             }
         }
-        LocationInfo::Port(_sm, md, port_id) => {
-            hover.sus_code(
-                md.make_port_info_string(port_id, &linker.files[md.link_info.file].file_text),
-            );
-        }
         LocationInfo::Interface(_md_uuid, md, _, interface) => {
-            let interface_decl = md.link_info.instructions
-                [interface.declaration_instruction.unwrap()]
-            .unwrap_interface();
+            match interface.declaration_instruction.unwrap() {
+                InterfaceDeclKind::Interface(decl_id) => {
+                    let interface_decl = md.link_info.instructions[decl_id].unwrap_interface();
 
-            let mut result = String::new();
-            md.make_interface_info_fmt(
-                interface_decl,
-                &linker.files[md.link_info.file].file_text,
-                &mut result,
-            );
-            hover.sus_code(result);
+                    let mut result = String::new();
+                    md.make_interface_info_fmt(
+                        interface_decl,
+                        &linker.files[md.link_info.file].file_text,
+                        &mut result,
+                    );
+                    hover.sus_code(result);
+                }
+                InterfaceDeclKind::SinglePort(decl_id) => {
+                    let port_decl = md.link_info.instructions[decl_id].unwrap_declaration();
+
+                    let mut result = String::new();
+                    md.make_port_info_fmt(
+                        port_decl,
+                        &linker.files[md.link_info.file].file_text,
+                        &mut result,
+                    );
+                    hover.sus_code(result);
+                }
+            }
         }
     };
 

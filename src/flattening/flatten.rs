@@ -425,7 +425,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 name,
                 name_span,
                 module_ref,
-                local_interface_domains: TyCell::new(),
+                local_domain_map: TyCell::new(),
                 typ: TyCell::new(),
                 documentation,
             }))
@@ -480,6 +480,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             let (name_span, name) = cursor.field_span(field!("name"), kind!("identifier"));
 
             let span_latency_specifier = self.flatten_latency_specifier(cursor);
+            let latency_specifier = span_latency_specifier.map(|(ls, _)| ls);
             // Parsing components done
 
             let documentation = cursor.extract_gathered_comments();
@@ -535,11 +536,21 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             is_input,
                             domain: self.current_domain,
                             declaration_instruction,
+                            latency_specifier,
+                        });
+                        let parent_interface = self.interfaces.alloc(Interface {
+                            name_span,
+                            name: name.to_owned(),
+                            domain: Some(self.current_domain),
+                            declaration_instruction: Some(InterfaceDeclKind::SinglePort(
+                                declaration_instruction,
+                            )),
                         });
                         DeclarationKind::Port {
                             is_input,
                             is_state,
                             port_id,
+                            parent_interface,
                             domain: self.current_domain,
                         }
                     } else {
@@ -585,9 +596,9 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 }
                 DeclarationKind::Port {
                     is_input,
-                    is_state: _,
-                    port_id: _,
                     domain,
+                    parent_interface,
+                    ..
                 } => {
                     let port_ctx = if is_input {
                         "here, it's already implicitly declared as an input port"
@@ -610,11 +621,13 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         is_input,
                         domain,
                         declaration_instruction,
+                        latency_specifier,
                     });
                     DeclarationKind::Port {
                         is_input,
                         is_state,
                         port_id,
+                        parent_interface,
                         domain,
                     }
                 }
@@ -653,7 +666,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         name: name.to_owned(),
                         name_span,
                         decl_span,
-                        latency_specifier: span_latency_specifier.map(|(ls, _)| ls),
+                        latency_specifier,
                         documentation,
                     }))
             );
@@ -949,8 +962,10 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             });
         }
 
+        let start_at = self.instructions.get_next_alloc_id();
         if !cursor.optional_field(field!("then_block")) {
-            return (UUIDRange::EMPTY, UUIDRange::EMPTY, None, None);
+            let empty = UUIDRange(start_at, start_at);
+            return (empty, empty, None, None);
         }
         let then_block_span = cursor.span();
         let then_block = self.flatten_code(cursor);
@@ -1120,9 +1135,12 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         );
                     });
                 }*/
-                kind!("interface_statement") => cursor.go_down_no_check(|cursor| {
-                    self.parse_interface(cursor);
-                }),
+                kind!("interface_statement") => {
+                    let whole_interface_span = cursor.span();
+                    cursor.go_down_no_check(|cursor| {
+                        self.parse_interface(whole_interface_span, cursor);
+                    })
+                }
                 kind!("domain_statement") => cursor.go_down_no_check(|cursor| {
                     self.parse_domain(cursor);
                 }),
@@ -1135,57 +1153,103 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         FlatIDRange::new(start_of_code, end_of_code)
     }
 
-    fn parse_interface(&mut self, cursor: &mut Cursor<'c>) {
+    fn parse_interface(&mut self, whole_interface_span: Span, cursor: &mut Cursor<'c>) {
         // Skip interface kind
         let is_local = cursor.optional_field(field!("local"));
         cursor.field(field!("interface_kind"));
         let (interface_kw, interface_kw_span) = cursor.kind_span();
         let (inputs_come_first, interface_kind) = match interface_kw {
             kw!("interface") => (true, InterfaceKind::RegularInterface),
-            kw!("action") => (true, InterfaceKind::Action),
-            kw!("trigger") => (false, InterfaceKind::Trigger),
+            kw!("action") => (true, InterfaceKind::Action(UUID::PLACEHOLDER)),
+            kw!("trigger") => (false, InterfaceKind::Trigger(UUID::PLACEHOLDER)),
             _ => unreachable!(),
         };
 
-        let (name_span, name) = cursor.field_to_string(field!("name"), kind!("identifier"));
-        let latency_specifier = self.flatten_latency_specifier(cursor);
+        let (name_span, name) = cursor.field_span(field!("name"), kind!("identifier"));
+        let parsed_latency_specifier = self.flatten_latency_specifier(cursor);
+        let latency_specifier = parsed_latency_specifier.map(|(l, _)| l);
 
-        let (inputs, outputs) = self.flatten_interface_ports(inputs_come_first, cursor);
+        let interface_decl_id =
+            self.instructions
+                .alloc(Instruction::Interface(InterfaceDeclaration {
+                    parent_condition: self.current_parent_condition,
+                    name: name.to_owned(),
+                    name_span,
+                    interface_kw_span,
+                    whole_interface_span,
+                    interface_id: UUID::PLACEHOLDER,
+                    interface_kind,
+                    latency_specifier,
+                    is_local,
+                    inputs: UUIDRange::PLACEHOLDER,
+                    outputs: UUIDRange::PLACEHOLDER,
+                    domain: DomainType::Physical(self.current_domain),
+                    then_block: FlatIDRange::PLACEHOLDER,
+                    else_block: FlatIDRange::PLACEHOLDER,
+                }));
 
-        let interface_id = self
-            .instructions
-            .alloc(Instruction::Interface(InterfaceDeclaration {
-                parent_condition: self.current_parent_condition,
-                name: name.clone(),
-                name_span,
-                interface_kw_span,
-                interface_kind,
-                latency_specifier: latency_specifier.map(|(l, _)| l),
-                is_local,
-                inputs,
-                outputs,
-                domain: DomainType::Physical(self.current_domain),
-                then_block: FlatIDRange::EMPTY,
-                else_block: FlatIDRange::EMPTY,
-            }));
+        let then_block_starts_at = self.instructions.get_next_alloc_id();
 
-        self.alloc_interface(name, name_span, interface_id);
+        let new_interface = Interface {
+            name_span,
+            name: name.to_owned(),
+            domain: Some(self.current_domain),
+            declaration_instruction: Some(InterfaceDeclKind::Interface(interface_decl_id)),
+        };
+        let interface_id = if name == self.name {
+            self.interfaces[InterfaceID::MAIN_INTERFACE] = new_interface;
+            InterfaceID::MAIN_INTERFACE
+        } else {
+            self.interfaces.alloc(new_interface)
+        };
+
+        let (inputs, outputs) =
+            self.flatten_interface_ports(inputs_come_first, interface_id, cursor);
 
         let (then_block, else_block, then_block_span, else_span) = self.flatten_then_else_blocks(
             cursor,
-            interface_kind.is_conditional().then_some(interface_id),
+            interface_kind.is_conditional().then_some(interface_decl_id),
         );
+        let then_block = UUIDRange(then_block_starts_at, then_block.1);
         let_unwrap!(
             Instruction::Interface(interface),
-            &mut self.instructions[interface_id]
+            &mut self.instructions[interface_decl_id]
         );
 
+        match &mut interface.interface_kind {
+            InterfaceKind::RegularInterface => {}
+            InterfaceKind::Action(port_id) => {
+                *port_id = self.ports.alloc(Port {
+                    name: name.to_owned(),
+                    name_span,
+                    decl_span: whole_interface_span,
+                    is_input: true,
+                    domain: self.current_domain,
+                    declaration_instruction: interface_decl_id,
+                    latency_specifier,
+                });
+            }
+            InterfaceKind::Trigger(port_id) => {
+                *port_id = self.ports.alloc(Port {
+                    name: name.to_owned(),
+                    name_span,
+                    decl_span: whole_interface_span,
+                    is_input: false,
+                    domain: self.current_domain,
+                    declaration_instruction: interface_decl_id,
+                    latency_specifier,
+                });
+            }
+        }
+        interface.interface_id = interface_id;
+        interface.inputs = inputs;
+        interface.outputs = outputs;
         interface.then_block = then_block;
         interface.else_block = else_block;
 
         match interface_kind {
             InterfaceKind::RegularInterface => {
-                if let Some((_, lat_spec_span)) = latency_specifier {
+                if let Some((_, lat_spec_span)) = parsed_latency_specifier {
                     self.errors.error(
                         lat_spec_span,
                         "Can only add latency specifiers to actions or triggers",
@@ -1196,13 +1260,13 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         .error(else_span, "Regular interfaces cannot take else blocks");
                 }
             }
-            InterfaceKind::Action => {
+            InterfaceKind::Action(_) => {
                 if then_block_span.is_none() {
                     self.errors
                         .error(interface_kw_span, "An action requires a block");
                 }
             }
-            InterfaceKind::Trigger => {}
+            InterfaceKind::Trigger(_) => {}
         }
     }
 
@@ -1226,21 +1290,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             domain_name,
             NamedLocal::DomainDecl(domain_id),
         );
-    }
-
-    fn alloc_interface(&mut self, name: String, name_span: Span, declaration_instruction: FlatID) {
-        if name == self.name {
-            let main_interface = &mut self.interfaces[InterfaceID::MAIN_INTERFACE];
-            main_interface.name_span = name_span;
-            assert!(main_interface.declaration_instruction.is_none());
-            main_interface.declaration_instruction = Some(declaration_instruction);
-        } else {
-            self.interfaces.alloc(Interface {
-                name_span,
-                name,
-                declaration_instruction: Some(declaration_instruction),
-            });
-        }
     }
 
     fn flatten_write_modifiers(&self, cursor: &mut Cursor<'c>) -> WriteModifiers {
@@ -1352,10 +1401,13 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     fn flatten_interface_ports(
         &mut self,
         inputs_come_first: bool,
+        parent_interface: InterfaceID,
         cursor: &mut Cursor<'c>,
     ) -> (PortIDRange, PortIDRange) {
         if !cursor.optional_field(field!("interface_ports")) {
-            return (PortIDRange::EMPTY, PortIDRange::EMPTY);
+            let next_port = self.ports.get_next_alloc_id();
+            let empty = UUIDRange(next_port, next_port);
+            return (empty, empty);
         }
         cursor.go_down(kind!("interface_ports"), |cursor| {
             let ports_start = self.ports.get_next_alloc_id();
@@ -1364,6 +1416,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     DeclarationKind::Port {
                         is_input: inputs_come_first,
                         is_state: false,
+                        parent_interface,
                         port_id: UUID::PLACEHOLDER,
                         domain: self.current_domain,
                     },
@@ -1376,6 +1429,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     DeclarationKind::Port {
                         is_input: !inputs_come_first,
                         is_state: false,
+                        parent_interface,
                         port_id: UUID::PLACEHOLDER,
                         domain: self.current_domain,
                     },
@@ -1500,6 +1554,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         self.interfaces.alloc(Interface {
             name_span,
             name: name.to_owned(),
+            domain: None,
             declaration_instruction: None,
         });
 
@@ -1528,7 +1583,7 @@ pub fn flatten_all_globals(linker: &mut Linker) {
                     .next()
                     .expect("Iterator cannot be exhausted");
 
-                linker.pass("Flattening", global_obj, |pass, errors| {
+                linker.pass("Flattening", global_obj, |pass, errors, _files| {
                     flatten_global(pass, errors, cursor);
                 });
             });

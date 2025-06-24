@@ -367,46 +367,9 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                             }
                         }
                     }
-                    for (_interface_id, interface_references, sm_interface) in
-                        zip_eq(&sm.interface_call_sites, &sub_module.interfaces)
-                    {
-                        let Some(sm_interface_decl) = sm_interface.declaration_instruction else {continue};
-                        let sm_interface_decl = sub_module.link_info.instructions[sm_interface_decl].unwrap_interface();
-                        if !interface_references.is_empty() {
-                            let interface_name = &sm_interface.name;
-                            if let Some(representative_port) = sm_interface_decl
-                                .inputs
-                                .first()
-                                .or(sm_interface_decl.outputs.first())
-                            {
-                                if instance.interface_ports[representative_port].is_none() {
-                                    for span in interface_references {
-                                        self.errors.error(*span, format!("The interface '{interface_name}' is disabled in this submodule instance"))
-                                        .info_obj_same_file(submod_instr)
-                                        .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
-                                    }
-                                }
-                            } else {
-                                for span in interface_references {
-                                    self.errors.todo(*span, format!("Using empty interface '{interface_name}' (This is a TODO with Actions etc)"))
-                                    .info_obj_same_file(submod_instr)
-                                    .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
-                                }
-                            }
-                            if sm_interface_decl
-                                .all_ports()
-                                .iter()
-                                .any(|port_id| instance.interface_ports[port_id].is_none())
-                            {
-                                // We say an interface is invalid if it has an invalid port.
-                                todo!("Invalid Interfaces");
-                            }
-                        }
-                    }
-
                     sm.instance
                         .set(instance)
-                        .expect("Can only set an InstantiatedModule once");
+                        .unwrap();
                 } else {
                     self.errors.error(
                         submod_instr.get_span(),

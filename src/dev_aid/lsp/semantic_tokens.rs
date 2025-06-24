@@ -1,4 +1,4 @@
-use crate::{prelude::*, typing::template::TemplateKind};
+use crate::{flattening::InterfaceDeclKind, prelude::*, typing::template::TemplateKind};
 
 use lsp_types::{
     Position, SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions,
@@ -162,11 +162,17 @@ fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifier
                     GlobalUUID::Type(_) => IDEIdentifierType::Type,
                     GlobalUUID::Constant(_) => IDEIdentifierType::Constant,
                 },
-                LocationInfo::Port(_, md, port_id) => {
-                    let interface = md.ports[port_id].domain;
-                    IDEIdentifierType::make_local(false, interface)
-                }
-                LocationInfo::Interface(_, _, _, _) => IDEIdentifierType::Interface,
+                LocationInfo::Interface(_, md, _, i) => match i.declaration_instruction.unwrap() {
+                    InterfaceDeclKind::SinglePort(decl_id) => {
+                        let domain = md.link_info.instructions[decl_id]
+                            .unwrap_declaration()
+                            .domain
+                            .get()
+                            .unwrap_physical();
+                        IDEIdentifierType::make_local(false, domain)
+                    }
+                    InterfaceDeclKind::Interface(_decl_id) => IDEIdentifierType::Interface,
+                },
             },
         ));
     });

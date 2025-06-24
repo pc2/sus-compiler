@@ -593,20 +593,6 @@ impl<'g> CodeGenerationContext<'g> {
                 };
                 write!(self.program_text, ",\n\t.{port_name}({wire_name})").unwrap();
             }
-            for (port_id, iport) in sm_inst.used_interfaces.iter_valids() {
-                let port_name =
-                    wire_name_self_latency(&sm_inst.wires[iport.wire], self.use_latency);
-                let wire_name = if let Some(port_wire) = &sm.interface_map[port_id] {
-                    wire_name_self_latency(
-                        &self.instance.wires[port_wire.maps_to_wire],
-                        self.use_latency,
-                    )
-                } else {
-                    // Ports that are defined on the submodule, but not used by impl
-                    Cow::Borrowed("")
-                };
-                write!(self.program_text, ",\n\t.{port_name}({wire_name})").unwrap();
-            }
             writeln!(self.program_text, "\n);").unwrap();
         }
     }

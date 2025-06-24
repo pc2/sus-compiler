@@ -9,7 +9,8 @@ use crate::typing::template::{Parameter, TVec, TemplateKind};
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
 use crate::flattening::{
-    DomainInfo, InterfaceDeclaration, InterfaceToDomainMap, Module, WrittenType,
+    Declaration, DeclarationKind, DomainInfo, InterfaceDeclKind, InterfaceDeclaration,
+    InterfaceToDomainMap, Module, WrittenType,
 };
 use crate::linker::{FileData, GlobalUUID, LinkInfo, LinkerGlobals};
 use crate::typing::{abstract_type::AbstractRankedType, concrete_type::ConcreteType};
@@ -232,16 +233,14 @@ impl DomainType {
 }
 
 impl Module {
-    pub fn make_port_info_fmt(&self, port_id: PortID, file_text: &FileText, result: &mut String) {
-        use std::fmt::Write;
-        let port = &self.ports[port_id];
-        let port_direction = if port.is_input { "input" } else { "output" };
-        writeln!(result, "{port_direction} {}", &file_text[port.decl_span]).unwrap()
-    }
-    pub fn make_port_info_string(&self, port_id: PortID, file_text: &FileText) -> String {
-        let mut r = String::new();
-        self.make_port_info_fmt(port_id, file_text, &mut r);
-        r
+    pub fn make_port_info_fmt(
+        &self,
+        decl: &Declaration,
+        file_text: &FileText,
+        result: &mut String,
+    ) {
+        let_unwrap!(DeclarationKind::Port { .. }, decl.decl_kind);
+        result.write_str(&file_text[decl.decl_span]).unwrap()
     }
 
     pub fn make_interface_info_fmt(
@@ -250,9 +249,9 @@ impl Module {
         file_text: &FileText,
         result: &mut String,
     ) {
-        for port_id in interface.all_ports() {
-            self.make_port_info_fmt(port_id, file_text, result);
-        }
+        result
+            .write_str(&file_text[interface.whole_interface_span])
+            .unwrap()
     }
 
     pub fn make_all_ports_info_string(
@@ -275,10 +274,21 @@ impl Module {
                 writeln!(result, "domain {name}:").unwrap();
             }
 
-            // TODO interfaces
-            for (port_id, port) in &self.ports {
-                if port.domain == domain_id {
-                    self.make_port_info_fmt(port_id, file_text, &mut result);
+            for (_, interface) in &self.interfaces {
+                match interface.declaration_instruction {
+                    Some(InterfaceDeclKind::Interface(decl_id)) => {
+                        let interface = self.link_info.instructions[decl_id].unwrap_interface();
+                        if interface.domain.unwrap_physical() == domain_id {
+                            self.make_interface_info_fmt(interface, file_text, &mut result);
+                        }
+                    }
+                    Some(InterfaceDeclKind::SinglePort(decl_id)) => {
+                        let single_port = self.link_info.instructions[decl_id].unwrap_declaration();
+                        if single_port.domain.get().unwrap_physical() == domain_id {
+                            self.make_port_info_fmt(single_port, file_text, &mut result);
+                        }
+                    }
+                    None => {}
                 }
             }
         }
@@ -289,13 +299,10 @@ impl Module {
     pub fn print_flattened_module(&self, file_data: &FileData) {
         println!("[[{}]]:", self.link_info.name);
         println!("Interface:");
-        for (port_id, port) in &self.ports {
-            println!(
-                "    {} -> {:?}",
-                self.make_port_info_string(port_id, &file_data.file_text),
-                port
-            );
-        }
+        println!(
+            "{}",
+            self.make_all_ports_info_string(&file_data.file_text, None)
+        );
         println!("Instructions:");
         let mut spans_print = Vec::new();
         for (id, inst) in &self.link_info.instructions {

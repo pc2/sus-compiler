@@ -247,9 +247,7 @@ impl PortLatencyInferenceInfo {
     ) -> PortLatencyInferenceInfo {
         Self {
             port_latency_linearities: ports.map(|(_port_id, port)| {
-                let decl = instructions[port.declaration_instruction].unwrap_declaration();
-
-                let latency_linearity = decl.latency_specifier.and_then(|latency_spec| {
+                let latency_linearity = port.latency_specifier.and_then(|latency_spec| {
                     recurse_down_expression(instructions, latency_spec, num_template_args)
                 });
 

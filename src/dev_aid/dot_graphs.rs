@@ -106,15 +106,6 @@ impl<'inst> GraphWalk<'inst, NodeType, EdgeType> for InstantiatedModule {
                     edges.push((NodeType::SubModule(submod_id), NodeType::Wire(w_id)));
                 }
             }
-            for (_, interface) in s.interface_map.iter_valids() {
-                let w_id = interface.maps_to_wire;
-                let w = &self.wires[w_id];
-                if w.is_port.unwrap() {
-                    edges.push((NodeType::Wire(w_id), NodeType::SubModule(submod_id)));
-                } else {
-                    edges.push((NodeType::SubModule(submod_id), NodeType::Wire(w_id)));
-                }
-            }
         }
 
         Cow::from(edges)

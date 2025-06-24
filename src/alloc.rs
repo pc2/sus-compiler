@@ -125,7 +125,6 @@ pub struct UUIDRange<IndexMarker>(pub UUID<IndexMarker>, pub UUID<IndexMarker>);
 
 impl<IndexMarker> UUIDRange<IndexMarker> {
     pub const PLACEHOLDER: UUIDRange<IndexMarker> = UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER);
-    pub const EMPTY: UUIDRange<IndexMarker> = UUIDRange(UUID(0, PhantomData), UUID(0, PhantomData));
 
     pub fn new(from: UUID<IndexMarker>, to: UUID<IndexMarker>) -> Self {
         Self(from, to)

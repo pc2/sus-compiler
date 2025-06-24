@@ -232,15 +232,16 @@ impl Linker {
         }
 
         for global_id in &global_ids {
-            self.pass("Typechecking", *global_id, |pass, errors| {
+            self.pass("Typechecking", *global_id, |pass, errors, files| {
                 typecheck(pass, errors);
-            });
 
-            if crate::debug::is_enabled("print-flattened") {
-                if let GlobalObj::Module(md) = &mut self.globals.get(*global_id) {
-                    md.print_flattened_module(&self.files[md.link_info.file]);
+                if crate::debug::is_enabled("print-flattened") {
+                    let md = pass.get_mut();
+                    if let GlobalObj::Module(md) = md {
+                        md.print_flattened_module(&files[md.link_info.file]);
+                    }
                 }
-            }
+            });
         }
         self.checkpoint(&global_ids, AFTER_TYPE_CHECK_CP);
 
@@ -249,7 +250,7 @@ impl Linker {
         }
 
         for global_id in &global_ids {
-            self.pass("Lints", *global_id, |pass, errors| {
+            self.pass("Lints", *global_id, |pass, errors, _files| {
                 perform_lints(pass, errors);
             });
         }

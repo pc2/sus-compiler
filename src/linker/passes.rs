@@ -1,9 +1,7 @@
 use super::*;
 use crate::{
     errors::{ErrorInfoObject, FileKnowingErrorInfoObject},
-    flattening::{
-        Declaration, GlobalReference, Interface, InterfaceDeclaration, Port, SubModuleInstance,
-    },
+    flattening::{Declaration, GlobalReference, InterfaceDeclaration, Port, SubModuleInstance},
     linker::checkpoint::ResolvedGlobalsCheckpoint,
     typing::abstract_type::{AbstractGlobalReference, AbstractInnerType, AbstractRankedType},
 };
@@ -27,7 +25,7 @@ impl Linker {
         &mut self,
         pass_name: &'static str,
         global_id: GlobalUUID,
-        f: impl FnOnce(&mut LinkerPass, &ErrorCollector),
+        f: impl FnOnce(&mut LinkerPass, &ErrorCollector, &ArenaAllocator<FileData, FileUUIDMarker>),
     ) {
         let working_on_mut = &mut self.globals[global_id];
         let error_store = std::mem::take(&mut working_on_mut.errors);
@@ -47,7 +45,7 @@ impl Linker {
             global_namespace: &self.global_namespace,
             cur_global: global_id,
         };
-        f(&mut linker_pass, &errors);
+        f(&mut linker_pass, &errors, &self.files);
 
         let resolved_globals = linker_pass.resolved_globals;
         let working_on_mut = &mut self.globals[global_id];
@@ -236,7 +234,7 @@ impl<'linker, 'from> GlobalResolver<'linker, 'from> {
     pub fn get_submodule(
         &self,
         sm_ref: &'linker AbstractGlobalReference<ModuleUUID>,
-    ) -> RemoteSubModule<'linker> {
+    ) -> RemoteSubModule<'linker, &'linker TVec<AbstractRankedType>> {
         RemoteSubModule {
             template_args: &sm_ref.template_arg_types,
             md: self.get_module(sm_ref.id),
@@ -245,7 +243,7 @@ impl<'linker, 'from> GlobalResolver<'linker, 'from> {
     pub fn get_declared_submodule(
         &self,
         submod_instr: &'linker SubModuleInstance,
-    ) -> RemoteSubModule<'linker> {
+    ) -> RemoteSubModule<'linker, &'linker TVec<AbstractRankedType>> {
         let AbstractInnerType::Interface(md_ref, _) = &submod_instr.typ.inner else {
             unreachable!("Must be an interface!")
         };
@@ -257,7 +255,7 @@ impl<'linker, 'from> GlobalResolver<'linker, 'from> {
     pub fn get_global_constant(
         &self,
         cst: &'linker GlobalReference<ConstantUUID>,
-    ) -> RemoteGlobalConstant<'linker> {
+    ) -> RemoteGlobalConstant<'linker, &'linker TVec<AbstractRankedType>> {
         RemoteGlobalConstant {
             cst: self.get_constant(cst.id),
             template_args: &cst.template_arg_types,
@@ -266,12 +264,12 @@ impl<'linker, 'from> GlobalResolver<'linker, 'from> {
 }
 
 #[derive(Clone, Copy)]
-pub struct RemoteGlobalConstant<'l> {
+pub struct RemoteGlobalConstant<'l, TemplateT> {
     pub cst: &'l NamedConstant,
-    pub template_args: &'l TVec<AbstractRankedType>,
+    pub template_args: TemplateT,
 }
-impl<'l> RemoteGlobalConstant<'l> {
-    pub fn get_target_decl(&self) -> RemoteDeclaration<'l> {
+impl<'l, TemplateT: Copy> RemoteGlobalConstant<'l, TemplateT> {
+    pub fn get_target_decl(&self) -> RemoteDeclaration<'l, TemplateT> {
         RemoteDeclaration::new(
             &self.cst.link_info,
             self.cst.output_decl,
@@ -280,61 +278,60 @@ impl<'l> RemoteGlobalConstant<'l> {
     }
 }
 #[derive(Clone, Copy)]
-pub struct RemoteSubModule<'l> {
+pub struct RemoteSubModule<'l, TemplateT> {
     pub md: &'l Module,
-    pub template_args: &'l TVec<AbstractRankedType>,
+    pub template_args: TemplateT,
 }
-impl<'l> RemoteSubModule<'l> {
-    pub fn get_port(self, port_id: PortID) -> RemotePort<'l> {
+impl<'l, TemplateT: Copy> RemoteSubModule<'l, TemplateT> {
+    pub fn get_decl(self, decl_id: FlatID) -> RemoteDeclaration<'l, TemplateT> {
+        RemoteDeclaration {
+            link_info: &self.md.link_info,
+            remote_decl: self.md.link_info.instructions[decl_id].unwrap_declaration(),
+            template_arguments: self.template_args,
+        }
+    }
+    pub fn get_fn(self, fn_decl_id: FlatID) -> RemoteFn<'l, TemplateT> {
+        RemoteFn {
+            parent: self,
+            fn_decl: self.md.link_info.instructions[fn_decl_id].unwrap_interface(),
+        }
+    }
+
+    pub fn get_port(self, port_id: PortID) -> RemotePort<'l, TemplateT> {
         RemotePort {
             parent: self,
             port: &self.md.ports[port_id],
         }
     }
-    pub fn get_callable_interface(
-        self,
-        interface_id: InterfaceID,
-    ) -> Result<RemoteInterface<'l>, &'l Interface> {
-        let interface = &self.md.interfaces[interface_id];
-        if let Some(decl_instr) = interface.declaration_instruction {
-            let interface = self.md.link_info.instructions[decl_instr].unwrap_interface();
-            Ok(RemoteInterface {
-                parent: self,
-                interface,
-            })
-        } else {
-            Err(interface)
-        }
-    }
 }
 #[derive(Clone, Copy)]
-pub struct RemoteInterface<'l> {
-    pub parent: RemoteSubModule<'l>,
-    pub interface: &'l InterfaceDeclaration,
+pub struct RemoteFn<'l, TemplateT> {
+    pub parent: RemoteSubModule<'l, TemplateT>,
+    pub fn_decl: &'l InterfaceDeclaration,
 }
-impl<'l> RemoteInterface<'l> {
-    pub fn get_port(self, port_id: PortID) -> RemotePort<'l> {
+impl<'l, TemplateT: Copy> RemoteFn<'l, TemplateT> {
+    pub fn get_port(self, port_id: PortID) -> RemotePort<'l, TemplateT> {
         self.parent.get_port(port_id)
     }
 }
 /// For interfaces of this module
-impl FileKnowingErrorInfoObject for RemoteInterface<'_> {
+impl<TemplateT> FileKnowingErrorInfoObject for RemoteFn<'_, TemplateT> {
     fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
         ErrorInfo {
-            position: self.interface.name_span,
+            position: self.fn_decl.name_span,
             file: self.parent.md.link_info.file,
-            info: format!("Interface '{}' defined here", &self.interface.name),
+            info: format!("Interface '{}' defined here", &self.fn_decl.name),
         }
     }
 }
 
 #[derive(Clone, Copy)]
-pub struct RemotePort<'l> {
-    pub parent: RemoteSubModule<'l>,
+pub struct RemotePort<'l, TemplateT> {
+    pub parent: RemoteSubModule<'l, TemplateT>,
     pub port: &'l Port,
 }
-impl<'l> RemotePort<'l> {
-    pub fn get_decl(&self) -> RemoteDeclaration<'l> {
+impl<'l, TemplateT: Copy> RemotePort<'l, TemplateT> {
+    pub fn get_decl(&self) -> RemoteDeclaration<'l, TemplateT> {
         RemoteDeclaration::new(
             &self.parent.md.link_info,
             self.port.declaration_instruction,
@@ -345,24 +342,20 @@ impl<'l> RemotePort<'l> {
         self.get_decl().make_info()
     }
 }
-impl FileKnowingErrorInfoObject for RemotePort<'_> {
+impl<TemplateT: Copy> FileKnowingErrorInfoObject for RemotePort<'_, TemplateT> {
     fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
         self.make_info()
     }
 }
 
 #[derive(Clone, Copy)]
-pub struct RemoteDeclaration<'l> {
+pub struct RemoteDeclaration<'l, TemplateT> {
     pub link_info: &'l LinkInfo,
     pub remote_decl: &'l Declaration,
-    pub template_arguments: &'l TVec<AbstractRankedType>,
+    pub template_arguments: TemplateT,
 }
-impl<'l> RemoteDeclaration<'l> {
-    pub fn new(
-        link_info: &'l LinkInfo,
-        decl_id: FlatID,
-        template_arguments: &'l TVec<AbstractRankedType>,
-    ) -> Self {
+impl<'l, TemplateT> RemoteDeclaration<'l, TemplateT> {
+    pub fn new(link_info: &'l LinkInfo, decl_id: FlatID, template_arguments: TemplateT) -> Self {
         Self {
             link_info,
             remote_decl: link_info.instructions[decl_id].unwrap_declaration(),
@@ -373,7 +366,7 @@ impl<'l> RemoteDeclaration<'l> {
         self.remote_decl.make_info(self.link_info.file).unwrap()
     }
 }
-impl FileKnowingErrorInfoObject for RemoteDeclaration<'_> {
+impl<TemplateT> FileKnowingErrorInfoObject for RemoteDeclaration<'_, TemplateT> {
     fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
         self.make_info()
     }

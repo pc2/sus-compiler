@@ -45,7 +45,9 @@ pub struct Module {
 
     /// Created in Stage 2: Initialization
     ///
-    /// Ports can only use domains in [Self::named_domains]
+    /// Ports can only use domains in [Self::domains]
+    ///
+    /// These are used by instantiation. They directly correspond to the ports that are actually used in the generated code
     pub ports: FlatAlloc<Port, PortIDMarker>,
 
     /// Created in Stage 2: Flattening
@@ -55,6 +57,8 @@ pub struct Module {
     pub domains: FlatAlloc<DomainInfo, DomainIDMarker>,
 
     /// Created in Stage 2: Initialization
+    ///
+    /// Used for resolving the names. These shouldn't really occur in Instantiation
     pub interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
 }
 
@@ -64,6 +68,14 @@ impl Module {
     /// See #7
     pub fn get_clock_name(&self) -> &str {
         &self.domains.iter().next().unwrap().1.name
+    }
+    pub fn get_fn_interface(&self, interface_id: InterfaceID) -> &InterfaceDeclaration {
+        let interface = &self.interfaces[interface_id];
+        let_unwrap!(
+            Some(InterfaceDeclKind::Interface(i)),
+            interface.declaration_instruction
+        );
+        self.link_info.instructions[i].unwrap_interface()
     }
 }
 
@@ -156,22 +168,29 @@ pub struct Port {
     pub domain: DomainID,
     /// Points to a [Declaration]
     pub declaration_instruction: FlatID,
+    pub latency_specifier: Option<FlatID>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InterfaceKind {
     RegularInterface,
-    Action,
-    Trigger,
+    Action(PortID),
+    Trigger(PortID),
 }
 
 impl InterfaceKind {
     pub fn is_conditional(&self) -> bool {
         match self {
             InterfaceKind::RegularInterface => false,
-            InterfaceKind::Action | InterfaceKind::Trigger => true,
+            InterfaceKind::Action(_) | InterfaceKind::Trigger(_) => true,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum InterfaceDeclKind {
+    Interface(FlatID),
+    SinglePort(FlatID),
 }
 
 /// An interface, like:
@@ -195,12 +214,12 @@ impl InterfaceKind {
 pub struct Interface {
     pub name_span: Span,
     pub name: String,
-    pub declaration_instruction: Option<FlatID>,
+    pub domain: Option<DomainID>,
+    pub declaration_instruction: Option<InterfaceDeclKind>,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum PathElemRefersTo {
-    Port(PortID),
     Interface(InterfaceID),
 }
 
@@ -500,6 +519,7 @@ pub enum DeclarationKind {
         is_input: bool,
         is_state: bool,
         port_id: PortID,
+        parent_interface: InterfaceID,
         domain: DomainID,
     },
     ConditionalBinding {
@@ -593,7 +613,7 @@ pub struct SubModuleInstance {
     /// Maps each of the module's local domains to the domain that it is used in.
     ///
     /// These are *always* [DomainType::Physical] (of course, start out as [DomainType::Unknown] before typing)
-    pub local_interface_domains: TyCell<FlatAlloc<DomainType, DomainIDMarker>>,
+    pub local_domain_map: TyCell<FlatAlloc<DomainType, DomainIDMarker>>,
     pub typ: TyCell<AbstractRankedType>,
     pub documentation: Documentation,
 }
@@ -846,8 +866,10 @@ pub struct InterfaceDeclaration {
     pub name: String,
     pub name_span: Span,
     pub interface_kw_span: Span,
+    pub whole_interface_span: Span,
     pub latency_specifier: Option<FlatID>,
     pub is_local: bool,
+    pub interface_id: InterfaceID,
     pub interface_kind: InterfaceKind,
     pub inputs: PortIDRange,
     pub outputs: PortIDRange,
