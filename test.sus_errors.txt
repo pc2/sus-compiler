@@ -18,7 +18,14 @@ Error: No such field 'in' on CrossDomain #(T: T[]). Available fields are 'CrossD
     │                    ─────┬─────  
     │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
 domain in_clk:
-interface in_domain : T in'0interface out_domain : -> T out'0domain out_clk:
+
+interface in_domain:
+input T in'0
+interface out_domain:
+output T out'0
+domain out_clk:
+
+
 
 ────╯
 Error: No such field 'out' on CrossDomain #(T: T[]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
@@ -34,7 +41,14 @@ Error: No such field 'out' on CrossDomain #(T: T[]). Available fields are 'Cross
     │                    ─────┬─────  
     │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
 domain in_clk:
-interface in_domain : T in'0interface out_domain : -> T out'0domain out_clk:
+
+interface in_domain:
+input T in'0
+interface out_domain:
+output T out'0
+domain out_clk:
+
+
 
 ────╯
 Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
@@ -50,7 +64,14 @@ Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'Cro
     │                    ─────┬─────  
     │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
 domain in_clk:
-interface in_domain : T in'0interface out_domain : -> T out'0domain out_clk:
+
+interface in_domain:
+input T in'0
+interface out_domain:
+output T out'0
+domain out_clk:
+
+
 
 ────╯
 Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
@@ -66,7 +87,14 @@ Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'Cro
     │                    ─────┬─────  
     │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
 domain in_clk:
-interface in_domain : T in'0interface out_domain : -> T out'0domain out_clk:
+
+interface in_domain:
+input T in'0
+interface out_domain:
+output T out'0
+domain out_clk:
+
+
 
 ────╯
 Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
@@ -82,7 +110,14 @@ Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'Cro
     │                    ─────┬─────  
     │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
 domain in_clk:
-interface in_domain : T in'0interface out_domain : -> T out'0domain out_clk:
+
+interface in_domain:
+input T in'0
+interface out_domain:
+output T out'0
+domain out_clk:
+
+
 
 ────╯
 Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
@@ -98,7 +133,14 @@ Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'Cr
     │                    ─────┬─────  
     │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
 domain in_clk:
-interface in_domain : T in'0interface out_domain : -> T out'0domain out_clk:
+
+interface in_domain:
+input T in'0
+interface out_domain:
+output T out'0
+domain out_clk:
+
+
 
 ────╯
 Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
@@ -114,7 +156,14 @@ Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'Cr
     │                    ─────┬─────  
     │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
 domain in_clk:
-interface in_domain : T in'0interface out_domain : -> T out'0domain out_clk:
+
+interface in_domain:
+input T in'0
+interface out_domain:
+output T out'0
+domain out_clk:
+
+
 
 ────╯
 Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
@@ -130,7 +179,14 @@ Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'Cr
     │                    ─────┬─────  
     │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
 domain in_clk:
-interface in_domain : T in'0interface out_domain : -> T out'0domain out_clk:
+
+interface in_domain:
+input T in'0
+interface out_domain:
+output T out'0
+domain out_clk:
+
+
 
 ────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
@@ -211,11 +267,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-    ╭─[ test.sus:82:11 ]
+    ╭─[ test.sus:82:5 ]
     │
  82 │     state int tot
-    │           ───┬───  
-    │              ╰───── Could not finalize this type, some parameters were still unknown: int #(
+    │     ──────┬──────  
+    │           ╰──────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -367,11 +423,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[3]
-     ╭─[ test.sus:178:8 ]
+     ╭─[ test.sus:178:2 ]
      │
  178 │     state int[3] st
-     │           ────┬────  
-     │               ╰────── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────┬───────  
+     │            ╰───────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[3]
@@ -871,11 +927,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:332:8 ]
+     ╭─[ test.sus:332:2 ]
      │
  332 │     state int state_reg
-     │           ──────┬──────  
-     │                 ╰──────── Could not finalize this type, some parameters were still unknown: int #(
+     │     ─────────┬─────────  
+     │              ╰─────────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -886,11 +942,11 @@ state_reg'0
 -> state_reg'1 (+1)
 
 Which conflicts with the starting latency
-     ╭─[ test.sus:332:8 ]
+     ╭─[ test.sus:332:2 ]
      │
  332 │     state int state_reg
-     │           ──────┬──────  
-     │                 ╰──────── This instruction is part of a net-positive latency cycle of +1
+     │     ─────────┬─────────  
+     │              ╰─────────── This instruction is part of a net-positive latency cycle of +1
 
 state_reg'0
 -> state_reg'1 (+1)
@@ -2343,11 +2399,11 @@ test'5
 -> test'10 (+10)
 
 Which conflicts with the starting latency
-     ╭─[ test.sus:360:8 ]
+     ╭─[ test.sus:360:2 ]
      │
  360 │     state int#(MIN: 0, MAX: 7) test
-     │           ────────────┬────────────  
-     │                       ╰────────────── This instruction is part of a net-positive latency cycle of +5
+     │     ───────────────┬───────────────  
+     │                    ╰───────────────── This instruction is part of a net-positive latency cycle of +5
 
 test'5
 -> __4_i'0 (-5)
@@ -2452,7 +2508,10 @@ Error: No such field 'port_a' on submodule_named_ports #(). Available fields are
      │        ──────────┬──────────  
      │                  ╰──────────── Module 'submodule_named_ports' defined here. module submodule_named_ports #():
 domain clk:
-interface submodule_named_ports : int#(MIN: 0, MAX: 100) port_a, int#(MIN: 0, MAX: 100) port_b -> int port_c
+interface submodule_named_ports:
+input int#(MIN: 0, MAX: 100) port_a
+input int#(MIN: 0, MAX: 100) port_b
+output int port_c
      │ 
  590 │     sm.port_a = i
      │        ───┬──  
@@ -2465,7 +2524,10 @@ Error: No such field 'port_b' on submodule_named_ports #(). Available fields are
      │        ──────────┬──────────  
      │                  ╰──────────── Module 'submodule_named_ports' defined here. module submodule_named_ports #():
 domain clk:
-interface submodule_named_ports : int#(MIN: 0, MAX: 100) port_a, int#(MIN: 0, MAX: 100) port_b -> int port_c
+interface submodule_named_ports:
+input int#(MIN: 0, MAX: 100) port_a
+input int#(MIN: 0, MAX: 100) port_b
+output int port_c
      │ 
  592 │     sm.port_b = i
      │        ───┬──  
@@ -2478,7 +2540,10 @@ Error: No such field 'port_c' on submodule_named_ports #(). Available fields are
      │        ──────────┬──────────  
      │                  ╰──────────── Module 'submodule_named_ports' defined here. module submodule_named_ports #():
 domain clk:
-interface submodule_named_ports : int#(MIN: 0, MAX: 100) port_a, int#(MIN: 0, MAX: 100) port_b -> int port_c
+interface submodule_named_ports:
+input int#(MIN: 0, MAX: 100) port_a
+input int#(MIN: 0, MAX: 100) port_b
+output int port_c
      │ 
  594 │     o = sm.port_c
      │            ───┬──  
@@ -2541,7 +2606,11 @@ Error: No such field 'i' on cross_memory #(). Available fields are 'cross_memory
      │        ──────┬─────  
      │              ╰─────── Module 'cross_memory' defined here. module cross_memory #():
 domain clk:
-interface in : bool[20][512] i'0interface out : -> bool[20][512] o'0
+
+interface in:
+input bool[20][512] i'0
+interface out:
+output bool[20][512] o'0
      │ 
  641 │     cr_m.i = mem
      │          ┬  
@@ -2554,7 +2623,11 @@ Error: No such field 'o' on cross_memory #(). Available fields are 'cross_memory
      │        ──────┬─────  
      │              ╰─────── Module 'cross_memory' defined here. module cross_memory #():
 domain clk:
-interface in : bool[20][512] i'0interface out : -> bool[20][512] o'0
+
+interface in:
+input bool[20][512] i'0
+interface out:
+output bool[20][512] o'0
      │ 
  643 │        rd_data = cr_m.o[rd_addr]
      │                       ┬  
@@ -2653,7 +2726,11 @@ Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', '
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
 domain clk:
-interface in : bool i'0interface out : -> bool o'0
+
+interface in:
+input bool i'0
+interface out:
+output bool o'0
      │ 
  667 │     ci.i = domain3
      │        ┬  
@@ -2666,7 +2743,11 @@ Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', '
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
 domain clk:
-interface in : bool i'0interface out : -> bool o'0
+
+interface in:
+input bool i'0
+interface out:
+output bool o'0
      │ 
  668 │     domain4 = ci.o
      │                  ┬  
@@ -2759,7 +2840,10 @@ Error: No such field 'a' on mod_with_unused_interface #(). Available fields are 
      │        ────────────┬────────────  
      │                    ╰────────────── Module 'mod_with_unused_interface' defined here. module mod_with_unused_interface #():
 domain clk:
-interface v : int#(MIN: 0, MAX: 100) a -> int b
+
+interface v:
+input int#(MIN: 0, MAX: 100) a
+output int b
      │ 
  707 │     mm.a
      │        ┬  
@@ -2772,7 +2856,11 @@ Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', '
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
 domain clk:
-interface in : bool i'0interface out : -> bool o'0
+
+interface in:
+input bool i'0
+interface out:
+output bool o'0
      │ 
  730 │     start_cr.i = start
      │              ┬  
@@ -2785,7 +2873,11 @@ Error: No such field 'i' on cross_int #(). Available fields are 'cross_int', 'in
      │        ────┬────  
      │            ╰────── Module 'cross_int' defined here. module cross_int #():
 domain clk:
-interface in : int#(MIN: 0, MAX: 100) i'0interface out : -> int o'0
+
+interface in:
+input int#(MIN: 0, MAX: 100) i'0
+interface out:
+output int o'0
      │ 
  733 │     upTo_cr.i = upTo
      │             ┬  
@@ -2798,7 +2890,11 @@ Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', '
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
 domain clk:
-interface in : bool i'0interface out : -> bool o'0
+
+interface in:
+input bool i'0
+interface out:
+output bool o'0
      │ 
  736 │     ready = ready_cr.o
      │                      ┬  
@@ -2811,7 +2907,11 @@ Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', '
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
 domain clk:
-interface in : bool i'0interface out : -> bool o'0
+
+interface in:
+input bool i'0
+interface out:
+output bool o'0
      │ 
  739 │     ready_cr.i = !valid
      │              ┬  
@@ -2824,7 +2924,11 @@ Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', '
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
 domain clk:
-interface in : bool i'0interface out : -> bool o'0
+
+interface in:
+input bool i'0
+interface out:
+output bool o'0
      │ 
  744 │     when start_cr.o {
      │                   ┬  
@@ -2837,7 +2941,11 @@ Error: No such field 'o' on cross_int #(). Available fields are 'cross_int', 'in
      │        ────┬────  
      │            ╰────── Module 'cross_int' defined here. module cross_int #():
 domain clk:
-interface in : int#(MIN: 0, MAX: 100) i'0interface out : -> int o'0
+
+interface in:
+input int#(MIN: 0, MAX: 100) i'0
+interface out:
+output int o'0
      │ 
  745 │        index = upTo_cr.o
      │                        ┬  
@@ -3102,11 +3210,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[127]
-     ╭─[ test.sus:799:8 ]
+     ╭─[ test.sus:799:2 ]
      │
  799 │     input int[WIDTH] values
-     │           ────────┬────────  
-     │                   ╰────────── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────────┬───────────  
+     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[127]
@@ -3115,11 +3223,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[15]
-     ╭─[ test.sus:799:8 ]
+     ╭─[ test.sus:799:2 ]
      │
  799 │     input int[WIDTH] values
-     │           ────────┬────────  
-     │                   ╰────────── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────────┬───────────  
+     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[15]
@@ -3128,11 +3236,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[1]
-     ╭─[ test.sus:799:8 ]
+     ╭─[ test.sus:799:2 ]
      │
  799 │     input int[WIDTH] values
-     │           ────────┬────────  
-     │                   ╰────────── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────────┬───────────  
+     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[1]
@@ -3141,11 +3249,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[255]
-     ╭─[ test.sus:799:8 ]
+     ╭─[ test.sus:799:2 ]
      │
  799 │     input int[WIDTH] values
-     │           ────────┬────────  
-     │                   ╰────────── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────────┬───────────  
+     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[255]
@@ -3154,11 +3262,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[31]
-     ╭─[ test.sus:799:8 ]
+     ╭─[ test.sus:799:2 ]
      │
  799 │     input int[WIDTH] values
-     │           ────────┬────────  
-     │                   ╰────────── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────────┬───────────  
+     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[31]
@@ -3167,11 +3275,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[3]
-     ╭─[ test.sus:799:8 ]
+     ╭─[ test.sus:799:2 ]
      │
  799 │     input int[WIDTH] values
-     │           ────────┬────────  
-     │                   ╰────────── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────────┬───────────  
+     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[3]
@@ -3180,11 +3288,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[63]
-     ╭─[ test.sus:799:8 ]
+     ╭─[ test.sus:799:2 ]
      │
  799 │     input int[WIDTH] values
-     │           ────────┬────────  
-     │                   ╰────────── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────────┬───────────  
+     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[63]
@@ -3193,11 +3301,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[7]
-     ╭─[ test.sus:799:8 ]
+     ╭─[ test.sus:799:2 ]
      │
  799 │     input int[WIDTH] values
-     │           ────────┬────────  
-     │                   ╰────────── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────────┬───────────  
+     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[7]
@@ -3206,11 +3314,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:9 ]
+     ╭─[ test.sus:800:2 ]
      │
  800 │     output int sum
-     │            ───┬───  
-     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────┬──────  
+     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3219,11 +3327,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:9 ]
+     ╭─[ test.sus:800:2 ]
      │
  800 │     output int sum
-     │            ───┬───  
-     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────┬──────  
+     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3232,11 +3340,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:9 ]
+     ╭─[ test.sus:800:2 ]
      │
  800 │     output int sum
-     │            ───┬───  
-     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────┬──────  
+     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3245,11 +3353,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:9 ]
+     ╭─[ test.sus:800:2 ]
      │
  800 │     output int sum
-     │            ───┬───  
-     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────┬──────  
+     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3258,11 +3366,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:9 ]
+     ╭─[ test.sus:800:2 ]
      │
  800 │     output int sum
-     │            ───┬───  
-     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────┬──────  
+     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3271,11 +3379,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:9 ]
+     ╭─[ test.sus:800:2 ]
      │
  800 │     output int sum
-     │            ───┬───  
-     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────┬──────  
+     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3284,11 +3392,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:9 ]
+     ╭─[ test.sus:800:2 ]
      │
  800 │     output int sum
-     │            ───┬───  
-     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────┬──────  
+     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3297,11 +3405,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:9 ]
+     ╭─[ test.sus:800:2 ]
      │
  800 │     output int sum
-     │            ───┬───  
-     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────┬──────  
+     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -10682,11 +10790,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:835:9 ]
+     ╭─[ test.sus:835:2 ]
      │
  835 │     output int beep = tr.sum
-     │            ────┬───  
-     │                ╰───── Could not finalize this type, some parameters were still unknown: int #(
+     │     ───────┬───────  
+     │            ╰───────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -10975,7 +11083,14 @@ Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'Cro
      │                    ─────┬─────  
      │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
 domain in_clk:
-interface in_domain : T in'0interface out_domain : -> T out'0domain out_clk:
+
+interface in_domain:
+input T in'0
+interface out_domain:
+output T out'0
+domain out_clk:
+
+
 
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
@@ -10998,7 +11113,14 @@ Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'Cr
      │                    ─────┬─────  
      │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
 domain in_clk:
-interface in_domain : T in'0interface out_domain : -> T out'0domain out_clk:
+
+interface in_domain:
+input T in'0
+interface out_domain:
+output T out'0
+domain out_clk:
+
+
 
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
@@ -11026,8 +11148,8 @@ Error: When using explicit domains, no port is allowed to be declared on the imp
       ╭─[ test.sus:1008:9 ]
       │
  1006 │     input int bad_port
-      │           ──────┬─────  
-      │                 ╰─────── A domain should be explicitly defined before this port
+      │     ─────────┬────────  
+      │              ╰────────── A domain should be explicitly defined before this port
       │ 
  1008 │     domain bad_domain
       │            ─────┬────  
@@ -11068,7 +11190,9 @@ Error: No such field 'a' on make_infinite_type_help #(T: ?[...]). Available fiel
       │        ───────────┬───────────  
       │                   ╰───────────── Module 'make_infinite_type_help' defined here. module make_infinite_type_help #(T):
 domain clk:
-interface make_infinite_type_help: T[3] a -> T b
+interface make_infinite_type_help:
+input T[3] a
+output T b
       │ 
  1029 │     mtinf.a = mtinf.b
       │           ┬  
@@ -11081,7 +11205,9 @@ Error: No such field 'b' on make_infinite_type_help #(T: ?[...]). Available fiel
       │        ───────────┬───────────  
       │                   ╰───────────── Module 'make_infinite_type_help' defined here. module make_infinite_type_help #(T):
 domain clk:
-interface make_infinite_type_help: T[3] a -> T b
+interface make_infinite_type_help:
+input T[3] a
+output T b
       │ 
  1029 │     mtinf.a = mtinf.b
       │                     ┬  
@@ -11462,11 +11588,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-      ╭─[ test.sus:1160:8 ]
+      ╭─[ test.sus:1160:2 ]
       │
  1160 │     input int data_received'3
-      │           ─────────┬─────────  
-      │                    ╰─────────── Could not finalize this type, some parameters were still unknown: int #(
+      │     ────────────┬────────────  
+      │                 ╰────────────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -12527,9 +12653,13 @@ Error: No such field 'process' on MultiStateLoop #(T: ?[...], II: int). Availabl
       │        ───────┬──────  
       │               ╰──────── Module 'MultiStateLoop' defined here. module MultiStateLoop #(T, int II):
 domain clk:
-trigger may_process'0 : T cur_state {
-		action next_state'II : T next_state_value
-	}action next_state'II : T next_state_valueaction request_output : -> trigger output_valid : T result
+
+trigger may_process'0:
+output T cur_state
+action next_state'II:
+input T next_state_value
+action request_output:
+input T result
       │ 
  1263 │     when loop.process : float cur_state {
       │               ───┬───  

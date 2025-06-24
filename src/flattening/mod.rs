@@ -865,8 +865,8 @@ pub struct InterfaceDeclaration {
     pub parent_condition: Option<ParentCondition>,
     pub name: String,
     pub name_span: Span,
+    pub decl_span: Span,
     pub interface_kw_span: Span,
-    pub whole_interface_span: Span,
     pub latency_specifier: Option<FlatID>,
     pub is_local: bool,
     pub interface_id: InterfaceID,
@@ -876,13 +876,6 @@ pub struct InterfaceDeclaration {
     pub then_block: FlatIDRange,
     pub else_block: FlatIDRange,
     pub domain: DomainType,
-}
-
-impl InterfaceDeclaration {
-    pub fn all_ports(&self) -> PortIDRange {
-        assert_eq!(self.inputs.1, self.outputs.0);
-        PortIDRange::new(self.inputs.0, self.outputs.1)
-    }
 }
 
 /// When a module has been parsed and flattened, it is turned into a large list of instructions,

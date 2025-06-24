@@ -444,7 +444,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         declaration_itself_is_not_written_to: bool,
         cursor: &mut Cursor<'c>,
     ) -> FlatID {
-        let whole_declaration_span = cursor.span();
+        let decl_span = cursor.span();
         cursor.go_down(kind!("declaration"), |cursor| {
             // Extra inputs and outputs declared in the body of the module
 
@@ -473,8 +473,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             };
 
             cursor.field(field!("type"));
-            let decl_span =
-                Span::new_overarching(cursor.span(), whole_declaration_span.empty_span_at_end());
             let typ_or_module_expr = self.flatten_module_or_type::<ALLOW_MODULES>(cursor);
 
             let (name_span, name) = cursor.field_span(field!("name"), kind!("identifier"));
@@ -1135,12 +1133,9 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         );
                     });
                 }*/
-                kind!("interface_statement") => {
-                    let whole_interface_span = cursor.span();
-                    cursor.go_down_no_check(|cursor| {
-                        self.parse_interface(whole_interface_span, cursor);
-                    })
-                }
+                kind!("interface_statement") => cursor.go_down_no_check(|cursor| {
+                    self.parse_interface(cursor);
+                }),
                 kind!("domain_statement") => cursor.go_down_no_check(|cursor| {
                     self.parse_domain(cursor);
                 }),
@@ -1153,7 +1148,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         FlatIDRange::new(start_of_code, end_of_code)
     }
 
-    fn parse_interface(&mut self, whole_interface_span: Span, cursor: &mut Cursor<'c>) {
+    fn parse_interface(&mut self, cursor: &mut Cursor<'c>) {
         // Skip interface kind
         let is_local = cursor.optional_field(field!("local"));
         cursor.field(field!("interface_kind"));
@@ -1169,6 +1164,12 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let parsed_latency_specifier = self.flatten_latency_specifier(cursor);
         let latency_specifier = parsed_latency_specifier.map(|(l, _)| l);
 
+        let interface_decl_span = if let Some((_, span)) = parsed_latency_specifier {
+            Span::new_overarching(interface_kw_span, span)
+        } else {
+            Span::new_overarching(interface_kw_span, name_span)
+        };
+
         let interface_decl_id =
             self.instructions
                 .alloc(Instruction::Interface(InterfaceDeclaration {
@@ -1176,7 +1177,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     name: name.to_owned(),
                     name_span,
                     interface_kw_span,
-                    whole_interface_span,
+                    decl_span: interface_decl_span,
                     interface_id: UUID::PLACEHOLDER,
                     interface_kind,
                     latency_specifier,
@@ -1222,7 +1223,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 *port_id = self.ports.alloc(Port {
                     name: name.to_owned(),
                     name_span,
-                    decl_span: whole_interface_span,
+                    decl_span: interface_decl_span,
                     is_input: true,
                     domain: self.current_domain,
                     declaration_instruction: interface_decl_id,
@@ -1233,7 +1234,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 *port_id = self.ports.alloc(Port {
                     name: name.to_owned(),
                     name_span,
-                    decl_span: whole_interface_span,
+                    decl_span: interface_decl_span,
                     is_input: false,
                     domain: self.current_domain,
                     declaration_instruction: interface_decl_id,
