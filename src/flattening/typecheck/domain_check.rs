@@ -217,13 +217,10 @@ impl<'l> TypeCheckingContext<'l> {
             WireReferenceRoot::LocalDecl(id) => {
                 Some(self.instructions[*id].unwrap_declaration().domain.get())
             }
-            WireReferenceRoot::NamedConstant(global_ref) => {
-                self.global_ref_must_be_generative(global_ref);
-                Some(DomainType::Generative)
-            }
-            WireReferenceRoot::NamedModule(global_ref) => {
-                self.global_ref_must_be_generative(global_ref);
-                Some(self.domain_checker.alloc_unknown())
+            WireReferenceRoot::LocalInterface(id) => {
+                let interface = self.instructions[*id].unwrap_interface();
+
+                Some(interface.domain)
             }
             WireReferenceRoot::LocalSubmodule(local_submod) => {
                 let submod = self.instructions[*local_submod].unwrap_submodule();
@@ -248,6 +245,14 @@ impl<'l> TypeCheckingContext<'l> {
                     }
                 }
                 None
+            }
+            WireReferenceRoot::NamedConstant(global_ref) => {
+                self.global_ref_must_be_generative(global_ref);
+                Some(DomainType::Generative)
+            }
+            WireReferenceRoot::NamedModule(global_ref) => {
+                self.global_ref_must_be_generative(global_ref);
+                Some(self.domain_checker.alloc_unknown())
             }
             WireReferenceRoot::Error => None,
         }

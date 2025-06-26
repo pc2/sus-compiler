@@ -15,6 +15,7 @@ use crate::typing::template::{
 pub enum InGlobal<'linker> {
     NamedLocal(&'linker Declaration),
     NamedSubmodule(&'linker SubModuleInstance),
+    LocalInterface(&'linker InterfaceDeclaration),
     Temporary(SingleOutputExpression<'linker>),
 }
 
@@ -51,30 +52,31 @@ impl From<LocationInfo<'_>> for RefersTo {
             parameter: None,
         };
         match info {
-            LocationInfo::InGlobal(obj_id, link_info, flat_id, flat_obj) => match flat_obj {
-                InGlobal::NamedLocal(_) => {
-                    let decl = link_info.instructions[flat_id].unwrap_declaration();
-                    match decl.decl_kind {
-                        DeclarationKind::RegularGenerative { .. }
-                        | DeclarationKind::ConditionalBinding { .. }
-                        | DeclarationKind::RegularWire { .. }
-                        | DeclarationKind::StructField(..) => {}
-                        DeclarationKind::Port {
-                            parent_interface, ..
-                        } => {
-                            result.interface = Some((obj_id.unwrap_module(), parent_interface));
-                        }
-                        DeclarationKind::TemplateParameter(template_id) => {
-                            result.parameter = Some((obj_id, template_id))
-                        }
+            LocationInfo::InGlobal(obj_id, _, flat_id, InGlobal::NamedLocal(decl)) => {
+                match decl.decl_kind {
+                    DeclarationKind::RegularGenerative { .. }
+                    | DeclarationKind::ConditionalBinding { .. }
+                    | DeclarationKind::RegularWire { .. }
+                    | DeclarationKind::StructField(..) => {}
+                    DeclarationKind::Port {
+                        parent_interface, ..
+                    } => {
+                        result.interface = Some((obj_id.unwrap_module(), parent_interface));
                     }
-                    result.local = Some((obj_id, flat_id));
+                    DeclarationKind::TemplateParameter(template_id) => {
+                        result.parameter = Some((obj_id, template_id))
+                    }
                 }
-                InGlobal::NamedSubmodule(_) => {
-                    result.local = Some((obj_id, flat_id));
-                }
-                InGlobal::Temporary(_) => {}
-            },
+                result.local = Some((obj_id, flat_id));
+            }
+            LocationInfo::InGlobal(obj_id, _, flat_id, InGlobal::NamedSubmodule(_)) => {
+                result.local = Some((obj_id, flat_id));
+            }
+            LocationInfo::InGlobal(obj_id, _, flat_id, InGlobal::LocalInterface(interface)) => {
+                result.interface = Some((obj_id.unwrap_module(), interface.interface_id));
+                result.local = Some((obj_id, flat_id));
+            }
+            LocationInfo::InGlobal(_, _, _, InGlobal::Temporary(_)) => {}
             LocationInfo::Type(_, _) => {}
             LocationInfo::Parameter(obj, _link_info, template_id, template_arg) => {
                 match &template_arg.kind {
@@ -93,10 +95,13 @@ impl From<LocationInfo<'_>> for RefersTo {
             }
             LocationInfo::Interface(md_id, _md, i_id, interface) => {
                 result.interface = Some((md_id, i_id));
-                if let InterfaceDeclKind::SinglePort(port_decl) =
-                    interface.declaration_instruction.unwrap()
-                {
-                    result.local = Some((GlobalUUID::Module(md_id), port_decl));
+                match interface.declaration_instruction.unwrap() {
+                    InterfaceDeclKind::SinglePort(port_decl) => {
+                        result.local = Some((GlobalUUID::Module(md_id), port_decl));
+                    }
+                    InterfaceDeclKind::Interface(decl_id) => {
+                        result.local = Some((GlobalUUID::Module(md_id), decl_id));
+                    }
                 }
             }
         }
@@ -257,6 +262,19 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                         *submod_decl,
                         InGlobal::NamedSubmodule(
                             link_info.instructions[*submod_decl].unwrap_submodule(),
+                        ),
+                    ),
+                );
+            }
+            WireReferenceRoot::LocalInterface(interface_decl) => {
+                self.visit(
+                    wire_ref.root_span,
+                    LocationInfo::InGlobal(
+                        obj_id,
+                        link_info,
+                        *interface_decl,
+                        InGlobal::LocalInterface(
+                            link_info.instructions[*interface_decl].unwrap_interface(),
                         ),
                     ),
                 );

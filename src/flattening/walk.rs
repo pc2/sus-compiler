@@ -11,18 +11,9 @@ impl ExpressionSource {
     pub fn for_each_dependency(&self, collect: &mut impl FnMut(FlatID)) {
         self.for_each_input_wire(collect);
         match self {
-            ExpressionSource::WireRef(wire_ref) => match &wire_ref.root {
-                WireReferenceRoot::LocalDecl(decl_id) => collect(*decl_id),
-                WireReferenceRoot::LocalSubmodule(submod_decl) => collect(*submod_decl),
-                WireReferenceRoot::NamedConstant(cst) => {
-                    cst.for_each_generative_input(collect);
-                }
-                WireReferenceRoot::NamedModule(md_ref) => {
-                    md_ref.for_each_generative_input(collect);
-                }
-
-                WireReferenceRoot::Error => {}
-            },
+            ExpressionSource::WireRef(wire_ref) => {
+                wire_ref.for_each_generative_input_in_root(collect)
+            }
             ExpressionSource::FuncCall(func_call) => {
                 func_call.func.for_each_generative_input(collect);
             }
@@ -62,10 +53,11 @@ impl ExpressionSource {
 }
 
 impl WireReference {
-    pub fn for_each_generative_input(&self, collect: &mut impl FnMut(FlatID)) {
+    pub fn for_each_generative_input_in_root(&self, collect: &mut impl FnMut(FlatID)) {
         match &self.root {
             WireReferenceRoot::LocalDecl(decl_id) => collect(*decl_id),
             WireReferenceRoot::LocalSubmodule(submod_decl) => collect(*submod_decl),
+            WireReferenceRoot::LocalInterface(interface_decl) => collect(*interface_decl),
             WireReferenceRoot::NamedConstant(cst) => {
                 cst.for_each_generative_input(collect);
             }
@@ -74,6 +66,9 @@ impl WireReference {
             }
             WireReferenceRoot::Error => {}
         }
+    }
+    pub fn for_each_generative_input(&self, collect: &mut impl FnMut(FlatID)) {
+        self.for_each_generative_input_in_root(collect);
         self.for_each_input_wire_in_path(collect);
     }
     pub fn for_each_input_wire_in_path(&self, collect: &mut impl FnMut(FlatID)) {

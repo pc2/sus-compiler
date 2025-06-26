@@ -270,6 +270,15 @@ pub enum WireReferenceRoot {
     /// [FlatID] points to [Instruction::SubModule]
     LocalSubmodule(FlatID),
     /// ```sus
+    /// trigger xyz: int a
+    /// when something {
+    ///     xyz(5)
+    /// }
+    /// ```
+    ///
+    /// [FlatID] points to [Instruction::Interface]
+    LocalInterface(FlatID),
+    /// ```sus
     /// bool b = true // root is global constant `true`
     /// ```
     NamedConstant(GlobalReference<ConstantUUID>),
@@ -286,6 +295,7 @@ impl WireReferenceRoot {
         match self {
             WireReferenceRoot::LocalDecl(f) => Some(*f),
             WireReferenceRoot::LocalSubmodule(f) => Some(*f),
+            WireReferenceRoot::LocalInterface(f) => Some(*f),
             WireReferenceRoot::NamedConstant(_) => None,
             WireReferenceRoot::NamedModule(_) => None,
             WireReferenceRoot::Error => None,
@@ -867,6 +877,7 @@ pub struct InterfaceDeclaration {
     pub name_span: Span,
     pub decl_span: Span,
     pub interface_kw_span: Span,
+    pub documentation: Documentation,
     pub latency_specifier: Option<FlatID>,
     pub is_local: bool,
     pub interface_id: InterfaceID,

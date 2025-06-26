@@ -219,15 +219,38 @@ impl Display for Value {
     }
 }
 
+pub struct DomainDisplay<'a> {
+    domain: DomainType,
+    domains: &'a FlatAlloc<DomainInfo, DomainIDMarker>,
+}
+
+impl Display for DomainDisplay<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.domain {
+            DomainType::Generative => f.write_str("gen"),
+            DomainType::Physical(physical_id) => {
+                if let Some(physical_domain) = self.domains.get(physical_id) {
+                    f.write_fmt(format_args!("{{{}}}", physical_domain.name))
+                } else {
+                    f.write_fmt(format_args!(
+                        "{{unnamed domain {}}}",
+                        physical_id.get_hidden_value()
+                    ))
+                }
+            }
+            DomainType::Unknown(_) => unreachable!(),
+        }
+    }
+}
+
 impl DomainType {
-    pub fn physical_to_string(
-        physical_id: DomainID,
-        domains: &FlatAlloc<DomainInfo, DomainIDMarker>,
-    ) -> String {
-        if let Some(interf) = domains.get(physical_id) {
-            format!("{{{}}}", interf.name)
-        } else {
-            format!("{{unnamed domain {}}}", physical_id.get_hidden_value())
+    pub fn display<'d>(
+        &self,
+        domains: &'d FlatAlloc<DomainInfo, DomainIDMarker>,
+    ) -> DomainDisplay<'d> {
+        DomainDisplay {
+            domain: *self,
+            domains,
         }
     }
 }
@@ -280,9 +303,8 @@ impl Module {
             let name = &domain.name;
             if let Some(domain_map) = &local_domains_used_in_parent_module {
                 let submod_name = &self.link_info.name;
-                let domain_id_in_parent = domain_map.local_domain_map[domain_id].unwrap_physical();
                 let name_in_parent =
-                    DomainType::physical_to_string(domain_id_in_parent, domain_map.domains);
+                    domain_map.local_domain_map[domain_id].display(domain_map.domains);
                 writeln!(result, "domain {submod_name}.{name} = {name_in_parent}").unwrap();
             } else {
                 writeln!(result, "domain {name}:").unwrap();

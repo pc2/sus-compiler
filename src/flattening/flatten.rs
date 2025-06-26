@@ -23,6 +23,7 @@ use crate::typing::template::{
 enum NamedLocal {
     Declaration(FlatID),
     SubModule(FlatID),
+    LocalInterface(FlatID),
     TemplateType(TemplateID),
     DomainDecl(DomainID),
 }
@@ -197,6 +198,11 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 .info_obj_same_file(&self.domains[dom]);
                             None
                         }
+                        Some(NamedLocal::LocalInterface(interf)) => {
+                            self.errors.error(name_span, format!("{name} does not name a Type or a Value. Local Interfaces are not allowed!"))
+                                .info_obj_same_file(self.instructions[interf].unwrap_interface());
+                            None
+                        }
                         None => {
                             self.errors.error(name_span, format!("{name} does not name a Type or a Value."));
                             None
@@ -323,7 +329,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             kind!("template_global") => {
                 match self.flatten_local_or_template_global(cursor) {
                     LocalOrGlobal::Local(span, NamedLocal::Declaration(instr))
-                    | LocalOrGlobal::Local(span, NamedLocal::SubModule(instr)) => {
+                    | LocalOrGlobal::Local(span, NamedLocal::SubModule(instr))
+                    | LocalOrGlobal::Local(span, NamedLocal::LocalInterface(instr)) => {
                         self.errors
                             .error(
                                 span,
@@ -401,6 +408,9 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 }
                 NamedLocal::SubModule(submod_id) => {
                     err_ref.info_obj_same_file(self.instructions[submod_id].unwrap_submodule());
+                }
+                NamedLocal::LocalInterface(interf_id) => {
+                    err_ref.info_obj_same_file(self.instructions[interf_id].unwrap_interface());
                 }
                 NamedLocal::TemplateType(template_id) => {
                     err_ref.info_obj_same_file(&self.parameters[template_id]);
@@ -799,8 +809,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             kind!("template_global") => {
                 match self.flatten_local_or_template_global(cursor) {
                     LocalOrGlobal::Local(span, named_obj) => match named_obj {
-                        NamedLocal::Declaration(decl_id) => {
-                            let root = WireReferenceRoot::LocalDecl(decl_id);
+                        NamedLocal::Declaration(instr) => {
+                            let root = WireReferenceRoot::LocalDecl(instr);
                             WireReference {
                                 root,
                                 output_typ: TyCell::new(),
@@ -808,8 +818,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 path: Vec::new(),
                             }
                         }
-                        NamedLocal::SubModule(submod_id) => {
-                            let root = WireReferenceRoot::LocalSubmodule(submod_id);
+                        NamedLocal::SubModule(instr) => {
+                            let root = WireReferenceRoot::LocalSubmodule(instr);
+                            WireReference {
+                                root,
+                                output_typ: TyCell::new(),
+                                root_span: expr_span,
+                                path: Vec::new(),
+                            }
+                        }
+                        NamedLocal::LocalInterface(instr) => {
+                            let root = WireReferenceRoot::LocalInterface(instr);
                             WireReference {
                                 root,
                                 output_typ: TyCell::new(),
@@ -1156,14 +1175,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             Span::new_overarching(interface_kw_span, name_span)
         };
 
+        let documentation = cursor.extract_gathered_comments();
+
         let interface_decl_id =
             self.instructions
                 .alloc(Instruction::Interface(InterfaceDeclaration {
                     parent_condition: self.current_parent_condition,
                     name: name.to_owned(),
                     name_span,
-                    interface_kw_span,
                     decl_span: interface_decl_span,
+                    interface_kw_span,
+                    documentation,
                     interface_id: UUID::PLACEHOLDER,
                     interface_kind,
                     latency_specifier,

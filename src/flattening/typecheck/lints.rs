@@ -39,6 +39,9 @@ impl LintContext<'_> {
                         .info_obj_same_file(decl);
                 }
             }
+            WireReferenceRoot::LocalInterface(interface_decl_id) => {
+                let interface = self.working_on.instructions[*interface_decl_id].unwrap_interface();
+            }
             WireReferenceRoot::LocalSubmodule(submod_decl_id) => {
                 let submod = self.globals.get_declared_submodule(
                     self.working_on.instructions[*submod_decl_id].unwrap_submodule(),

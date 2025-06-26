@@ -338,6 +338,39 @@ fn gather_all_references_across_all_files(
     ref_locations
 }
 
+fn goto_definition(linker: &mut Linker, file_uuid: FileUUID, pos: usize) -> Vec<(Span, FileUUID)> {
+    let mut goto_definition_list: Vec<SpanFile> = Vec::new();
+
+    let Some((_location, info)) = get_selected_object(linker, file_uuid, pos) else {
+        return Vec::new();
+    };
+    match info {
+        LocationInfo::InGlobal(_obj_id, link_info, _, InGlobal::NamedLocal(decl)) => {
+            goto_definition_list.push((decl.name_span, link_info.file));
+        }
+        LocationInfo::InGlobal(_obj_id, link_info, _, InGlobal::NamedSubmodule(submod_decl)) => {
+            goto_definition_list.push((submod_decl.name_span, link_info.file))
+        }
+        LocationInfo::InGlobal(_obj_id, link_info, _, InGlobal::LocalInterface(interface)) => {
+            goto_definition_list.push((interface.name_span, link_info.file))
+        }
+        LocationInfo::InGlobal(_, _, _, InGlobal::Temporary(_)) => {}
+        LocationInfo::Type(_, _) => {}
+        LocationInfo::Parameter(_, link_info, _, template_arg) => {
+            goto_definition_list.push((template_arg.name_span, link_info.file))
+        }
+        LocationInfo::Global(id) => {
+            let link_info = &linker.globals[id];
+            goto_definition_list.push((link_info.name_span, link_info.file));
+        }
+        LocationInfo::Interface(_md_uuid, md, _interface_id, interface) => {
+            goto_definition_list.push((interface.name_span, md.link_info.file));
+        }
+    }
+
+    goto_definition_list
+}
+
 fn handle_request(
     method: &str,
     params: serde_json::Value,
@@ -379,38 +412,7 @@ fn handle_request(
             let (file_uuid, pos) =
                 linker.location_in_file(&params.text_document_position_params, manager);
 
-            let mut goto_definition_list: Vec<SpanFile> = Vec::new();
-
-            if let Some((_location, info)) = get_selected_object(linker, file_uuid, pos) {
-                match info {
-                    LocationInfo::InGlobal(
-                        _obj_id,
-                        link_info,
-                        _decl_id,
-                        InGlobal::NamedLocal(decl),
-                    ) => {
-                        goto_definition_list.push((decl.name_span, link_info.file));
-                    }
-                    LocationInfo::InGlobal(
-                        _obj_id,
-                        link_info,
-                        _decl_id,
-                        InGlobal::NamedSubmodule(submod_decl),
-                    ) => goto_definition_list.push((submod_decl.name_span, link_info.file)),
-                    LocationInfo::InGlobal(_, _, _, InGlobal::Temporary(_)) => {}
-                    LocationInfo::Type(_, _) => {}
-                    LocationInfo::Parameter(_, link_info, _, template_arg) => {
-                        goto_definition_list.push((template_arg.name_span, link_info.file))
-                    }
-                    LocationInfo::Global(id) => {
-                        let link_info = &linker.globals[id];
-                        goto_definition_list.push((link_info.name_span, link_info.file));
-                    }
-                    LocationInfo::Interface(_md_uuid, md, _interface_id, interface) => {
-                        goto_definition_list.push((interface.name_span, md.link_info.file));
-                    }
-                }
-            }
+            let goto_definition_list = goto_definition(linker, file_uuid, pos);
 
             serde_json::to_value(GotoDefinitionResponse::Array(cvt_location_list(
                 goto_definition_list,

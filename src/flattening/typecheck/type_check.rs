@@ -27,6 +27,13 @@ impl<'l> TypeCheckingContext<'l> {
                 let submod = self.instructions[*submod_decl].unwrap_submodule();
                 submod.typ.clone()
             }
+            WireReferenceRoot::LocalInterface(interface_decl) => {
+                let interface = self.instructions[*interface_decl].unwrap_interface();
+                AbstractRankedType {
+                    inner: AbstractInnerType::Interface(todo!(), interface.interface_id),
+                    rank: PeanoType::Zero,
+                }
+            }
             WireReferenceRoot::NamedConstant(cst) => {
                 self.typecheck_template_global(cst);
 

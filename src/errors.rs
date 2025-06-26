@@ -6,7 +6,8 @@ use std::cell::Cell;
 use crate::{alloc::ArenaAllocator, typing::template::Parameter};
 
 use crate::flattening::{
-    Declaration, DomainInfo, Instruction, Interface, Module, Port, SubModuleInstance,
+    Declaration, DomainInfo, Instruction, Interface, InterfaceDeclaration, Module, Port,
+    SubModuleInstance,
 };
 use crate::linker::{checkpoint::ErrorCheckpoint, FileData, LinkInfo};
 
@@ -335,11 +336,22 @@ impl ErrorInfoObject for SubModuleInstance {
     }
 }
 
+impl ErrorInfoObject for InterfaceDeclaration {
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+        Some(ErrorInfo {
+            position: self.name_span,
+            file,
+            info: format!("'{}' declared here", &self.name),
+        })
+    }
+}
+
 impl ErrorInfoObject for Instruction {
     fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
         match self {
-            Instruction::SubModule(sm) => sm.make_info(file),
+            Instruction::SubModule(decl) => decl.make_info(file),
             Instruction::Declaration(decl) => decl.make_info(file),
+            Instruction::Interface(decl) => decl.make_info(file),
             Instruction::Expression(_) => None,
             _ => unreachable!("At least there shouldn't be cases where we're referring to something other than SubModule or Declaration")
         }

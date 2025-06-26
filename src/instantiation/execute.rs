@@ -244,6 +244,13 @@ fn factorial(mut n: UBig) -> UBig {
     n
 }
 
+struct InterfaceWires {
+    condition_wire: Option<WireID>,
+    inputs: Vec<WireID>,
+    outputs: Vec<WireID>,
+    interface_span: Span,
+}
+
 trait Concretizer {
     fn get_type(&mut self, id: TemplateID) -> ConcreteType;
     fn get_value(&mut self, expr: FlatID) -> ExecutionResult<UnifyableValue>;
@@ -691,7 +698,7 @@ impl<'l> ExecutionContext<'l> {
                     wire_ref.root_span,
                 )?
             }
-            WireReferenceRoot::NamedModule(_) => {
+            WireReferenceRoot::LocalInterface(_) | WireReferenceRoot::NamedModule(_) => {
                 caught_by_typecheck!("Can't turn an inline module into a wire")
             }
             WireReferenceRoot::Error => caught_by_typecheck!(),
@@ -812,6 +819,20 @@ impl<'l> ExecutionContext<'l> {
             is_port: None,
         }))
     }
+    fn alloc_bool(&mut self, v: bool, original_instruction: FlatID, domain: DomainID) -> WireID {
+        self.wires.alloc(RealWire {
+            typ: ConcreteType::BOOL,
+            source: RealWireDataSource::Constant {
+                value: Value::Bool(v),
+            },
+            original_instruction,
+            domain,
+            name: self.unique_name_producer.get_unique_name(""),
+            specified_latency: CALCULATE_LATENCY_LATER,
+            absolute_latency: CALCULATE_LATENCY_LATER,
+            is_port: None,
+        })
+    }
     fn get_wire_or_constant_as_wire(
         &mut self,
         original_instruction: FlatID,
@@ -898,25 +919,56 @@ impl<'l> ExecutionContext<'l> {
         }
     }
     fn get_submodule_interface(
-        &self,
+        &mut self,
         submod_id: SubModuleID,
         interface_id: InterfaceID,
-    ) -> &'l InterfaceDeclaration {
+        interface_span: Span,
+        domain: DomainID,
+    ) -> InterfaceWires {
+        add_to_small_set(
+            &mut self.submodules[submod_id].interface_call_sites[interface_id],
+            interface_span,
+        );
         let md = &self.linker.modules[self.submodules[submod_id].refers_to.id];
         let interface = &md.interfaces[interface_id];
         let_unwrap!(
             Some(InterfaceDeclKind::Interface(interface_id)),
             interface.declaration_instruction
         );
-        md.link_info.instructions[interface_id].unwrap_interface()
+
+        let interface = md.link_info.instructions[interface_id].unwrap_interface();
+
+        let cond = if let InterfaceKind::Action(condition_port) = interface.interface_kind {
+            Some(self.get_submodule_port(submod_id, condition_port, Some(interface_span), domain))
+        } else {
+            None
+        };
+
+        let inputs = interface
+            .inputs
+            .iter()
+            .map(|port_id| self.get_submodule_port(submod_id, port_id, None, domain))
+            .collect();
+        let outputs = interface
+            .outputs
+            .iter()
+            .map(|port_id| self.get_submodule_port(submod_id, port_id, None, domain))
+            .collect();
+
+        InterfaceWires {
+            condition_wire: cond,
+            inputs,
+            outputs,
+            interface_span,
+        }
     }
 
-    fn get_func_interface(
+    fn get_interface(
         &mut self,
         interface_ref: &'l WireReference,
         original_instruction: FlatID,
         domain: DomainID,
-    ) -> ExecutionResult<(SubModuleID, InterfaceID, Span)> {
+    ) -> ExecutionResult<InterfaceWires> {
         match &interface_ref.root {
             WireReferenceRoot::LocalSubmodule(submod_decl_id) => {
                 let submod_id = self.generation_state[*submod_decl_id].unwrap_submodule_instance();
@@ -924,16 +976,39 @@ impl<'l> ExecutionContext<'l> {
                 let (interface, name_span, path) =
                     self.execute_wire_ref_path(interface_ref, domain)?;
 
-                Ok((submod_id, interface, name_span))
+                Ok(self.get_submodule_interface(submod_id, interface, name_span, domain))
             }
             WireReferenceRoot::NamedModule(module_ref) => {
                 let submod_id = self.instantiate_submodule(module_ref, "", original_instruction)?;
+
                 assert!(interface_ref.path.is_empty());
-                Ok((
+                Ok(self.get_submodule_interface(
                     submod_id,
                     InterfaceID::MAIN_INTERFACE,
                     module_ref.get_total_span(),
+                    domain,
                 ))
+            }
+            WireReferenceRoot::LocalInterface(interface_decl) => {
+                let interface = self.link_info.instructions[*interface_decl].unwrap_interface();
+                if !interface_ref.path.is_empty() {
+                    todo!("Can't yet work with sub-interfaces");
+                }
+
+                let condition_wire = match interface.interface_kind {
+                    InterfaceKind::RegularInterface => unreachable!(),
+                    InterfaceKind::Action(_) => unreachable!(),
+                    InterfaceKind::Trigger(_trigger_port) => {
+                        Some(self.generation_state[*interface_decl].unwrap_wire())
+                    }
+                };
+
+                Ok(InterfaceWires {
+                    condition_wire,
+                    inputs: todo!(),
+                    outputs: todo!(),
+                    interface_span: interface_ref.root_span,
+                })
             }
             WireReferenceRoot::LocalDecl(_)
             | WireReferenceRoot::NamedConstant(_)
@@ -981,51 +1056,27 @@ impl<'l> ExecutionContext<'l> {
                 }
             }
             ExpressionSource::FuncCall(fc) => {
-                let (submod_id, interface_id, interface_span) =
-                    self.get_func_interface(&fc.func, original_instruction, domain)?;
+                let func_interface = self.get_interface(&fc.func, original_instruction, domain)?;
 
-                let interface = self.get_submodule_interface(submod_id, interface_id);
+                if let Some(condition) = func_interface.condition_wire {
+                    let true_wire = self.alloc_bool(true, original_instruction, domain);
 
-                add_to_small_set(
-                    &mut self.submodules[submod_id].interface_call_sites[interface_id],
-                    interface_span,
-                );
-
-                if let InterfaceKind::Action(condition_port) = interface.interface_kind {
-                    let condition_port_wire = self.get_submodule_port(
-                        submod_id,
-                        condition_port,
-                        Some(interface_span),
-                        domain,
-                    );
-                    let true_wire = self.alloc_wire_for_const(
-                        Value::Bool(true),
-                        &AbstractRankedType::BOOL,
-                        original_instruction,
-                        domain,
-                        interface_span,
-                    )?;
                     self.instantiate_write_to_wire(
-                        condition_port_wire,
+                        condition,
                         Vec::new(),
                         true_wire,
                         0,
-                        interface_span,
+                        func_interface.interface_span,
                     );
                 }
 
-                for (port, arg) in zip_eq(interface.inputs, &fc.arguments) {
+                for (port_wire, arg) in zip_eq(&func_interface.inputs, &fc.arguments) {
                     let arg_span = self.link_info.instructions[*arg].get_span();
                     let from = self.get_wire_or_constant_as_wire(*arg, domain)?;
-                    let port_wire = self.get_submodule_port(submod_id, port, None, domain);
-                    self.instantiate_write_to_wire(port_wire, Vec::new(), from, 0, arg_span);
+                    self.instantiate_write_to_wire(*port_wire, Vec::new(), from, 0, arg_span);
                 }
 
-                return Ok(interface
-                    .outputs
-                    .iter()
-                    .map(|port_id| self.get_submodule_port(submod_id, port_id, None, domain))
-                    .collect());
+                return Ok(func_interface.outputs);
             }
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut array_wires = Vec::with_capacity(arr.len());
@@ -1125,7 +1176,9 @@ impl<'l> ExecutionContext<'l> {
                 .get_generation_value(*decl_id)?
                 .clone(),
             WireReferenceRoot::NamedConstant(cst) => self.get_named_constant_value(cst)?,
-            WireReferenceRoot::LocalSubmodule(_) | WireReferenceRoot::NamedModule(_) => {
+            WireReferenceRoot::LocalSubmodule(_)
+            | WireReferenceRoot::NamedModule(_)
+            | WireReferenceRoot::LocalInterface(_) => {
                 todo!("Don't yet support compile time functions")
             }
             WireReferenceRoot::Error => caught_by_typecheck!(),

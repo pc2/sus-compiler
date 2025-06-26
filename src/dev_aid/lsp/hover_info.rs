@@ -1,6 +1,3 @@
-use std::borrow::Cow;
-
-use crate::alloc::ArenaAllocator;
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::prelude::*;
 use crate::typing::domain_type::DomainType;
@@ -8,7 +5,7 @@ use crate::typing::template::TemplateKind;
 
 use lsp_types::{LanguageString, MarkedString};
 
-use crate::flattening::{DeclarationKind, InterfaceDeclKind, InterfaceToDomainMap, Module};
+use crate::flattening::{DeclarationKind, InterfaceDeclKind, InterfaceToDomainMap};
 use crate::instantiation::SubModuleOrWire;
 use crate::linker::{Documentation, FileData, GlobalUUID, LinkInfo};
 
@@ -88,17 +85,6 @@ impl HoverCollector<'_> {
     }
 }
 
-fn try_get_module(
-    linker_modules: &ArenaAllocator<Module, ModuleUUIDMarker>,
-    id: GlobalUUID,
-) -> Option<&Module> {
-    if let GlobalUUID::Module(md_id) = id {
-        Some(&linker_modules[md_id])
-    } else {
-        None
-    }
-}
-
 pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<MarkedString> {
     let mut hover = HoverCollector {
         list: Vec::new(),
@@ -108,13 +94,14 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
 
     match info {
         LocationInfo::InGlobal(obj_id, link_info, decl_id, InGlobal::NamedLocal(decl)) => {
-            let mut details_vec: Vec<String> = Vec::with_capacity(5);
+            let mut details_vec: Vec<String> = Vec::new();
 
-            if let Some(md) = try_get_module(&linker.modules, obj_id) {
-                if let DomainType::Physical(ph) = decl.domain.get() {
-                    details_vec.push(DomainType::physical_to_string(ph, &md.domains));
-                }
-            }
+            let domains = if let GlobalUUID::Module(md_id) = obj_id {
+                &linker.modules[md_id].domains
+            } else {
+                &FlatAlloc::EMPTY_FLAT_ALLOC
+            };
+            details_vec.push(decl.domain.get().display(domains).to_string());
 
             match decl.decl_kind {
                 DeclarationKind::Port { is_input, .. } => {
@@ -127,9 +114,6 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 | DeclarationKind::ConditionalBinding { .. } => {}
             }
 
-            if decl.decl_kind.is_generative() {
-                details_vec.push("gen".to_owned());
-            }
             if decl.decl_kind.is_state() {
                 details_vec.push("state".to_owned());
             }
@@ -146,6 +130,20 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.sus_code(details_vec.join(" "));
 
             hover.gather_hover_infos(obj_id, decl_id, decl.decl_kind.is_generative());
+        }
+        LocationInfo::InGlobal(obj_id, _, decl_id, InGlobal::LocalInterface(interface)) => {
+            hover.documentation(&interface.documentation);
+
+            if let GlobalUUID::Module(md_id) = obj_id {
+                let md = &linker.modules[md_id];
+
+                let mut result = String::new();
+                md.make_interface_info_fmt(interface, &file_data.file_text, &mut result);
+
+                hover.sus_code(result);
+            }
+
+            hover.gather_hover_infos(obj_id, decl_id, false);
         }
         LocationInfo::InGlobal(obj_id, _link_info, id, InGlobal::NamedSubmodule(submod)) => {
             let md_id = obj_id.unwrap_module();
@@ -174,24 +172,18 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.gather_submodule_hover_infos(md_id, id);
         }
         LocationInfo::InGlobal(obj_id, link_info, id, InGlobal::Temporary(expr)) => {
-            let mut details_vec: Vec<Cow<str>> = Vec::with_capacity(2);
-            match expr.domain {
-                DomainType::Generative => details_vec.push(Cow::Borrowed("gen")),
-                DomainType::Physical(ph) => {
-                    if let Some(md) = try_get_module(&linker.modules, obj_id) {
-                        details_vec
-                            .push(Cow::Owned(DomainType::physical_to_string(ph, &md.domains)))
-                    }
-                }
-                DomainType::Unknown(_) => {
-                    unreachable!("Variables should have been eliminated already")
-                }
+            let mut details_vec: Vec<String> = Vec::new();
+            let domains = if let GlobalUUID::Module(md_id) = obj_id {
+                &linker.modules[md_id].domains
+            } else {
+                &FlatAlloc::EMPTY_FLAT_ALLOC
             };
-            details_vec.push(Cow::Owned(
+            details_vec.push(expr.domain.display(domains).to_string());
+            details_vec.push(
                 expr.typ
                     .display(linker, &link_info.template_parameters)
                     .to_string(),
-            ));
+            );
             hover.sus_code(details_vec.join(" "));
             hover.gather_hover_infos(obj_id, id, expr.domain == DomainType::Generative);
         }
