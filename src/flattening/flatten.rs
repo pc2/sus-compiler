@@ -412,25 +412,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         }
     }
 
-    fn alloc_submodule_instruction(
-        &mut self,
-        module_ref: GlobalReference<ModuleUUID>,
-        name: String,
-        name_span: Span,
-        documentation: Documentation,
-    ) -> FlatID {
-        self.instructions
-            .alloc(Instruction::SubModule(SubModuleInstance {
-                parent_condition: self.current_parent_condition,
-                name,
-                name_span,
-                module_ref,
-                local_domain_map: TyCell::new(),
-                typ: TyCell::new(),
-                documentation,
-            }))
-    }
-
     fn forbid_keyword(&self, kw_span: Option<Span>, context: &str) {
         if let Some(kw_span) = kw_span {
             self.errors
@@ -493,12 +474,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         self.errors
                             .error(span, "Cannot add latency specifier to module instances");
                     }
-                    let submod_id = self.alloc_submodule_instruction(
-                        module_ref,
-                        name.to_owned(),
+
+                    let new_submod = SubModuleInstance {
+                        parent_condition: self.current_parent_condition,
+                        name: name.to_owned(),
                         name_span,
+                        module_ref,
+                        local_domain_map: TyCell::new(),
+                        typ: TyCell::new(),
                         documentation,
-                    );
+                    };
+                    let submod_id = self.instructions.alloc(Instruction::SubModule(new_submod));
 
                     self.alloc_local_name(name_span, name, NamedLocal::SubModule(submod_id));
 
