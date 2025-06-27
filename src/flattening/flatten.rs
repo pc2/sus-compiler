@@ -1178,7 +1178,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         let documentation = cursor.extract_gathered_comments();
 
-        let interface_decl_id =
+        let declaration_instruction =
             self.instructions
                 .alloc(Instruction::Interface(InterfaceDeclaration {
                     parent_condition: self.current_parent_condition,
@@ -1204,7 +1204,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             name_span,
             name: name.to_owned(),
             domain: Some(self.current_domain),
-            declaration_instruction: Some(InterfaceDeclKind::Interface(interface_decl_id)),
+            declaration_instruction: Some(InterfaceDeclKind::Interface(declaration_instruction)),
         };
         let interface_id = if name == self.name {
             self.interfaces[InterfaceID::MAIN_INTERFACE] = new_interface;
@@ -1213,17 +1213,26 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             self.interfaces.alloc(new_interface)
         };
 
+        let variable_ctx_frame = match interface_kind {
+            InterfaceKind::RegularInterface => None,
+            InterfaceKind::Action(_) | InterfaceKind::Trigger(_) => {
+                Some(self.local_variable_context.new_frame())
+            }
+        };
+
         let (inputs, outputs) =
             self.flatten_interface_ports(inputs_come_first, interface_id, cursor);
 
         let (then_block, else_block, then_block_span, else_span) = self.flatten_then_else_blocks(
             cursor,
-            interface_kind.is_conditional().then_some(interface_decl_id),
+            interface_kind
+                .is_conditional()
+                .then_some(declaration_instruction),
         );
         let then_block = UUIDRange(then_block_starts_at, then_block.1);
         let_unwrap!(
             Instruction::Interface(interface),
-            &mut self.instructions[interface_decl_id]
+            &mut self.instructions[declaration_instruction]
         );
 
         match &mut interface.interface_kind {
@@ -1235,7 +1244,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     decl_span: interface_decl_span,
                     is_input: true,
                     domain: self.current_domain,
-                    declaration_instruction: interface_decl_id,
+                    declaration_instruction,
                     latency_specifier,
                 });
             }
@@ -1246,7 +1255,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     decl_span: interface_decl_span,
                     is_input: false,
                     domain: self.current_domain,
-                    declaration_instruction: interface_decl_id,
+                    declaration_instruction,
                     latency_specifier,
                 });
             }
@@ -1277,6 +1286,10 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 }
             }
             InterfaceKind::Trigger(_) => {}
+        }
+
+        if let Some(variable_ctx_frame) = variable_ctx_frame {
+            self.local_variable_context.pop_frame(variable_ctx_frame);
         }
     }
 
