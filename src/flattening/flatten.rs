@@ -1,4 +1,5 @@
 use std::cell::OnceCell;
+use std::num::NonZeroU16;
 
 use crate::alloc::{ArenaAllocator, UUIDRange, UUID};
 
@@ -1190,8 +1191,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     interface_kind,
                     latency_specifier,
                     is_local,
-                    inputs: UUIDRange::PLACEHOLDER,
-                    outputs: UUIDRange::PLACEHOLDER,
+                    inputs: Vec::new(),
+                    outputs: Vec::new(),
                     domain: DomainType::Physical(self.current_domain),
                     then_block: FlatIDRange::PLACEHOLDER,
                     else_block: FlatIDRange::PLACEHOLDER,
@@ -1399,12 +1400,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
     fn flatten_declaration_list(
         &mut self,
+        field: NonZeroU16,
         default_decl_kind: DeclarationKind,
         cursor: &mut Cursor<'c>,
     ) -> Vec<FlatID> {
-        cursor.collect_list(kind!("declaration_list"), |cursor| {
-            self.flatten_declaration::<false>(default_decl_kind, true, cursor)
-        })
+        if cursor.optional_field(field) {
+            cursor.collect_list(kind!("declaration_list"), |cursor| {
+                self.flatten_declaration::<false>(default_decl_kind, true, cursor)
+            })
+        } else {
+            Vec::new()
+        }
     }
 
     fn flatten_interface_ports(
@@ -1412,45 +1418,39 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         inputs_come_first: bool,
         parent_interface: InterfaceID,
         cursor: &mut Cursor<'c>,
-    ) -> (PortIDRange, PortIDRange) {
+    ) -> (Vec<FlatID>, Vec<FlatID>) {
         if !cursor.optional_field(field!("interface_ports")) {
-            let next_port = self.ports.get_next_alloc_id();
-            let empty = UUIDRange(next_port, next_port);
-            return (empty, empty);
+            return (Vec::new(), Vec::new());
         }
         cursor.go_down(kind!("interface_ports"), |cursor| {
-            let ports_start = self.ports.get_next_alloc_id();
-            if cursor.optional_field(field!("inputs")) {
-                self.flatten_declaration_list(
-                    DeclarationKind::Port {
-                        is_input: inputs_come_first,
-                        is_state: false,
-                        parent_interface,
-                        port_id: UUID::PLACEHOLDER,
-                        domain: self.current_domain,
-                    },
-                    cursor,
-                );
-            }
-            let mid = self.ports.get_next_alloc_id();
-            if cursor.optional_field(field!("outputs")) {
-                self.flatten_declaration_list(
-                    DeclarationKind::Port {
-                        is_input: !inputs_come_first,
-                        is_state: false,
-                        parent_interface,
-                        port_id: UUID::PLACEHOLDER,
-                        domain: self.current_domain,
-                    },
-                    cursor,
-                );
-            }
-            let ports_end = self.ports.get_next_alloc_id();
+            let inputs = self.flatten_declaration_list(
+                field!("inputs"),
+                DeclarationKind::Port {
+                    is_input: inputs_come_first,
+                    is_state: false,
+                    parent_interface,
+                    port_id: UUID::PLACEHOLDER,
+                    domain: self.current_domain,
+                },
+                cursor,
+            );
+
+            let outputs = self.flatten_declaration_list(
+                field!("outputs"),
+                DeclarationKind::Port {
+                    is_input: !inputs_come_first,
+                    is_state: false,
+                    parent_interface,
+                    port_id: UUID::PLACEHOLDER,
+                    domain: self.current_domain,
+                },
+                cursor,
+            );
 
             if inputs_come_first {
-                (UUIDRange(ports_start, mid), UUIDRange(mid, ports_end))
+                (inputs, outputs)
             } else {
-                (UUIDRange(mid, ports_end), UUIDRange(ports_start, mid))
+                (outputs, inputs)
             }
         })
     }
@@ -1460,30 +1460,24 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         when_id: FlatID,
         cursor: &mut Cursor<'c>,
     ) -> (Vec<FlatID>, Vec<FlatID>) {
-        let left_bindings = if cursor.optional_field(field!("inputs")) {
-            self.flatten_declaration_list(
-                DeclarationKind::ConditionalBinding {
-                    when_id,
-                    is_input: true,
-                    is_state: false,
-                },
-                cursor,
-            )
-        } else {
-            Vec::new()
-        };
-        let right_bindings = if cursor.optional_field(field!("outputs")) {
-            self.flatten_declaration_list(
-                DeclarationKind::ConditionalBinding {
-                    when_id,
-                    is_input: false,
-                    is_state: false,
-                },
-                cursor,
-            )
-        } else {
-            Vec::new()
-        };
+        let left_bindings = self.flatten_declaration_list(
+            field!("inputs"),
+            DeclarationKind::ConditionalBinding {
+                when_id,
+                is_input: true,
+                is_state: false,
+            },
+            cursor,
+        );
+        let right_bindings = self.flatten_declaration_list(
+            field!("outputs"),
+            DeclarationKind::ConditionalBinding {
+                when_id,
+                is_input: false,
+                is_state: false,
+            },
+            cursor,
+        );
         (left_bindings, right_bindings)
     }
 

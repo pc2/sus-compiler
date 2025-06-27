@@ -274,16 +274,14 @@ impl Module {
     ) {
         result.write_str(&file_text[interface.decl_span]).unwrap();
         result.write_str(":\n").unwrap();
-        for port_id in interface.inputs {
-            let port_decl = self.ports[port_id].declaration_instruction;
-            let port_decl = self.link_info.instructions[port_decl].unwrap_declaration();
+        for decl_id in &interface.inputs {
+            let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
             result.write_str("input ").unwrap();
             self.make_port_info_fmt(port_decl, file_text, result);
             result.write_char('\n').unwrap();
         }
-        for port_id in interface.outputs {
-            let port_decl = self.ports[port_id].declaration_instruction;
-            let port_decl = self.link_info.instructions[port_decl].unwrap_declaration();
+        for decl_id in &interface.outputs {
+            let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
             result.write_str("output ").unwrap();
             self.make_port_info_fmt(port_decl, file_text, result);
             result.write_char('\n').unwrap();

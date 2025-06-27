@@ -947,12 +947,20 @@ impl<'l> ExecutionContext<'l> {
         let inputs = interface
             .inputs
             .iter()
-            .map(|port_id| self.get_submodule_port(submod_id, port_id, None, domain))
+            .map(|decl_id| {
+                let (port, is_input) = md.get_port_for_decl(*decl_id);
+                assert!(is_input);
+                self.get_submodule_port(submod_id, port, None, domain)
+            })
             .collect();
         let outputs = interface
             .outputs
             .iter()
-            .map(|port_id| self.get_submodule_port(submod_id, port_id, None, domain))
+            .map(|decl_id| {
+                let (port, is_input) = md.get_port_for_decl(*decl_id);
+                assert!(!is_input);
+                self.get_submodule_port(submod_id, port, None, domain)
+            })
             .collect();
 
         InterfaceWires {

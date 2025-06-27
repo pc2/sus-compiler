@@ -346,8 +346,8 @@ impl<'l> TypeCheckingContext<'l> {
         func_call: &FuncCall,
         interface: RemoteFn<'l, &'l TVec<AbstractRankedType>>,
     ) {
-        for (port, arg) in std::iter::zip(interface.fn_decl.inputs, &func_call.arguments) {
-            let port_decl = interface.get_port(port).get_decl();
+        for (decl_id, arg) in std::iter::zip(&interface.fn_decl.inputs, &func_call.arguments) {
+            let port_decl = interface.parent.get_decl(*decl_id);
             let port_type = port_decl.get_local_type(&mut self.type_checker);
 
             // Typecheck the value with target type
@@ -406,7 +406,7 @@ impl<'l> TypeCheckingContext<'l> {
                     );
 
                     if let Some(first_output) = interface.fn_decl.outputs.first() {
-                        let port_decl = interface.get_port(first_output).get_decl();
+                        let port_decl = interface.parent.get_decl(*first_output);
 
                         port_decl.get_local_type(&mut self.type_checker)
                     } else {
@@ -468,8 +468,8 @@ impl<'l> TypeCheckingContext<'l> {
                         multi_write.iter().map(|v| v.to_span),
                     );
 
-                    for (port, to) in std::iter::zip(interface.fn_decl.outputs, multi_write) {
-                        let port_decl = interface.get_port(port).get_decl();
+                    for (decl_id, to) in std::iter::zip(&interface.fn_decl.outputs, multi_write) {
+                        let port_decl = interface.parent.get_decl(*decl_id);
                         let port_type = port_decl.get_local_type(&mut self.type_checker);
 
                         self.type_checker.unify_report_error(

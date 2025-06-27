@@ -77,6 +77,19 @@ impl Module {
         );
         self.link_info.instructions[i].unwrap_interface()
     }
+
+    pub fn get_port_for_decl(&self, decl_id: FlatID) -> (PortID, bool) {
+        let decl = self.link_info.instructions[decl_id].unwrap_declaration();
+        let_unwrap!(
+            DeclarationKind::Port {
+                is_input,
+                port_id,
+                ..
+            },
+            decl.decl_kind
+        );
+        (port_id, is_input)
+    }
 }
 
 /// Represents an opaque type in the compiler, like `int` or `bool`.
@@ -882,8 +895,8 @@ pub struct InterfaceDeclaration {
     pub is_local: bool,
     pub interface_id: InterfaceID,
     pub interface_kind: InterfaceKind,
-    pub inputs: PortIDRange,
-    pub outputs: PortIDRange,
+    pub inputs: Vec<FlatID>,
+    pub outputs: Vec<FlatID>,
     pub then_block: FlatIDRange,
     pub else_block: FlatIDRange,
     pub domain: DomainType,
