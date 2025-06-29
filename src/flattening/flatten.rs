@@ -1460,11 +1460,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 cursor,
             );
 
-            if inputs_come_first {
                 (inputs, outputs)
-            } else {
-                (outputs, inputs)
-            }
         })
     }
 

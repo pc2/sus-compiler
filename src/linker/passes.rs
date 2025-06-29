@@ -273,13 +273,14 @@ impl<'l, TemplateT: Copy> RemoteGlobalConstant<'l, TemplateT> {
         RemoteDeclaration::new(
             &self.cst.link_info,
             self.cst.output_decl,
-            self.template_args,
+            Some(self.template_args),
         )
     }
 }
 #[derive(Clone, Copy)]
 pub struct RemoteSubModule<'l, TemplateT> {
     pub md: &'l Module,
+    /// None if this is the module itself
     pub template_args: TemplateT,
 }
 impl<'l, TemplateT: Copy> RemoteSubModule<'l, TemplateT> {
@@ -287,12 +288,12 @@ impl<'l, TemplateT: Copy> RemoteSubModule<'l, TemplateT> {
         RemoteDeclaration {
             link_info: &self.md.link_info,
             remote_decl: self.md.link_info.instructions[decl_id].unwrap_declaration(),
-            template_arguments: self.template_args,
+            template_args: Some(self.template_args),
         }
     }
     pub fn get_fn(self, fn_decl_id: FlatID) -> RemoteFn<'l, TemplateT> {
         RemoteFn {
-            parent: self,
+            parent: LocalOrRemoteParentModule::Remote(self),
             fn_decl: self.md.link_info.instructions[fn_decl_id].unwrap_interface(),
         }
     }
@@ -304,22 +305,42 @@ impl<'l, TemplateT: Copy> RemoteSubModule<'l, TemplateT> {
         }
     }
 }
+
+#[derive(Clone, Copy)]
+pub enum LocalOrRemoteParentModule<'l, TemplateT> {
+    Remote(RemoteSubModule<'l, TemplateT>),
+    Local(&'l LinkInfo),
+}
+impl<'l, TemplateT: Copy> LocalOrRemoteParentModule<'l, TemplateT> {
+    pub fn get_decl(self, decl_id: FlatID) -> RemoteDeclaration<'l, TemplateT> {
+        match self {
+            LocalOrRemoteParentModule::Remote(remote_sub_module) => {
+                remote_sub_module.get_decl(decl_id)
+            }
+            LocalOrRemoteParentModule::Local(link_info) => RemoteDeclaration {
+                link_info,
+                remote_decl: link_info.instructions[decl_id].unwrap_declaration(),
+                template_args: None,
+            },
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct RemoteFn<'l, TemplateT> {
-    pub parent: RemoteSubModule<'l, TemplateT>,
+    pub parent: LocalOrRemoteParentModule<'l, TemplateT>,
     pub fn_decl: &'l InterfaceDeclaration,
-}
-impl<'l, TemplateT: Copy> RemoteFn<'l, TemplateT> {
-    pub fn get_port(self, port_id: PortID) -> RemotePort<'l, TemplateT> {
-        self.parent.get_port(port_id)
-    }
 }
 /// For interfaces of this module
 impl<TemplateT> FileKnowingErrorInfoObject for RemoteFn<'_, TemplateT> {
     fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
+        let link_info = match &self.parent {
+            LocalOrRemoteParentModule::Remote(remote_sub_module) => &remote_sub_module.md.link_info,
+            LocalOrRemoteParentModule::Local(link_info) => link_info,
+        };
         ErrorInfo {
             position: self.fn_decl.name_span,
-            file: self.parent.md.link_info.file,
+            file: link_info.file,
             info: format!("Interface '{}' defined here", &self.fn_decl.name),
         }
     }
@@ -335,7 +356,7 @@ impl<'l, TemplateT: Copy> RemotePort<'l, TemplateT> {
         RemoteDeclaration::new(
             &self.parent.md.link_info,
             self.port.declaration_instruction,
-            self.parent.template_args,
+            Some(self.parent.template_args),
         )
     }
     pub fn make_info(&self) -> ErrorInfo {
@@ -352,14 +373,15 @@ impl<TemplateT: Copy> FileKnowingErrorInfoObject for RemotePort<'_, TemplateT> {
 pub struct RemoteDeclaration<'l, TemplateT> {
     pub link_info: &'l LinkInfo,
     pub remote_decl: &'l Declaration,
-    pub template_arguments: TemplateT,
+    /// None if this is a local declaration
+    pub template_args: Option<TemplateT>,
 }
 impl<'l, TemplateT> RemoteDeclaration<'l, TemplateT> {
-    pub fn new(link_info: &'l LinkInfo, decl_id: FlatID, template_arguments: TemplateT) -> Self {
+    pub fn new(link_info: &'l LinkInfo, decl_id: FlatID, template_args: Option<TemplateT>) -> Self {
         Self {
             link_info,
             remote_decl: link_info.instructions[decl_id].unwrap_declaration(),
-            template_arguments,
+            template_args,
         }
     }
     pub fn make_info(&self) -> ErrorInfo {

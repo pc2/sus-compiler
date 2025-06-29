@@ -474,10 +474,9 @@ impl ModuleTypingContext<'_> {
             }
             LatencyCountingError::IndeterminablePortLatency { bad_ports } => {
                 for (port, a, b) in bad_ports {
-                    let port_decl = self.md.link_info.instructions
-                        [self.wires[latency_node_meanings[port]].original_instruction]
-                        .unwrap_declaration();
-                    error(port_decl.name_span, format!("Cannot determine port latency. Options are {a} and {b}\nTry specifying an explicit latency or rework the module to remove this ambiguity"));
+                    let port_instr = self.wires[latency_node_meanings[port]].original_instruction;
+                    let port_name_span = self.md.link_info.instructions[port_instr].get_span();
+                    error(port_name_span, format!("Cannot determine port latency. Options are {a} and {b}\nTry specifying an explicit latency or rework the module to remove this ambiguity"));
                 }
             }
             LatencyCountingError::UnreachablePortInThisDomain { hit_and_not_hit } => {
@@ -493,19 +492,14 @@ impl ModuleTypingContext<'_> {
                     let hit_names: Vec<_> = hit_instrs
                         .iter()
                         .map(|instr| {
-                            format!(
-                                "'{}'",
-                                self.md.link_info.instructions[*instr]
-                                    .unwrap_declaration()
-                                    .name
-                            )
+                            let name = self.md.link_info.instructions[*instr].get_name();
+                            format!("'{name}'")
                         })
                         .collect();
                     let hit_names_error_infos: Vec<_> = hit_instrs
                         .iter()
                         .map(|instr| {
                             self.md.link_info.instructions[*instr]
-                                .unwrap_declaration()
                                 .make_info(self.md.link_info.file)
                                 .unwrap()
                         })
@@ -513,9 +507,7 @@ impl ModuleTypingContext<'_> {
                     let strongly_connected_port_list = hit_names.join(", ");
 
                     for non_hit in non_hit_instrs {
-                        let node_instr_span = self.md.link_info.instructions[*non_hit]
-                            .unwrap_declaration()
-                            .name_span;
+                        let node_instr_span = self.md.link_info.instructions[*non_hit].get_span();
 
                         error(node_instr_span, format!("This port is not strongly connected to the strongly connected port cluster {strongly_connected_port_list}.\nAn input and output port are strongly connected if there is a direct dependency path from the input port to the output port.\nStrongly connected ports are also transitive.\nIf you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.")).add_info_list(hit_names_error_infos.clone());
                     }
@@ -526,12 +518,10 @@ impl ModuleTypingContext<'_> {
                     &self.wires[latency_node_meanings[conflict_path.first().unwrap().node]];
                 let end_wire =
                     &self.wires[latency_node_meanings[conflict_path.last().unwrap().node]];
-                let start_decl = self.md.link_info.instructions[start_wire.original_instruction]
-                    .unwrap_declaration();
-                let end_decl = self.md.link_info.instructions[end_wire.original_instruction]
-                    .unwrap_declaration();
+                let start_decl = &self.md.link_info.instructions[start_wire.original_instruction];
+                let end_decl = &self.md.link_info.instructions[end_wire.original_instruction];
                 let end_latency_decl = self.md.link_info.instructions
-                    [end_decl.latency_specifier.unwrap()]
+                    [end_decl.get_latency_specifier().unwrap()]
                 .unwrap_expression();
 
                 let writes_involved =

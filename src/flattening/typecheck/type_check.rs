@@ -3,7 +3,9 @@ use std::ops::Deref;
 
 use crate::alloc::UUID;
 use crate::errors::ErrorInfo;
-use crate::linker::passes::{RemoteDeclaration, RemoteFn};
+use crate::linker::passes::{
+    LocalOrRemoteParentModule, RemoteDeclaration, RemoteFn, RemoteSubModule,
+};
 use crate::prelude::*;
 use crate::to_string::join_string_iter;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType};
@@ -210,7 +212,7 @@ impl<'l> TypeCheckingContext<'l> {
                     let target_decl = RemoteDeclaration::new(
                         target_link_info,
                         v.declaration_instruction,
-                        &abs_types,
+                        Some(&abs_types),
                     );
 
                     let param_required_typ = target_decl.get_local_type(&mut self.type_checker);
@@ -332,25 +334,37 @@ impl<'l> TypeCheckingContext<'l> {
         wire_ref: &'l WireReference,
     ) -> Option<RemoteFn<'l, &'l TVec<AbstractRankedType>>> {
         self.typecheck_wire_reference(wire_ref);
-        if let AbstractInnerType::Interface(sm_ref, interface) = &wire_ref.output_typ.inner {
-            let submod = self.globals.get_submodule(sm_ref);
-            let interface = &submod.md.interfaces[*interface];
-            let Some(interface) = interface.declaration_instruction else {
-                let name = &interface.name;
+        match &wire_ref.output_typ.inner {
+            AbstractInnerType::Interface(sm_ref, interface) => {
+                let submod = self.globals.get_submodule(sm_ref);
+                let interface = &submod.md.interfaces[*interface];
+                let Some(interface) = interface.declaration_instruction else {
+                    let name = &interface.name;
+                    let err_text = format!("A Function call expects this to be a callable interface, the interface `{name}` is not callable");
+                    self.errors
+                        .error(wire_ref.get_total_span(), err_text)
+                        .info_obj_different_file(interface, submod.md.link_info.file);
+                    return None;
+                };
+                let_unwrap!(InterfaceDeclKind::Interface(interface), interface);
+                Some(submod.get_fn(interface))
+            }
+            AbstractInnerType::LocalInterface(interface_decl) => {
+                let fn_decl = self.link_info.instructions[*interface_decl].unwrap_interface();
+                Some(RemoteFn {
+                    parent: LocalOrRemoteParentModule::Local(self.link_info),
+                    fn_decl,
+                })
+            }
+            AbstractInnerType::Template(_)
+            | AbstractInnerType::Named(_)
+            | AbstractInnerType::Unknown(_) => {
                 self.errors.error(
-                        wire_ref.get_total_span(),
-                        format!("A Function call expects this to be a callable interface, the interface `{name}` is not callable"),
-                    ).info_obj_different_file(interface, submod.md.link_info.file);
-                return None;
-            };
-            let_unwrap!(InterfaceDeclKind::Interface(interface), interface);
-            Some(submod.get_fn(interface))
-        } else {
-            self.errors.error(
-                wire_ref.get_total_span(),
-                "A Function call expects this to be an interface, but found a regular wire",
-            );
-            None
+                    wire_ref.get_total_span(),
+                    "A Function call expects this to be an interface, but found a regular wire",
+                );
+                None
+            }
         }
     }
 
@@ -582,10 +596,14 @@ impl<'l> TypeCheckingContext<'l> {
 
 impl<'l> RemoteDeclaration<'l, &'l TVec<AbstractRankedType>> {
     fn get_local_type(&self, type_checker: &mut AbstractTypeSubstitutor) -> AbstractRankedType {
-        type_checker.written_to_abstract_type_substitute_templates(
-            &self.remote_decl.typ_expr,
-            self.template_arguments,
-        )
+        if let Some(template_args) = self.template_args {
+            type_checker.written_to_abstract_type_substitute_templates(
+                &self.remote_decl.typ_expr,
+                template_args,
+            )
+        } else {
+            self.remote_decl.typ.clone()
+        }
     }
 }
 

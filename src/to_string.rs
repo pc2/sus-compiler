@@ -270,8 +270,36 @@ impl Module {
         file_text: &FileText,
         result: &mut String,
     ) {
-        let_unwrap!(DeclarationKind::Port { .. }, decl.decl_kind);
-        result.write_str(&file_text[decl.decl_span]).unwrap()
+        let_unwrap!(
+            DeclarationKind::Port {
+                is_input,
+                is_state,
+                ..
+            },
+            decl.decl_kind
+        );
+        result
+            .write_str(if is_input { "input " } else { "output " })
+            .unwrap();
+        if is_state {
+            result.write_str("state ").unwrap();
+        }
+
+        result
+            .write_str(&file_text[decl.typ_expr.get_span()])
+            .unwrap();
+
+        result.write_char(' ').unwrap();
+
+        result.write_str(&decl.name).unwrap();
+
+        if let Some(lat_spec) = decl.latency_specifier {
+            result.write_char('\'').unwrap();
+
+            let lat_spec_expr = self.link_info.instructions[lat_spec].unwrap_expression();
+            result.write_str(&file_text[lat_spec_expr.span]).unwrap();
+        }
+        result.write_char('\n').unwrap();
     }
 
     pub fn make_interface_info_fmt(
@@ -284,15 +312,14 @@ impl Module {
         result.write_str(":\n").unwrap();
         for decl_id in &interface.inputs {
             let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
-            result.write_str("input ").unwrap();
+            result.write_str("\t").unwrap();
             self.make_port_info_fmt(port_decl, file_text, result);
-            result.write_char('\n').unwrap();
         }
+        result.write_str("\t->\n").unwrap();
         for decl_id in &interface.outputs {
             let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
-            result.write_str("output ").unwrap();
+            result.write_str("\t").unwrap();
             self.make_port_info_fmt(port_decl, file_text, result);
-            result.write_char('\n').unwrap();
         }
         result.pop().unwrap();
     }

@@ -1406,3 +1406,13 @@ module StraightTransmute {
 	int #(MIN: 5, MAX: 3) v
 }
 
+module use_trigger {
+
+	trigger beep : int boop
+
+	action maybe_use_trigger {
+		beep(5)
+	} else {
+		beep(7)
+	}
+}

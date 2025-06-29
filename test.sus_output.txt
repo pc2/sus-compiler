@@ -168,6 +168,7 @@ Flattening write_to_generative_through_when
 Flattening SameNameAsType
 Flattening InstantiateTransmutes
 Flattening StraightTransmute
+Flattening use_trigger
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -322,6 +323,7 @@ Typechecking write_to_generative_through_when
 Typechecking SameNameAsType
 Typechecking InstantiateTransmutes
 Typechecking StraightTransmute
+Typechecking use_trigger
 Typechecking bool
 Typechecking int
 Typechecking float
@@ -492,6 +494,7 @@ Lints write_to_generative_through_when
 Lints SameNameAsType
 Lints InstantiateTransmutes
 Lints StraightTransmute
+Lints use_trigger
 Lints bool
 Lints int
 Lints float
@@ -822,3 +825,6 @@ Instantiating transmute_from_bits #(T: type int #(MIN: 0, MAX: 65535))
 Concrete Typechecking transmute_from_bits #(T: type int #(MIN: 0, MAX: 65535))
 Checking array accesses transmute_from_bits #(T: type int #(MIN: 0, MAX: 65535))
 Checking array accesses transmute #(T1: type int #(MIN: 0, MAX: 255)[2], T2: type int #(MIN: 0, MAX: 65535))
+Instantiating use_trigger
+Concrete Typechecking use_trigger
+Checking array accesses use_trigger

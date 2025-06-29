@@ -714,10 +714,12 @@ impl<'l> ExecutionContext<'l> {
         num_regs: i64,
         write_span: Span,
     ) {
+        let target_wire = &mut self.wires[write_to_wire];
+
         let RealWireDataSource::Multiplexer {
             is_state: _,
             sources,
-        } = &mut self.wires[write_to_wire].source
+        } = &mut target_wire.source
         else {
             caught_by_typecheck!("Should only be a writeable wire here")
         };
@@ -1003,32 +1005,28 @@ impl<'l> ExecutionContext<'l> {
                     todo!("Can't yet work with sub-interfaces");
                 }
 
-                let (condition_wire, invert_ports) = match interface.interface_kind {
+                let condition_wire = match interface.interface_kind {
                     InterfaceKind::RegularInterface => {
+                        interface.decl_span.debug();
                         unreachable!("Can't call interfaces locally")
                     }
                     InterfaceKind::Action(_) => unreachable!("Can't call actions locally"),
                     InterfaceKind::Trigger(_trigger_port) => {
-                        let cond_wire = Some(self.generation_state[*interface_decl].unwrap_wire());
-                        (cond_wire, true)
+                        Some(self.generation_state[*interface_decl].unwrap_wire())
                     }
                 };
 
                 let interface = self.link_info.instructions[*interface_decl].unwrap_interface();
-                let mut inputs = interface
+                let inputs = interface
                     .inputs
                     .iter()
                     .map(|input_decl| self.generation_state[*input_decl].unwrap_wire())
                     .collect();
-                let mut outputs = interface
+                let outputs = interface
                     .outputs
                     .iter()
                     .map(|input_decl| self.generation_state[*input_decl].unwrap_wire())
                     .collect();
-
-                if invert_ports {
-                    std::mem::swap(&mut inputs, &mut outputs);
-                }
 
                 Ok(InterfaceWires {
                     condition_wire,
@@ -1457,20 +1455,29 @@ impl<'l> ExecutionContext<'l> {
                         let specified_latency =
                             self.get_specified_latency(interface.latency_specifier)?;
 
-                        let is_input = match interface.interface_kind {
+                        let is_port = match interface.interface_kind {
                             InterfaceKind::RegularInterface => unreachable!(),
-                            InterfaceKind::Action(_) => true,
-                            InterfaceKind::Trigger(_) => false,
+                            InterfaceKind::Action(_) => Some(true),
+                            InterfaceKind::Trigger(_) => Some(false),
+                        };
+
+                        let source = if is_port == Some(true) {
+                            RealWireDataSource::ReadOnly
+                        } else {
+                            RealWireDataSource::Multiplexer {
+                                is_state: None,
+                                sources: Vec::new(),
+                            }
                         };
                         let condition_wire = self.wires.alloc(RealWire {
                             name: self.unique_name_producer.get_unique_name(&interface.name),
                             typ: ConcreteType::BOOL,
                             original_instruction,
                             domain: interface.domain.unwrap_physical(),
-                            source: RealWireDataSource::ReadOnly,
+                            source,
                             specified_latency,
                             absolute_latency: CALCULATE_LATENCY_LATER,
-                            is_port: Some(is_input),
+                            is_port,
                         });
 
                         self.condition_stack.push(ConditionStackElem {

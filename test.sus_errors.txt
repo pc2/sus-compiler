@@ -50,9 +50,11 @@ Error: No such field 'in' on CrossDomain #(T: T[]). Available fields are 'CrossD
 domain in_clk:
 
 interface in_domain:
-input T in'0
+	input T in'0
+	->
 interface out_domain:
-output T out'0
+	->
+	output T out'0
 domain out_clk:
 
 
@@ -73,9 +75,11 @@ Error: No such field 'out' on CrossDomain #(T: T[]). Available fields are 'Cross
 domain in_clk:
 
 interface in_domain:
-input T in'0
+	input T in'0
+	->
 interface out_domain:
-output T out'0
+	->
+	output T out'0
 domain out_clk:
 
 
@@ -128,9 +132,11 @@ Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'Cro
 domain in_clk:
 
 interface in_domain:
-input T in'0
+	input T in'0
+	->
 interface out_domain:
-output T out'0
+	->
+	output T out'0
 domain out_clk:
 
 
@@ -151,9 +157,11 @@ Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'Cro
 domain in_clk:
 
 interface in_domain:
-input T in'0
+	input T in'0
+	->
 interface out_domain:
-output T out'0
+	->
+	output T out'0
 domain out_clk:
 
 
@@ -174,9 +182,11 @@ Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'Cro
 domain in_clk:
 
 interface in_domain:
-input T in'0
+	input T in'0
+	->
 interface out_domain:
-output T out'0
+	->
+	output T out'0
 domain out_clk:
 
 
@@ -211,9 +221,11 @@ Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'Cr
 domain in_clk:
 
 interface in_domain:
-input T in'0
+	input T in'0
+	->
 interface out_domain:
-output T out'0
+	->
+	output T out'0
 domain out_clk:
 
 
@@ -234,9 +246,11 @@ Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'Cr
 domain in_clk:
 
 interface in_domain:
-input T in'0
+	input T in'0
+	->
 interface out_domain:
-output T out'0
+	->
+	output T out'0
 domain out_clk:
 
 
@@ -271,9 +285,11 @@ Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'Cr
 domain in_clk:
 
 interface in_domain:
-input T in'0
+	input T in'0
+	->
 interface out_domain:
-output T out'0
+	->
+	output T out'0
 domain out_clk:
 
 
@@ -350,11 +366,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-    ╭─[ test.sus:26:2 ]
+    ╭─[ test.sus:26:6 ]
     │
  26 │     int a = pow17(2)
-    │     ──┬──  
-    │       ╰──── Could not finalize this type, some parameters were still unknown: int #(
+    │         ┬  
+    │         ╰── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -404,11 +420,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-    ╭─[ test.sus:81:71 ]
+    ╭─[ test.sus:81:75 ]
     │
  81 │     interface Accumulator : int#(MIN: 0, MAX: 100) term, bool done -> int total
-    │                                                                       ────┬────  
-    │                                                                           ╰────── Could not finalize this type, some parameters were still unknown: int #(
+    │                                                                           ──┬──  
+    │                                                                             ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -417,11 +433,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-    ╭─[ test.sus:82:5 ]
+    ╭─[ test.sus:82:15 ]
     │
  82 │     state int tot
-    │     ──────┬──────  
-    │           ╰──────── Could not finalize this type, some parameters were still unknown: int #(
+    │               ─┬─  
+    │                ╰─── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -430,11 +446,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-    ╭─[ test.sus:85:5 ]
+    ╭─[ test.sus:85:9 ]
     │
  85 │     int new_tot = (tot + term) % 100
-    │     ─────┬─────  
-    │          ╰─────── Could not finalize this type, some parameters were still unknown: int #(
+    │         ───┬───  
+    │            ╰───── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -547,11 +563,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:175:40 ]
+     ╭─[ test.sus:175:44 ]
      │
  175 │     interface assignment_producer : -> int v'0, int o'0, bool j'0 }
-     │                                        ───┬───  
-     │                                           ╰───── Could not finalize this type, some parameters were still unknown: int #(
+     │                                            ┬  
+     │                                            ╰── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -560,11 +576,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:175:49 ]
+     ╭─[ test.sus:175:53 ]
      │
  175 │     interface assignment_producer : -> int v'0, int o'0, bool j'0 }
-     │                                                 ───┬───  
-     │                                                    ╰───── Could not finalize this type, some parameters were still unknown: int #(
+     │                                                     ┬  
+     │                                                     ╰── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -573,11 +589,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[3]
-     ╭─[ test.sus:178:2 ]
+     ╭─[ test.sus:178:15 ]
      │
  178 │     state int[3] st
-     │     ───────┬───────  
-     │            ╰───────── Could not finalize this type, some parameters were still unknown: int #(
+     │                  ─┬  
+     │                   ╰── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[3]
@@ -600,11 +616,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:180:6 ]
+     ╭─[ test.sus:180:10 ]
      │
  180 │     reg int a, st[2], reg reg b = assignment_producer()
-     │         ──┬──  
-     │           ╰──── Could not finalize this type, some parameters were still unknown: int #(
+     │             ┬  
+     │             ╰── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -674,11 +690,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:224:51 ]
+     ╭─[ test.sus:224:55 ]
      │
  224 │     interface first_bit_idx_24 : bool[24] bits -> int first
-     │                                                   ────┬────  
-     │                                                       ╰────── Could not finalize this type, some parameters were still unknown: int #(
+     │                                                       ──┬──  
+     │                                                         ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -687,11 +703,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[4]
-     ╭─[ test.sus:225:2 ]
+     ╭─[ test.sus:225:9 ]
      │
  225 │     int[4] offsets
-     │     ───────┬──────  
-     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
+     │            ───┬───  
+     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[4]
@@ -735,11 +751,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:234:3 ]
+     ╭─[ test.sus:234:7 ]
      │
  234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │        ─────┬────  
-     │             ╰────── Could not finalize this type, some parameters were still unknown: int #(
+     │            ───┬──  
+     │               ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -748,11 +764,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:234:3 ]
+     ╭─[ test.sus:234:7 ]
      │
  234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │        ─────┬────  
-     │             ╰────── Could not finalize this type, some parameters were still unknown: int #(
+     │            ───┬──  
+     │               ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -761,11 +777,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:234:3 ]
+     ╭─[ test.sus:234:7 ]
      │
  234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │        ─────┬────  
-     │             ╰────── Could not finalize this type, some parameters were still unknown: int #(
+     │            ───┬──  
+     │               ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -774,11 +790,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:234:3 ]
+     ╭─[ test.sus:234:7 ]
      │
  234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │        ─────┬────  
-     │             ╰────── Could not finalize this type, some parameters were still unknown: int #(
+     │            ───┬──  
+     │               ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -1055,11 +1071,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:331:55 ]
+     ╭─[ test.sus:331:59 ]
      │
  331 │     interface bad_cycle : int#(MIN: 0, MAX: 100) a -> int r
-     │                                                       ──┬──  
-     │                                                         ╰──── Could not finalize this type, some parameters were still unknown: int #(
+     │                                                           ┬  
+     │                                                           ╰── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -1068,11 +1084,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:332:2 ]
+     ╭─[ test.sus:332:12 ]
      │
  332 │     state int state_reg
-     │     ─────────┬─────────  
-     │              ╰─────────── Could not finalize this type, some parameters were still unknown: int #(
+     │               ────┬────  
+     │                   ╰────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -1083,11 +1099,11 @@ state_reg'0
 -> state_reg'1 (+1)
 
 Which conflicts with the starting latency
-     ╭─[ test.sus:332:2 ]
+     ╭─[ test.sus:332:12 ]
      │
  332 │     state int state_reg
-     │     ─────────┬─────────  
-     │              ╰─────────── This instruction is part of a net-positive latency cycle of +1
+     │               ────┬────  
+     │                   ╰────── This instruction is part of a net-positive latency cycle of +1
 
 state_reg'0
 -> state_reg'1 (+1)
@@ -2540,11 +2556,11 @@ test'5
 -> test'10 (+10)
 
 Which conflicts with the starting latency
-     ╭─[ test.sus:360:2 ]
+     ╭─[ test.sus:360:29 ]
      │
  360 │     state int#(MIN: 0, MAX: 7) test
-     │     ───────────────┬───────────────  
-     │                    ╰───────────────── This instruction is part of a net-positive latency cycle of +5
+     │                                ──┬─  
+     │                                  ╰─── This instruction is part of a net-positive latency cycle of +5
 
 test'5
 -> __4_i'0 (-5)
@@ -2650,9 +2666,10 @@ Error: No such field 'port_a' on submodule_named_ports #(). Available fields are
      │                  ╰──────────── Module 'submodule_named_ports' defined here. module submodule_named_ports #():
 domain clk:
 interface submodule_named_ports:
-input int#(MIN: 0, MAX: 100) port_a
-input int#(MIN: 0, MAX: 100) port_b
-output int port_c
+	input int#(MIN: 0, MAX: 100) port_a
+	input int#(MIN: 0, MAX: 100) port_b
+	->
+	output int port_c
      │ 
  590 │     sm.port_a = i
      │        ───┬──  
@@ -2666,9 +2683,10 @@ Error: No such field 'port_b' on submodule_named_ports #(). Available fields are
      │                  ╰──────────── Module 'submodule_named_ports' defined here. module submodule_named_ports #():
 domain clk:
 interface submodule_named_ports:
-input int#(MIN: 0, MAX: 100) port_a
-input int#(MIN: 0, MAX: 100) port_b
-output int port_c
+	input int#(MIN: 0, MAX: 100) port_a
+	input int#(MIN: 0, MAX: 100) port_b
+	->
+	output int port_c
      │ 
  592 │     sm.port_b = i
      │        ───┬──  
@@ -2682,9 +2700,10 @@ Error: No such field 'port_c' on submodule_named_ports #(). Available fields are
      │                  ╰──────────── Module 'submodule_named_ports' defined here. module submodule_named_ports #():
 domain clk:
 interface submodule_named_ports:
-input int#(MIN: 0, MAX: 100) port_a
-input int#(MIN: 0, MAX: 100) port_b
-output int port_c
+	input int#(MIN: 0, MAX: 100) port_a
+	input int#(MIN: 0, MAX: 100) port_b
+	->
+	output int port_c
      │ 
  594 │     o = sm.port_c
      │            ───┬──  
@@ -2795,9 +2814,11 @@ Error: No such field 'i' on cross_memory #(). Available fields are 'cross_memory
 domain clk:
 
 interface in:
-input bool[20][512] i'0
+	input bool[20][512] i'0
+	->
 interface out:
-output bool[20][512] o'0
+	->
+	output bool[20][512] o'0
      │ 
  641 │     cr_m.i = mem
      │          ┬  
@@ -2826,9 +2847,11 @@ Error: No such field 'o' on cross_memory #(). Available fields are 'cross_memory
 domain clk:
 
 interface in:
-input bool[20][512] i'0
+	input bool[20][512] i'0
+	->
 interface out:
-output bool[20][512] o'0
+	->
+	output bool[20][512] o'0
      │ 
  643 │        rd_data = cr_m.o[rd_addr]
      │                       ┬  
@@ -2838,11 +2861,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:648:29 ]
+     ╭─[ test.sus:648:33 ]
      │
  648 │     interface use_fifo : -> int o
-     │                             ──┬──  
-     │                               ╰──── Could not finalize this type, some parameters were still unknown: int #(
+     │                                 ┬  
+     │                                 ╰── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -2920,9 +2943,11 @@ Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', '
 domain clk:
 
 interface in:
-input bool i'0
+	input bool i'0
+	->
 interface out:
-output bool o'0
+	->
+	output bool o'0
      │ 
  667 │     ci.i = domain3
      │        ┬  
@@ -2937,9 +2962,11 @@ Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', '
 domain clk:
 
 interface in:
-input bool i'0
+	input bool i'0
+	->
 interface out:
-output bool o'0
+	->
+	output bool o'0
      │ 
  668 │     domain4 = ci.o
      │                  ┬  
@@ -3034,8 +3061,9 @@ Error: No such field 'a' on mod_with_unused_interface #(). Available fields are 
 domain clk:
 
 interface v:
-input int#(MIN: 0, MAX: 100) a
-output int b
+	input int#(MIN: 0, MAX: 100) a
+	->
+	output int b
      │ 
  707 │     mm.a
      │        ┬  
@@ -3073,9 +3101,11 @@ Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', '
 domain clk:
 
 interface in:
-input bool i'0
+	input bool i'0
+	->
 interface out:
-output bool o'0
+	->
+	output bool o'0
      │ 
  730 │     start_cr.i = start
      │              ┬  
@@ -3097,9 +3127,11 @@ Error: No such field 'i' on cross_int #(). Available fields are 'cross_int', 'in
 domain clk:
 
 interface in:
-input int#(MIN: 0, MAX: 100) i'0
+	input int#(MIN: 0, MAX: 100) i'0
+	->
 interface out:
-output int o'0
+	->
+	output int o'0
      │ 
  733 │     upTo_cr.i = upTo
      │             ┬  
@@ -3114,9 +3146,11 @@ Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', '
 domain clk:
 
 interface in:
-input bool i'0
+	input bool i'0
+	->
 interface out:
-output bool o'0
+	->
+	output bool o'0
      │ 
  736 │     ready = ready_cr.o
      │                      ┬  
@@ -3131,9 +3165,11 @@ Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', '
 domain clk:
 
 interface in:
-input bool i'0
+	input bool i'0
+	->
 interface out:
-output bool o'0
+	->
+	output bool o'0
      │ 
  739 │     ready_cr.i = !valid
      │              ┬  
@@ -3148,9 +3184,11 @@ Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', '
 domain clk:
 
 interface in:
-input bool i'0
+	input bool i'0
+	->
 interface out:
-output bool o'0
+	->
+	output bool o'0
      │ 
  744 │     when start_cr.o {
      │                   ┬  
@@ -3165,9 +3203,11 @@ Error: No such field 'o' on cross_int #(). Available fields are 'cross_int', 'in
 domain clk:
 
 interface in:
-input int#(MIN: 0, MAX: 100) i'0
+	input int#(MIN: 0, MAX: 100) i'0
+	->
 interface out:
-output int o'0
+	->
+	output int o'0
      │ 
  745 │        index = upTo_cr.o
      │                        ┬  
@@ -3218,11 +3258,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:758:19 ]
+     ╭─[ test.sus:758:23 ]
      │
  758 │     bool iter_valid, int iter_index = sdf.iter()
-     │                      ───────┬──────  
-     │                             ╰──────── Could not finalize this type, some parameters were still unknown: int #(
+     │                          ─────┬────  
+     │                               ╰────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3238,11 +3278,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:760:3 ]
+     ╭─[ test.sus:760:7 ]
      │
  760 │        int idx = iter_index
-     │        ───┬───  
-     │           ╰───── Could not finalize this type, some parameters were still unknown: int #(
+     │            ─┬─  
+     │             ╰─── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3271,11 +3311,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:763:2 ]
+     ╭─[ test.sus:763:6 ]
      │
  763 │     int beep
-     │     ────┬───  
-     │         ╰───── Could not finalize this type, some parameters were still unknown: int #(
+     │         ──┬─  
+     │           ╰─── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3432,11 +3472,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[127]
-     ╭─[ test.sus:799:2 ]
+     ╭─[ test.sus:799:19 ]
      │
  799 │     input int[WIDTH] values
-     │     ───────────┬───────────  
-     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
+     │                      ───┬──  
+     │                         ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[127]
@@ -3445,11 +3485,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[15]
-     ╭─[ test.sus:799:2 ]
+     ╭─[ test.sus:799:19 ]
      │
  799 │     input int[WIDTH] values
-     │     ───────────┬───────────  
-     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
+     │                      ───┬──  
+     │                         ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[15]
@@ -3458,11 +3498,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[1]
-     ╭─[ test.sus:799:2 ]
+     ╭─[ test.sus:799:19 ]
      │
  799 │     input int[WIDTH] values
-     │     ───────────┬───────────  
-     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
+     │                      ───┬──  
+     │                         ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[1]
@@ -3471,11 +3511,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[255]
-     ╭─[ test.sus:799:2 ]
+     ╭─[ test.sus:799:19 ]
      │
  799 │     input int[WIDTH] values
-     │     ───────────┬───────────  
-     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
+     │                      ───┬──  
+     │                         ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[255]
@@ -3484,11 +3524,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[31]
-     ╭─[ test.sus:799:2 ]
+     ╭─[ test.sus:799:19 ]
      │
  799 │     input int[WIDTH] values
-     │     ───────────┬───────────  
-     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
+     │                      ───┬──  
+     │                         ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[31]
@@ -3497,11 +3537,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[3]
-     ╭─[ test.sus:799:2 ]
+     ╭─[ test.sus:799:19 ]
      │
  799 │     input int[WIDTH] values
-     │     ───────────┬───────────  
-     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
+     │                      ───┬──  
+     │                         ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[3]
@@ -3510,11 +3550,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[63]
-     ╭─[ test.sus:799:2 ]
+     ╭─[ test.sus:799:19 ]
      │
  799 │     input int[WIDTH] values
-     │     ───────────┬───────────  
-     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
+     │                      ───┬──  
+     │                         ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[63]
@@ -3523,11 +3563,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[7]
-     ╭─[ test.sus:799:2 ]
+     ╭─[ test.sus:799:19 ]
      │
  799 │     input int[WIDTH] values
-     │     ───────────┬───────────  
-     │                ╰───────────── Could not finalize this type, some parameters were still unknown: int #(
+     │                      ───┬──  
+     │                         ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[7]
@@ -3536,11 +3576,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:2 ]
+     ╭─[ test.sus:800:13 ]
      │
  800 │     output int sum
-     │     ───────┬──────  
-     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
+     │                ─┬─  
+     │                 ╰─── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3549,11 +3589,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:2 ]
+     ╭─[ test.sus:800:13 ]
      │
  800 │     output int sum
-     │     ───────┬──────  
-     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
+     │                ─┬─  
+     │                 ╰─── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3562,11 +3602,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:2 ]
+     ╭─[ test.sus:800:13 ]
      │
  800 │     output int sum
-     │     ───────┬──────  
-     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
+     │                ─┬─  
+     │                 ╰─── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3575,11 +3615,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:2 ]
+     ╭─[ test.sus:800:13 ]
      │
  800 │     output int sum
-     │     ───────┬──────  
-     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
+     │                ─┬─  
+     │                 ╰─── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3588,11 +3628,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:2 ]
+     ╭─[ test.sus:800:13 ]
      │
  800 │     output int sum
-     │     ───────┬──────  
-     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
+     │                ─┬─  
+     │                 ╰─── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3601,11 +3641,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:2 ]
+     ╭─[ test.sus:800:13 ]
      │
  800 │     output int sum
-     │     ───────┬──────  
-     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
+     │                ─┬─  
+     │                 ╰─── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3614,11 +3654,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:2 ]
+     ╭─[ test.sus:800:13 ]
      │
  800 │     output int sum
-     │     ───────┬──────  
-     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
+     │                ─┬─  
+     │                 ╰─── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -3627,11 +3667,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:800:2 ]
+     ╭─[ test.sus:800:13 ]
      │
  800 │     output int sum
-     │     ───────┬──────  
-     │            ╰──────── Could not finalize this type, some parameters were still unknown: int #(
+     │                ─┬─  
+     │                 ╰─── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -11012,11 +11052,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:835:2 ]
+     ╭─[ test.sus:835:13 ]
      │
  835 │     output int beep = tr.sum
-     │     ───────┬───────  
-     │            ╰───────── Could not finalize this type, some parameters were still unknown: int #(
+     │                ──┬─  
+     │                  ╰─── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -11307,9 +11347,11 @@ Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'Cro
 domain in_clk:
 
 interface in_domain:
-input T in'0
+	input T in'0
+	->
 interface out_domain:
-output T out'0
+	->
+	output T out'0
 domain out_clk:
 
 
@@ -11337,9 +11379,11 @@ Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'Cr
 domain in_clk:
 
 interface in_domain:
-input T in'0
+	input T in'0
+	->
 interface out_domain:
-output T out'0
+	->
+	output T out'0
 domain out_clk:
 
 
@@ -11413,8 +11457,9 @@ Error: No such field 'a' on make_infinite_type_help #(T: ?[...]). Available fiel
       │                   ╰───────────── Module 'make_infinite_type_help' defined here. module make_infinite_type_help #(T):
 domain clk:
 interface make_infinite_type_help:
-input T[3] a
-output T b
+	input T[3] a
+	->
+	output T b
       │ 
  1029 │     mtinf.a = mtinf.b
       │           ┬  
@@ -11428,8 +11473,9 @@ Error: No such field 'b' on make_infinite_type_help #(T: ?[...]). Available fiel
       │                   ╰───────────── Module 'make_infinite_type_help' defined here. module make_infinite_type_help #(T):
 domain clk:
 interface make_infinite_type_help:
-input T[3] a
-output T b
+	input T[3] a
+	->
+	output T b
       │ 
  1029 │     mtinf.a = mtinf.b
       │                     ┬  
@@ -11446,11 +11492,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-      ╭─[ test.sus:1037:3 ]
+      ╭─[ test.sus:1037:7 ]
       │
  1037 │        int addr'0,
-      │        ─────┬────  
-      │             ╰────── Could not finalize this type, some parameters were still unknown: int #(
+      │            ──┬─  
+      │              ╰─── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -11534,11 +11580,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[20]
-      ╭─[ test.sus:1070:2 ]
+      ╭─[ test.sus:1070:10 ]
       │
  1070 │     int[20] arr
-      │     ─────┬─────  
-      │          ╰─────── Could not finalize this type, some parameters were still unknown: int #(
+      │             ─┬─  
+      │              ╰─── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[20]
@@ -11554,11 +11600,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[5]
-      ╭─[ test.sus:1072:2 ]
+      ╭─[ test.sus:1072:9 ]
       │
  1072 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
-      │     ──────┬──────  
-      │           ╰──────── Could not finalize this type, some parameters were still unknown: int #(
+      │            ───┬──  
+      │               ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[5]
@@ -11810,11 +11856,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-      ╭─[ test.sus:1160:2 ]
+      ╭─[ test.sus:1160:12 ]
       │
  1160 │     input int data_received'3
-      │     ────────────┬────────────  
-      │                 ╰────────────── Could not finalize this type, some parameters were still unknown: int #(
+      │               ──────┬──────  
+      │                     ╰──────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -11864,11 +11910,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-      ╭─[ test.sus:1166:23 ]
+      ╭─[ test.sus:1166:27 ]
       │
  1166 │        reg reg reg reg reg int heavy_computation = data_received
-      │                            ──────────┬──────────  
-      │                                      ╰──────────── Could not finalize this type, some parameters were still unknown: int #(
+      │                                ────────┬────────  
+      │                                        ╰────────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -11939,11 +11985,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[10][6][2]
-      ╭─[ test.sus:1206:29 ]
+      ╭─[ test.sus:1206:43 ]
       │
  1206 │     interface testArrayWrite : int[10][6][2] in_arr -> int[10][6] out_arr
-      │                                ──────────┬─────────  
-      │                                          ╰─────────── Could not finalize this type, some parameters were still unknown: int #(
+      │                                              ───┬──  
+      │                                                 ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[10][6][2]
@@ -11952,11 +11998,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[10][6]
-      ╭─[ test.sus:1206:53 ]
+      ╭─[ test.sus:1206:64 ]
       │
  1206 │     interface testArrayWrite : int[10][6][2] in_arr -> int[10][6] out_arr
-      │                                                        ─────────┬────────  
-      │                                                                 ╰────────── Could not finalize this type, some parameters were still unknown: int #(
+      │                                                                   ───┬───  
+      │                                                                      ╰───── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[10][6]
@@ -12877,11 +12923,14 @@ Error: No such field 'process' on MultiStateLoop #(T: ?[...], II: int). Availabl
 domain clk:
 
 trigger may_process'0:
-output T cur_state
+	output T cur_state
+	->
 action next_state'II:
-input T next_state_value
+	input T next_state_value
+	->
 action request_output:
-input T result
+	input T result
+	->
       │ 
  1263 │     when loop.process : float cur_state {
       │               ───┬───  
@@ -12958,11 +13007,11 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[4]
-      ╭─[ test.sus:1275:2 ]
+      ╭─[ test.sus:1275:9 ]
       │
  1275 │     int[4] result = []
-      │     ──────┬──────  
-      │           ╰──────── Could not finalize this type, some parameters were still unknown: int #(
+      │            ───┬──  
+      │               ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[4]
@@ -13294,11 +13343,11 @@ Error: The type of this wire is invalid! int #(
     MIN: 5, 
     MAX: 3
 )
-      ╭─[ test.sus:1406:2 ]
+      ╭─[ test.sus:1406:24 ]
       │
  1406 │     int #(MIN: 5, MAX: 3) v
-      │     ───────────┬───────────  
-      │                ╰───────────── The type of this wire is invalid! int #(
+      │                           ┬  
+      │                           ╰── The type of this wire is invalid! int #(
     MIN: 5, 
     MAX: 3
 )

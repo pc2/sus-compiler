@@ -895,7 +895,11 @@ pub struct InterfaceDeclaration {
     pub is_local: bool,
     pub interface_id: InterfaceID,
     pub interface_kind: InterfaceKind,
+    /// These and [Self::outputs] are respective to the function-call syntax!
+    ///
+    /// Do not be confused by [InterfaceKind::Trigger], where [Self::inputs] corresponds to module Output ports!
     pub inputs: Vec<FlatID>,
+    /// See [Self::inputs]
     pub outputs: Vec<FlatID>,
     pub then_block: FlatIDRange,
     pub else_block: FlatIDRange,
@@ -1006,11 +1010,34 @@ impl Instruction {
     pub fn get_span(&self) -> Span {
         match self {
             Instruction::SubModule(sub_module_instance) => sub_module_instance.name_span,
-            Instruction::Declaration(declaration) => declaration.decl_span,
+            Instruction::Declaration(declaration) => declaration.name_span,
             Instruction::Interface(act_trig) => act_trig.name_span,
             Instruction::Expression(expression) => expression.span,
-            Instruction::IfStatement(_) => unreachable!(),
-            Instruction::ForStatement(_) => unreachable!(),
+            Instruction::IfStatement(_) | Instruction::ForStatement(_) => {
+                unreachable!("{self:?} is control flow! Shouldn't ask it's span")
+            }
+        }
+    }
+    pub fn get_name(&self) -> &str {
+        match self {
+            Instruction::Declaration(declaration) => &declaration.name,
+            Instruction::Interface(interface_declaration) => &interface_declaration.name,
+            Instruction::SubModule(submod) => &submod.name,
+            Instruction::Expression(_)
+            | Instruction::IfStatement(_)
+            | Instruction::ForStatement(_) => unreachable!("{self:?} is not nameable!"),
+        }
+    }
+    pub fn get_latency_specifier(&self) -> Option<FlatID> {
+        match self {
+            Instruction::Declaration(declaration) => declaration.latency_specifier,
+            Instruction::Interface(interface) => interface.latency_specifier,
+            Instruction::SubModule(_)
+            | Instruction::Expression(_)
+            | Instruction::IfStatement(_)
+            | Instruction::ForStatement(_) => {
+                unreachable!("{self:?} Cannot have Latency Specifier!")
+            }
         }
     }
 }
