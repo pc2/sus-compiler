@@ -277,28 +277,6 @@ impl ModuleTypingContext<'_> {
     // Returns a proper interface if all ports involved did not produce an error. If a port did produce an error then returns None.
     // Computes all latencies involved
     pub fn compute_latencies(&mut self, unifier: &ValueUnifierStore) {
-        let mut any_invalid_port = false;
-        for (port_id, p) in self.interface_ports.iter_valids() {
-            if !p.is_input {
-                let port_wire = &self.wires[p.wire];
-                let RealWireDataSource::Multiplexer {
-                    is_state: _,
-                    sources,
-                } = &port_wire.source
-                else {
-                    unreachable!()
-                };
-                if sources.is_empty() && port_wire.specified_latency == CALCULATE_LATENCY_LATER {
-                    any_invalid_port = true;
-                    let port = &self.md.ports[port_id];
-                    self.errors.error(port.name_span, format!("Pre-emptive error because latency-unspecified '{}' is never written to. \n(This is because work-in-progress code would get a lot of latency counting errors while unfinished)", port.name));
-                }
-            }
-        }
-        if any_invalid_port {
-            return; // Early exit so we don't flood WIP modules with "Node not reached by Latency Counting" errors
-        }
-
         let mut problem = LatencyCountingProblem::new(self, unifier);
         // Remove all poisoned edges as solve_latencies doesn't deal with them
         problem.remove_poison_edges();

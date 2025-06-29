@@ -648,15 +648,6 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Pre-emptive error because latency-unspecified 'first' is never written to. 
-(This is because work-in-progress code would get a lot of latency counting errors while unfinished)
-     ╭─[ test.sus:224:55 ]
-     │
- 224 │     interface first_bit_idx_24 : bool[24] bits -> int first
-     │                                                       ──┬──  
-     │                                                         ╰──── Pre-emptive error because latency-unspecified 'first' is never written to. 
-(This is because work-in-progress code would get a lot of latency counting errors while unfinished)
-─────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
@@ -2806,15 +2797,6 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-─────╯
-Error: Pre-emptive error because latency-unspecified 'o' is never written to. 
-(This is because work-in-progress code would get a lot of latency counting errors while unfinished)
-     ╭─[ test.sus:648:33 ]
-     │
- 648 │     interface use_fifo : -> int o
-     │                                 ┬  
-     │                                 ╰── Pre-emptive error because latency-unspecified 'o' is never written to. 
-(This is because work-in-progress code would get a lot of latency counting errors while unfinished)
 ─────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: FIFO #(
     T: type bool[20], 
