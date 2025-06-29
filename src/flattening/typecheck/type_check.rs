@@ -3,9 +3,7 @@ use std::ops::Deref;
 
 use crate::alloc::UUID;
 use crate::errors::ErrorInfo;
-use crate::linker::passes::{
-    LocalOrRemoteParentModule, RemoteDeclaration, RemoteFn, RemoteSubModule,
-};
+use crate::linker::passes::{LocalOrRemoteParentModule, RemoteDeclaration, RemoteFn};
 use crate::prelude::*;
 use crate::to_string::join_string_iter;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType};

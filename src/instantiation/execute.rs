@@ -879,13 +879,12 @@ impl<'l> ExecutionContext<'l> {
         } else {
             let submod_md = &self.linker.modules[submod_instance.refers_to.id];
             let port_data = &submod_md.ports[port_id];
-            let source = if port_data.is_input {
-                RealWireDataSource::Multiplexer {
+            let source = match port_data.direction {
+                Direction::Input => RealWireDataSource::Multiplexer {
                     is_state: None,
                     sources: Vec::new(),
-                }
-            } else {
-                RealWireDataSource::ReadOnly
+                },
+                Direction::Output => RealWireDataSource::ReadOnly,
             };
             let typ = Self::concretize_submodule_port_type(
                 &mut self.type_substitutor,
@@ -950,8 +949,8 @@ impl<'l> ExecutionContext<'l> {
             .inputs
             .iter()
             .map(|decl_id| {
-                let (port, is_input) = md.get_port_for_decl(*decl_id);
-                assert!(is_input);
+                let (port, direction) = md.get_port_for_decl(*decl_id);
+                assert_eq!(direction, Direction::Input);
                 self.get_submodule_port(submod_id, port, None, domain)
             })
             .collect();
@@ -959,8 +958,8 @@ impl<'l> ExecutionContext<'l> {
             .outputs
             .iter()
             .map(|decl_id| {
-                let (port, is_input) = md.get_port_for_decl(*decl_id);
-                assert!(!is_input);
+                let (port, direction) = md.get_port_for_decl(*decl_id);
+                assert_eq!(direction, Direction::Output);
                 self.get_submodule_port(submod_id, port, None, domain)
             })
             .collect();
@@ -1174,8 +1173,8 @@ impl<'l> ExecutionContext<'l> {
 
             let specified_latency = self.get_specified_latency(wire_decl.latency_specifier)?;
 
-            let is_port = if let DeclarationKind::Port { is_input, .. } = &wire_decl.decl_kind {
-                Some(*is_input)
+            let is_port = if let DeclarationKind::Port { direction, .. } = &wire_decl.decl_kind {
+                Some(*direction)
             } else {
                 None
             };
@@ -1457,14 +1456,13 @@ impl<'l> ExecutionContext<'l> {
 
                         let is_port = match interface.interface_kind {
                             InterfaceKind::RegularInterface => unreachable!(),
-                            InterfaceKind::Action(_) => Some(true),
-                            InterfaceKind::Trigger(_) => Some(false),
+                            InterfaceKind::Action(_) => Some(Direction::Input),
+                            InterfaceKind::Trigger(_) => Some(Direction::Output),
                         };
 
-                        let source = if is_port == Some(true) {
-                            RealWireDataSource::ReadOnly
-                        } else {
-                            RealWireDataSource::Multiplexer {
+                        let source = match is_port {
+                            Some(Direction::Input) => RealWireDataSource::ReadOnly,
+                            Some(Direction::Output) | None => RealWireDataSource::Multiplexer {
                                 is_state: None,
                                 sources: Vec::new(),
                             }

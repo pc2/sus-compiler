@@ -15,7 +15,9 @@ use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
 use std::cell::OnceCell;
 use std::rc::Rc;
 
-use crate::flattening::{BinaryOperator, ExpressionSource, Instruction, Module, UnaryOperator};
+use crate::flattening::{
+    BinaryOperator, Direction, ExpressionSource, Instruction, Module, UnaryOperator,
+};
 use crate::{errors::ErrorStore, value::Value};
 
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
@@ -90,7 +92,7 @@ pub struct RealWire {
     pub specified_latency: i64,
     /// The computed latencies after latency counting
     pub absolute_latency: i64,
-    pub is_port: Option<bool>,
+    pub is_port: Option<Direction>,
 }
 impl RealWire {
     fn get_span(&self, link_info: &LinkInfo) -> Span {
@@ -142,7 +144,7 @@ impl SubModule {
 #[derive(Debug)]
 pub struct InstantiatedPort {
     pub wire: WireID,
-    pub is_input: bool,
+    pub direction: Direction,
     pub absolute_latency: i64,
     pub typ: ConcreteType,
     pub domain: DomainID,
@@ -306,7 +308,7 @@ impl Executed {
             let wire = &self.wires[*wire_id];
             Some(InstantiatedPort {
                 wire: *wire_id,
-                is_input: port.is_input,
+                direction: port.direction,
                 absolute_latency: CALCULATE_LATENCY_LATER,
                 typ: wire.typ.clone(),
                 domain: wire.domain,

@@ -358,11 +358,14 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                             }
                             (Some(concrete_port), Some(connecting_wire)) => {
                                 let wire = &self.wires[connecting_wire.maps_to_wire];
-                                if source_code_port.is_input {
+                                match source_code_port.direction {
                                     // Subtype relations always flow FORWARD.
-                                    unifier.unify_concrete::<false>(&wire.typ, &concrete_port.typ);
-                                } else {
-                                    unifier.unify_concrete::<true>(&wire.typ, &concrete_port.typ);
+                                    Direction::Input => {
+                                        unifier.unify_concrete::<false>(&wire.typ, &concrete_port.typ);
+                                    }
+                                    Direction::Output => {
+                                        unifier.unify_concrete::<true>(&wire.typ, &concrete_port.typ);
+                                    }
                                 }
                             }
                         }

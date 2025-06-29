@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use crate::{
     alloc::zip_eq,
-    flattening::{DeclarationKind, ExpressionSource},
+    flattening::{DeclarationKind, Direction, ExpressionSource},
     instantiation::{SubModule, SubModulePort},
     prelude::*,
     typing::{
@@ -213,7 +213,7 @@ fn recurse_down_expression(
 #[derive(Debug, Clone)]
 struct FullPortLatencyLinearity {
     domain: DomainID,
-    is_input: bool,
+    direction: Direction,
     latency_linearity: Option<PortLatencyLinearity>,
 }
 
@@ -253,7 +253,7 @@ impl PortLatencyInferenceInfo {
 
                 FullPortLatencyLinearity {
                     domain: port.domain,
-                    is_input: port.is_input,
+                    direction: port.direction,
                     latency_linearity,
                 }
             }),
@@ -283,11 +283,11 @@ impl PortLatencyInferenceInfo {
 
         // Inference Edges
         for (from_id, from) in &updated_port_linearities {
-            if !from.is_input {
+            if from.direction == Direction::Output {
                 continue;
             }
             for (to_id, to) in &updated_port_linearities {
-                if to.domain != from.domain || to.is_input {
+                if to.domain != from.domain || to.direction == Direction::Input {
                     continue; // ports on different domains cannot be related in latency counting
                 }
 
@@ -483,6 +483,7 @@ impl InferenceEdgesForDomain {
 mod tests {
     use crate::{
         alloc::{FlatAlloc, UUIDRange},
+        flattening::Direction,
         instantiation::SubModulePort,
         latency::{
             latency_algorithm::{
@@ -495,15 +496,28 @@ mod tests {
 
     use super::{FullPortLatencyLinearity, PortLatencyInferenceInfo, PortLatencyLinearity};
 
-    fn mk_port_linearity(
+    fn mk_input_linearity(
         domain: DomainID,
-        is_input: bool,
         const_factor: i64,
         arg_factors: Vec<i64>,
     ) -> FullPortLatencyLinearity {
         FullPortLatencyLinearity {
             domain,
-            is_input,
+            direction: Direction::Input,
+            latency_linearity: Some(PortLatencyLinearity {
+                const_factor,
+                arg_linear_factor: FlatAlloc::from_vec(arg_factors),
+            }),
+        }
+    }
+    fn mk_output_linearity(
+        domain: DomainID,
+        const_factor: i64,
+        arg_factors: Vec<i64>,
+    ) -> FullPortLatencyLinearity {
+        FullPortLatencyLinearity {
+            domain,
+            direction: Direction::Input,
             latency_linearity: Some(PortLatencyLinearity {
                 const_factor,
                 arg_linear_factor: FlatAlloc::from_vec(arg_factors),
@@ -527,10 +541,10 @@ mod tests {
         let first_domain = domains.0;
         let mut port_latency_linearities: FlatAlloc<FullPortLatencyLinearity, PortIDMarker> =
             FlatAlloc::with_capacity(4);
-        port_latency_linearities.alloc(mk_port_linearity(first_domain, true, 0, vec![0, 0]));
-        port_latency_linearities.alloc(mk_port_linearity(first_domain, true, 3, vec![1, 0]));
-        port_latency_linearities.alloc(mk_port_linearity(first_domain, false, 5, vec![3, 0]));
-        port_latency_linearities.alloc(mk_port_linearity(first_domain, false, 0, vec![0, 1]));
+        port_latency_linearities.alloc(mk_input_linearity(first_domain, 0, vec![0, 0]));
+        port_latency_linearities.alloc(mk_input_linearity(first_domain, 3, vec![1, 0]));
+        port_latency_linearities.alloc(mk_output_linearity(first_domain, 5, vec![3, 0]));
+        port_latency_linearities.alloc(mk_output_linearity(first_domain, 0, vec![0, 1]));
 
         let latency_info = PortLatencyInferenceInfo {
             port_latency_linearities,
@@ -618,12 +632,12 @@ mod tests {
 
         let mut port_latency_linearities: FlatAlloc<FullPortLatencyLinearity, PortIDMarker> =
             FlatAlloc::with_capacity(6);
-        port_latency_linearities.alloc(mk_port_linearity(domain_x, true, 0, vec![-1, 0, 0])); // 2
-        port_latency_linearities.alloc(mk_port_linearity(domain_x, true, 0, vec![0, -1, 0])); // 3
-        port_latency_linearities.alloc(mk_port_linearity(domain_y, true, 3, vec![0, 0, -1])); // 4'C+3, which makes C 3 smaller than in [latency_algorithm::tests::test_inference_no_poison]
-        port_latency_linearities.alloc(mk_port_linearity(domain_y, true, 0, vec![0, -1, 0])); // 5
-        port_latency_linearities.alloc(mk_port_linearity(domain_x, false, 0, vec![0, 0, 0])); // 6
-        port_latency_linearities.alloc(mk_port_linearity(domain_y, false, 0, vec![0, 0, 0])); // 7
+        port_latency_linearities.alloc(mk_input_linearity(domain_x, 0, vec![-1, 0, 0])); // 2
+        port_latency_linearities.alloc(mk_input_linearity(domain_x, 0, vec![0, -1, 0])); // 3
+        port_latency_linearities.alloc(mk_input_linearity(domain_y, 3, vec![0, 0, -1])); // 4'C+3, which makes C 3 smaller than in [latency_algorithm::tests::test_inference_no_poison]
+        port_latency_linearities.alloc(mk_input_linearity(domain_y, 0, vec![0, -1, 0])); // 5
+        port_latency_linearities.alloc(mk_output_linearity(domain_x, 0, vec![0, 0, 0])); // 6
+        port_latency_linearities.alloc(mk_output_linearity(domain_y, 0, vec![0, 0, 0])); // 7
 
         let latency_info = PortLatencyInferenceInfo {
             port_latency_linearities,

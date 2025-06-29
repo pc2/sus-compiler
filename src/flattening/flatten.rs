@@ -511,7 +511,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         self.forbid_keyword(state_kw, "on a generative declaration.");
                         DeclarationKind::RegularGenerative { read_only: false }
                     } else if input_kw.is_some() | output_kw.is_some() {
-                        let (is_input, is_state) = if input_kw.is_some() {
+                        let (direction, is_state) = if input_kw.is_some() {
                             self.forbid_keyword(
                                 output_kw,
                                 "on a port which has already been declared an input",
@@ -520,15 +520,15 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 state_kw,
                                 "on an input port, because it is read-only",
                             );
-                            (true, false)
+                            (Direction::Input, false)
                         } else {
-                            (false, state_kw.is_some())
+                            (Direction::Output, state_kw.is_some())
                         };
                         let port_id = self.ports.alloc(Port {
                             name: name.to_owned(),
                             name_span,
                             decl_span,
-                            is_input,
+                            direction,
                             domain: self.current_domain,
                             declaration_instruction,
                             latency_specifier,
@@ -542,7 +542,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             )),
                         });
                         DeclarationKind::Port {
-                            is_input,
+                            direction,
                             is_state,
                             port_id,
                             parent_interface,
@@ -572,54 +572,65 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     }
                 }
                 DeclarationKind::ConditionalBinding {
-                    when_id, is_input, ..
+                    when_id, direction, ..
                 } => {
                     self.forbid_keyword(input_kw, "on a conditional binding");
                     self.forbid_keyword(output_kw, "on a conditional binding");
                     self.forbid_keyword(gen_kw, "on a conditional binding");
-                    let is_state = if is_input {
-                        self.forbid_keyword(state_kw, "on input ports, because they are read-only");
-                        false
-                    } else {
-                        state_kw.is_some()
+                    let is_state = match direction {
+                        Direction::Input => {
+                            self.forbid_keyword(
+                                state_kw,
+                                "on input conditional bindings, because they are read-only",
+                            );
+                            false
+                        }
+                        Direction::Output => state_kw.is_some(),
                     };
                     DeclarationKind::ConditionalBinding {
-                        is_input,
+                        direction,
                         is_state,
                         when_id,
                     }
                 }
                 DeclarationKind::Port {
-                    is_input,
+                    direction,
                     domain,
                     parent_interface,
                     ..
                 } => {
-                    let port_ctx = if is_input {
-                        "here, it's already implicitly declared as an input port"
-                    } else {
-                        "here, it's already implicitly declared as an output port"
+                    let port_ctx = match direction {
+                        Direction::Input => {
+                            "here, it's already implicitly declared as an input port"
+                        }
+                        Direction::Output => {
+                            "here, it's already implicitly declared as an output port"
+                        }
                     };
                     self.forbid_keyword(input_kw, port_ctx);
                     self.forbid_keyword(output_kw, port_ctx);
                     self.forbid_keyword(gen_kw, "on ports");
-                    let is_state = if is_input {
-                        self.forbid_keyword(state_kw, "on input ports, because they are read-only");
-                        false
-                    } else {
-                        state_kw.is_some()
+                    let is_state = match direction {
+                        Direction::Input => {
+                            self.forbid_keyword(
+                                state_kw,
+                                "on input ports, because they are read-only",
+                            );
+                            false
+                        }
+                        Direction::Output => state_kw.is_some(),
                     };
                     let port_id = self.ports.alloc(Port {
                         name: name.to_owned(),
                         name_span,
                         decl_span,
-                        is_input,
+                        direction,
                         domain,
                         declaration_instruction,
                         latency_specifier,
                     });
                     DeclarationKind::Port {
-                        is_input,
+                        direction,
                         is_state,
                         port_id,
                         parent_interface,
@@ -1159,10 +1170,10 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let is_local = cursor.optional_field(field!("local"));
         cursor.field(field!("interface_kind"));
         let (interface_kw, interface_kw_span) = cursor.kind_span();
-        let (inputs_come_first, interface_kind) = match interface_kw {
-            kw!("interface") => (true, InterfaceKind::RegularInterface),
-            kw!("action") => (true, InterfaceKind::Action(UUID::PLACEHOLDER)),
-            kw!("trigger") => (false, InterfaceKind::Trigger(UUID::PLACEHOLDER)),
+        let (left_direction, interface_kind) = match interface_kw {
+            kw!("interface") => (Direction::Input, InterfaceKind::RegularInterface),
+            kw!("action") => (Direction::Input, InterfaceKind::Action(UUID::PLACEHOLDER)),
+            kw!("trigger") => (Direction::Output, InterfaceKind::Trigger(UUID::PLACEHOLDER)),
             _ => unreachable!(),
         };
 
@@ -1210,10 +1221,10 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             self.interfaces[InterfaceID::MAIN_INTERFACE] = new_interface;
             InterfaceID::MAIN_INTERFACE
         } else {
-            self.interfaces.alloc(new_interface)
+            let interface_id = self.interfaces.alloc(new_interface);
+            self.alloc_local_name(name_span, name, NamedLocal::LocalInterface(decl_instr));
+            interface_id
         };
-
-        self.alloc_local_name(name_span, name, NamedLocal::LocalInterface(decl_instr));
 
         let variable_ctx_frame = match interface_kind {
             InterfaceKind::RegularInterface => None,
@@ -1222,8 +1233,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             }
         };
 
-        let (inputs, outputs) =
-            self.flatten_interface_ports(inputs_come_first, interface_id, cursor);
+        let (inputs, outputs) = self.flatten_interface_ports(left_direction, interface_id, cursor);
 
         let (then_block, else_block, then_block_span, else_span) = self.flatten_then_else_blocks(
             cursor,
@@ -1242,7 +1252,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     name: name.to_owned(),
                     name_span,
                     decl_span: interface_decl_span,
-                    is_input: true,
+                    direction: Direction::Input,
                     domain: self.current_domain,
                     declaration_instruction: decl_instr,
                     latency_specifier,
@@ -1253,7 +1263,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     name: name.to_owned(),
                     name_span,
                     decl_span: interface_decl_span,
-                    is_input: false,
+                    direction: Direction::Output,
                     domain: self.current_domain,
                     declaration_instruction: decl_instr,
                     latency_specifier,
@@ -1428,7 +1438,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
     fn flatten_interface_ports(
         &mut self,
-        inputs_come_first: bool,
+        left_direction: Direction,
         parent_interface: InterfaceID,
         cursor: &mut Cursor<'c>,
     ) -> (Vec<FlatID>, Vec<FlatID>) {
@@ -1439,7 +1449,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             let inputs = self.flatten_declaration_list(
                 field!("inputs"),
                 DeclarationKind::Port {
-                    is_input: inputs_come_first,
+                    direction: left_direction,
                     is_state: false,
                     parent_interface,
                     port_id: UUID::PLACEHOLDER,
@@ -1451,7 +1461,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             let outputs = self.flatten_declaration_list(
                 field!("outputs"),
                 DeclarationKind::Port {
-                    is_input: !inputs_come_first,
+                    direction: left_direction.invert(),
                     is_state: false,
                     parent_interface,
                     port_id: UUID::PLACEHOLDER,
@@ -1460,7 +1470,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 cursor,
             );
 
-                (inputs, outputs)
+            (inputs, outputs)
         })
     }
 
@@ -1473,7 +1483,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             field!("inputs"),
             DeclarationKind::ConditionalBinding {
                 when_id,
-                is_input: true,
+                direction: Direction::Input,
                 is_state: false,
             },
             cursor,
@@ -1482,7 +1492,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             field!("outputs"),
             DeclarationKind::ConditionalBinding {
                 when_id,
-                is_input: false,
+                direction: Direction::Output,
                 is_state: false,
             },
             cursor,

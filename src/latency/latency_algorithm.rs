@@ -18,6 +18,7 @@ use std::collections::VecDeque;
 
 use crate::{
     alloc::FlatAlloc,
+    flattening::Direction,
     prelude::{InferenceVarIDMarker, LatencyCountInferenceVarID},
 };
 
@@ -502,12 +503,15 @@ pub struct LatencyCountingPorts {
 }
 
 impl LatencyCountingPorts {
-    pub fn push(&mut self, node: usize, is_input: bool) {
-        if is_input {
-            self.port_nodes.insert(self.outputs_start_at, node);
-            self.outputs_start_at += 1;
-        } else {
-            self.port_nodes.push(node);
+    pub fn push(&mut self, node: usize, direction: Direction) {
+        match direction {
+            Direction::Input => {
+                self.port_nodes.insert(self.outputs_start_at, node);
+                self.outputs_start_at += 1;
+            }
+            Direction::Output => {
+                self.port_nodes.push(node);
+            }
         }
     }
     pub fn inputs(&self) -> &[usize] {
@@ -526,7 +530,7 @@ impl LatencyCountingPorts {
 
         for edge in inference_edges {
             match std::mem::replace(&mut was_port_seen[edge.to_node], Some(true)) {
-                None => result.push(edge.to_node, true),
+                None => result.push(edge.to_node, Direction::Input),
                 Some(false) => {
                     unreachable!("Inference port cannot be both input and output")
                 }
@@ -535,7 +539,7 @@ impl LatencyCountingPorts {
         }
         for edge in inference_edges {
             match std::mem::replace(&mut was_port_seen[edge.from_node], Some(false)) {
-                None => result.push(edge.from_node, false),
+                None => result.push(edge.from_node, Direction::Output),
                 Some(true) => {
                     unreachable!("Inference port cannot be both input and output")
                 }

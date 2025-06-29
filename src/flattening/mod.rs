@@ -11,6 +11,7 @@ use crate::typing::abstract_type::{AbstractGlobalReference, AbstractRankedType, 
 use crate::typing::domain_type::DomainType;
 
 use std::cell::{Cell, OnceCell};
+use std::fmt::Display;
 
 use crate::latency::port_latency_inference::PortLatencyInferenceInfo;
 pub use flatten::flatten_all_globals;
@@ -78,17 +79,17 @@ impl Module {
         self.link_info.instructions[i].unwrap_interface()
     }
 
-    pub fn get_port_for_decl(&self, decl_id: FlatID) -> (PortID, bool) {
+    pub fn get_port_for_decl(&self, decl_id: FlatID) -> (PortID, Direction) {
         let decl = self.link_info.instructions[decl_id].unwrap_declaration();
         let_unwrap!(
             DeclarationKind::Port {
-                is_input,
+                direction,
                 port_id,
                 ..
             },
             decl.decl_kind
         );
-        (port_id, is_input)
+        (port_id, direction)
     }
 }
 
@@ -177,11 +178,33 @@ pub struct Port {
     pub name: String,
     pub name_span: Span,
     pub decl_span: Span,
-    pub is_input: bool,
+    pub direction: Direction,
     pub domain: DomainID,
     /// Points to a [Declaration]
     pub declaration_instruction: FlatID,
     pub latency_specifier: Option<FlatID>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Direction {
+    Input,
+    Output,
+}
+impl Direction {
+    pub fn invert(self) -> Direction {
+        match self {
+            Direction::Input => Direction::Output,
+            Direction::Output => Direction::Input,
+        }
+    }
+}
+impl Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Direction::Input => "input",
+            Direction::Output => "output",
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -539,7 +562,7 @@ pub enum DeclarationKind {
     },
     StructField(FieldID),
     Port {
-        is_input: bool,
+        direction: Direction,
         is_state: bool,
         port_id: PortID,
         parent_interface: InterfaceID,
@@ -547,7 +570,7 @@ pub enum DeclarationKind {
     },
     ConditionalBinding {
         when_id: FlatID,
-        is_input: bool,
+        direction: Direction,
         is_state: bool,
     },
     RegularGenerative {
@@ -557,10 +580,10 @@ pub enum DeclarationKind {
 }
 
 impl DeclarationKind {
-    /// Basically an unwrap to see if this [Declaration] refers to a [Port], and returns `Some(is_input)` if so.
-    pub fn is_io_port(&self) -> Option<bool> {
-        if let DeclarationKind::Port { is_input, .. } = self {
-            Some(*is_input)
+    /// Basically an unwrap to see if this [Declaration] refers to a [Port], and returns `Some(direction)` if so.
+    pub fn is_io_port(&self) -> Option<Direction> {
+        if let DeclarationKind::Port { direction, .. } = self {
+            Some(*direction)
         } else {
             None
         }
@@ -568,9 +591,9 @@ impl DeclarationKind {
     pub fn is_read_only(&self) -> bool {
         match self {
             DeclarationKind::RegularWire { read_only, .. } => *read_only,
-            DeclarationKind::ConditionalBinding { is_input, .. } => *is_input,
+            DeclarationKind::ConditionalBinding { direction, .. } => *direction == Direction::Input,
             DeclarationKind::StructField(_) => false,
-            DeclarationKind::Port { is_input, .. } => *is_input,
+            DeclarationKind::Port { direction, .. } => *direction == Direction::Input,
             DeclarationKind::RegularGenerative { read_only } => *read_only,
             DeclarationKind::TemplateParameter(_) => true,
         }

@@ -1,5 +1,5 @@
 use crate::{
-    flattening::{DeclarationKind, Instruction},
+    flattening::{DeclarationKind, Direction, Instruction},
     linker::IsExtern,
     typing::concrete_type::ConcreteType,
     FlatAlloc, InstantiatedModule, Linker, Module, WireIDMarker,
@@ -100,7 +100,10 @@ impl<Stream: std::fmt::Write> CodeGenerationContext<'_, '_, Stream> {
         while let Some((_, port)) = it.next() {
             let port_wire = &self.instance.wires[port.wire];
             let port_name = &port_wire.name;
-            let port_direction = if port.is_input { "in" } else { "out" };
+            let port_direction = match port.direction {
+                Direction::Input => "in",
+                Direction::Output => "out",
+            };
             let port_type = typ_to_declaration(&port_wire.typ);
             let end = if it.peek().is_some() { ";" } else { "" };
             writeln!(

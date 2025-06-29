@@ -4,6 +4,7 @@ use dot::{render, Edges, GraphWalk, Id, LabelText, Labeller, Nodes, Style};
 
 use crate::{
     alloc::FlatAlloc,
+    flattening::Direction,
     instantiation::{
         ForEachContainedWire, InstantiatedModule, RealWire, RealWireDataSource, SubModule,
     },
@@ -100,10 +101,13 @@ impl<'inst> GraphWalk<'inst, NodeType, EdgeType> for InstantiatedModule {
             for (_, port) in s.port_map.iter_valids() {
                 let w_id = port.maps_to_wire;
                 let w = &self.wires[w_id];
-                if w.is_port.unwrap() {
-                    edges.push((NodeType::Wire(w_id), NodeType::SubModule(submod_id)));
-                } else {
-                    edges.push((NodeType::SubModule(submod_id), NodeType::Wire(w_id)));
+                match w.is_port.unwrap() {
+                    Direction::Input => {
+                        edges.push((NodeType::Wire(w_id), NodeType::SubModule(submod_id)));
+                    }
+                    Direction::Output => {
+                        edges.push((NodeType::SubModule(submod_id), NodeType::Wire(w_id)));
+                    }
                 }
             }
         }
@@ -131,10 +135,10 @@ pub fn display_latency_count_graph(
     // true for input
     let mut extra_node_info = vec![(None, None); lc_problem.map_latency_node_to_wire.len()];
     for port in lc_problem.ports.inputs() {
-        extra_node_info[*port].0 = Some(true);
+        extra_node_info[*port].0 = Some(Direction::Input);
     }
     for port in lc_problem.ports.outputs() {
-        extra_node_info[*port].0 = Some(false);
+        extra_node_info[*port].0 = Some(Direction::Output);
     }
 
     for spec in &lc_problem.specified_latencies {
@@ -178,7 +182,7 @@ struct Problem<'a> {
     submodules: &'a FlatAlloc<SubModule, SubModuleIDMarker>,
     linker: &'a Linker,
     solution: Option<&'a [i64]>,
-    extra_node_info: Vec<(Option<bool>, Option<i64>)>,
+    extra_node_info: Vec<(Option<Direction>, Option<i64>)>,
 }
 
 impl<'a> Labeller<'a, usize, LatencyEdge<'a>> for Problem<'a> {
@@ -226,9 +230,15 @@ impl<'a> Labeller<'a, usize, LatencyEdge<'a>> for Problem<'a> {
     }
 
     fn node_color(&'a self, node: &usize) -> Option<LabelText<'a>> {
-        self.extra_node_info[*node]
-            .0
-            .map(|is_input| LabelText::LabelStr(if is_input { "red" } else { "blue" }.into()))
+        self.extra_node_info[*node].0.map(|direction| {
+            LabelText::LabelStr(
+                match direction {
+                    Direction::Input => "red",
+                    Direction::Output => "blue",
+                }
+                .into(),
+            )
+        })
     }
 }
 

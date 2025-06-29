@@ -59,17 +59,17 @@ impl LintContext<'_> {
                             {
                                 let module_port_decl = submod.get_decl(port_decl);
                                 let_unwrap!(
-                                    DeclarationKind::Port { is_input, .. },
+                                    DeclarationKind::Port { direction, .. },
                                     module_port_decl.remote_decl.decl_kind
                                 );
-                                match (is_writing_to, is_input) {
-                                    (true, true) | (false, false) => {}
-                                    (true, false) => {
+                                match (is_writing_to, direction) {
+                                    (true, Direction::Input) | (false, Direction::Output) => {}
+                                    (true, Direction::Output) => {
                                         self.errors
                                             .error(*name_span, "Cannot write to an output port")
                                             .info_obj(&module_port_decl);
                                     }
-                                    (false, true) => {
+                                    (false, Direction::Input) => {
                                         self.errors
                                             .error(*name_span, "Cannot read from an input port")
                                             .info_obj(&module_port_decl);
@@ -248,7 +248,7 @@ impl LintContext<'_> {
             GlobalObj::Module(md) => {
                 // Output ports
                 for (_id, port) in &md.ports {
-                    if !port.is_input {
+                    if port.direction == Direction::Output {
                         is_instance_used_map[port.declaration_instruction] = true;
                         wire_to_explore_queue.push(port.declaration_instruction);
                     }

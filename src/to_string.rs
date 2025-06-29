@@ -272,15 +272,13 @@ impl Module {
     ) {
         let_unwrap!(
             DeclarationKind::Port {
-                is_input,
+                direction,
                 is_state,
                 ..
             },
             decl.decl_kind
         );
-        result
-            .write_str(if is_input { "input " } else { "output " })
-            .unwrap();
+        result.write_fmt(format_args!("{direction} ")).unwrap();
         if is_state {
             result.write_str("state ").unwrap();
         }

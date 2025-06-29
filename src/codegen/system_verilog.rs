@@ -9,7 +9,7 @@ use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::{IsExtern, LinkInfo};
 use crate::prelude::*;
 
-use crate::flattening::{Module, Port};
+use crate::flattening::{Direction, Module, Port};
 use crate::instantiation::{
     InstantiatedModule, MultiplexerSource, RealWire, RealWireDataSource, RealWirePathElem,
 };
@@ -335,19 +335,13 @@ impl<'g> CodeGenerationContext<'g> {
         )
         .unwrap();
         for (_id, port_wire) in &self.instance.wires {
-            let input_or_output = match port_wire.is_port {
-                Some(true) => "input",
-                Some(false) => "output",
-                None => continue,
+            let Some(direction) = port_wire.is_port else {
+                continue;
             };
             let wire_doc = port_wire.source.wire_or_reg();
             let wire_name = wire_name_self_latency(port_wire, self.use_latency);
             let wire_decl = typ_to_declaration(&port_wire.typ, &wire_name);
-            write!(
-                self.program_text,
-                ",\n\t{input_or_output} {wire_doc}{wire_decl}"
-            )
-            .unwrap();
+            write!(self.program_text, ",\n\t{direction} {wire_doc}{wire_decl}").unwrap();
         }
         write!(self.program_text, "\n);\n\n").unwrap();
 
@@ -689,81 +683,81 @@ impl<'g> CodeGenerationContext<'g> {
     fn write_builtins(&mut self) {
         match self.md.link_info.name.as_str() {
             "LatencyOffset" => {
-                let _in_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(0), true, "in");
-                let _out_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(1), false, "out");
+                let _in_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "in");
+                let _out_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "out");
                 self.program_text.write_str("\tassign out = in;\n").unwrap();
             }
             "CrossDomain" => {
-                let _in_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(0), true, "in");
-                let _out_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(1), false, "out");
+                let _in_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "in");
+                let _out_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "out");
                 self.program_text.write_str("\tassign out = in;\n").unwrap();
             }
             "IntToBits" => {
                 let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
                 let _num_bits: usize = num_bits.try_into().unwrap();
 
-                let _value_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(0), true, "value");
-                let _bits_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(1), false, "bits");
+                let _value_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "value");
+                let _bits_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "bits");
                 writeln!(self.program_text, "\tassign bits = value;").unwrap();
             }
             "BitsToInt" => {
                 let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
                 let _num_bits: usize = num_bits.try_into().unwrap();
 
-                let _bits_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(0), true, "bits");
-                let _value_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(1), false, "value");
+                let _bits_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "bits");
+                let _value_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "value");
                 writeln!(self.program_text, "\tassign value = bits;").unwrap();
             }
             "UIntToBits" => {
                 let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
                 let _num_bits: usize = num_bits.try_into().unwrap();
 
-                let _value_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(0), true, "value");
-                let _bits_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(1), false, "bits");
+                let _value_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "value");
+                let _bits_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "bits");
                 writeln!(self.program_text, "\tassign bits = value;").unwrap();
             }
             "BitsToUInt" => {
                 let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
                 let _num_bits: usize = num_bits.try_into().unwrap();
 
-                let _bits_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(0), true, "bits");
-                let _value_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(1), false, "value");
+                let _bits_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "bits");
+                let _value_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "value");
                 writeln!(self.program_text, "\tassign value = bits;").unwrap();
             }
             "transmute_to_bits" => {
                 let [typ] = self.instance.global_ref.template_args.cast_to_array();
                 let typ = typ.unwrap_type();
 
-                let _value_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(0), true, "value");
-                let _bits_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(1), false, "bits");
+                let _value_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "value");
+                let _bits_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "bits");
 
                 self.walk_typ_to_generate_foreach(typ, false, |path, num_bits| {
                     let path_str = ForEachPathElement::to_string(path);
@@ -779,12 +773,12 @@ impl<'g> CodeGenerationContext<'g> {
                 let [typ] = self.instance.global_ref.template_args.cast_to_array();
                 let typ = typ.unwrap_type();
 
-                let _bits_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(0), true, "bits");
-                let _value_port = self
-                    .md
-                    .unwrap_port(PortID::from_hidden_value(1), false, "value");
+                let _bits_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "bits");
+                let _value_port =
+                    self.md
+                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "value");
 
                 self.walk_typ_to_generate_foreach(typ, false, |path, num_bits| {
                     let path_str = ForEachPathElement::to_string(path);
@@ -808,11 +802,11 @@ impl<'g> CodeGenerationContext<'g> {
 }
 
 impl Module {
-    fn unwrap_port(&self, port_id: PortID, is_input: bool, name: &str) -> &Port {
+    fn unwrap_port(&self, port_id: PortID, direction: Direction, name: &str) -> &Port {
         let result = &self.ports[port_id];
 
         assert_eq!(result.name, name);
-        assert_eq!(result.is_input, is_input);
+        assert_eq!(result.direction, direction);
 
         result
     }

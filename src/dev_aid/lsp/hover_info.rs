@@ -104,9 +104,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             details_vec.push(decl.domain.get().display(domains).to_string());
 
             match decl.decl_kind {
-                DeclarationKind::Port { is_input, .. } => {
-                    details_vec.push(if is_input { "input" } else { "output" }.to_owned())
-                }
+                DeclarationKind::Port { direction, .. } => details_vec.push(direction.to_string()),
                 DeclarationKind::TemplateParameter(_) => details_vec.push("param".to_owned()),
                 DeclarationKind::RegularWire { .. }
                 | DeclarationKind::RegularGenerative { .. }
