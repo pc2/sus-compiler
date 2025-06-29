@@ -21,6 +21,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
    │                            ──┬──  
    │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
 ───╯
+Error: Can't read from an interface. Use a function call or interface connector instead
+   ╭─[ util.sus:9:7 ]
+   │
+ 9 │     when write {
+   │          ──┬──  
+   │            ╰──── Can't read from an interface. Use a function call or interface connector instead
+───╯
 Error: Typing Error: if statement condition expects a bool but was given a Local Interface write
    ╭─[ util.sus:9:7 ]
    │
@@ -175,6 +182,13 @@ domain out_clk:
 
 
 ────╯
+Error: Can't read from an interface. Use a function call or interface connector instead
+    ╭─[ util.sus:51:7 ]
+    │
+ 51 │     when pop {
+    │          ─┬─  
+    │           ╰─── Can't read from an interface. Use a function call or interface connector instead
+────╯
 Error: Typing Error: if statement condition expects a bool but was given a Local Interface pop
     ╭─[ util.sus:51:7 ]
     │
@@ -228,6 +242,13 @@ domain out_clk:
 
 
 ────╯
+Error: Can't read from an interface. Use a function call or interface connector instead
+    ╭─[ util.sus:60:7 ]
+    │
+ 60 │     when push {
+    │          ──┬─  
+    │            ╰─── Can't read from an interface. Use a function call or interface connector instead
+────╯
 Error: Typing Error: if statement condition expects a bool but was given a Local Interface push
     ╭─[ util.sus:60:7 ]
     │
@@ -274,6 +295,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
     │                            ──┬──  
     │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
 ────╯
+Error: Can't read from an interface. Use a function call or interface connector instead
+    ╭─[ util.sus:90:7 ]
+    │
+ 90 │     when start {
+    │          ──┬──  
+    │            ╰──── Can't read from an interface. Use a function call or interface connector instead
+────╯
 Error: Typing Error: if statement condition expects a bool but was given a Local Interface start
     ╭─[ util.sus:90:7 ]
     │
@@ -296,6 +324,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  105 │     interface start : bool start
      │                            ──┬──  
      │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Can't read from an interface. Use a function call or interface connector instead
+     ╭─[ util.sus:110:7 ]
+     │
+ 110 │     when start {
+     │          ──┬──  
+     │            ╰──── Can't read from an interface. Use a function call or interface connector instead
 ─────╯
 Error: Typing Error: if statement condition expects a bool but was given a Local Interface start
      ╭─[ util.sus:110:7 ]
@@ -2737,6 +2772,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                           ──┬─  
      │                             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: Can't read from an interface. Use a function call or interface connector instead
+     ╭─[ test.sus:636:7 ]
+     │
+ 636 │     when write {
+     │          ──┬──  
+     │            ╰──── Can't read from an interface. Use a function call or interface connector instead
+─────╯
 Error: Typing Error: if statement condition expects a bool but was given a Local Interface write
      ╭─[ test.sus:636:7 ]
      │
@@ -2760,6 +2802,13 @@ output bool[20][512] o'0
  641 │     cr_m.i = mem
      │          ┬  
      │          ╰── No such field 'i' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
+─────╯
+Error: Can't read from an interface. Use a function call or interface connector instead
+     ╭─[ test.sus:642:7 ]
+     │
+ 642 │     when read {
+     │          ──┬─  
+     │            ╰─── Can't read from an interface. Use a function call or interface connector instead
 ─────╯
 Error: Typing Error: if statement condition expects a bool but was given a Local Interface read
      ╭─[ test.sus:642:7 ]
@@ -3008,6 +3057,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                            ──┬──  
      │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: Can't write to an interface. Use a function call or interface connector instead
+     ╭─[ test.sus:730:2 ]
+     │
+ 730 │     start_cr.i = start
+     │     ─────┬────  
+     │          ╰────── Can't write to an interface. Use a function call or interface connector instead
+─────╯
 Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:730:11 ]
      │
@@ -3024,6 +3080,13 @@ output bool o'0
  730 │     start_cr.i = start
      │              ┬  
      │              ╰── No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+─────╯
+Error: Can't read from an interface. Use a function call or interface connector instead
+     ╭─[ test.sus:730:15 ]
+     │
+ 730 │     start_cr.i = start
+     │                  ──┬──  
+     │                    ╰──── Can't read from an interface. Use a function call or interface connector instead
 ─────╯
 Error: No such field 'i' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
      ╭─[ test.sus:733:10 ]

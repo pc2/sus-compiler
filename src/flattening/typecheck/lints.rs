@@ -40,7 +40,7 @@ impl LintContext<'_> {
                 }
             }
             WireReferenceRoot::LocalInterface(interface_decl_id) => {
-                let interface = self.working_on.instructions[*interface_decl_id].unwrap_interface();
+                let _ = self.working_on.instructions[*interface_decl_id].unwrap_interface();
             }
             WireReferenceRoot::LocalSubmodule(submod_decl_id) => {
                 let submod = self.globals.get_declared_submodule(
@@ -96,8 +96,13 @@ impl LintContext<'_> {
         }
     }
     fn cant_be_interface(&self, operation: &'static str, wire_ref: &WireReference) {
-        if let AbstractInnerType::Interface(_, _) = &wire_ref.output_typ.inner {
-            self.errors.error(wire_ref.get_total_span(), format!("Can't {operation} an interface. Use a function call or interface connector instead"));
+        match &wire_ref.output_typ.inner {
+            AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => {
+                self.errors.error(wire_ref.get_total_span(), format!("Can't {operation} an interface. Use a function call or interface connector instead"));
+            }
+            AbstractInnerType::Template(_)
+            | AbstractInnerType::Named(_)
+            | AbstractInnerType::Unknown(_) => {}
         }
     }
     fn lint_instructions(&self) {
