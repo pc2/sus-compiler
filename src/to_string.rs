@@ -62,14 +62,16 @@ impl WrittenType {
 pub struct AbstractRankedTypeDisplay<'a> {
     typ: &'a AbstractRankedType,
     globals: &'a LinkerGlobals,
-    template_names: &'a TVec<Parameter>,
+    link_info: &'a LinkInfo,
 }
 
 impl Display for AbstractRankedTypeDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.typ.inner {
             AbstractInnerType::Unknown(_) => write!(f, "?"),
-            AbstractInnerType::Template(id) => f.write_str(&self.template_names[*id].name),
+            AbstractInnerType::Template(id) => {
+                f.write_str(&self.link_info.template_parameters[*id].name)
+            }
             AbstractInnerType::Named(id) => {
                 f.write_str(&self.globals.types[*id].link_info.get_full_name())
             }
@@ -78,9 +80,15 @@ impl Display for AbstractRankedTypeDisplay<'_> {
                 f.write_fmt(format_args!(
                     "Interface {} of {}",
                     md.interfaces[*interface_id].name,
-                    md_id.display(self.globals, self.template_names)
+                    md_id.display(self.globals, self.link_info)
                 ))
             }
+            AbstractInnerType::LocalInterface(local_interface) => f.write_fmt(format_args!(
+                "Local Interface {}",
+                self.link_info.instructions[*local_interface]
+                    .unwrap_interface()
+                    .name,
+            )),
         }
         .and_then(|_| f.write_fmt(format_args!("{}", &self.typ.rank)))
     }
@@ -89,7 +97,7 @@ impl Display for AbstractRankedTypeDisplay<'_> {
 pub struct AbstractGlobalReferenceDisplay<'a, ID> {
     typ: &'a AbstractGlobalReference<ID>,
     globals: &'a LinkerGlobals,
-    template_names: &'a TVec<Parameter>,
+    link_info: &'a LinkInfo,
 }
 
 impl<ID: Into<GlobalUUID> + Copy> Display for AbstractGlobalReferenceDisplay<'_, ID> {
@@ -108,7 +116,7 @@ impl<ID: Into<GlobalUUID> + Copy> Display for AbstractGlobalReferenceDisplay<'_,
             f.write_fmt(format_args!(
                 "{}: {}",
                 param.name,
-                typ.display(self.globals, self.template_names)
+                typ.display(self.globals, self.link_info)
             ))
         })?;
         f.write_str(")")
@@ -119,12 +127,12 @@ impl<ID: Into<GlobalUUID> + Copy> AbstractGlobalReference<ID> {
     pub fn display<'a>(
         &'a self,
         globals: &'a LinkerGlobals,
-        template_names: &'a TVec<Parameter>,
+        link_info: &'a LinkInfo,
     ) -> impl Display + 'a {
         AbstractGlobalReferenceDisplay {
             typ: self,
             globals,
-            template_names,
+            link_info,
         }
     }
 }
@@ -133,12 +141,12 @@ impl AbstractRankedType {
     pub fn display<'a>(
         &'a self,
         globals: &'a LinkerGlobals,
-        template_names: &'a TVec<Parameter>,
+        link_info: &'a LinkInfo,
     ) -> impl Display + 'a {
         AbstractRankedTypeDisplay {
             typ: self,
             globals,
-            template_names,
+            link_info,
         }
     }
 }

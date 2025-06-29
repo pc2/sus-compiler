@@ -28,9 +28,9 @@ impl<'l> TypeCheckingContext<'l> {
                 submod.typ.clone()
             }
             WireReferenceRoot::LocalInterface(interface_decl) => {
-                let interface = self.instructions[*interface_decl].unwrap_interface();
+                let _ = self.instructions[*interface_decl].unwrap_interface();
                 AbstractRankedType {
-                    inner: AbstractInnerType::Interface(todo!(), interface.interface_id),
+                    inner: AbstractInnerType::LocalInterface(*interface_decl),
                     rank: PeanoType::Zero,
                 }
             }
@@ -89,7 +89,7 @@ impl<'l> TypeCheckingContext<'l> {
                     input_typ.set(walking_typ);
                     walking_typ = match &input_typ.inner {
                         AbstractInnerType::Template(template_id) => {
-                            let template_arg = &self.template_args[*template_id];
+                            let template_arg = &self.link_info.template_parameters[*template_id];
                             self.errors
                                 .error(
                                     *name_span,
@@ -99,6 +99,20 @@ impl<'l> TypeCheckingContext<'l> {
                                     ),
                                 )
                                 .info_obj_same_file(template_arg);
+                            self.type_checker.alloc_unknown()
+                        }
+                        AbstractInnerType::LocalInterface(interface_id) => {
+                            let interface_decl =
+                                self.link_info.instructions[*interface_id].unwrap_interface();
+                            self.errors
+                                .error(
+                                    *name_span,
+                                    format!(
+                                        "The type of this object is a local interfaec '{}'. You cannot use struct fields on local interfaces",
+                                        interface_decl.name
+                                    ),
+                                )
+                                .info_obj_same_file(interface_decl);
                             self.type_checker.alloc_unknown()
                         }
                         AbstractInnerType::Named(_) => todo!("Structs"),
@@ -130,8 +144,7 @@ impl<'l> TypeCheckingContext<'l> {
                                 }
                             } else {
                                 let obj = self.globals.get_module(md_ref.id);
-                                let obj_name =
-                                    md_ref.display(self.globals.globals, self.template_args);
+                                let obj_name = md_ref.display(self.globals.globals, self.link_info);
                                 let mut field_names = String::new();
                                 join_string_iter(
                                     &mut field_names,

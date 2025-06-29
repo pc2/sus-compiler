@@ -8,11 +8,8 @@ use crate::{
         passes::{GlobalResolver, LinkerPass},
         GlobalObj,
     },
-    typing::{
-        template::Parameter,
-        type_inference::{
-            AbstractTypeSubstitutor, FailedUnification, TypeSubstitutor, TypeUnifier,
-        },
+    typing::type_inference::{
+        AbstractTypeSubstitutor, FailedUnification, TypeSubstitutor, TypeUnifier,
     },
 };
 
@@ -25,7 +22,7 @@ struct TypeCheckingContext<'l> {
     globals: GlobalResolver<'l, 'l>,
     errors: &'l ErrorCollector<'l>,
     instructions: &'l FlatAlloc<Instruction, FlatIDMarker>,
-    template_args: &'l TVec<Parameter>,
+    link_info: &'l LinkInfo,
     type_checker: TypeUnifier<AbstractTypeSubstitutor>,
     domain_checker: TypeUnifier<TypeSubstitutor<DomainType>>,
 }
@@ -45,7 +42,7 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
         type_checker: TypeUnifier::from(AbstractTypeSubstitutor::default()),
         domain_checker: TypeUnifier::default(),
         instructions: &link_info.instructions,
-        template_args: &link_info.template_parameters,
+        link_info,
     };
 
     for (_, instr) in context.instructions {
@@ -120,12 +117,8 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
         let _ = found.fully_substitute(&finalize_ctx.type_checker);
         let _ = expected.fully_substitute(&finalize_ctx.type_checker);
 
-        let expected_name = expected
-            .display(globals.globals, &link_info.template_parameters)
-            .to_string();
-        let found_name = found
-            .display(globals.globals, &link_info.template_parameters)
-            .to_string();
+        let expected_name = expected.display(globals.globals, link_info).to_string();
+        let found_name = found.display(globals.globals, link_info).to_string();
         errors
             .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
             .add_info_list(infos);
@@ -147,7 +140,7 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
             span,
             format!(
                 "Could not fully figure out the type of this object. {}",
-                typ.display(globals.globals, &link_info.template_parameters)
+                typ.display(globals.globals, link_info)
             ),
         );
     }

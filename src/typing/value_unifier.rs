@@ -282,9 +282,11 @@ impl Value {
                 })
             }
             AbstractInnerType::Unknown(_) => unreachable!("Caught by typecheck"),
-            AbstractInnerType::Interface(_, _) => unreachable!(
-                "Interfaces can't be concretized, should have been caught by typecheck!"
-            ),
+            AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => {
+                unreachable!(
+                    "Interfaces can't be concretized, should have been caught by typecheck!"
+                )
+            }
         };
 
         Ok(content_typ.stack_arrays_usize(&tensor_sizes))

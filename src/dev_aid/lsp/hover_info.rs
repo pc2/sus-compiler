@@ -118,10 +118,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 details_vec.push("state".to_owned());
             }
 
-            let typ_str = decl
-                .typ
-                .display(linker, &link_info.template_parameters)
-                .to_string();
+            let typ_str = decl.typ.display(linker, link_info).to_string();
             details_vec.push(typ_str);
 
             details_vec.push(decl.name.clone());
@@ -179,11 +176,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 &FlatAlloc::EMPTY_FLAT_ALLOC
             };
             details_vec.push(expr.domain.display(domains).to_string());
-            details_vec.push(
-                expr.typ
-                    .display(linker, &link_info.template_parameters)
-                    .to_string(),
-            );
+            details_vec.push(expr.typ.display(linker, link_info).to_string());
             hover.sus_code(details_vec.join(" "));
             hover.gather_hover_infos(obj_id, id, expr.domain == DomainType::Generative);
         }

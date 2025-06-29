@@ -397,7 +397,7 @@ fn concretize_type_recurse(
             AbstractInnerType::Unknown(_) => {
                 unreachable!("Should have been resolved already!")
             }
-            AbstractInnerType::Interface(_, _) => unreachable!("Cannot concretize an interface type. Only proper wire types are concretizeable! Should have been caught by typecheck!")
+            AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => unreachable!("Cannot concretize an interface type. Only proper wire types are concretizeable! Should have been caught by typecheck!")
         },
         PeanoType::Succ(one_down) => {
             let (new_wr_typ, size) = match wr_typ {
@@ -1003,18 +1003,37 @@ impl<'l> ExecutionContext<'l> {
                     todo!("Can't yet work with sub-interfaces");
                 }
 
-                let condition_wire = match interface.interface_kind {
-                    InterfaceKind::RegularInterface => unreachable!(),
-                    InterfaceKind::Action(_) => unreachable!(),
+                let (condition_wire, invert_ports) = match interface.interface_kind {
+                    InterfaceKind::RegularInterface => {
+                        unreachable!("Can't call interfaces locally")
+                    }
+                    InterfaceKind::Action(_) => unreachable!("Can't call actions locally"),
                     InterfaceKind::Trigger(_trigger_port) => {
-                        Some(self.generation_state[*interface_decl].unwrap_wire())
+                        let cond_wire = Some(self.generation_state[*interface_decl].unwrap_wire());
+                        (cond_wire, true)
                     }
                 };
 
+                let interface = self.link_info.instructions[*interface_decl].unwrap_interface();
+                let mut inputs = interface
+                    .inputs
+                    .iter()
+                    .map(|input_decl| self.generation_state[*input_decl].unwrap_wire())
+                    .collect();
+                let mut outputs = interface
+                    .outputs
+                    .iter()
+                    .map(|input_decl| self.generation_state[*input_decl].unwrap_wire())
+                    .collect();
+
+                if invert_ports {
+                    std::mem::swap(&mut inputs, &mut outputs);
+                }
+
                 Ok(InterfaceWires {
                     condition_wire,
-                    inputs: todo!(),
-                    outputs: todo!(),
+                    inputs,
+                    outputs,
                     interface_span: interface_ref.root_span,
                 })
             }

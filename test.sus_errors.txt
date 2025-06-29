@@ -5,6 +5,29 @@ Warning: The result of this expression is not used. Only function calls can retu
     │     ────────────────────┬────────────────────  
     │                         ╰────────────────────── The result of this expression is not used. Only function calls can return nothing. 
 ────╯
+Error: This declaration conflicts with a previous declaration in the same scope
+   ╭─[ util.sus:7:25 ]
+   │
+ 7 │     interface write : bool write'0, int#(MIN: 0, MAX) addr'0, T data'0
+   │               ──┬──        ──┬──  
+   │                 ╰───────────────── 'write' declared here
+   │                              │    
+   │                              ╰──── This declaration conflicts with a previous declaration in the same scope
+───╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+   ╭─[ util.sus:7:25 ]
+   │
+ 7 │     interface write : bool write'0, int#(MIN: 0, MAX) addr'0, T data'0
+   │                            ──┬──  
+   │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
+───╯
+Error: Typing Error: if statement condition expects a bool but was given a Local Interface write
+   ╭─[ util.sus:9:7 ]
+   │
+ 9 │     when write {
+   │          ──┬──  
+   │            ╰──── Typing Error: if statement condition expects a bool but was given a Local Interface write
+───╯
 Error: No such field 'in' on CrossDomain #(T: T[]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
     ╭─[ util.sus:17:12 ]
     │
@@ -50,6 +73,38 @@ domain out_clk:
 
 
 
+────╯
+Error: This declaration conflicts with a previous declaration in the same scope
+    ╭─[ util.sus:37:24 ]
+    │
+ 37 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
+    │               ──┬─        ──┬─  
+    │                 ╰─────────────── 'push' declared here
+    │                             │   
+    │                             ╰─── This declaration conflicts with a previous declaration in the same scope
+────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+    ╭─[ util.sus:37:24 ]
+    │
+ 37 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
+    │                           ──┬─  
+    │                             ╰─── Unused Variable: This variable does not affect the output ports of this module
+────╯
+Error: This declaration conflicts with a previous declaration in the same scope
+    ╭─[ util.sus:40:23 ]
+    │
+ 40 │     interface pop : bool pop -> bool data_valid, T data_out
+    │               ─┬─        ─┬─  
+    │                ╰────────────── 'pop' declared here
+    │                           │   
+    │                           ╰─── This declaration conflicts with a previous declaration in the same scope
+────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+    ╭─[ util.sus:40:23 ]
+    │
+ 40 │     interface pop : bool pop -> bool data_valid, T data_out
+    │                          ─┬─  
+    │                           ╰─── Unused Variable: This variable does not affect the output ports of this module
 ────╯
 Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
     ╭─[ util.sus:43:15 ]
@@ -120,6 +175,13 @@ domain out_clk:
 
 
 ────╯
+Error: Typing Error: if statement condition expects a bool but was given a Local Interface pop
+    ╭─[ util.sus:51:7 ]
+    │
+ 51 │     when pop {
+    │          ─┬─  
+    │           ╰─── Typing Error: if statement condition expects a bool but was given a Local Interface pop
+────╯
 Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
     ╭─[ util.sus:52:42 ]
     │
@@ -166,6 +228,13 @@ domain out_clk:
 
 
 ────╯
+Error: Typing Error: if statement condition expects a bool but was given a Local Interface push
+    ╭─[ util.sus:60:7 ]
+    │
+ 60 │     when push {
+    │          ──┬─  
+    │            ╰─── Typing Error: if statement condition expects a bool but was given a Local Interface push
+────╯
 Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
     ╭─[ util.sus:66:38 ]
     │
@@ -189,6 +258,52 @@ domain out_clk:
 
 
 ────╯
+Error: This declaration conflicts with a previous declaration in the same scope
+    ╭─[ util.sus:82:25 ]
+    │
+ 82 │     interface start : bool start, int #(MIN: 0, MAX) up_to
+    │               ──┬──        ──┬──  
+    │                 ╰───────────────── 'start' declared here
+    │                              │    
+    │                              ╰──── This declaration conflicts with a previous declaration in the same scope
+────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+    ╭─[ util.sus:82:25 ]
+    │
+ 82 │     interface start : bool start, int #(MIN: 0, MAX) up_to
+    │                            ──┬──  
+    │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
+────╯
+Error: Typing Error: if statement condition expects a bool but was given a Local Interface start
+    ╭─[ util.sus:90:7 ]
+    │
+ 90 │     when start {
+    │          ──┬──  
+    │            ╰──── Typing Error: if statement condition expects a bool but was given a Local Interface start
+────╯
+Error: This declaration conflicts with a previous declaration in the same scope
+     ╭─[ util.sus:105:25 ]
+     │
+ 105 │     interface start : bool start
+     │               ──┬──        ──┬──  
+     │                 ╰───────────────── 'start' declared here
+     │                              │    
+     │                              ╰──── This declaration conflicts with a previous declaration in the same scope
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ util.sus:105:25 ]
+     │
+ 105 │     interface start : bool start
+     │                            ──┬──  
+     │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Typing Error: if statement condition expects a bool but was given a Local Interface start
+     ╭─[ util.sus:110:7 ]
+     │
+ 110 │     when start {
+     │          ──┬──  
+     │            ╰──── Typing Error: if statement condition expects a bool but was given a Local Interface start
+─────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
      ╭─[ util.sus:221:4 ]
      │
@@ -2599,6 +2714,45 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                       ┬  
      │                                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: This declaration conflicts with a previous declaration in the same scope
+     ╭─[ test.sus:632:25 ]
+     │
+ 632 │     interface write : bool write, bool[20] wr_data, int#(MIN:0, MAX: 511) wr_addr
+     │               ──┬──        ──┬──  
+     │                 ╰───────────────── 'write' declared here
+     │                              │    
+     │                              ╰──── This declaration conflicts with a previous declaration in the same scope
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:632:25 ]
+     │
+ 632 │     interface write : bool write, bool[20] wr_data, int#(MIN:0, MAX: 511) wr_addr
+     │                            ──┬──  
+     │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: This declaration conflicts with a previous declaration in the same scope
+     ╭─[ test.sus:634:24 ]
+     │
+ 634 │     interface read : bool read, int#(MIN:0, MAX: 511) rd_addr -> bool[20] rd_data
+     │               ──┬─        ──┬─  
+     │                 ╰─────────────── 'read' declared here
+     │                             │   
+     │                             ╰─── This declaration conflicts with a previous declaration in the same scope
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:634:24 ]
+     │
+ 634 │     interface read : bool read, int#(MIN:0, MAX: 511) rd_addr -> bool[20] rd_data
+     │                           ──┬─  
+     │                             ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Typing Error: if statement condition expects a bool but was given a Local Interface write
+     ╭─[ test.sus:636:7 ]
+     │
+ 636 │     when write {
+     │          ──┬──  
+     │            ╰──── Typing Error: if statement condition expects a bool but was given a Local Interface write
+─────╯
 Error: No such field 'i' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
      ╭─[ test.sus:641:7 ]
      │
@@ -2615,6 +2769,13 @@ output bool[20][512] o'0
  641 │     cr_m.i = mem
      │          ┬  
      │          ╰── No such field 'i' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
+─────╯
+Error: Typing Error: if statement condition expects a bool but was given a Local Interface read
+     ╭─[ test.sus:642:7 ]
+     │
+ 642 │     when read {
+     │          ──┬─  
+     │            ╰─── Typing Error: if statement condition expects a bool but was given a Local Interface read
 ─────╯
 Error: No such field 'o' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
      ╭─[ test.sus:643:18 ]
@@ -2848,6 +3009,22 @@ output int b
  707 │     mm.a
      │        ┬  
      │        ╰── No such field 'a' on mod_with_unused_interface #(). Available fields are 'mod_with_unused_interface', 'v'
+─────╯
+Error: This declaration conflicts with a previous declaration in the same scope
+     ╭─[ test.sus:723:25 ]
+     │
+ 723 │     interface start : bool start'0, int#(MIN: 0, MAX: 100) upTo'0
+     │               ──┬──        ──┬──  
+     │                 ╰───────────────── 'start' declared here
+     │                              │    
+     │                              ╰──── This declaration conflicts with a previous declaration in the same scope
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:723:25 ]
+     │
+ 723 │     interface start : bool start'0, int#(MIN: 0, MAX: 100) upTo'0
+     │                            ──┬──  
+     │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:730:11 ]

@@ -1178,25 +1178,25 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         let documentation = cursor.extract_gathered_comments();
 
-        let declaration_instruction =
-            self.instructions
-                .alloc(Instruction::Interface(InterfaceDeclaration {
-                    parent_condition: self.current_parent_condition,
-                    name: name.to_owned(),
-                    name_span,
-                    decl_span: interface_decl_span,
-                    interface_kw_span,
-                    documentation,
-                    interface_id: UUID::PLACEHOLDER,
-                    interface_kind,
-                    latency_specifier,
-                    is_local,
-                    inputs: Vec::new(),
-                    outputs: Vec::new(),
-                    domain: DomainType::Physical(self.current_domain),
-                    then_block: FlatIDRange::PLACEHOLDER,
-                    else_block: FlatIDRange::PLACEHOLDER,
-                }));
+        let decl_instr = self
+            .instructions
+            .alloc(Instruction::Interface(InterfaceDeclaration {
+                parent_condition: self.current_parent_condition,
+                name: name.to_owned(),
+                name_span,
+                decl_span: interface_decl_span,
+                interface_kw_span,
+                documentation,
+                interface_id: UUID::PLACEHOLDER,
+                interface_kind,
+                latency_specifier,
+                is_local,
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                domain: DomainType::Physical(self.current_domain),
+                then_block: FlatIDRange::PLACEHOLDER,
+                else_block: FlatIDRange::PLACEHOLDER,
+            }));
 
         let then_block_starts_at = self.instructions.get_next_alloc_id();
 
@@ -1204,7 +1204,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             name_span,
             name: name.to_owned(),
             domain: Some(self.current_domain),
-            declaration_instruction: Some(InterfaceDeclKind::Interface(declaration_instruction)),
+            declaration_instruction: Some(InterfaceDeclKind::Interface(decl_instr)),
         };
         let interface_id = if name == self.name {
             self.interfaces[InterfaceID::MAIN_INTERFACE] = new_interface;
@@ -1212,6 +1212,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         } else {
             self.interfaces.alloc(new_interface)
         };
+
+        self.alloc_local_name(name_span, name, NamedLocal::LocalInterface(decl_instr));
 
         let variable_ctx_frame = match interface_kind {
             InterfaceKind::RegularInterface => None,
@@ -1225,14 +1227,12 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         let (then_block, else_block, then_block_span, else_span) = self.flatten_then_else_blocks(
             cursor,
-            interface_kind
-                .is_conditional()
-                .then_some(declaration_instruction),
+            interface_kind.is_conditional().then_some(decl_instr),
         );
         let then_block = UUIDRange(then_block_starts_at, then_block.1);
         let_unwrap!(
             Instruction::Interface(interface),
-            &mut self.instructions[declaration_instruction]
+            &mut self.instructions[decl_instr]
         );
 
         match &mut interface.interface_kind {
@@ -1244,7 +1244,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     decl_span: interface_decl_span,
                     is_input: true,
                     domain: self.current_domain,
-                    declaration_instruction,
+                    declaration_instruction: decl_instr,
                     latency_specifier,
                 });
             }
@@ -1255,7 +1255,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     decl_span: interface_decl_span,
                     is_input: false,
                     domain: self.current_domain,
-                    declaration_instruction,
+                    declaration_instruction: decl_instr,
                     latency_specifier,
                 });
             }

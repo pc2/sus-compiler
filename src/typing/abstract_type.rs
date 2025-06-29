@@ -24,6 +24,7 @@ pub enum AbstractInnerType {
     Template(TemplateID),
     Named(TypeUUID),
     Interface(AbstractGlobalReference<ModuleUUID>, InterfaceID),
+    LocalInterface(FlatID),
     /// Referencing [AbstractType::Unknown] is a strong code smell.
     /// It is likely you should use [TypeSubstitutor::unify_must_succeed] or [TypeSubstitutor::unify_report_error] instead
     ///

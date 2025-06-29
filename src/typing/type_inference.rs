@@ -309,6 +309,7 @@ pub enum AbstractTypeHMInfo {
     Template(TemplateID),
     Named(TypeUUID),
     Interface(ModuleUUID, InterfaceID),
+    LocalInterface(FlatID),
 }
 
 impl HindleyMilner for AbstractInnerType {
@@ -326,6 +327,9 @@ impl HindleyMilner for AbstractInnerType {
             }
             AbstractInnerType::Interface(md_ref, interface) => {
                 HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Interface(md_ref.id, *interface))
+            }
+            AbstractInnerType::LocalInterface(decl) => {
+                HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::LocalInterface(*decl))
             }
         }
     }
@@ -351,7 +355,9 @@ impl HindleyMilner for AbstractInnerType {
     /// Doesn't cover the PeanoType Unknowns
     fn for_each_unknown(&self, f: &mut impl FnMut(InnerTypeVariableID)) {
         match self {
-            AbstractInnerType::Template(_) | AbstractInnerType::Named(_) => {}
+            AbstractInnerType::Template(_)
+            | AbstractInnerType::Named(_)
+            | AbstractInnerType::LocalInterface(_) => {}
             AbstractInnerType::Interface(md_ref, _) => {
                 for (_, arg) in &md_ref.template_arg_types {
                     arg.inner.for_each_unknown(f);
@@ -527,7 +533,9 @@ impl AbstractRankedType {
     pub fn fully_substitute(&mut self, substitutor: &AbstractTypeSubstitutor) -> bool {
         let inner_success = match &mut self.inner {
             // Template Name & Name is included in get_hm_info
-            AbstractInnerType::Named(_) | AbstractInnerType::Template(_) => true,
+            AbstractInnerType::Named(_)
+            | AbstractInnerType::Template(_)
+            | AbstractInnerType::LocalInterface(_) => true,
             AbstractInnerType::Interface(md_ref, _) => {
                 let mut success = true;
                 for (_, arg) in &mut md_ref.template_arg_types {
