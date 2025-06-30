@@ -9,9 +9,9 @@ __builtin__ module LatencyOffset #(T, int OFFSET) {
 /// Important: Does not perform any kind of Clock Domain Crossing!
 __builtin__ module CrossDomain #(T) {
     domain in_clk
-    interface in_domain : T in'0
+    input T in'0
     domain out_clk
-    interface out_domain : -> T out'0
+    output T out'0
 }
 
 __builtin__ module IntToBits #(int NUM_BITS) {
