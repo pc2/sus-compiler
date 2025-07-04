@@ -11565,31 +11565,63 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │                   ╰───── Interface 'infer_me' defined here
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1160:12 ]
+      ╭─[ test.sus:1159:51 ]
       │
- 1160 │     input int data_received'3
-      │               ──────┬──────  
-      │                     ╰──────── Unused Variable: This variable does not affect the output ports of this module
+ 1159 │     trigger request_data'0 : -> int#(MIN: 0, MAX: 6) data_received'3
+      │                                                      ──────┬──────  
+      │                                                            ╰──────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused port 'data_out'
+      ╭─[ test.sus:1161:20 ]
+      │
+ 1161 │     FIFO #(DEPTH: 30) fifo
+      │                       ──┬─  
+      │                         ╰─── Unused port 'data_out'
+      │                         │   
+      │                         ╰─── fifo declared here
+      │
+      ├─[ util.sus:48:36 ]
+      │
+   48 │     action pop: -> bool data_valid, T data_out {
+      │                                       ────┬───  
+      │                                           ╰───── Port 'data_out' declared here
+──────╯
+Warning: Unused port 'data_valid'
+      ╭─[ test.sus:1161:20 ]
+      │
+ 1161 │     FIFO #(DEPTH: 30) fifo
+      │                       ──┬─  
+      │                         ╰─── Unused port 'data_valid'
+      │                         │   
+      │                         ╰─── fifo declared here
+      │
+      ├─[ util.sus:48:22 ]
+      │
+   48 │     action pop: -> bool data_valid, T data_out {
+      │                         ─────┬────  
+      │                              ╰────── Port 'data_valid' declared here
+──────╯
+Warning: Unused port 'pop'
+      ╭─[ test.sus:1161:20 ]
+      │
+ 1161 │     FIFO #(DEPTH: 30) fifo
+      │                       ──┬─  
+      │                         ╰─── Unused port 'pop'
+      │                         │   
+      │                         ╰─── fifo declared here
+      │
+      ├─[ util.sus:48:9 ]
+      │
+   48 │     action pop: -> bool data_valid, T data_out {
+      │            ─┬─  
+      │             ╰─── Port 'pop' declared here
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1166:27 ]
+      ╭─[ test.sus:1164:27 ]
       │
- 1166 │        reg reg reg reg reg int heavy_computation = data_received
+ 1164 │        reg reg reg reg reg int heavy_computation = request_data()
       │                                ────────┬────────  
       │                                        ╰────────── Unused Variable: This variable does not affect the output ports of this module
-──────╯
-Error: Excess argument. Function takes 1 args, but 2 were passed.
-      ╭─[ test.sus:1168:19 ]
-      │
- 1168 │        fifo.push(true, heavy_computation)
-      │                        ────────┬────────  
-      │                                ╰────────── Excess argument. Function takes 1 args, but 2 were passed.
-      │
-      ├─[ util.sus:42:9 ]
-      │
-   42 │     action push'READY_SLACK: T data_in'READY_SLACK {
-      │            ──┬─  
-      │              ╰─── Interface 'push' defined here
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(
     A: /* Could not infer */

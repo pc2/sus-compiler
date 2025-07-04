@@ -767,7 +767,21 @@ Instantiating infer_me #(A: 5)
 Concrete Typechecking infer_me #(A: 5)
 Checking array accesses infer_me #(A: 5)
 Checking array accesses infer_from_local_context
-Not Instantiating instantiate_fifo due to flattening errors
+Instantiating instantiate_fifo
+Concrete Typechecking instantiate_fifo
+Instantiating FIFO #(T: type int #(MIN: 0, MAX: 6), DEPTH: 30, READY_SLACK: 8)
+Concrete Typechecking FIFO #(T: type int #(MIN: 0, MAX: 6), DEPTH: 30, READY_SLACK: 8)
+Instantiating CrossDomain #(T: type int #(MIN: 0, MAX: 29))
+Concrete Typechecking CrossDomain #(T: type int #(MIN: 0, MAX: 29))
+Checking array accesses CrossDomain #(T: type int #(MIN: 0, MAX: 29))
+Instantiating CrossDomain #(T: type int #(MIN: 0, MAX: 6)[30])
+Concrete Typechecking CrossDomain #(T: type int #(MIN: 0, MAX: 6)[30])
+Checking array accesses CrossDomain #(T: type int #(MIN: 0, MAX: 6)[30])
+Instantiating LatencyOffset #(T: type bool, OFFSET: -9)
+Concrete Typechecking LatencyOffset #(T: type bool, OFFSET: -9)
+Checking array accesses LatencyOffset #(T: type bool, OFFSET: -9)
+Checking array accesses FIFO #(T: type int #(MIN: 0, MAX: 6), DEPTH: 30, READY_SLACK: 8)
+Checking array accesses instantiate_fifo
 Instantiating inference_edge_case
 Concrete Typechecking inference_edge_case
 Instantiating specified_latencies_not_ports_edge_case

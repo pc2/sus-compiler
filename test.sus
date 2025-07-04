@@ -1156,18 +1156,18 @@ module infer_from_local_context {
 }
 
 module instantiate_fifo {
-	output bool request_data'0
-	input int data_received'3
+	trigger request_data'0 : -> int#(MIN: 0, MAX: 6) data_received'3
 
 	FIFO #(DEPTH: 30) fifo
 
-	request_data = fifo.ready
 	when fifo.ready {
-		reg reg reg reg reg int heavy_computation = data_received
+		reg reg reg reg reg int heavy_computation = request_data()
 
-		fifo.push(true, heavy_computation)
+		fifo.push(heavy_computation)
 	}
 }
+
+
 
 // This produces a graph much like this:
 // a'0-.     .- b'3
