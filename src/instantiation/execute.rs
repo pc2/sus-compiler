@@ -479,7 +479,7 @@ impl<'l> ExecutionContext<'l> {
         submodule_port: &Port,
         submodule_template_args: &TVec<ConcreteTemplateArg>,
         submodule_link_info: &LinkInfo,
-    ) -> ConcreteType {
+    ) -> (ConcreteType, bool) {
         match &submodule_link_info.instructions[submodule_port.declaration_instruction] {
             Instruction::Declaration(submodule_decl) => {
                 let mut concretizer = SubModuleTypeConcretizer {
@@ -487,20 +487,21 @@ impl<'l> ExecutionContext<'l> {
                     instructions: &submodule_link_info.instructions,
                     type_substitutor,
                 };
-                concretize_type_recurse(
+                let typ = concretize_type_recurse(
                     linker,
                     &submodule_decl.typ.inner,
                     &submodule_decl.typ.rank,
                     Some(&submodule_decl.typ_expr),
                     &mut concretizer,
                 )
-                .unwrap()
+                .unwrap();
+                (typ, false)
             }
             Instruction::Interface(interface_decl) => match interface_decl.interface_kind {
                 InterfaceKind::RegularInterface => {
                     unreachable!("Non-conditional interfaces can't have condition")
                 }
-                InterfaceKind::Action(_) | InterfaceKind::Trigger(_) => ConcreteType::BOOL,
+                InterfaceKind::Action(_) | InterfaceKind::Trigger(_) => (ConcreteType::BOOL, true),
             },
             _ => unreachable!("Ports can only point to Declaration or InterfaceDeclaration"),
         }
@@ -879,6 +880,7 @@ impl<'l> ExecutionContext<'l> {
         } else {
             let submod_md = &self.linker.modules[submod_instance.refers_to.id];
             let port_data = &submod_md.ports[port_id];
+            let write_span = submod_instance.get_span(self.link_info);
             let source = match port_data.direction {
                 Direction::Input => RealWireDataSource::Multiplexer {
                     is_state: None,
@@ -886,16 +888,17 @@ impl<'l> ExecutionContext<'l> {
                 },
                 Direction::Output => RealWireDataSource::ReadOnly,
             };
-            let typ = Self::concretize_submodule_port_type(
+            let (typ, is_condition) = Self::concretize_submodule_port_type(
                 &mut self.type_substitutor,
                 self.linker,
                 port_data,
                 &submod_instance.refers_to.template_args,
                 &submod_md.link_info,
             );
+            let original_instruction = submod_instance.original_instruction;
             let new_wire = self.wires.alloc(RealWire {
                 source,
-                original_instruction: submod_instance.original_instruction,
+                original_instruction,
                 domain,
                 typ,
                 name: self
@@ -906,13 +909,28 @@ impl<'l> ExecutionContext<'l> {
                 is_port: None,
             });
 
+            if is_condition && port_data.direction == Direction::Input {
+                let false_wire = self.alloc_bool(false, original_instruction, domain);
+                let_unwrap!(
+                    RealWireDataSource::Multiplexer { sources, .. },
+                    &mut self.wires[new_wire].source
+                );
+                sources.push(MultiplexerSource {
+                    to_path: Vec::new(),
+                    num_regs: 0,
+                    from: false_wire,
+                    condition: Box::new([]),
+                    write_span,
+                });
+            }
+
             let name_refs = if let Some(sp) = port_name_span {
                 vec![sp]
             } else {
                 Vec::new()
             };
 
-            *wire_found = Some(SubModulePort {
+            self.submodules[sub_module_id].port_map[port_id] = Some(SubModulePort {
                 maps_to_wire: new_wire,
                 name_refs,
             });
@@ -1465,7 +1483,7 @@ impl<'l> ExecutionContext<'l> {
                             Some(Direction::Output) | None => RealWireDataSource::Multiplexer {
                                 is_state: None,
                                 sources: Vec::new(),
-                            }
+                            },
                         };
                         let condition_wire = self.wires.alloc(RealWire {
                             name: self.unique_name_producer.get_unique_name(&interface.name),
