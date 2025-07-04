@@ -59,7 +59,7 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
                 let [min, max] = template_args.cast_to_int_array();
                 let bitwidth = get_int_bitwidth(min, max) - 1;
                 if min < &IBig::from(0) {
-                    return format!("signed [{bitwidth}:0] {var_name}{array_string}");
+                    return format!(" signed[{bitwidth}:0] {var_name}{array_string}");
                 } else {
                     return format!("[{bitwidth}:0] {var_name}{array_string}");
                 }
