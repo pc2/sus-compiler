@@ -5,360 +5,10 @@ Warning: The result of this expression is not used. Only function calls can retu
     │     ────────────────────┬────────────────────  
     │                         ╰────────────────────── The result of this expression is not used. Only function calls can return nothing. 
 ────╯
-Error: This declaration conflicts with a previous declaration in the same scope
-   ╭─[ util.sus:7:25 ]
-   │
- 7 │     interface write : bool write'0, int#(MIN: 0, MAX) addr'0, T data'0
-   │               ──┬──        ──┬──  
-   │                 ╰───────────────── 'write' declared here
-   │                              │    
-   │                              ╰──── This declaration conflicts with a previous declaration in the same scope
-───╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-   ╭─[ util.sus:7:25 ]
-   │
- 7 │     interface write : bool write'0, int#(MIN: 0, MAX) addr'0, T data'0
-   │                            ──┬──  
-   │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
-───╯
-Error: Can't read from an interface. Use a function call or interface connector instead
-   ╭─[ util.sus:9:7 ]
-   │
- 9 │     when write {
-   │          ──┬──  
-   │            ╰──── Can't read from an interface. Use a function call or interface connector instead
-───╯
-Error: Typing Error: if statement condition expects a bool but was given a Local Interface write
-   ╭─[ util.sus:9:7 ]
-   │
- 9 │     when write {
-   │          ──┬──  
-   │            ╰──── Typing Error: if statement condition expects a bool but was given a Local Interface write
-───╯
-Error: No such field 'in' on CrossDomain #(T: T[]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    ╭─[ util.sus:17:12 ]
-    │
- 17 │     cross_mem.in = mem
-    │               ─┬  
-    │                ╰── No such field 'in' on CrossDomain #(T: T[]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    │
-    ├─[ core.sus:10:20 ]
-    │
- 10 │ __builtin__ module CrossDomain #(T) {
-    │                    ─────┬─────  
-    │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
-domain in_clk:
-
-interface in_domain:
-	input T in'0
-	->
-interface out_domain:
-	->
-	output T out'0
-domain out_clk:
-
-
-
-────╯
-Error: No such field 'out' on CrossDomain #(T: T[]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    ╭─[ util.sus:19:24 ]
-    │
- 19 │     read_data = cross_mem.out[read_addr]
-    │                           ─┬─  
-    │                            ╰─── No such field 'out' on CrossDomain #(T: T[]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    │
-    ├─[ core.sus:10:20 ]
-    │
- 10 │ __builtin__ module CrossDomain #(T) {
-    │                    ─────┬─────  
-    │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
-domain in_clk:
-
-interface in_domain:
-	input T in'0
-	->
-interface out_domain:
-	->
-	output T out'0
-domain out_clk:
-
-
-
-────╯
-Error: This declaration conflicts with a previous declaration in the same scope
-    ╭─[ util.sus:37:24 ]
-    │
- 37 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
-    │               ──┬─        ──┬─  
-    │                 ╰─────────────── 'push' declared here
-    │                             │   
-    │                             ╰─── This declaration conflicts with a previous declaration in the same scope
-────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-    ╭─[ util.sus:37:24 ]
-    │
- 37 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
-    │                           ──┬─  
-    │                             ╰─── Unused Variable: This variable does not affect the output ports of this module
-────╯
-Error: This declaration conflicts with a previous declaration in the same scope
-    ╭─[ util.sus:40:23 ]
-    │
- 40 │     interface pop : bool pop -> bool data_valid, T data_out
-    │               ─┬─        ─┬─  
-    │                ╰────────────── 'pop' declared here
-    │                           │   
-    │                           ╰─── This declaration conflicts with a previous declaration in the same scope
-────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-    ╭─[ util.sus:40:23 ]
-    │
- 40 │     interface pop : bool pop -> bool data_valid, T data_out
-    │                          ─┬─  
-    │                           ╰─── Unused Variable: This variable does not affect the output ports of this module
-────╯
-Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    ╭─[ util.sus:43:15 ]
-    │
- 43 │     write_to_pop.in = write_addr
-    │                  ─┬  
-    │                   ╰── No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    │
-    ├─[ core.sus:10:20 ]
-    │
- 10 │ __builtin__ module CrossDomain #(T) {
-    │                    ─────┬─────  
-    │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
-domain in_clk:
-
-interface in_domain:
-	input T in'0
-	->
-interface out_domain:
-	->
-	output T out'0
-domain out_clk:
-
-
-
-────╯
-Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    ╭─[ util.sus:46:15 ]
-    │
- 46 │     read_to_push.in = read_addr
-    │                  ─┬  
-    │                   ╰── No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    │
-    ├─[ core.sus:10:20 ]
-    │
- 10 │ __builtin__ module CrossDomain #(T) {
-    │                    ─────┬─────  
-    │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
-domain in_clk:
-
-interface in_domain:
-	input T in'0
-	->
-interface out_domain:
-	->
-	output T out'0
-domain out_clk:
-
-
-
-────╯
-Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    ╭─[ util.sus:49:13 ]
-    │
- 49 │     mem_to_pop.in = mem
-    │                ─┬  
-    │                 ╰── No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    │
-    ├─[ core.sus:10:20 ]
-    │
- 10 │ __builtin__ module CrossDomain #(T) {
-    │                    ─────┬─────  
-    │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
-domain in_clk:
-
-interface in_domain:
-	input T in'0
-	->
-interface out_domain:
-	->
-	output T out'0
-domain out_clk:
-
-
-
-────╯
-Error: Can't read from an interface. Use a function call or interface connector instead
-    ╭─[ util.sus:51:7 ]
-    │
- 51 │     when pop {
-    │          ─┬─  
-    │           ╰─── Can't read from an interface. Use a function call or interface connector instead
-────╯
-Error: Typing Error: if statement condition expects a bool but was given a Local Interface pop
-    ╭─[ util.sus:51:7 ]
-    │
- 51 │     when pop {
-    │          ─┬─  
-    │           ╰─── Typing Error: if statement condition expects a bool but was given a Local Interface pop
-────╯
-Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    ╭─[ util.sus:52:42 ]
-    │
- 52 │        data_valid = read_addr != write_to_pop.out
-    │                                               ─┬─  
-    │                                                ╰─── No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    │
-    ├─[ core.sus:10:20 ]
-    │
- 10 │ __builtin__ module CrossDomain #(T) {
-    │                    ─────┬─────  
-    │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
-domain in_clk:
-
-interface in_domain:
-	input T in'0
-	->
-interface out_domain:
-	->
-	output T out'0
-domain out_clk:
-
-
-
-────╯
-Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    ╭─[ util.sus:55:30 ]
-    │
- 55 │          reg data_out = mem_to_pop.out[read_addr]
-    │                                    ─┬─  
-    │                                     ╰─── No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    │
-    ├─[ core.sus:10:20 ]
-    │
- 10 │ __builtin__ module CrossDomain #(T) {
-    │                    ─────┬─────  
-    │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
-domain in_clk:
-
-interface in_domain:
-	input T in'0
-	->
-interface out_domain:
-	->
-	output T out'0
-domain out_clk:
-
-
-
-────╯
-Error: Can't read from an interface. Use a function call or interface connector instead
-    ╭─[ util.sus:60:7 ]
-    │
- 60 │     when push {
-    │          ──┬─  
-    │            ╰─── Can't read from an interface. Use a function call or interface connector instead
-────╯
-Error: Typing Error: if statement condition expects a bool but was given a Local Interface push
-    ╭─[ util.sus:60:7 ]
-    │
- 60 │     when push {
-    │          ──┬─  
-    │            ╰─── Typing Error: if statement condition expects a bool but was given a Local Interface push
-────╯
-Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    ╭─[ util.sus:66:38 ]
-    │
- 66 │     int space_remaining = (read_to_push.out - write_addr) % DEPTH
-    │                                         ─┬─  
-    │                                          ╰─── No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-    │
-    ├─[ core.sus:10:20 ]
-    │
- 10 │ __builtin__ module CrossDomain #(T) {
-    │                    ─────┬─────  
-    │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
-domain in_clk:
-
-interface in_domain:
-	input T in'0
-	->
-interface out_domain:
-	->
-	output T out'0
-domain out_clk:
-
-
-
-────╯
-Error: This declaration conflicts with a previous declaration in the same scope
-    ╭─[ util.sus:82:25 ]
-    │
- 82 │     interface start : bool start, int #(MIN: 0, MAX) up_to
-    │               ──┬──        ──┬──  
-    │                 ╰───────────────── 'start' declared here
-    │                              │    
-    │                              ╰──── This declaration conflicts with a previous declaration in the same scope
-────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-    ╭─[ util.sus:82:25 ]
-    │
- 82 │     interface start : bool start, int #(MIN: 0, MAX) up_to
-    │                            ──┬──  
-    │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
-────╯
-Error: Can't read from an interface. Use a function call or interface connector instead
-    ╭─[ util.sus:90:7 ]
-    │
- 90 │     when start {
-    │          ──┬──  
-    │            ╰──── Can't read from an interface. Use a function call or interface connector instead
-────╯
-Error: Typing Error: if statement condition expects a bool but was given a Local Interface start
-    ╭─[ util.sus:90:7 ]
-    │
- 90 │     when start {
-    │          ──┬──  
-    │            ╰──── Typing Error: if statement condition expects a bool but was given a Local Interface start
-────╯
-Error: This declaration conflicts with a previous declaration in the same scope
-     ╭─[ util.sus:105:25 ]
-     │
- 105 │     interface start : bool start
-     │               ──┬──        ──┬──  
-     │                 ╰───────────────── 'start' declared here
-     │                              │    
-     │                              ╰──── This declaration conflicts with a previous declaration in the same scope
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ util.sus:105:25 ]
-     │
- 105 │     interface start : bool start
-     │                            ──┬──  
-     │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Can't read from an interface. Use a function call or interface connector instead
-     ╭─[ util.sus:110:7 ]
-     │
- 110 │     when start {
-     │          ──┬──  
-     │            ╰──── Can't read from an interface. Use a function call or interface connector instead
-─────╯
-Error: Typing Error: if statement condition expects a bool but was given a Local Interface start
-     ╭─[ util.sus:110:7 ]
-     │
- 110 │     when start {
-     │          ──┬──  
-     │            ╰──── Typing Error: if statement condition expects a bool but was given a Local Interface start
-─────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
-     ╭─[ util.sus:221:4 ]
+     ╭─[ util.sus:210:4 ]
      │
- 221 │          assert#(C: false)
+ 210 │          assert#(C: false)
      │          ────────┬────────  
      │                  ╰────────── The result of this expression is not used. Only function calls can return nothing. 
 ─────╯
@@ -2857,34 +2507,6 @@ interface out:
      │                       ┬  
      │                       ╰── No such field 'o' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:648:33 ]
-     │
- 648 │     interface use_fifo : -> int o
-     │                                 ┬  
-     │                                 ╰── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not infer the parameters of this submodule, some parameters were still unknown: FIFO #(
-    T: type bool[20], 
-    DEPTH: /* Could not infer */, 
-    READY_SLACK: /* Could not infer */
-)
-     ╭─[ test.sus:649:7 ]
-     │
- 649 │     FIFO fiii
-     │          ──┬─  
-     │            ╰─── Could not infer the parameters of this submodule, some parameters were still unknown: FIFO #(
-    T: type bool[20], 
-    DEPTH: /* Could not infer */, 
-    READY_SLACK: /* Could not infer */
-)
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:651:11 ]
      │
@@ -2905,6 +2527,19 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  653 │     bool valid, bool[20] data2 = fiii.pop(true)
      │                          ──┬──  
      │                            ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Excess argument. Function takes 0 args, but 1 were passed.
+     ╭─[ test.sus:653:40 ]
+     │
+ 653 │     bool valid, bool[20] data2 = fiii.pop(true)
+     │                                           ──┬─  
+     │                                             ╰─── Excess argument. Function takes 0 args, but 1 were passed.
+     │
+     ├─[ util.sus:48:9 ]
+     │
+  48 │     action pop: -> bool data_valid, T data_out {
+     │            ─┬─  
+     │             ╰─── Interface 'pop' defined here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:659:44 ]
@@ -3416,9 +3051,9 @@ Error: 'BITWIDTH' is not a valid template argument of FIFO
      │            ────┬───  
      │                ╰───── 'BITWIDTH' is not a valid template argument of FIFO
      │
-     ├─[ util.sus:22:8 ]
+     ├─[ util.sus:18:8 ]
      │
-  22 │ module FIFO #(
+  18 │ module FIFO #(
      │        ──┬─  
      │          ╰─── 'FIFO' defined here
 ─────╯
@@ -11325,6 +10960,19 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                ┬  
      │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
+     ╭─[ test.sus:956:9 ]
+     │
+ 956 │     int[5] a
+     │            ┬  
+     │            ╰── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:956:9 ]
      │
@@ -11332,30 +10980,74 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │            ┬  
      │            ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-     ╭─[ test.sus:960:5 ]
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
+     ╭─[ test.sus:958:14 ]
+     │
+ 958 │     CrossDomain cr
+     │                 ─┬  
+     │                  ╰── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
+     ╭─[ test.sus:958:14 ]
+     │
+ 958 │     CrossDomain cr
+     │                 ─┬  
+     │                  ╰── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
+─────╯
+Error: Could not infer the parameters of this submodule, some parameters were still unknown: CrossDomain #(
+    T: type int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
+)
+     ╭─[ test.sus:958:14 ]
+     │
+ 958 │     CrossDomain cr
+     │                 ─┬  
+     │                  ╰── Could not infer the parameters of this submodule, some parameters were still unknown: CrossDomain #(
+    T: type int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
+     ╭─[ test.sus:960:10 ]
      │
  960 │     cr.in = a
-     │        ─┬  
-     │         ╰── No such field 'in' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
+     │             ┬  
+     │             ╰── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
+     ╭─[ test.sus:961:9 ]
      │
-     ├─[ core.sus:10:20 ]
-     │
-  10 │ __builtin__ module CrossDomain #(T) {
-     │                    ─────┬─────  
-     │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
-domain in_clk:
-
-interface in_domain:
-	input T in'0
-	->
-interface out_domain:
-	->
-	output T out'0
-domain out_clk:
-
-
-
+ 961 │     int[5] b = cr.out
+     │            ┬  
+     │            ╰── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:961:9 ]
@@ -11364,30 +11056,18 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │            ┬  
      │            ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-     ╭─[ test.sus:961:16 ]
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
+     ╭─[ test.sus:961:13 ]
      │
  961 │     int[5] b = cr.out
-     │                   ─┬─  
-     │                    ╰─── No such field 'out' on CrossDomain #(T: ?[...]). Available fields are 'CrossDomain', 'in_domain', 'out_domain'
-     │
-     ├─[ core.sus:10:20 ]
-     │
-  10 │ __builtin__ module CrossDomain #(T) {
-     │                    ─────┬─────  
-     │                         ╰─────── Module 'CrossDomain' defined here. module CrossDomain #(T):
-domain in_clk:
-
-interface in_domain:
-	input T in'0
-	->
-interface out_domain:
-	->
-	output T out'0
-domain out_clk:
-
-
-
+     │                ───┬──  
+     │                   ╰──── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:965:9 ]
@@ -11488,19 +11168,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │             ────┬───  
       │                 ╰───── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-      ╭─[ test.sus:1037:7 ]
-      │
- 1037 │        int addr'0,
-      │            ──┬─  
-      │              ╰─── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1038:13 ]
       │
@@ -11508,38 +11175,57 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                  ──┬─  
       │                    ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Error instantiating submodule
-      ╭─[ test.sus:1041:45 ]
+Error: 'MAX' is not a valid template argument of DualPortMem
+      ╭─[ test.sus:1041:16 ]
       │
  1041 │     DualPortMem #(MAX: 128, T: type bool[500]) mem
-      │                                                ─┬─  
-      │                                                 ╰─── Error instantiating submodule
+      │                   ─┬─  
+      │                    ╰─── 'MAX' is not a valid template argument of DualPortMem
+      │
+      ├─[ util.sus:2:8 ]
+      │
+    2 │ module DualPortMem #(T, int SIZE) {
+      │        ─────┬─────  
+      │             ╰─────── 'DualPortMem' defined here
 ──────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
+Error: Typing Error: function argument expects a int but was given a bool
+      ╭─[ test.sus:1043:12 ]
+      │
+ 1043 │     mem.write(do_write, addr, data)
+      │               ────┬───  
+      │                   ╰───── Typing Error: function argument expects a int but was given a bool
+      │
+      ├─[ util.sus:8:47 ]
+      │
+    8 │     action write'0 : int#(MIN: 0, MAX: SIZE - 1) addr'0, T data'0 {
+      │                                                  ──┬─  
+      │                                                    ╰─── 'addr' declared here
+──────╯
+Error: Typing Error: function argument expects a bool[] but was given a int
       ╭─[ test.sus:1043:22 ]
       │
  1043 │     mem.write(do_write, addr, data)
       │                         ──┬─  
-      │                           ╰─── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-──────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-      ╭─[ test.sus:1045:23 ]
+      │                           ╰─── Typing Error: function argument expects a bool[] but was given a int
       │
- 1045 │     read_data = mem.read(addr)
-      │                          ──┬─  
-      │                            ╰─── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
+      ├─[ util.sus:8:57 ]
+      │
+    8 │     action write'0 : int#(MIN: 0, MAX: SIZE - 1) addr'0, T data'0 {
+      │                                                            ──┬─  
+      │                                                              ╰─── 'data' declared here
+──────╯
+Error: Excess argument. Function takes 2 args, but 3 were passed.
+      ╭─[ test.sus:1043:28 ]
+      │
+ 1043 │     mem.write(do_write, addr, data)
+      │                               ──┬─  
+      │                                 ╰─── Excess argument. Function takes 2 args, but 3 were passed.
+      │
+      ├─[ util.sus:8:9 ]
+      │
+    8 │     action write'0 : int#(MIN: 0, MAX: SIZE - 1) addr'0, T data'0 {
+      │            ──┬──  
+      │              ╰──── Interface 'write' defined here
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: FIFO #(
     T: type int #(
@@ -11568,6 +11254,32 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1053 │     interface start_iteration : bool do_start
       │                                      ────┬───  
       │                                          ╰───── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Typing Error: function argument expects a int but was given a bool
+      ╭─[ test.sus:1060:20 ]
+      │
+ 1060 │     arrayStream.start(do_start, 10)
+      │                       ────┬───  
+      │                           ╰───── Typing Error: function argument expects a int but was given a bool
+      │
+      ├─[ util.sus:81:36 ]
+      │
+   81 │     action start : int #(MIN: 0, MAX) up_to {
+      │                                       ──┬──  
+      │                                         ╰──── 'up_to' declared here
+──────╯
+Error: Excess argument. Function takes 1 args, but 2 were passed.
+      ╭─[ test.sus:1060:30 ]
+      │
+ 1060 │     arrayStream.start(do_start, 10)
+      │                                 ─┬  
+      │                                  ╰── Excess argument. Function takes 1 args, but 2 were passed.
+      │
+      ├─[ util.sus:81:9 ]
+      │
+   81 │     action start : int #(MIN: 0, MAX) up_to {
+      │            ──┬──  
+      │              ╰──── Interface 'start' defined here
 ──────╯
 Error: Used 'if' in a non generative context, use 'when' instead
       ╭─[ test.sus:1064:2 ]
@@ -11852,72 +11564,12 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │               ────┬───  
       │                   ╰───── Interface 'infer_me' defined here
 ──────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-      ╭─[ test.sus:1160:12 ]
-      │
- 1160 │     input int data_received'3
-      │               ──────┬──────  
-      │                     ╰──────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1160:12 ]
       │
  1160 │     input int data_received'3
       │               ──────┬──────  
       │                     ╰──────── Unused Variable: This variable does not affect the output ports of this module
-──────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-      ╭─[ test.sus:1162:20 ]
-      │
- 1162 │     FIFO #(DEPTH: 30) fifo
-      │                       ──┬─  
-      │                         ╰─── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-──────╯
-Error: Could not infer the parameters of this submodule, some parameters were still unknown: FIFO #(
-    T: type int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-), 
-    DEPTH: 30, 
-    READY_SLACK: /* Could not infer */
-)
-      ╭─[ test.sus:1162:20 ]
-      │
- 1162 │     FIFO #(DEPTH: 30) fifo
-      │                       ──┬─  
-      │                         ╰─── Could not infer the parameters of this submodule, some parameters were still unknown: FIFO #(
-    T: type int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-), 
-    DEPTH: 30, 
-    READY_SLACK: /* Could not infer */
-)
-──────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-      ╭─[ test.sus:1166:27 ]
-      │
- 1166 │        reg reg reg reg reg int heavy_computation = data_received
-      │                                ────────┬────────  
-      │                                        ╰────────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1166:27 ]
@@ -11926,31 +11578,18 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                                ────────┬────────  
       │                                        ╰────────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-      ╭─[ test.sus:1166:47 ]
-      │
- 1166 │        reg reg reg reg reg int heavy_computation = data_received
-      │                                                    ──────┬──────  
-      │                                                          ╰──────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-──────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
+Error: Excess argument. Function takes 1 args, but 2 were passed.
       ╭─[ test.sus:1168:19 ]
       │
  1168 │        fifo.push(true, heavy_computation)
       │                        ────────┬────────  
-      │                                ╰────────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
+      │                                ╰────────── Excess argument. Function takes 1 args, but 2 were passed.
+      │
+      ├─[ util.sus:42:9 ]
+      │
+   42 │     action push'READY_SLACK: T data_in'READY_SLACK {
+      │            ──┬─  
+      │              ╰─── Interface 'push' defined here
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(
     A: /* Could not infer */
@@ -13202,12 +12841,18 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │            ─┬  
       │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Error instantiating submodule
-      ╭─[ test.sus:1374:39 ]
+Error: Excess argument. Function takes 1 args, but 2 were passed.
+      ╭─[ test.sus:1376:18 ]
       │
- 1374 │     FIFO #(DEPTH: 53, READY_SLACK: 3) f
-      │                                       ┬  
-      │                                       ╰── Error instantiating submodule
+ 1376 │     f.push(true, 3)
+      │                  ┬  
+      │                  ╰── Excess argument. Function takes 1 args, but 2 were passed.
+      │
+      ├─[ util.sus:42:9 ]
+      │
+   42 │     action push'READY_SLACK: T data_in'READY_SLACK {
+      │            ──┬─  
+      │              ╰─── Interface 'push' defined here
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1380:11 ]
