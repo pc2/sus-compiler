@@ -517,7 +517,7 @@ mod tests {
     ) -> FullPortLatencyLinearity {
         FullPortLatencyLinearity {
             domain,
-            direction: Direction::Input,
+            direction: Direction::Output,
             latency_linearity: Some(PortLatencyLinearity {
                 const_factor,
                 arg_linear_factor: FlatAlloc::from_vec(arg_factors),
@@ -684,7 +684,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            values_to_infer.cast_to_array().map(|v| v.get()),
+            values_to_infer.map(|v| v.1.get()).into_vec(),
             [Some(6), Some(1), Some(9)] // C 3 smaller due to offset on port 4
         );
     }
