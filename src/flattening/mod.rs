@@ -888,6 +888,7 @@ pub struct IfStatement {
     pub is_generative: bool,
     pub then_block: FlatIDRange,
     pub else_block: FlatIDRange,
+    pub conditional_bindings: Option<(Vec<FlatID>, Vec<FlatID>)>,
 }
 
 /// A control-flow altering [Instruction] to represent compiletime looping on a generative index

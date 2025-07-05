@@ -1036,14 +1036,14 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     is_generative: expects_generative,
                     then_block: FlatIDRange::PLACEHOLDER,
                     else_block: FlatIDRange::PLACEHOLDER,
+                    conditional_bindings: None,
                 }));
 
-            let (conditional_bindings_inputs, conditional_bindings_outputs) =
-                if cursor.optional_field(field!("conditional_bindings")) {
-                    self.flatten_conditional_bindings(if_id, cursor)
-                } else {
-                    (Vec::new(), Vec::new())
-                };
+            let conditional_bindings = if cursor.optional_field(field!("conditional_bindings")) {
+                Some(self.flatten_conditional_bindings(if_id, cursor))
+            } else {
+                None
+            };
 
             let (then_block, else_block, then_block_span, _else_span) =
                 self.flatten_then_else_blocks(cursor, (!expects_generative).then_some(if_id));
@@ -1056,6 +1056,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             );
             if_stmt.then_block = then_block;
             if_stmt.else_block = else_block;
+            if_stmt.conditional_bindings = conditional_bindings;
         })
     }
 
