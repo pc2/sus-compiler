@@ -132,9 +132,6 @@ impl<IndexMarker> UUIDRange<IndexMarker> {
     pub fn new_with_length(len: usize) -> Self {
         UUIDRange(UUID(0, PhantomData), UUID(len, PhantomData))
     }
-    pub fn empty() -> Self {
-        UUIDRange(UUID(0, PhantomData), UUID(0, PhantomData))
-    }
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }

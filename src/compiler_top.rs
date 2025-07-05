@@ -3,7 +3,11 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::config::EarlyExitUpTo;
-use crate::linker::AFTER_INITIAL_PARSE_CP;
+use crate::flattening::typecheck::{perform_lints, typecheck};
+use crate::linker::checkpoint::{
+    AFTER_FLATTEN_CP, AFTER_INITIAL_PARSE_CP, AFTER_LINTS_CP, AFTER_TYPE_CHECK_CP,
+};
+use crate::linker::GlobalObj;
 use crate::prelude::*;
 use crate::typing::concrete_type::ConcreteGlobalReference;
 
@@ -15,9 +19,7 @@ use crate::{
     linker::FileData,
 };
 
-use crate::flattening::{
-    flatten_all_globals, gather_initial_file_data, perform_lints, typecheck_all_modules, Module,
-};
+use crate::flattening::{flatten_all_globals, gather_initial_file_data};
 
 const STD_LIB_PATH: &str = env!("SUS_COMPILER_STD_LIB_PATH");
 
@@ -87,6 +89,16 @@ impl Linker {
         );
     }
 
+    pub fn add_file<ExtraInfoManager: LinkerExtraFileInfoManager>(
+        &mut self,
+        file_path: &Path,
+        info_mngr: &mut ExtraInfoManager,
+    ) {
+        let file_text = std::fs::read_to_string(file_path).unwrap();
+        let file_identifier: String = info_mngr.convert_filename(file_path);
+        self.add_file_text(file_identifier, file_text, info_mngr);
+    }
+
     pub fn add_all_files_in_directory<ExtraInfoManager: LinkerExtraFileInfoManager>(
         &mut self,
         directory: &PathBuf,
@@ -101,14 +113,12 @@ impl Linker {
         for file in files {
             let file_path = file.canonicalize().unwrap();
             if file_path.is_file() && file_path.extension() == Some(OsStr::new("sus")) {
-                let file_text = std::fs::read_to_string(&file_path).unwrap();
-                let file_identifier: String = info_mngr.convert_filename(&file_path);
-                self.add_file(file_identifier, file_text, info_mngr);
+                self.add_file(&file_path, info_mngr);
             }
         }
     }
 
-    pub fn add_file<ExtraInfoManager: LinkerExtraFileInfoManager>(
+    pub fn add_file_text<ExtraInfoManager: LinkerExtraFileInfoManager>(
         &mut self,
         file_identifier: String,
         text: String,
@@ -124,17 +134,13 @@ impl Linker {
         parser.set_language(&tree_sitter_sus::language()).unwrap();
         let tree = parser.parse(&text, None).unwrap();
 
-        let file_id = self.files.reserve();
-        self.files.alloc_reservation(
-            file_id,
-            FileData {
-                file_identifier,
-                file_text: FileText::new(text),
-                tree,
-                associated_values: Vec::new(),
-                parsing_errors: ErrorStore::new(),
-            },
-        );
+        let file_id = self.files.alloc(FileData {
+            file_identifier,
+            file_text: FileText::new(text),
+            tree,
+            associated_values: Vec::new(),
+            parsing_errors: ErrorStore::new(),
+        });
 
         self.with_file_builder(file_id, |builder| {
             let _panic_guard = SpanDebugger::new(
@@ -144,6 +150,8 @@ impl Linker {
             );
             gather_initial_file_data(builder);
         });
+        let assoc_vals = self.files[file_id].associated_values.clone();
+        self.checkpoint(&assoc_vals, AFTER_INITIAL_PARSE_CP);
 
         info_mngr.on_file_added(file_id, self);
 
@@ -177,10 +185,12 @@ impl Linker {
                 );
                 gather_initial_file_data(builder);
             });
+            let assoc_vals = self.files[file_id].associated_values.clone();
+            self.checkpoint(&assoc_vals, AFTER_INITIAL_PARSE_CP);
 
             info_mngr.on_file_updated(file_id, self);
         } else {
-            self.add_file(file_identifier.to_owned(), text, info_mngr);
+            self.add_file_text(file_identifier.to_owned(), text, info_mngr);
         }
     }
 
@@ -194,34 +204,57 @@ impl Linker {
 
         self.instantiator.borrow_mut().clear_instances();
 
+        let global_ids = self.get_all_global_ids();
         // First reset all modules back to post-gather_initial_file_data
-        for (_, md) in &mut self.modules {
-            let Module { link_info, .. } = md;
+        for id in &global_ids {
+            let link_info = &mut self.globals[*id];
+
             link_info.reset_to(AFTER_INITIAL_PARSE_CP);
             link_info.instructions.clear();
-        }
-        for (_, typ) in &mut self.types {
-            typ.link_info.reset_to(AFTER_INITIAL_PARSE_CP);
-        }
-        for (_, cst) in &mut self.constants {
-            cst.link_info.reset_to(AFTER_INITIAL_PARSE_CP);
         }
         if config.early_exit == EarlyExitUpTo::Initialize {
             return;
         }
 
         flatten_all_globals(self);
+
+        for global_id in &global_ids {
+            if let GlobalObj::Module(md) = &mut self.globals.get_mut(*global_id) {
+                if crate::debug::is_enabled("print-flattened-pre-typecheck") {
+                    md.print_flattened_module(&self.files[md.link_info.file]);
+                }
+            }
+        }
+
+        self.checkpoint(&global_ids, AFTER_FLATTEN_CP);
         if config.early_exit == EarlyExitUpTo::Flatten {
             return;
         }
 
-        typecheck_all_modules(self);
+        for global_id in &global_ids {
+            self.pass("Typechecking", *global_id, |pass, errors, files| {
+                typecheck(pass, errors);
+
+                if crate::debug::is_enabled("print-flattened") {
+                    let md = pass.get_mut();
+                    if let GlobalObj::Module(md) = md {
+                        md.print_flattened_module(&files[md.link_info.file]);
+                    }
+                }
+            });
+        }
+        self.checkpoint(&global_ids, AFTER_TYPE_CHECK_CP);
 
         if config.early_exit == EarlyExitUpTo::AbstractTypecheck {
             return;
         }
 
-        perform_lints(self);
+        for global_id in &global_ids {
+            self.pass("Lints", *global_id, |pass, errors, _files| {
+                perform_lints(pass, errors);
+            });
+        }
+        self.checkpoint(&global_ids, AFTER_LINTS_CP);
 
         if config.early_exit == EarlyExitUpTo::Lint {
             return;

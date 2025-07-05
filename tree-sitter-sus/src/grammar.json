@@ -548,6 +548,35 @@
         }
       ]
     },
+    "_then_else_block": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "then_block",
+          "content": {
+            "type": "SYMBOL",
+            "name": "block"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "else_block",
+              "content": {
+                "type": "SYMBOL",
+                "name": "else_block"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
     "if_statement": {
       "type": "SEQ",
       "members": [
@@ -577,28 +606,24 @@
           }
         },
         {
-          "type": "FIELD",
-          "name": "then_block",
-          "content": {
-            "type": "SYMBOL",
-            "name": "block"
-          }
-        },
-        {
           "type": "CHOICE",
           "members": [
             {
               "type": "FIELD",
-              "name": "else_block",
+              "name": "conditional_bindings",
               "content": {
                 "type": "SYMBOL",
-                "name": "else_block"
+                "name": "interface_ports"
               }
             },
             {
               "type": "BLANK"
             }
           ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_then_else_block"
         }
       ]
     },
@@ -698,8 +723,41 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "STRING",
-          "value": "interface"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "local",
+              "content": {
+                "type": "STRING",
+                "value": "local"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "FIELD",
+          "name": "interface_kind",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "interface"
+              },
+              {
+                "type": "STRING",
+                "value": "action"
+              },
+              {
+                "type": "STRING",
+                "value": "trigger"
+              }
+            ]
+          }
         },
         {
           "type": "FIELD",
@@ -714,11 +772,39 @@
           "members": [
             {
               "type": "FIELD",
+              "name": "latency_specifier",
+              "content": {
+                "type": "SYMBOL",
+                "name": "latency_specifier"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
               "name": "interface_ports",
               "content": {
                 "type": "SYMBOL",
                 "name": "interface_ports"
               }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_then_else_block"
             },
             {
               "type": "BLANK"
@@ -852,44 +938,10 @@
           "members": [
             {
               "type": "FIELD",
-              "name": "io_port_modifiers",
-              "content": {
-                "type": "CHOICE",
-                "members": [
-                  {
-                    "type": "STRING",
-                    "value": "input"
-                  },
-                  {
-                    "type": "STRING",
-                    "value": "output"
-                  }
-                ]
-              }
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        },
-        {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "FIELD",
               "name": "declaration_modifiers",
               "content": {
-                "type": "CHOICE",
-                "members": [
-                  {
-                    "type": "STRING",
-                    "value": "state"
-                  },
-                  {
-                    "type": "STRING",
-                    "value": "gen"
-                  }
-                ]
+                "type": "SYMBOL",
+                "name": "declaration_modifiers"
               }
             },
             {
@@ -930,6 +982,34 @@
           ]
         }
       ]
+    },
+    "declaration_modifiers": {
+      "type": "REPEAT1",
+      "content": {
+        "type": "FIELD",
+        "name": "item",
+        "content": {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "state"
+            },
+            {
+              "type": "STRING",
+              "value": "gen"
+            },
+            {
+              "type": "STRING",
+              "value": "input"
+            },
+            {
+              "type": "STRING",
+              "value": "output"
+            }
+          ]
+        }
+      }
     },
     "latency_specifier": {
       "type": "SEQ",

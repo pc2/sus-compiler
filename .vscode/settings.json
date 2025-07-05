@@ -6,7 +6,8 @@
   "sus_lsp.args": [
     "--lsp",
     // Tracking down slow compilations
-    "--kill-timeout", "2000ms"
+    "--kill-timeout", "2000ms",
+    "test.sus"
     //, "--upto", "typecheck"
   ],
   "editor.lineHeight": 0,

@@ -15,7 +15,9 @@ use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
 use std::cell::OnceCell;
 use std::rc::Rc;
 
-use crate::flattening::{BinaryOperator, ExpressionOutput, Module, Port, UnaryOperator, WriteTo};
+use crate::flattening::{
+    BinaryOperator, Direction, ExpressionSource, Instruction, Module, UnaryOperator,
+};
 use crate::{errors::ErrorStore, value::Value};
 
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
@@ -28,25 +30,6 @@ pub enum RealWirePathElem {
     ArrayAccess { span: BracketSpan, idx_wire: WireID },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct WriteReference {
-    /// The [crate::flattening::Instruction::Expression] that created this write
-    pub original_expression: FlatID,
-    /// Which write in a [crate::flattening::ExpressionOutput::MultiWrite] corresponds to [Self::to_path]
-    pub write_idx: usize,
-}
-
-impl WriteReference {
-    pub fn get<'l>(&self, link_info: &'l LinkInfo) -> Option<&'l WriteTo> {
-        let expr = link_info.instructions[self.original_expression].unwrap_expression();
-        if let ExpressionOutput::MultiWrite(writes) = &expr.output {
-            Some(&writes[self.write_idx])
-        } else {
-            None
-        }
-    }
-}
-
 /// One arm of a multiplexer. Each arm has an attached condition that is also stored here.
 ///
 /// See [RealWireDataSource::Multiplexer]
@@ -56,7 +39,7 @@ pub struct MultiplexerSource {
     pub num_regs: i64,
     pub from: WireID,
     pub condition: Box<[ConditionStackElem]>,
-    pub wr_ref: WriteReference,
+    pub write_span: Span,
 }
 
 /// Where a [RealWire] gets its data, be it an operator, read-only value, constant, etc.
@@ -109,6 +92,7 @@ pub struct RealWire {
     pub specified_latency: i64,
     /// The computed latencies after latency counting
     pub absolute_latency: i64,
+    pub is_port: Option<Direction>,
 }
 impl RealWire {
     fn get_span(&self, link_info: &LinkInfo) -> Span {
@@ -143,9 +127,16 @@ pub struct SubModule {
 }
 impl SubModule {
     fn get_span(&self, link_info: &LinkInfo) -> Span {
-        link_info.instructions[self.original_instruction]
-            .unwrap_submodule()
-            .get_most_relevant_span()
+        match &link_info.instructions[self.original_instruction] {
+            Instruction::SubModule(sub_module_instance) => sub_module_instance.name_span,
+            Instruction::Expression(expression) => {
+                let ExpressionSource::FuncCall(fc) = &expression.source else {
+                    unreachable!()
+                };
+                fc.func.get_total_span()
+            }
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -153,7 +144,7 @@ impl SubModule {
 #[derive(Debug)]
 pub struct InstantiatedPort {
     pub wire: WireID,
-    pub is_input: bool,
+    pub direction: Direction,
     pub absolute_latency: i64,
     pub typ: ConcreteType,
     pub domain: DomainID,
@@ -188,7 +179,7 @@ pub enum SubModuleOrWire {
     Wire(WireID),
     CompileTimeValue(Value),
     // Variable doesn't exist yet
-    Unnasigned,
+    Unassigned,
 }
 
 impl SubModuleOrWire {
@@ -308,24 +299,20 @@ struct Executed {
 }
 
 impl Executed {
-    fn make_interface(
-        &self,
-        ports: &FlatAlloc<Port, PortIDMarker>,
-    ) -> FlatAlloc<Option<InstantiatedPort>, PortIDMarker> {
-        ports.map(|(_, port)| {
+    fn make_interface(&self, md: &Module) -> FlatAlloc<Option<InstantiatedPort>, PortIDMarker> {
+        md.ports.map(|(_, port)| {
             let port_decl_id = port.declaration_instruction;
-            if let SubModuleOrWire::Wire(wire_id) = &self.generation_state[port_decl_id] {
-                let wire = &self.wires[*wire_id];
-                Some(InstantiatedPort {
-                    wire: *wire_id,
-                    is_input: port.is_input,
-                    absolute_latency: CALCULATE_LATENCY_LATER,
-                    typ: wire.typ.clone(),
-                    domain: wire.domain,
-                })
-            } else {
-                None
-            }
+            let SubModuleOrWire::Wire(wire_id) = &self.generation_state[port_decl_id] else {
+                return None;
+            };
+            let wire = &self.wires[*wire_id];
+            Some(InstantiatedPort {
+                wire: *wire_id,
+                direction: port.direction,
+                absolute_latency: CALCULATE_LATENCY_LATER,
+                typ: wire.typ.clone(),
+                domain: wire.domain,
+            })
         })
     }
 
@@ -335,7 +322,7 @@ impl Executed {
         md: &'l Module,
         global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
     ) -> (ModuleTypingContext<'l>, ValueUnifierAlloc) {
-        let interface_ports = self.make_interface(&md.ports);
+        let interface_ports = self.make_interface(md);
         let errors = ErrorCollector::new_empty(md.link_info.file, &linker.files);
         if let Err((position, reason)) = self.execution_status {
             errors.error(position, reason);
@@ -420,7 +407,7 @@ fn perform_instantiation(
             generation_state: md
                 .link_info
                 .instructions
-                .map(|_| SubModuleOrWire::Unnasigned),
+                .map(|_| SubModuleOrWire::Unassigned),
         };
     }
 

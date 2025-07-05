@@ -1,20 +1,15 @@
-use std::borrow::Cow;
-
-use crate::alloc::ArenaAllocator;
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::prelude::*;
+use crate::typing::domain_type::DomainType;
 use crate::typing::template::TemplateKind;
 
 use lsp_types::{LanguageString, MarkedString};
 
-use crate::flattening::{DeclarationKind, IdentifierType, InterfaceToDomainMap, Module};
+use crate::flattening::{DeclarationKind, InterfaceDeclKind, InterfaceToDomainMap};
 use crate::instantiation::SubModuleOrWire;
 use crate::linker::{Documentation, FileData, GlobalUUID, LinkInfo};
 
-use crate::typing::{
-    abstract_type::DomainType,
-    template::{GenerativeParameterKind, TypeParameterKind},
-};
+use crate::typing::template::{GenerativeParameterKind, TypeParameterKind};
 
 use super::tree_walk::{InGlobal, LocationInfo};
 
@@ -57,7 +52,7 @@ impl HoverCollector<'_> {
                             unreachable!()
                         }
                         SubModuleOrWire::CompileTimeValue(v) => format!(" = {}", v),
-                        SubModuleOrWire::Unnasigned => "never assigned to".to_string(),
+                        SubModuleOrWire::Unassigned => "never assigned to".to_string(),
                     };
                     self.monospace(value_str);
                 } else {
@@ -65,7 +60,7 @@ impl HoverCollector<'_> {
                         if wire.original_instruction != id {
                             continue;
                         }
-                        let typ_str = wire.typ.display(&self.linker.types, true);
+                        let typ_str = wire.typ.display(self.linker, true);
                         let name_str = &wire.name;
                         let latency_str = if wire.absolute_latency != CALCULATE_LATENCY_LATER {
                             wire.absolute_latency.to_string()
@@ -90,17 +85,6 @@ impl HoverCollector<'_> {
     }
 }
 
-fn try_get_module(
-    linker_modules: &ArenaAllocator<Module, ModuleUUIDMarker>,
-    id: GlobalUUID,
-) -> Option<&Module> {
-    if let GlobalUUID::Module(md_id) = id {
-        Some(&linker_modules[md_id])
-    } else {
-        None
-    }
-}
-
 pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<MarkedString> {
     let mut hover = HoverCollector {
         list: Vec::new(),
@@ -110,34 +94,29 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
 
     match info {
         LocationInfo::InGlobal(obj_id, link_info, decl_id, InGlobal::NamedLocal(decl)) => {
-            let mut details_vec: Vec<String> = Vec::with_capacity(5);
+            let mut details_vec: Vec<String> = Vec::new();
 
-            if let Some(md) = try_get_module(&linker.modules, obj_id) {
-                if let DomainType::Physical(ph) = decl.typ.domain {
-                    details_vec.push(DomainType::physical_to_string(ph, &md.domains));
-                }
-            }
+            let domains = if let GlobalUUID::Module(md_id) = obj_id {
+                &linker.modules[md_id].domains
+            } else {
+                &FlatAlloc::EMPTY_FLAT_ALLOC
+            };
+            details_vec.push(decl.domain.get().display(domains).to_string());
 
             match decl.decl_kind {
-                DeclarationKind::RegularPort {
-                    is_input,
-                    port_id: _,
-                } => details_vec.push(if is_input { "input" } else { "output" }.to_owned()),
-                DeclarationKind::NotPort | DeclarationKind::StructField { field_id: _ } => {}
-                DeclarationKind::GenerativeInput(_) => details_vec.push("param".to_owned()),
+                DeclarationKind::Port { direction, .. } => details_vec.push(direction.to_string()),
+                DeclarationKind::TemplateParameter(_) => details_vec.push("param".to_owned()),
+                DeclarationKind::RegularWire { .. }
+                | DeclarationKind::RegularGenerative { .. }
+                | DeclarationKind::StructField(_)
+                | DeclarationKind::ConditionalBinding { .. } => {}
             }
 
-            match decl.identifier_type {
-                IdentifierType::Local => {}
-                IdentifierType::State => details_vec.push("state".to_owned()),
-                IdentifierType::Generative => details_vec.push("gen".to_owned()),
+            if decl.decl_kind.is_state() {
+                details_vec.push("state".to_owned());
             }
 
-            let typ_str = decl
-                .typ
-                .typ
-                .display(&linker.types, &link_info.template_parameters)
-                .to_string();
+            let typ_str = decl.typ.display(linker, link_info).to_string();
             details_vec.push(typ_str);
 
             details_vec.push(decl.name.clone());
@@ -145,7 +124,21 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.documentation(&decl.documentation);
             hover.sus_code(details_vec.join(" "));
 
-            hover.gather_hover_infos(obj_id, decl_id, decl.identifier_type.is_generative());
+            hover.gather_hover_infos(obj_id, decl_id, decl.decl_kind.is_generative());
+        }
+        LocationInfo::InGlobal(obj_id, _, decl_id, InGlobal::LocalInterface(interface)) => {
+            hover.documentation(&interface.documentation);
+
+            if let GlobalUUID::Module(md_id) = obj_id {
+                let md = &linker.modules[md_id];
+
+                let mut result = String::new();
+                md.make_interface_info_fmt(interface, &file_data.file_text, &mut result);
+
+                hover.sus_code(result);
+            }
+
+            hover.gather_hover_infos(obj_id, decl_id, false);
         }
         LocationInfo::InGlobal(obj_id, _link_info, id, InGlobal::NamedSubmodule(submod)) => {
             let md_id = obj_id.unwrap_module();
@@ -158,17 +151,13 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.sus_code(format!(
                 "{} {}",
                 submodule.link_info.get_full_name(),
-                submod
-                    .name
-                    .as_ref()
-                    .expect("Impossible to select an unnamed submodule")
-                    .0
+                submod.name
             ));
 
             hover.sus_code(submodule.make_all_ports_info_string(
                 &linker.files[submodule.link_info.file].file_text,
                 Some(InterfaceToDomainMap {
-                    local_domain_map: &submod.local_interface_domains,
+                    local_domain_map: &submod.local_domain_map,
                     domains: &md.domains,
                 }),
             ));
@@ -178,30 +167,20 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.gather_submodule_hover_infos(md_id, id);
         }
         LocationInfo::InGlobal(obj_id, link_info, id, InGlobal::Temporary(expr)) => {
-            let mut details_vec: Vec<Cow<str>> = Vec::with_capacity(2);
-            match expr.domain {
-                DomainType::Generative => details_vec.push(Cow::Borrowed("gen")),
-                DomainType::Physical(ph) => {
-                    if let Some(md) = try_get_module(&linker.modules, obj_id) {
-                        details_vec
-                            .push(Cow::Owned(DomainType::physical_to_string(ph, &md.domains)))
-                    }
-                }
-                DomainType::Unknown(_) => {
-                    unreachable!("Variables should have been eliminated already")
-                }
+            let mut details_vec: Vec<String> = Vec::new();
+            let domains = if let GlobalUUID::Module(md_id) = obj_id {
+                &linker.modules[md_id].domains
+            } else {
+                &FlatAlloc::EMPTY_FLAT_ALLOC
             };
-            details_vec.push(Cow::Owned(
-                expr.typ
-                    .display(&linker.types, &link_info.template_parameters)
-                    .to_string(),
-            ));
+            details_vec.push(expr.domain.display(domains).to_string());
+            details_vec.push(expr.typ.display(linker, link_info).to_string());
             hover.sus_code(details_vec.join(" "));
-            hover.gather_hover_infos(obj_id, id, expr.domain.is_generative());
+            hover.gather_hover_infos(obj_id, id, expr.domain == DomainType::Generative);
         }
         LocationInfo::Type(typ, link_info) => {
             hover.sus_code(
-                typ.display(&linker.types, &link_info.template_parameters)
+                typ.display(linker, &link_info.template_parameters)
                     .to_string(),
             );
         }
@@ -219,7 +198,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     hover.sus_code(format!(
                         "param {} {}",
                         decl.typ_expr
-                            .display(&linker.types, &link_info.template_parameters),
+                            .display(linker, &link_info.template_parameters),
                         template_arg.name
                     ));
                     hover.gather_hover_infos(obj_id, *declaration_instruction, true);
@@ -227,7 +206,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             }
         }
         LocationInfo::Global(global) => {
-            let link_info = linker.get_link_info(global);
+            let link_info = &linker.globals[global];
             hover.documentation_link_info(link_info);
             let file = &linker.files[link_info.file];
             hover.sus_code(
@@ -247,18 +226,31 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 GlobalUUID::Constant(_) => {}
             }
         }
-        LocationInfo::Port(_sm, md, port_id) => {
-            hover.sus_code(
-                md.make_port_info_string(port_id, &linker.files[md.link_info.file].file_text),
-            );
-        }
         LocationInfo::Interface(_md_uuid, md, _, interface) => {
-            hover.sus_code(
-                md.make_interface_info_string(
-                    interface,
-                    &linker.files[md.link_info.file].file_text,
-                ),
-            );
+            match interface.declaration_instruction.unwrap() {
+                InterfaceDeclKind::Interface(decl_id) => {
+                    let interface_decl = md.link_info.instructions[decl_id].unwrap_interface();
+
+                    let mut result = String::new();
+                    md.make_interface_info_fmt(
+                        interface_decl,
+                        &linker.files[md.link_info.file].file_text,
+                        &mut result,
+                    );
+                    hover.sus_code(result);
+                }
+                InterfaceDeclKind::SinglePort(decl_id) => {
+                    let port_decl = md.link_info.instructions[decl_id].unwrap_declaration();
+
+                    let mut result = String::new();
+                    md.make_port_info_fmt(
+                        port_decl,
+                        &linker.files[md.link_info.file].file_text,
+                        &mut result,
+                    );
+                    hover.sus_code(result);
+                }
+            }
         }
     };
 

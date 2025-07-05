@@ -2,6 +2,8 @@
 //!
 //! This file also defines all IDs (Implementations of [UUIDMarker] & [UUID]) that are used in the rest of the program for use with [FlatAlloc].
 
+use std::marker::PhantomData;
+
 // public imports
 pub use crate::alloc::FlatAlloc;
 pub use crate::errors::ErrorCollector;
@@ -12,6 +14,8 @@ pub use crate::linker::Linker;
 pub use crate::__debug_span;
 #[allow(unused_imports)]
 pub use crate::let_unwrap;
+#[allow(unused_imports)]
+pub use crate::unwrap_variant;
 #[allow(unused_imports)]
 pub use sus_proc_macro::__debug_breakpoint;
 
@@ -69,6 +73,10 @@ impl UUIDMarker for InterfaceIDMarker {
 }
 pub type InterfaceID = UUID<InterfaceIDMarker>;
 
+impl InterfaceID {
+    pub const MAIN_INTERFACE: InterfaceID = UUID(0, PhantomData);
+}
+
 pub struct DomainIDMarker;
 impl UUIDMarker for DomainIDMarker {
     const DISPLAY_NAME: &'static str = "domain_";
@@ -76,6 +84,9 @@ impl UUIDMarker for DomainIDMarker {
 /// Interfaces are also indexed using DomainIDs. But in general, these refer to (clock/latency counting) domains
 pub type DomainID = UUID<DomainIDMarker>;
 
+impl DomainID {
+    pub const MAIN_DOMAIN: DomainID = UUID(0, PhantomData);
+}
 pub struct FieldIDMarker;
 impl UUIDMarker for FieldIDMarker {
     const DISPLAY_NAME: &'static str = "field_";

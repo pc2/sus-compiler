@@ -282,6 +282,11 @@ impl Value {
                 })
             }
             AbstractInnerType::Unknown(_) => unreachable!("Caught by typecheck"),
+            AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => {
+                unreachable!(
+                    "Interfaces can't be concretized, should have been caught by typecheck!"
+                )
+            }
         };
 
         Ok(content_typ.stack_arrays_usize(&tensor_sizes))
@@ -390,7 +395,7 @@ impl ConcreteType {
     pub fn display_substitute(&self, linker: &Linker, substitutor: &ValueUnifierStore) -> String {
         let mut typ_copy = self.clone();
         typ_copy.fully_substitute(substitutor);
-        let as_display = typ_copy.display(&linker.types, true);
+        let as_display = typ_copy.display(linker, true);
         as_display.to_string()
     }
 }

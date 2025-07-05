@@ -91,6 +91,13 @@ impl Value {
             Value::Unset => true,
         }
     }
+    pub fn is_unset(&self) -> bool {
+        match self {
+            Value::Unset => true,
+            Value::Array(values) => values.iter().all(|v| v.is_unset()),
+            Value::Bool(_) | Value::Integer(_) => false,
+        }
+    }
 
     #[track_caller]
     pub fn unwrap_integer(&self) -> &IBig {
