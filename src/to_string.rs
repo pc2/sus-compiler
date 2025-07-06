@@ -72,9 +72,10 @@ impl Display for AbstractRankedTypeDisplay<'_> {
             AbstractInnerType::Template(id) => {
                 f.write_str(&self.link_info.template_parameters[*id].name)
             }
-            AbstractInnerType::Named(id) => {
-                f.write_str(&self.globals.types[*id].link_info.get_full_name())
-            }
+            AbstractInnerType::Named(name) => f.write_fmt(format_args!(
+                "{}",
+                name.display(self.globals, self.link_info)
+            )),
             AbstractInnerType::Interface(md_id, interface_id) => {
                 let md = &self.globals.modules[md_id.id];
                 f.write_fmt(format_args!(
@@ -102,9 +103,17 @@ pub struct AbstractGlobalReferenceDisplay<'a, ID> {
 
 impl<ID: Into<GlobalUUID> + Copy> Display for AbstractGlobalReferenceDisplay<'_, ID> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let target_link_info = &self.globals[self.typ.id.into()];
+        let target_link_info: &LinkInfo = &self.globals[self.typ.id.into()];
 
         f.write_str(&target_link_info.name)?;
+
+        if !self.typ.template_arg_types.iter().any(|(_, t)| match t {
+            TemplateKind::Type(_) => true,
+            TemplateKind::Value(_) => false,
+        }) {
+            return Ok(());
+        }
+
         f.write_str(" #(")?;
 
         let args_iter = zip_eq(
@@ -112,12 +121,13 @@ impl<ID: Into<GlobalUUID> + Copy> Display for AbstractGlobalReferenceDisplay<'_,
             &target_link_info.template_parameters,
         );
 
-        join_string_iter_formatter(", ", f, args_iter, |(_, typ, param), f| {
-            f.write_fmt(format_args!(
+        join_string_iter_formatter(", ", f, args_iter, |(_, typ, param), f| match typ {
+            TemplateKind::Type(typ) => f.write_fmt(format_args!(
                 "{}: {}",
                 param.name,
                 typ.display(self.globals, self.link_info)
-            ))
+            )),
+            TemplateKind::Value(()) => f.write_fmt(format_args!("{}: _", param.name)),
         })?;
         f.write_str(")")
     }

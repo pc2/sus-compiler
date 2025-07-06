@@ -1,12 +1,13 @@
 use std::fmt::Write;
 use std::ops::Deref;
 
-use crate::alloc::UUID;
 use crate::errors::ErrorInfo;
 use crate::linker::passes::{LocalOrRemoteParentModule, RemoteDeclaration, RemoteFn};
 use crate::prelude::*;
 use crate::to_string::join_string_iter;
-use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType};
+use crate::typing::abstract_type::{
+    AbstractInnerType, AbstractRankedType, BOOL_INNER, BOOL_SCALAR, INT_INNER, INT_SCALAR,
+};
 use crate::typing::template::TVec;
 use crate::typing::type_inference::{AbstractTypeSubstitutor, TypeUnifier, UnifyErrorReport};
 
@@ -40,7 +41,7 @@ impl<'l> TypeCheckingContext<'l> {
                 self.globals
                     .get_global_constant(cst)
                     .get_target_decl()
-                    .get_local_type(&mut self.type_checker)
+                    .get_local_type(&self.globals, &mut self.type_checker)
             }
             WireReferenceRoot::NamedModule(md) => {
                 self.typecheck_template_global(md);
@@ -69,7 +70,7 @@ impl<'l> TypeCheckingContext<'l> {
 
                     self.type_checker.unify_report_error(
                         idx_expr.typ,
-                        &AbstractRankedType::INT,
+                        &INT_SCALAR,
                         idx_expr.span,
                         "array index",
                     );
@@ -132,7 +133,7 @@ impl<'l> TypeCheckingContext<'l> {
                                     md.md.interfaces[interface].declaration_instruction
                                 {
                                     md.get_decl(port_decl)
-                                        .get_local_type(&mut self.type_checker)
+                                        .get_local_type(&self.globals, &mut self.type_checker)
                                 } else {
                                     AbstractRankedType {
                                         inner: AbstractInnerType::Interface(
@@ -183,24 +184,18 @@ impl<'l> TypeCheckingContext<'l> {
 
         // This iteration has to split into two parts, because we first have to set all the type
         // parameters for use by creating the types to compare against the value parameters
-        let mut abs_types =
+        let template_arg_types =
             target_link_info
                 .template_parameters
                 .map(|(id, param)| match &param.kind {
-                    TemplateKind::Type(_) => {
+                    TemplateKind::Type(_) => TemplateKind::Type({
                         if let Some(wr_typ) = global_ref.get_type_arg_for(id) {
                             self.typecheck_written_type(wr_typ)
                         } else {
                             self.type_checker.alloc_unknown()
                         }
-                    }
-                    TemplateKind::Value(_) => {
-                        AbstractRankedType {
-                            // Will immediately get overwritten
-                            inner: AbstractInnerType::Unknown(UUID::PLACEHOLDER),
-                            rank: PeanoType::Unknown(UUID::PLACEHOLDER),
-                        }
-                    }
+                    }),
+                    TemplateKind::Value(_) => TemplateKind::Value(()),
                 });
 
         for (id, param) in &target_link_info.template_parameters {
@@ -210,10 +205,11 @@ impl<'l> TypeCheckingContext<'l> {
                     let target_decl = RemoteDeclaration::new(
                         target_link_info,
                         v.declaration_instruction,
-                        Some(&abs_types),
+                        Some(&template_arg_types),
                     );
 
-                    let param_required_typ = target_decl.get_local_type(&mut self.type_checker);
+                    let param_required_typ =
+                        target_decl.get_local_type(&self.globals, &mut self.type_checker);
 
                     if let Some(from_expr) = global_ref.get_value_arg_for(id) {
                         let from_expr = self.instructions[from_expr].unwrap_subexpression();
@@ -225,12 +221,11 @@ impl<'l> TypeCheckingContext<'l> {
                             "Template argument",
                         );
                     }
-                    abs_types[id] = param_required_typ;
                 }
             }
         }
 
-        global_ref.template_arg_types.set(abs_types);
+        global_ref.template_arg_types.set(template_arg_types);
     }
 
     fn typecheck_written_type(&mut self, wr_typ: &WrittenType) -> AbstractRankedType {
@@ -240,7 +235,7 @@ impl<'l> TypeCheckingContext<'l> {
             WrittenType::Named(global_ref) => {
                 self.typecheck_template_global(global_ref);
 
-                AbstractInnerType::Named(global_ref.id).scalar()
+                AbstractInnerType::Named(global_ref.as_abstract_global_ref()).scalar()
             }
             WrittenType::Array(_, arr_box) => {
                 let (content_typ, arr_idx, _bracket_span) = arr_box.deref();
@@ -250,7 +245,7 @@ impl<'l> TypeCheckingContext<'l> {
                 let idx_expr = self.instructions[*arr_idx].unwrap_subexpression();
                 self.type_checker.unify_report_error(
                     idx_expr.typ,
-                    &AbstractRankedType::INT,
+                    &INT_SCALAR,
                     idx_expr.span,
                     "array size",
                 );
@@ -265,7 +260,7 @@ impl<'l> TypeCheckingContext<'l> {
             let latency_specifier_expr = self.instructions[latency_spec].unwrap_subexpression();
             self.type_checker.unify_report_error(
                 latency_specifier_expr.typ,
-                &AbstractRankedType::INT,
+                &INT_SCALAR,
                 latency_specifier_expr.span,
                 "latency specifier",
             );
@@ -275,7 +270,7 @@ impl<'l> TypeCheckingContext<'l> {
     fn report_errors_for_bad_function_call(
         &self,
         func_call: &FuncCall,
-        interface: &RemoteFn<'l, &'l TVec<AbstractRankedType>>,
+        interface: &RemoteFn<'l, &'l TVec<TemplateKind<AbstractRankedType, ()>>>,
         whole_func_span: Span,
         mut to_spans_iter: impl ExactSizeIterator<Item = Span>,
     ) {
@@ -330,7 +325,7 @@ impl<'l> TypeCheckingContext<'l> {
     fn typecheck_func_func(
         &mut self,
         wire_ref: &'l WireReference,
-    ) -> Option<RemoteFn<'l, &'l TVec<AbstractRankedType>>> {
+    ) -> Option<RemoteFn<'l, &'l TVec<TemplateKind<AbstractRankedType, ()>>>> {
         self.typecheck_wire_reference(wire_ref);
         match &wire_ref.output_typ.inner {
             AbstractInnerType::Interface(sm_ref, interface) => {
@@ -369,11 +364,11 @@ impl<'l> TypeCheckingContext<'l> {
     fn typecheck_func_call_args(
         &mut self,
         func_call: &FuncCall,
-        interface: RemoteFn<'l, &'l TVec<AbstractRankedType>>,
+        interface: RemoteFn<'l, &'l TVec<TemplateKind<AbstractRankedType, ()>>>,
     ) {
         for (decl_id, arg) in std::iter::zip(&interface.fn_decl.inputs, &func_call.arguments) {
             let port_decl = interface.parent.get_decl(*decl_id);
-            let port_type = port_decl.get_local_type(&mut self.type_checker);
+            let port_type = port_decl.get_local_type(&self.globals, &mut self.type_checker);
 
             // Typecheck the value with target type
             let from = self.instructions[*arg].unwrap_subexpression();
@@ -433,7 +428,7 @@ impl<'l> TypeCheckingContext<'l> {
                     if let Some(first_output) = interface.fn_decl.outputs.first() {
                         let port_decl = interface.parent.get_decl(*first_output);
 
-                        port_decl.get_local_type(&mut self.type_checker)
+                        port_decl.get_local_type(&self.globals, &mut self.type_checker)
                     } else {
                         self.type_checker.alloc_unknown()
                     }
@@ -441,9 +436,11 @@ impl<'l> TypeCheckingContext<'l> {
                     self.type_checker.alloc_unknown()
                 }
             }
-            ExpressionSource::Literal(value) => AbstractRankedType {
-                inner: AbstractInnerType::Named(value.get_type_id()),
-                rank: PeanoType::Zero,
+            ExpressionSource::Literal(value) => match value {
+                Value::Bool(_) => BOOL_SCALAR,
+                Value::Integer(_) => INT_SCALAR.clone(),
+                Value::Array(_) => unreachable!("Value::get_type_abs is only ever used for terminal Values, because any array instantiations would be Expression::ArrayConstruct"),
+                Value::Unset => unreachable!(),
             },
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut arr_iter = arr.iter();
@@ -495,7 +492,8 @@ impl<'l> TypeCheckingContext<'l> {
 
                     for (decl_id, to) in std::iter::zip(&interface.fn_decl.outputs, multi_write) {
                         let port_decl = interface.parent.get_decl(*decl_id);
-                        let port_type = port_decl.get_local_type(&mut self.type_checker);
+                        let port_type =
+                            port_decl.get_local_type(&self.globals, &mut self.type_checker);
 
                         self.type_checker.unify_report_error(
                             &to.to.output_typ,
@@ -556,7 +554,7 @@ impl<'l> TypeCheckingContext<'l> {
                 let condition_expr = &self.instructions[stm.condition].unwrap_subexpression();
                 self.type_checker.unify_report_error(
                     condition_expr.typ,
-                    &AbstractRankedType::BOOL,
+                    &BOOL_SCALAR,
                     condition_expr.span,
                     "if statement condition",
                 );
@@ -592,11 +590,16 @@ impl<'l> TypeCheckingContext<'l> {
     }
 }
 
-impl<'l> RemoteDeclaration<'l, &'l TVec<AbstractRankedType>> {
-    fn get_local_type(&self, type_checker: &mut AbstractTypeSubstitutor) -> AbstractRankedType {
+impl<'l> RemoteDeclaration<'l, &'l TVec<TemplateKind<AbstractRankedType, ()>>> {
+    fn get_local_type(
+        &self,
+        globals: &GlobalResolver<'_, '_>,
+        type_checker: &mut AbstractTypeSubstitutor,
+    ) -> AbstractRankedType {
         if let Some(template_args) = self.template_args {
             type_checker.written_to_abstract_type_substitute_templates(
                 &self.remote_decl.typ_expr,
+                globals,
                 template_args,
             )
         } else {
@@ -606,32 +609,75 @@ impl<'l> RemoteDeclaration<'l, &'l TVec<AbstractRankedType>> {
 }
 
 impl AbstractTypeSubstitutor {
-    /// This should always be what happens first to a given variable.
-    ///
-    /// Therefore it should be impossible that one of the internal unifications ever fails
-    ///
-    /// template_type_args applies to both Template Type args and Template Value args.
-    ///
-    /// For Types this is the Type, for Values this is unified with the parameter declaration type
+    fn written_to_abstract_global_ref_substitute_templates<ID: Into<GlobalUUID> + Copy>(
+        &mut self,
+        global_ref: &GlobalReference<ID>,
+        globals: &GlobalResolver<'_, '_>,
+        template_args: &TVec<TemplateKind<AbstractRankedType, ()>>,
+    ) -> AbstractGlobalReference<ID> {
+        let global_obj: GlobalUUID = global_ref.id.into();
+        let target_link_info = &globals.get(global_obj).get_link_info();
+
+        let template_arg_types =
+            target_link_info
+                .template_parameters
+                .map(|(_, param)| match &param.kind {
+                    TemplateKind::Type(_) => TemplateKind::Type(
+                        global_ref
+                            .template_args
+                            .iter()
+                            .find_map(|arg| {
+                                if let (Some(TemplateKind::Type(typ)), true) =
+                                    (&arg.kind, arg.name == param.name)
+                                {
+                                    Some(self.written_to_abstract_type_substitute_templates(
+                                        typ,
+                                        globals,
+                                        template_args,
+                                    ))
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap_or_else(|| self.alloc_unknown()),
+                    ),
+                    TemplateKind::Value(_) => TemplateKind::Value(()),
+                });
+
+        AbstractGlobalReference {
+            id: global_ref.id,
+            template_arg_types,
+        }
+    }
+
     fn written_to_abstract_type_substitute_templates(
         &mut self,
         wr_typ: &WrittenType,
-        template_args: &TVec<AbstractRankedType>,
+        globals: &GlobalResolver<'_, '_>,
+        template_args: &TVec<TemplateKind<AbstractRankedType, ()>>,
     ) -> AbstractRankedType {
         match wr_typ {
             WrittenType::Error(_span) => self.alloc_unknown(),
             WrittenType::TemplateVariable(_span, argument_id) => {
-                template_args[*argument_id].clone()
+                template_args[*argument_id].unwrap_type().clone()
             }
             WrittenType::Named(global_reference) => {
-                AbstractInnerType::Named(global_reference.id).scalar()
+                let abs_ref = self.written_to_abstract_global_ref_substitute_templates(
+                    global_reference,
+                    globals,
+                    template_args,
+                );
+                AbstractInnerType::Named(abs_ref).scalar()
             }
             WrittenType::Array(_span, array_content_and_size) => {
                 let (arr_content_type, _size_flat, _array_bracket_span) =
                     array_content_and_size.deref();
 
-                let content_typ = self
-                    .written_to_abstract_type_substitute_templates(arr_content_type, template_args);
+                let content_typ = self.written_to_abstract_type_substitute_templates(
+                    arr_content_type,
+                    globals,
+                    template_args,
+                );
 
                 content_typ.rank_up()
             }
@@ -672,21 +718,21 @@ impl TypeUnifier<AbstractTypeSubstitutor> {
     ) -> AbstractRankedType {
         let input_rank = input_typ.rank.clone();
         if op == UnaryOperator::Not {
-            let result_typ = AbstractInnerType::BOOL.with_rank(input_rank);
+            let result_typ = BOOL_INNER.with_rank(input_rank);
             self.unify_report_error(input_typ, &result_typ, span, "! input");
 
             result_typ
         } else if op == UnaryOperator::Negate {
-            let result_typ = AbstractInnerType::INT.with_rank(input_rank);
+            let result_typ = INT_INNER.clone().with_rank(input_rank);
             self.unify_report_error(input_typ, &result_typ, span, "unary - input");
             result_typ
         } else {
             let reduction_type = match op {
-                UnaryOperator::And => AbstractInnerType::BOOL,
-                UnaryOperator::Or => AbstractInnerType::BOOL,
-                UnaryOperator::Xor => AbstractInnerType::BOOL,
-                UnaryOperator::Sum => AbstractInnerType::INT,
-                UnaryOperator::Product => AbstractInnerType::INT,
+                UnaryOperator::And => BOOL_INNER,
+                UnaryOperator::Or => BOOL_INNER,
+                UnaryOperator::Xor => BOOL_INNER,
+                UnaryOperator::Sum => INT_INNER.clone(),
+                UnaryOperator::Product => INT_INNER.clone(),
                 _ => unreachable!(),
             };
             let reduction_type = reduction_type.with_rank(input_rank.clone());
@@ -703,28 +749,30 @@ impl TypeUnifier<AbstractTypeSubstitutor> {
         left_span: Span,
         right_span: Span,
     ) -> AbstractRankedType {
-        const BOOL_TYPE: AbstractInnerType = AbstractInnerType::BOOL;
-        const INT_TYPE: AbstractInnerType = AbstractInnerType::INT;
-        let (exp_left, exp_right, out_typ) = match op {
-            BinaryOperator::And => (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
-            BinaryOperator::Or => (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
-            BinaryOperator::Xor => (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
-            BinaryOperator::Add => (INT_TYPE, INT_TYPE, INT_TYPE),
-            BinaryOperator::Subtract => (INT_TYPE, INT_TYPE, INT_TYPE),
-            BinaryOperator::Multiply => (INT_TYPE, INT_TYPE, INT_TYPE),
-            BinaryOperator::Divide => (INT_TYPE, INT_TYPE, INT_TYPE),
-            BinaryOperator::Modulo => (INT_TYPE, INT_TYPE, INT_TYPE),
-            BinaryOperator::Equals => (INT_TYPE, INT_TYPE, BOOL_TYPE),
-            BinaryOperator::NotEquals => (INT_TYPE, INT_TYPE, BOOL_TYPE),
-            BinaryOperator::GreaterEq => (INT_TYPE, INT_TYPE, BOOL_TYPE),
-            BinaryOperator::Greater => (INT_TYPE, INT_TYPE, BOOL_TYPE),
-            BinaryOperator::LesserEq => (INT_TYPE, INT_TYPE, BOOL_TYPE),
-            BinaryOperator::Lesser => (INT_TYPE, INT_TYPE, BOOL_TYPE),
+        let (exp_left, exp_right, out_typ): (
+            &AbstractInnerType,
+            &AbstractInnerType,
+            &AbstractInnerType,
+        ) = match op {
+            BinaryOperator::And => (&BOOL_INNER, &BOOL_INNER, &BOOL_INNER),
+            BinaryOperator::Or => (&BOOL_INNER, &BOOL_INNER, &BOOL_INNER),
+            BinaryOperator::Xor => (&BOOL_INNER, &BOOL_INNER, &BOOL_INNER),
+            BinaryOperator::Add => (&INT_INNER, &INT_INNER, &INT_INNER),
+            BinaryOperator::Subtract => (&INT_INNER, &INT_INNER, &INT_INNER),
+            BinaryOperator::Multiply => (&INT_INNER, &INT_INNER, &INT_INNER),
+            BinaryOperator::Divide => (&INT_INNER, &INT_INNER, &INT_INNER),
+            BinaryOperator::Modulo => (&INT_INNER, &INT_INNER, &INT_INNER),
+            BinaryOperator::Equals => (&INT_INNER, &INT_INNER, &BOOL_INNER),
+            BinaryOperator::NotEquals => (&INT_INNER, &INT_INNER, &BOOL_INNER),
+            BinaryOperator::GreaterEq => (&INT_INNER, &INT_INNER, &BOOL_INNER),
+            BinaryOperator::Greater => (&INT_INNER, &INT_INNER, &BOOL_INNER),
+            BinaryOperator::LesserEq => (&INT_INNER, &INT_INNER, &BOOL_INNER),
+            BinaryOperator::Lesser => (&INT_INNER, &INT_INNER, &BOOL_INNER),
         };
         let input_rank = left_typ.rank.clone();
-        let exp_left = exp_left.with_rank(input_rank.clone());
-        let exp_right = exp_right.with_rank(input_rank.clone());
-        let out_typ = out_typ.with_rank(input_rank.clone());
+        let exp_left = exp_left.clone().with_rank(input_rank.clone());
+        let exp_right = exp_right.clone().with_rank(input_rank.clone());
+        let out_typ = out_typ.clone().with_rank(input_rank.clone());
 
         self.unify_report_error(left_typ, &exp_left, left_span, "binop left side");
         self.unify_report_error(right_typ, &exp_right, right_span, "binop right side");
@@ -784,7 +832,12 @@ impl FinalizationContext {
     fn finalize_global_ref<ID: Copy>(&mut self, global_ref: &mut GlobalReference<ID>) {
         let global_ref_span = global_ref.get_total_span();
         for (_template_id, arg) in global_ref.template_arg_types.get_mut() {
-            self.finalize_abstract_type(arg, global_ref_span);
+            match arg {
+                TemplateKind::Type(arg) => {
+                    self.finalize_abstract_type(arg, global_ref_span);
+                }
+                TemplateKind::Value(()) => {}
+            }
         }
     }
 

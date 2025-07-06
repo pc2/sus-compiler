@@ -120,7 +120,7 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
         let expected_name = expected.display(globals.globals, link_info).to_string();
         let found_name = found.display(globals.globals, link_info).to_string();
         errors
-            .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
+            .error(span, format!("Typing Error: {context} expects '{expected_name}' but was given '{found_name}'"))
             .add_info_list(infos);
 
         assert_ne!(found, expected);

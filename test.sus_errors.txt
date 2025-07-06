@@ -625,12 +625,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                                                        ──┬──  
      │                                                                          ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Typing Error: writing the output of this expression expects a bool[] but was given a int
+Error: Typing Error: writing the output of this expression expects 'bool[]' but was given 'int'
      ╭─[ test.sus:250:2 ]
      │
  250 │     state bool[24] stored_valid_permutes = 000000000000000000000000
      │     ──────────────────┬─────────────────  
-     │                       ╰─────────────────── Typing Error: writing the output of this expression expects a bool[] but was given a int
+     │                       ╰─────────────────── Typing Error: writing the output of this expression expects 'bool[]' but was given 'int'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:252:10 ]
@@ -2308,7 +2308,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │          ┬  
      │          ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: No such field 'port_a' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
+Error: No such field 'port_a' on submodule_named_ports. Available fields are 'submodule_named_ports'
      ╭─[ test.sus:590:5 ]
      │
  576 │ module submodule_named_ports {
@@ -2323,9 +2323,9 @@ interface submodule_named_ports:
      │ 
  590 │     sm.port_a = i
      │        ───┬──  
-     │           ╰──── No such field 'port_a' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
+     │           ╰──── No such field 'port_a' on submodule_named_ports. Available fields are 'submodule_named_ports'
 ─────╯
-Error: No such field 'port_b' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
+Error: No such field 'port_b' on submodule_named_ports. Available fields are 'submodule_named_ports'
      ╭─[ test.sus:592:5 ]
      │
  576 │ module submodule_named_ports {
@@ -2340,9 +2340,9 @@ interface submodule_named_ports:
      │ 
  592 │     sm.port_b = i
      │        ───┬──  
-     │           ╰──── No such field 'port_b' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
+     │           ╰──── No such field 'port_b' on submodule_named_ports. Available fields are 'submodule_named_ports'
 ─────╯
-Error: No such field 'port_c' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
+Error: No such field 'port_c' on submodule_named_ports. Available fields are 'submodule_named_ports'
      ╭─[ test.sus:594:9 ]
      │
  576 │ module submodule_named_ports {
@@ -2357,7 +2357,7 @@ interface submodule_named_ports:
      │ 
  594 │     o = sm.port_c
      │            ───┬──  
-     │               ╰──── No such field 'port_c' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
+     │               ╰──── No such field 'port_c' on submodule_named_ports. Available fields are 'submodule_named_ports'
 ─────╯
 Error: 'contains_submodule_submodule' conflicts with other declarations:
      ╭─[ test.sus:597:8 ]
@@ -2448,14 +2448,14 @@ Error: Can't read from an interface. Use a function call or interface connector 
      │          ──┬──  
      │            ╰──── Can't read from an interface. Use a function call or interface connector instead
 ─────╯
-Error: Typing Error: if statement condition expects a bool but was given a Local Interface write
+Error: Typing Error: if statement condition expects 'bool' but was given 'Local Interface write'
      ╭─[ test.sus:636:7 ]
      │
  636 │     when write {
      │          ──┬──  
-     │            ╰──── Typing Error: if statement condition expects a bool but was given a Local Interface write
+     │            ╰──── Typing Error: if statement condition expects 'bool' but was given 'Local Interface write'
 ─────╯
-Error: No such field 'i' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
+Error: No such field 'i' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
      ╭─[ test.sus:641:7 ]
      │
  618 │ module cross_memory {
@@ -2472,7 +2472,7 @@ interface out:
      │ 
  641 │     cr_m.i = mem
      │          ┬  
-     │          ╰── No such field 'i' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
+     │          ╰── No such field 'i' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
 ─────╯
 Error: Can't read from an interface. Use a function call or interface connector instead
      ╭─[ test.sus:642:7 ]
@@ -2481,14 +2481,14 @@ Error: Can't read from an interface. Use a function call or interface connector 
      │          ──┬─  
      │            ╰─── Can't read from an interface. Use a function call or interface connector instead
 ─────╯
-Error: Typing Error: if statement condition expects a bool but was given a Local Interface read
+Error: Typing Error: if statement condition expects 'bool' but was given 'Local Interface read'
      ╭─[ test.sus:642:7 ]
      │
  642 │     when read {
      │          ──┬─  
-     │            ╰─── Typing Error: if statement condition expects a bool but was given a Local Interface read
+     │            ╰─── Typing Error: if statement condition expects 'bool' but was given 'Local Interface read'
 ─────╯
-Error: No such field 'o' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
+Error: No such field 'o' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
      ╭─[ test.sus:643:18 ]
      │
  618 │ module cross_memory {
@@ -2505,7 +2505,7 @@ interface out:
      │ 
  643 │        rd_data = cr_m.o[rd_addr]
      │                       ┬  
-     │                       ╰── No such field 'o' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
+     │                       ╰── No such field 'o' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:651:11 ]
@@ -2569,7 +2569,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │          ───┬───  
      │             ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+Error: No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:667:5 ]
      │
  607 │ module cross_bool {
@@ -2586,9 +2586,9 @@ interface out:
      │ 
  667 │     ci.i = domain3
      │        ┬  
-     │        ╰── No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+     │        ╰── No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
 ─────╯
-Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+Error: No such field 'o' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:668:15 ]
      │
  607 │ module cross_bool {
@@ -2605,7 +2605,7 @@ interface out:
      │ 
  668 │     domain4 = ci.o
      │                  ┬  
-     │                  ╰── No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+     │                  ╰── No such field 'o' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:670:7 ]
@@ -2687,7 +2687,7 @@ Warning: The result of this expression is not used. Only function calls can retu
      │     ──┬─  
      │       ╰─── The result of this expression is not used. Only function calls can return nothing. 
 ─────╯
-Error: No such field 'a' on mod_with_unused_interface #(). Available fields are 'mod_with_unused_interface', 'v'
+Error: No such field 'a' on mod_with_unused_interface. Available fields are 'mod_with_unused_interface', 'v'
      ╭─[ test.sus:707:5 ]
      │
  684 │ module mod_with_unused_interface {
@@ -2702,7 +2702,7 @@ interface v:
      │ 
  707 │     mm.a
      │        ┬  
-     │        ╰── No such field 'a' on mod_with_unused_interface #(). Available fields are 'mod_with_unused_interface', 'v'
+     │        ╰── No such field 'a' on mod_with_unused_interface. Available fields are 'mod_with_unused_interface', 'v'
 ─────╯
 Error: This declaration conflicts with a previous declaration in the same scope
      ╭─[ test.sus:723:25 ]
@@ -2727,7 +2727,7 @@ Error: Can't write to an interface. Use a function call or interface connector i
      │     ─────┬────  
      │          ╰────── Can't write to an interface. Use a function call or interface connector instead
 ─────╯
-Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+Error: No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:730:11 ]
      │
  607 │ module cross_bool {
@@ -2744,7 +2744,7 @@ interface out:
      │ 
  730 │     start_cr.i = start
      │              ┬  
-     │              ╰── No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+     │              ╰── No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
 ─────╯
 Error: Can't read from an interface. Use a function call or interface connector instead
      ╭─[ test.sus:730:15 ]
@@ -2753,7 +2753,7 @@ Error: Can't read from an interface. Use a function call or interface connector 
      │                  ──┬──  
      │                    ╰──── Can't read from an interface. Use a function call or interface connector instead
 ─────╯
-Error: No such field 'i' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
+Error: No such field 'i' on cross_int. Available fields are 'cross_int', 'in', 'out'
      ╭─[ test.sus:733:10 ]
      │
  612 │ module cross_int {
@@ -2770,9 +2770,9 @@ interface out:
      │ 
  733 │     upTo_cr.i = upTo
      │             ┬  
-     │             ╰── No such field 'i' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
+     │             ╰── No such field 'i' on cross_int. Available fields are 'cross_int', 'in', 'out'
 ─────╯
-Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+Error: No such field 'o' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:736:19 ]
      │
  607 │ module cross_bool {
@@ -2789,9 +2789,9 @@ interface out:
      │ 
  736 │     ready = ready_cr.o
      │                      ┬  
-     │                      ╰── No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+     │                      ╰── No such field 'o' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
 ─────╯
-Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+Error: No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:739:11 ]
      │
  607 │ module cross_bool {
@@ -2808,9 +2808,9 @@ interface out:
      │ 
  739 │     ready_cr.i = !valid
      │              ┬  
-     │              ╰── No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+     │              ╰── No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
 ─────╯
-Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+Error: No such field 'o' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:744:16 ]
      │
  607 │ module cross_bool {
@@ -2827,9 +2827,9 @@ interface out:
      │ 
  744 │     when start_cr.o {
      │                   ┬  
-     │                   ╰── No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+     │                   ╰── No such field 'o' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
 ─────╯
-Error: No such field 'o' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
+Error: No such field 'o' on cross_int. Available fields are 'cross_int', 'in', 'out'
      ╭─[ test.sus:745:19 ]
      │
  612 │ module cross_int {
@@ -2846,7 +2846,7 @@ interface out:
      │ 
  745 │        index = upTo_cr.o
      │                        ┬  
-     │                        ╰── No such field 'o' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
+     │                        ╰── No such field 'o' on cross_int. Available fields are 'cross_int', 'in', 'out'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:750:30 ]
@@ -10846,12 +10846,12 @@ Error: A Function call expects this to be a callable interface, the interface `n
      │             ────────┬────────  
      │                     ╰────────── A Function call expects this to be a callable interface, the interface `no_main_interface` is not callable
 ─────╯
-Error: Typing Error: array size expects a int but was given a bool
+Error: Typing Error: array size expects 'int' but was given 'bool'
      ╭─[ test.sus:918:6 ]
      │
  918 │     int[true] a
      │         ──┬─  
-     │           ╰─── Typing Error: array size expects a int but was given a bool
+     │           ╰─── Typing Error: array size expects 'int' but was given 'bool'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:918:12 ]
@@ -10860,12 +10860,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │               ┬  
      │               ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Typing Error: array size expects a int but was given a bool
+Error: Typing Error: array size expects 'int' but was given 'bool'
      ╭─[ test.sus:922:41 ]
      │
  922 │     interface moduleWithBadInterface : int[true] a
      │                                            ──┬─  
-     │                                              ╰─── Typing Error: array size expects a int but was given a bool
+     │                                              ╰─── Typing Error: array size expects 'int' but was given 'bool'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:922:47 ]
@@ -10881,12 +10881,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │            ─┬─  
      │             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Typing Error: writing the output of this expression expects a int but was given a bool
+Error: Typing Error: writing the output of this expression expects 'int' but was given 'bool'
      ╭─[ test.sus:929:2 ]
      │
  929 │     xyz[3] = true
      │     ───┬──  
-     │        ╰──── Typing Error: writing the output of this expression expects a int but was given a bool
+     │        ╰──── Typing Error: writing the output of this expression expects 'int' but was given 'bool'
 ─────╯
 Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
      ╭─[ test.sus:935:2 ]
@@ -11188,12 +11188,12 @@ Error: 'MAX' is not a valid template argument of DualPortMem
       │        ─────┬─────  
       │             ╰─────── 'DualPortMem' defined here
 ──────╯
-Error: Typing Error: function argument expects a int but was given a bool
+Error: Typing Error: function argument expects 'int' but was given 'bool'
       ╭─[ test.sus:1043:12 ]
       │
  1043 │     mem.write(do_write, addr, data)
       │               ────┬───  
-      │                   ╰───── Typing Error: function argument expects a int but was given a bool
+      │                   ╰───── Typing Error: function argument expects 'int' but was given 'bool'
       │
       ├─[ util.sus:8:47 ]
       │
@@ -11201,12 +11201,12 @@ Error: Typing Error: function argument expects a int but was given a bool
       │                                                  ──┬─  
       │                                                    ╰─── 'addr' declared here
 ──────╯
-Error: Typing Error: function argument expects a bool[] but was given a int
+Error: Typing Error: function argument expects 'bool[]' but was given 'int'
       ╭─[ test.sus:1043:22 ]
       │
  1043 │     mem.write(do_write, addr, data)
       │                         ──┬─  
-      │                           ╰─── Typing Error: function argument expects a bool[] but was given a int
+      │                           ╰─── Typing Error: function argument expects 'bool[]' but was given 'int'
       │
       ├─[ util.sus:8:57 ]
       │
@@ -11255,12 +11255,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                                      ────┬───  
       │                                          ╰───── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Typing Error: function argument expects a int but was given a bool
+Error: Typing Error: function argument expects 'int' but was given 'bool'
       ╭─[ test.sus:1060:20 ]
       │
  1060 │     arrayStream.start(do_start, 10)
       │                       ────┬───  
-      │                           ╰───── Typing Error: function argument expects a int but was given a bool
+      │                           ╰───── Typing Error: function argument expects 'int' but was given 'bool'
       │
       ├─[ util.sus:81:36 ]
       │
@@ -12585,7 +12585,7 @@ Error: While parsing 'interface_statement', parser found a syntax error in a nod
       │ │           
       │ ╰─────────── Parent node 'interface_statement'
 ──────╯
-Error: No such field 'process' on MultiStateLoop #(T: ?[...], II: int). Available fields are 'MultiStateLoop', 'may_process', 'next_state', 'request_output'
+Error: No such field 'process' on MultiStateLoop #(T: ?[...], II: _). Available fields are 'MultiStateLoop', 'may_process', 'next_state', 'request_output'
       ╭─[ test.sus:1263:12 ]
       │
  1245 │ module MultiStateLoop #(T, int II) {
@@ -12605,14 +12605,14 @@ action request_output:
       │ 
  1263 │     when loop.process : float cur_state {
       │               ───┬───  
-      │                  ╰───── No such field 'process' on MultiStateLoop #(T: ?[...], II: int). Available fields are 'MultiStateLoop', 'may_process', 'next_state', 'request_output'
+      │                  ╰───── No such field 'process' on MultiStateLoop #(T: ?[...], II: _). Available fields are 'MultiStateLoop', 'may_process', 'next_state', 'request_output'
 ──────╯
-Error: Typing Error: writing the output of this expression expects a float but was given a int
+Error: Typing Error: writing the output of this expression expects 'float' but was given 'int'
       ╭─[ test.sus:1264:3 ]
       │
  1264 │        float next_state = cur_state * cur_state
       │        ────────┬───────  
-      │                ╰───────── Typing Error: writing the output of this expression expects a float but was given a int
+      │                ╰───────── Typing Error: writing the output of this expression expects 'float' but was given 'int'
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1264:9 ]

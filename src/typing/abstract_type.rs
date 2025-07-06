@@ -1,6 +1,11 @@
+use std::sync::LazyLock;
+
 use sus_proc_macro::get_builtin_type;
 
-use crate::{prelude::*, typing::template::TVec};
+use crate::{
+    prelude::*,
+    typing::template::{TVec, TemplateKind},
+};
 
 use super::type_inference::{InnerTypeVariableID, PeanoVariableID};
 
@@ -22,7 +27,7 @@ use super::type_inference::{InnerTypeVariableID, PeanoVariableID};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AbstractInnerType {
     Template(TemplateID),
-    Named(TypeUUID),
+    Named(AbstractGlobalReference<TypeUUID>),
     Interface(AbstractGlobalReference<ModuleUUID>, InterfaceID),
     LocalInterface(FlatID),
     /// Referencing [AbstractType::Unknown] is a strong code smell.
@@ -32,10 +37,18 @@ pub enum AbstractInnerType {
     Unknown(InnerTypeVariableID),
 }
 
-impl AbstractInnerType {
-    pub const BOOL: AbstractInnerType = AbstractInnerType::Named(get_builtin_type!("bool"));
-    pub const INT: AbstractInnerType = AbstractInnerType::Named(get_builtin_type!("int"));
+pub const BOOL_INNER: AbstractInnerType = AbstractInnerType::Named(AbstractGlobalReference {
+    id: get_builtin_type!("bool"),
+    template_arg_types: TVec::new(),
+});
+pub static INT_INNER: LazyLock<AbstractInnerType> = LazyLock::new(|| {
+    AbstractInnerType::Named(AbstractGlobalReference {
+        id: get_builtin_type!("int"),
+        template_arg_types: TVec::from_vec(vec![TemplateKind::Value(()), TemplateKind::Value(())]),
+    })
+});
 
+impl AbstractInnerType {
     pub fn scalar(self) -> AbstractRankedType {
         AbstractRankedType {
             inner: self,
@@ -53,16 +66,16 @@ pub struct AbstractRankedType {
     pub rank: PeanoType,
 }
 
-impl AbstractRankedType {
-    pub const BOOL: AbstractRankedType = AbstractRankedType {
-        inner: AbstractInnerType::BOOL,
-        rank: PeanoType::Zero,
-    };
-    pub const INT: AbstractRankedType = AbstractRankedType {
-        inner: AbstractInnerType::INT,
-        rank: PeanoType::Zero,
-    };
+pub const BOOL_SCALAR: AbstractRankedType = AbstractRankedType {
+    inner: BOOL_INNER,
+    rank: PeanoType::Zero,
+};
+pub static INT_SCALAR: LazyLock<AbstractRankedType> = LazyLock::new(|| AbstractRankedType {
+    inner: INT_INNER.clone(),
+    rank: PeanoType::Zero,
+});
 
+impl AbstractRankedType {
     pub const fn scalar(inner: AbstractInnerType) -> Self {
         Self {
             inner,
@@ -97,5 +110,5 @@ impl PeanoType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AbstractGlobalReference<ID> {
     pub id: ID,
-    pub template_arg_types: TVec<AbstractRankedType>,
+    pub template_arg_types: TVec<TemplateKind<AbstractRankedType, ()>>,
 }

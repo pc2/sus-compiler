@@ -332,13 +332,14 @@ fn concretize_global_ref<ID: Copy + Into<GlobalUUID>>(
     global_ref: &GlobalReference<ID>,
     concretizer: &mut impl Concretizer,
 ) -> ExecutionResult<ConcreteGlobalReference<ID>> {
-    let target = &linker.globals[global_ref.id.into()];
+    let target: &LinkInfo = &linker.globals[global_ref.id.into()];
     let template_args = target.template_parameters.try_map2(
         &global_ref.template_arg_types,
         |(param_id, param, abs_typ)| -> ExecutionResult<ConcreteTemplateArg> {
             Ok(match &param.kind {
                 TemplateKind::Type(_) => {
                     let wr_typ = global_ref.get_type_arg_for(param_id);
+                    let abs_typ = abs_typ.unwrap_type();
                     TemplateKind::Type(concretize_type_recurse(
                         linker,
                         &abs_typ.inner,
@@ -374,15 +375,15 @@ fn concretize_type_recurse(
         PeanoType::Zero => match inner {
             AbstractInnerType::Template(id) => concretizer.get_type(*id),
             AbstractInnerType::Named(name) => {
-                let target = &linker.types[*name].link_info;
+                let target = &linker.types[name.id].link_info;
                 ConcreteType::Named(match wr_typ {
                     Some(WrittenType::Named(wr_named)) => {
-                        assert_eq!(wr_named.id, *name);
+                        assert_eq!(wr_named.id, name.id);
                         concretize_global_ref(linker, wr_named, concretizer)?
                     }
                     Some(_) => unreachable!("Can't get Array from Non-Array WrittenType!"), // TODO Fix with Let bindings (#57)
                     None => ConcreteGlobalReference {
-                        id: *name,
+                        id: name.id,
                         template_args: target.template_parameters.map(|(_, arg)| match &arg.kind {
                             TemplateKind::Type(_) => {
                                 todo!("Abstract Type Args aren't yet supported!")

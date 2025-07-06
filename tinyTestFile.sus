@@ -2,8 +2,15 @@
 // DO NOT COMMIT
 // To use with VSCode debugger, name the module "TEST", and in the code use `if crate::debug::is_enabled("TEST") {}` to enable breakpoint code
 
+module infff #(int DELAY) {
+    interface infff : bool a'-DELAY -> bool b'0
+}
 
 module TEST {
-    bool[42] x = transmute_to_bits([2,9,5,3,58,9])
-    int y = transmute_from_bits #(T: type int #(MIN:10, MAX: 2000000000000))(x)
+
+    interface TEST : bool a'0 -> bool b'20
+
+    infff x
+
+    b = x(a)
 }

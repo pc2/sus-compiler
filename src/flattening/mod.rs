@@ -118,6 +118,7 @@ pub struct StructType {
 pub struct StructField {
     #[allow(unused)]
     pub name: String,
+    #[allow(unused)]
     pub name_span: Span,
     #[allow(unused)]
     pub decl_span: Span,
@@ -727,7 +728,7 @@ pub struct GlobalReference<ID> {
     pub name_span: Span,
     pub id: ID,
     pub template_args: Vec<WrittenTemplateArg>,
-    pub template_arg_types: TyCell<TVec<AbstractRankedType>>,
+    pub template_arg_types: TyCell<TVec<TemplateKind<AbstractRankedType, ()>>>,
     pub template_span: Option<BracketSpan>,
 }
 

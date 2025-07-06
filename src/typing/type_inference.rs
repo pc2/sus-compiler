@@ -7,8 +7,10 @@ use std::ops::{BitAnd, BitAndAssign, Deref, DerefMut};
 use crate::errors::ErrorInfo;
 use crate::prelude::*;
 
-use crate::alloc::{UUIDMarker, UUID};
+use crate::alloc::{zip_eq, UUIDMarker, UUID};
+use crate::typing::abstract_type::AbstractGlobalReference;
 use crate::typing::domain_type::DomainType;
+use crate::typing::template::TemplateKind;
 
 use super::abstract_type::AbstractRankedType;
 use super::abstract_type::{AbstractInnerType, PeanoType};
@@ -322,8 +324,8 @@ impl HindleyMilner for AbstractInnerType {
             AbstractInnerType::Template(template_id) => {
                 HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Template(*template_id))
             }
-            AbstractInnerType::Named(named_id) => {
-                HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Named(*named_id))
+            AbstractInnerType::Named(named) => {
+                HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Named(named.id))
             }
             AbstractInnerType::Interface(md_ref, interface) => {
                 HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Interface(md_ref.id, *interface))
@@ -345,7 +347,17 @@ impl HindleyMilner for AbstractInnerType {
                 UnifyResult::Success
             } // Already covered by get_hm_info
             (AbstractInnerType::Named(na), AbstractInnerType::Named(nb)) => {
-                assert!(*na == *nb);
+                assert!(na.id == nb.id);
+
+                for (_, a, b) in zip_eq(&na.template_arg_types, &nb.template_arg_types) {
+                    match a.and_by_ref(b) {
+                        TemplateKind::Type((a, b)) => {
+                            todo!("Abstract Type Type Parameter Unification")
+                        }
+                        TemplateKind::Value(((), ())) => {}
+                    }
+                }
+
                 UnifyResult::Success
             } // Already covered by get_hm_info
             (_, _) => unreachable!("All others should have been eliminated by get_hm_info check"),
@@ -360,7 +372,12 @@ impl HindleyMilner for AbstractInnerType {
             | AbstractInnerType::LocalInterface(_) => {}
             AbstractInnerType::Interface(md_ref, _) => {
                 for (_, arg) in &md_ref.template_arg_types {
-                    arg.inner.for_each_unknown(f);
+                    match arg {
+                        TemplateKind::Type(arg) => {
+                            arg.inner.for_each_unknown(f);
+                        }
+                        TemplateKind::Value(()) => {}
+                    }
                 }
             }
             AbstractInnerType::Unknown(uuid) => f(*uuid),
@@ -529,22 +546,29 @@ impl PeanoType {
     }
 }
 
-impl AbstractRankedType {
+impl<ID> AbstractGlobalReference<ID> {
     pub fn fully_substitute(&mut self, substitutor: &AbstractTypeSubstitutor) -> bool {
-        let inner_success = match &mut self.inner {
-            // Template Name & Name is included in get_hm_info
-            AbstractInnerType::Named(_)
-            | AbstractInnerType::Template(_)
-            | AbstractInnerType::LocalInterface(_) => true,
-            AbstractInnerType::Interface(md_ref, _) => {
-                let mut success = true;
-                for (_, arg) in &mut md_ref.template_arg_types {
+        let mut success = true;
+        for (_, arg) in &mut self.template_arg_types {
+            match arg {
+                TemplateKind::Type(arg) => {
                     if !arg.fully_substitute(substitutor) {
                         success = false;
                     }
                 }
-                success
+                TemplateKind::Value(()) => {}
             }
+        }
+        success
+    }
+}
+impl AbstractRankedType {
+    pub fn fully_substitute(&mut self, substitutor: &AbstractTypeSubstitutor) -> bool {
+        let inner_success = match &mut self.inner {
+            // Template Name & Name is included in get_hm_info
+            AbstractInnerType::Template(_) | AbstractInnerType::LocalInterface(_) => true,
+            AbstractInnerType::Named(typ_ref) => typ_ref.fully_substitute(substitutor),
+            AbstractInnerType::Interface(md_ref, _) => md_ref.fully_substitute(substitutor),
             AbstractInnerType::Unknown(var) => {
                 if let Some(replacement) = substitutor.inner_substitutor[*var].get() {
                     assert!(!std::ptr::eq(&self.inner, replacement));

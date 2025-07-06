@@ -234,7 +234,7 @@ impl<'linker, 'from> GlobalResolver<'linker, 'from> {
     pub fn get_submodule(
         &self,
         sm_ref: &'linker AbstractGlobalReference<ModuleUUID>,
-    ) -> RemoteSubModule<'linker, &'linker TVec<AbstractRankedType>> {
+    ) -> RemoteSubModule<'linker, &'linker TVec<TemplateKind<AbstractRankedType, ()>>> {
         RemoteSubModule {
             template_args: &sm_ref.template_arg_types,
             md: self.get_module(sm_ref.id),
@@ -243,7 +243,7 @@ impl<'linker, 'from> GlobalResolver<'linker, 'from> {
     pub fn get_declared_submodule(
         &self,
         submod_instr: &'linker SubModuleInstance,
-    ) -> RemoteSubModule<'linker, &'linker TVec<AbstractRankedType>> {
+    ) -> RemoteSubModule<'linker, &'linker TVec<TemplateKind<AbstractRankedType, ()>>> {
         let AbstractInnerType::Interface(md_ref, _) = &submod_instr.typ.inner else {
             unreachable!("Must be an interface!")
         };
@@ -255,7 +255,7 @@ impl<'linker, 'from> GlobalResolver<'linker, 'from> {
     pub fn get_global_constant(
         &self,
         cst: &'linker GlobalReference<ConstantUUID>,
-    ) -> RemoteGlobalConstant<'linker, &'linker TVec<AbstractRankedType>> {
+    ) -> RemoteGlobalConstant<'linker, &'linker TVec<TemplateKind<AbstractRankedType, ()>>> {
         RemoteGlobalConstant {
             cst: self.get_constant(cst.id),
             template_args: &cst.template_arg_types,
