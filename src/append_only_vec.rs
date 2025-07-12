@@ -1,6 +1,8 @@
 use std::cell::UnsafeCell;
 
 /// An append-only Vector. The contents cannot be looked at, unless the vector is explicitly consumed. This allows us to present a const-ref [Self::push], which has nice ergonomics
+///
+/// Basically a "vector" variant of [std::cell::Cell]
 #[derive(Debug)]
 pub struct AppendOnlyVec<T> {
     v: UnsafeCell<Vec<T>>,
@@ -37,6 +39,21 @@ impl<T> AppendOnlyVec<T> {
     }
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// No clone_elem with similar reasoning as [std::cell::Cell]
+    pub fn copy_elem(&self, idx: usize) -> T
+    where
+        T: Copy,
+    {
+        unsafe { (*self.v.get())[idx] }
+    }
+
+    pub fn set_elem(&self, idx: usize, v: T) -> T {
+        unsafe {
+            let vec = &mut *self.v.get();
+            std::mem::replace(&mut vec[idx], v)
+        }
     }
 }
 

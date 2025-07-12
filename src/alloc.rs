@@ -7,6 +7,8 @@ use std::{
     ops::{Index, IndexMut},
 };
 
+use crate::append_only_vec::AppendOnlyVec;
+
 /// UUIDs are type-safe integers. They are used for [FlatAlloc] and [ArenaAllocator]
 ///
 /// They don't support arithmetic, as they're just meant to represent pointers.
@@ -1027,5 +1029,49 @@ pub fn zip_eq3<IDMarker, OA, OB, OC>(
         iter_a: iter_a.into_iter(),
         iter_b: iter_b.into_iter(),
         iter_c: iter_c.into_iter(),
+    }
+}
+
+pub struct AppendOnlyAlloc<T, IndexMarker: UUIDMarker> {
+    data: AppendOnlyVec<T>,
+    _ph: PhantomData<IndexMarker>,
+}
+
+impl<T, IndexMarker: UUIDMarker> Default for AppendOnlyAlloc<T, IndexMarker> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T, IndexMarker: UUIDMarker> AppendOnlyAlloc<T, IndexMarker> {
+    pub fn new() -> Self {
+        Self {
+            data: AppendOnlyVec::new(),
+            _ph: PhantomData,
+        }
+    }
+    pub fn alloc(&self, v: T) -> UUID<IndexMarker> {
+        let idx = UUID(self.data.len(), PhantomData);
+        self.data.push(v);
+        idx
+    }
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    /// No clone_elem with similar reasoning as [std::cell::Cell]
+    pub fn copy_elem(&self, idx: UUID<IndexMarker>) -> T
+    where
+        T: Copy,
+    {
+        self.data.copy_elem(idx.0)
+    }
+
+    /// Returns the old value
+    pub fn set_elem(&self, idx: UUID<IndexMarker>, v: T) -> T {
+        self.data.set_elem(idx.0, v)
     }
 }
