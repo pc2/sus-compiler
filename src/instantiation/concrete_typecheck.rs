@@ -314,8 +314,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 .gather_all_substitutables(&mut substitutables);
 
             unifier.add_constraint(substitutables, |unifier| {
-                let submod_instr =
-                    self.link_info.instructions[sm.original_instruction].unwrap_submodule();
+                let submod_instr =&
+                    self.link_info.instructions[sm.original_instruction];
 
                 let mut refers_to_clone = sm.refers_to.clone();
                 refers_to_clone.template_args.fully_substitute(&unifier.store);
@@ -347,7 +347,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                                 // Port is enabled, but not used
                                 self.errors
                                     .warn(
-                                        submod_instr.module_ref.get_total_span(),
+                                        submod_instr.get_span(),
                                         format!("Unused port '{}'", source_code_port.name),
                                     )
                                     .info_obj_different_file(
@@ -358,56 +358,24 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                             }
                             (Some(concrete_port), Some(connecting_wire)) => {
                                 let wire = &self.wires[connecting_wire.maps_to_wire];
-                                if source_code_port.is_input {
+                                match source_code_port.direction {
                                     // Subtype relations always flow FORWARD.
-                                    unifier.unify_concrete::<false>(&wire.typ, &concrete_port.typ);
-                                } else {
-                                    unifier.unify_concrete::<true>(&wire.typ, &concrete_port.typ);
-                                }
-                            }
-                        }
-                    }
-                    for (_interface_id, interface_references, sm_interface) in
-                        zip_eq(&sm.interface_call_sites, &sub_module.interfaces)
-                    {
-                        if !interface_references.is_empty() {
-                            let interface_name = &sm_interface.name;
-                            if let Some(representative_port) = sm_interface
-                                .func_call_inputs
-                                .first()
-                                .or(sm_interface.func_call_outputs.first())
-                            {
-                                if instance.interface_ports[representative_port].is_none() {
-                                    for span in interface_references {
-                                        self.errors.error(*span, format!("The interface '{interface_name}' is disabled in this submodule instance"))
-                                        .info_obj_same_file(submod_instr)
-                                        .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
+                                    Direction::Input => {
+                                        unifier.unify_concrete::<false>(&wire.typ, &concrete_port.typ);
+                                    }
+                                    Direction::Output => {
+                                        unifier.unify_concrete::<true>(&wire.typ, &concrete_port.typ);
                                     }
                                 }
-                            } else {
-                                for span in interface_references {
-                                    self.errors.todo(*span, format!("Using empty interface '{interface_name}' (This is a TODO with Actions etc)"))
-                                    .info_obj_same_file(submod_instr)
-                                    .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
-                                }
-                            }
-                            if sm_interface
-                                .all_ports()
-                                .iter()
-                                .any(|port_id| instance.interface_ports[port_id].is_none())
-                            {
-                                // We say an interface is invalid if it has an invalid port.
-                                todo!("Invalid Interfaces");
                             }
                         }
                     }
-
                     sm.instance
                         .set(instance)
-                        .expect("Can only set an InstantiatedModule once");
+                        .unwrap();
                 } else {
                     self.errors.error(
-                        submod_instr.module_ref.get_total_span(),
+                        submod_instr.get_span(),
                         "Error instantiating submodule",
                     );
                 }
@@ -425,7 +393,15 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     span,
                     format!(
                         "Could not finalize this type, some parameters were still unknown: {}",
-                        w.typ.display(&self.linker.types, true)
+                        w.typ.display(self.linker, true)
+                    ),
+                );
+            } else if !w.typ.is_valid() {
+                self.errors.error(
+                    w.get_span(self.link_info),
+                    format!(
+                        "The type of this wire is invalid! {}",
+                        w.typ.display(self.linker, true)
                     ),
                 );
             }
@@ -444,8 +420,13 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         for (_, sm) in &mut self.submodules {
             if !sm.refers_to.template_args.fully_substitute(substitutor) {
                 self.errors.error(sm.get_span(self.link_info), format!("Could not infer the parameters of this submodule, some parameters were still unknown: {}", 
-                sm.refers_to.display(self.linker, true)
-            ));
+                    sm.refers_to.display(self.linker, true)
+                ));
+            } else if let Err(reason) = sm.refers_to.report_if_errors(
+                self.linker,
+                "Invalid arguments found in a submodule's template arguments.",
+            ) {
+                self.errors.error(sm.get_span(self.link_info), reason);
             }
             if let Some(instance) = sm.instance.get() {
                 for (_port_id, concrete_port, connecting_wire) in

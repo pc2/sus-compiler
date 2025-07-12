@@ -205,16 +205,6 @@ impl ValueUnifierAlloc {
 }
 
 impl Value {
-    /// Returns None for Unset
-    pub fn get_type_id(&self) -> TypeUUID {
-        match self {
-            Value::Bool(_) => get_builtin_type!("bool"),
-            Value::Integer(_) => get_builtin_type!("int"),
-            Value::Array(_) => unreachable!("Value::get_type_abs is only ever used for terminal Values, because any array instantiations would be Expression::ArrayConstruct"),
-            Value::Unset => unreachable!(),
-        }
-    }
-
     /// Traverses the Value, to create a [ConcreteType] for it, guided by the abstract type given.
     /// So '1' becomes `ConcreteType::Named(ConcreteGlobalReference{id: get_builtin_type!("int"), ...}})`,
     /// but `Value::Array([])` becomes `ConcreteType::Array((ConcreteType::Unknown, 0))`
@@ -235,16 +225,16 @@ impl Value {
                 self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |_| Ok(()))?;
                 template_args[*template_id].unwrap_type().clone()
             }
-            AbstractInnerType::Named(content_typ_id) => {
+            AbstractInnerType::Named(content_typ) => {
                 let mut result_args: Option<TVec<ConcreteTemplateArg>> = None;
 
                 self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |v| {
                     match v {
                         Value::Bool(_) => {
-                            assert_eq!(*content_typ_id, get_builtin_type!("bool"));
+                            assert_eq!(content_typ.id, get_builtin_type!("bool"));
                         }
                         Value::Integer(v) => {
-                            assert_eq!(*content_typ_id, get_builtin_type!("int"));
+                            assert_eq!(content_typ.id, get_builtin_type!("int"));
                             if let Some(args) = &mut result_args {
                                 let [min, max] = args.cast_to_int_array_mut();
                                 if v < min {
@@ -271,10 +261,10 @@ impl Value {
                 })?;
 
                 ConcreteType::Named(ConcreteGlobalReference {
-                    id: *content_typ_id,
+                    id: content_typ.id,
                     template_args: match result_args {
                         Some(args) => args,
-                        None => linker.types[*content_typ_id].link_info.template_parameters.map(|(_, param)| match &param.kind {
+                        None => linker.types[content_typ.id].link_info.template_parameters.map(|(_, param)| match &param.kind {
                             TemplateKind::Type(_) => todo!("Should extract type info from AbstractRankedType with specified args instead!"),
                             TemplateKind::Value(_) => TemplateKind::Value(value_alloc.alloc_unknown())
                         }),
@@ -282,6 +272,11 @@ impl Value {
                 })
             }
             AbstractInnerType::Unknown(_) => unreachable!("Caught by typecheck"),
+            AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => {
+                unreachable!(
+                    "Interfaces can't be concretized, should have been caught by typecheck!"
+                )
+            }
         };
 
         Ok(content_typ.stack_arrays_usize(&tensor_sizes))
@@ -390,7 +385,7 @@ impl ConcreteType {
     pub fn display_substitute(&self, linker: &Linker, substitutor: &ValueUnifierStore) -> String {
         let mut typ_copy = self.clone();
         typ_copy.fully_substitute(substitutor);
-        let as_display = typ_copy.display(&linker.types, true);
+        let as_display = typ_copy.display(linker, true);
         as_display.to_string()
     }
 }

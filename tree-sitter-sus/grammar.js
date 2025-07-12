@@ -129,15 +129,19 @@ module.exports = grammar({
             field('item', 'initial')
         ),
 
+        _then_else_block: $ => seq(
+            field('then_block', $.block),
+            optional(field('else_block', $.else_block))
+        ),
+
         if_statement: $ => seq(
             field('statement_type',choice(
                 'when',
                 'if'
             )),
             field('condition', $._expression),
-            //optional(field('conditional_bindings', $.interface_ports)),
-            field('then_block', $.block),
-            optional(field('else_block', $.else_block))
+            optional(field('conditional_bindings', $.interface_ports)),
+            $._then_else_block
         ),
         else_block: $ => seq(
             'else',
@@ -164,10 +168,12 @@ module.exports = grammar({
         ),
 
         interface_statement: $ => seq(
-            'interface',//field('interface_kind', choice('action', 'query', 'trigger')),
+            optional(field('local', 'local')),
+            field('interface_kind', choice('interface', 'action', 'trigger')),
             field('name', $.identifier),
+            optional(field('latency_specifier', $.latency_specifier)),
             optional(field('interface_ports', $.interface_ports)),
-            //optional(field('block', $.block))
+            optional($._then_else_block)
         ),
 
         interface_ports: $ => seq(
@@ -192,18 +198,17 @@ module.exports = grammar({
         declaration_list: $ => sepSeq1($.declaration, $._comma),
 
         declaration: $ => seq(
-            optional(field('io_port_modifiers', choice(
-                'input',
-                'output'
-            ))),
-            optional(field('declaration_modifiers', choice(
-                'state',
-                'gen'
-            ))),
+            optional(field('declaration_modifiers', $.declaration_modifiers)),
             field('type', $._type),
             field('name', $.identifier),
             optional(field('latency_specifier', $.latency_specifier))
         ),
+        declaration_modifiers: $ => repeat1(field('item', choice(
+            'state',
+            'gen',
+            'input',
+            'output'
+        ))),
 
         latency_specifier: $ => seq(
             '\'',

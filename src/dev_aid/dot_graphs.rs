@@ -4,6 +4,7 @@ use dot::{render, Edges, GraphWalk, Id, LabelText, Labeller, Nodes, Style};
 
 use crate::{
     alloc::FlatAlloc,
+    flattening::Direction,
     instantiation::{
         ForEachContainedWire, InstantiatedModule, RealWire, RealWireDataSource, SubModule,
     },
@@ -12,9 +13,9 @@ use crate::{
     prelude::{SubModuleID, SubModuleIDMarker, WireID, WireIDMarker},
 };
 
-pub fn display_generated_hardware_structure(md_instance: &InstantiatedModule, linker: &Linker) {
+pub fn display_generated_hardware_structure(md_instance: &InstantiatedModule) {
     let mut file = std::fs::File::create("hardware_structure.dot").unwrap();
-    render(&(md_instance, linker), &mut file).unwrap();
+    render(md_instance, &mut file).unwrap();
 }
 
 #[derive(Clone, Copy)]
@@ -25,19 +26,19 @@ enum NodeType {
 
 type EdgeType = (NodeType, NodeType);
 
-impl<'inst> Labeller<'inst, NodeType, EdgeType> for (&'inst InstantiatedModule, &'inst Linker) {
+impl<'inst> Labeller<'inst, NodeType, EdgeType> for InstantiatedModule {
     fn graph_id(&'inst self) -> Id<'inst> {
-        Id::new(&self.0.mangled_name).unwrap()
+        Id::new(&self.mangled_name).unwrap()
     }
 
     fn node_id(&'inst self, n: &NodeType) -> Id<'inst> {
         Id::new(match *n {
             NodeType::Wire(id) => {
-                let wire = &self.0.wires[id];
+                let wire = &self.wires[id];
                 &wire.name
             }
             NodeType::SubModule(id) => {
-                let sm = &self.0.submodules[id];
+                let sm = &self.submodules[id];
                 &sm.name
             }
         })
@@ -47,7 +48,7 @@ impl<'inst> Labeller<'inst, NodeType, EdgeType> for (&'inst InstantiatedModule, 
     fn node_label(&'inst self, n: &NodeType) -> LabelText<'inst> {
         LabelText::LabelStr(Cow::Owned(match *n {
             NodeType::Wire(id) => {
-                let wire = &self.0.wires[id];
+                let wire = &self.wires[id];
                 let name: Cow<'_, str> = match &wire.source {
                     RealWireDataSource::ReadOnly | RealWireDataSource::Multiplexer { .. } => {
                         wire.name.as_str().into()
@@ -65,7 +66,7 @@ impl<'inst> Labeller<'inst, NodeType, EdgeType> for (&'inst InstantiatedModule, 
                 }
             }
             NodeType::SubModule(id) => {
-                let sm = &self.0.submodules[id];
+                let sm = &self.submodules[id];
                 format!("{id:?}: {}", &sm.name)
             }
         }))
@@ -79,40 +80,35 @@ impl<'inst> Labeller<'inst, NodeType, EdgeType> for (&'inst InstantiatedModule, 
     }
 }
 
-impl<'inst> GraphWalk<'inst, NodeType, EdgeType> for (&'inst InstantiatedModule, &'inst Linker) {
+impl<'inst> GraphWalk<'inst, NodeType, EdgeType> for InstantiatedModule {
     fn nodes(&'inst self) -> Nodes<'inst, NodeType> {
-        let (inst, _linker) = self;
-        inst.wires
+        self.wires
             .iter()
             .map(|(w, _)| NodeType::Wire(w))
-            .chain(inst.submodules.iter().map(|(s, _)| NodeType::SubModule(s)))
+            .chain(self.submodules.iter().map(|(s, _)| NodeType::SubModule(s)))
             .collect()
     }
 
     fn edges(&'inst self) -> Edges<'inst, EdgeType> {
-        let (inst, linker) = self;
-
         let mut edges = Vec::new();
 
-        for (id, w) in &inst.wires {
+        for (id, w) in &self.wires {
             w.source
                 .for_each_wire(&mut |v| edges.push((NodeType::Wire(v), NodeType::Wire(id))));
         }
 
-        for (submod_id, s) in &inst.submodules {
-            for (port_id, p) in s.port_map.iter_valids() {
-                let sm = &linker.modules[s.refers_to.id];
-                edges.push(if sm.ports[port_id].is_input {
-                    (
-                        NodeType::Wire(p.maps_to_wire),
-                        NodeType::SubModule(submod_id),
-                    )
-                } else {
-                    (
-                        NodeType::SubModule(submod_id),
-                        NodeType::Wire(p.maps_to_wire),
-                    )
-                });
+        for (submod_id, s) in &self.submodules {
+            for (_, port) in s.port_map.iter_valids() {
+                let w_id = port.maps_to_wire;
+                let w = &self.wires[w_id];
+                match w.is_port.unwrap() {
+                    Direction::Input => {
+                        edges.push((NodeType::Wire(w_id), NodeType::SubModule(submod_id)));
+                    }
+                    Direction::Output => {
+                        edges.push((NodeType::SubModule(submod_id), NodeType::Wire(w_id)));
+                    }
+                }
             }
         }
 
@@ -139,10 +135,10 @@ pub fn display_latency_count_graph(
     // true for input
     let mut extra_node_info = vec![(None, None); lc_problem.map_latency_node_to_wire.len()];
     for port in lc_problem.ports.inputs() {
-        extra_node_info[*port].0 = Some(true);
+        extra_node_info[*port].0 = Some(Direction::Input);
     }
     for port in lc_problem.ports.outputs() {
-        extra_node_info[*port].0 = Some(false);
+        extra_node_info[*port].0 = Some(Direction::Output);
     }
 
     for spec in &lc_problem.specified_latencies {
@@ -186,7 +182,7 @@ struct Problem<'a> {
     submodules: &'a FlatAlloc<SubModule, SubModuleIDMarker>,
     linker: &'a Linker,
     solution: Option<&'a [i64]>,
-    extra_node_info: Vec<(Option<bool>, Option<i64>)>,
+    extra_node_info: Vec<(Option<Direction>, Option<i64>)>,
 }
 
 impl<'a> Labeller<'a, usize, LatencyEdge<'a>> for Problem<'a> {
@@ -234,9 +230,15 @@ impl<'a> Labeller<'a, usize, LatencyEdge<'a>> for Problem<'a> {
     }
 
     fn node_color(&'a self, node: &usize) -> Option<LabelText<'a>> {
-        self.extra_node_info[*node]
-            .0
-            .map(|is_input| LabelText::LabelStr(if is_input { "red" } else { "blue" }.into()))
+        self.extra_node_info[*node].0.map(|direction| {
+            LabelText::LabelStr(
+                match direction {
+                    Direction::Input => "red",
+                    Direction::Output => "blue",
+                }
+                .into(),
+            )
+        })
     }
 }
 

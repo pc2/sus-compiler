@@ -125,7 +125,7 @@ impl<T, const BLOCK_SIZE: usize> Index<usize> for BlockVec<T, BLOCK_SIZE> {
 
         unsafe {
             let vec = self.blocks.get();
-            (*vec)[block].deref()[idx_in_block].assume_init_ref()
+            (&*vec)[block].deref()[idx_in_block].assume_init_ref()
         }
     }
 }
