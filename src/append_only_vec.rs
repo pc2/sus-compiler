@@ -46,7 +46,7 @@ impl<T> AppendOnlyVec<T> {
     where
         T: Copy,
     {
-        unsafe { (*self.v.get())[idx] }
+        unsafe { (&*self.v.get())[idx] }
     }
 
     pub fn set_elem(&self, idx: usize, v: T) -> T {
