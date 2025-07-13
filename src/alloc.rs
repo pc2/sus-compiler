@@ -1032,6 +1032,7 @@ pub fn zip_eq3<IDMarker, OA, OB, OC>(
     }
 }
 
+#[allow(unused)]
 pub struct AppendOnlyAlloc<T, IndexMarker: UUIDMarker> {
     data: AppendOnlyVec<T>,
     _ph: PhantomData<IndexMarker>,
@@ -1043,6 +1044,7 @@ impl<T, IndexMarker: UUIDMarker> Default for AppendOnlyAlloc<T, IndexMarker> {
     }
 }
 
+#[allow(unused)]
 impl<T, IndexMarker: UUIDMarker> AppendOnlyAlloc<T, IndexMarker> {
     pub fn new() -> Self {
         Self {
