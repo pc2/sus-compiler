@@ -4,22 +4,18 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::{
-    alloc::{AppendOnlyAlloc, UUIDMarker, UUID},
-    let_unwrap,
-    typing::type_inference::PeanoVariableIDMarker,
-};
+use crate::{append_only_vec::AppendOnlyVec, let_unwrap};
 
-enum Interior<T: Debug + Clone, IDMarker: UUIDMarker> {
+enum Interior<T: Debug + Clone> {
     Known(T),
     /// If no substitution is known yet, then this points to itself (may be in any cycle length, [UnifyableCell::resolve_substitution_chain] is there to contract it).
-    SubstitutesTo(UUID<IDMarker>),
+    SubstitutesTo(usize),
     /// Default state of a new Type Variable. This means the variable is *unique*, and so we don't yet need an ID to track its Unification.
     /// CANNOT BE CLONED (panics)
     Unallocated,
 }
 
-impl<T: Debug + Clone, IDMarker: UUIDMarker> Clone for Interior<T, IDMarker> {
+impl<T: Debug + Clone> Clone for Interior<T> {
     fn clone(&self) -> Self {
         match self {
             Self::Known(arg0) => Self::Known(arg0.clone()),
@@ -31,7 +27,7 @@ impl<T: Debug + Clone, IDMarker: UUIDMarker> Clone for Interior<T, IDMarker> {
     }
 }
 
-impl<T: Debug + Clone, IDMarker: UUIDMarker> Debug for Interior<T, IDMarker> {
+impl<T: Debug + Clone> Debug for Interior<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Known(known) => f.debug_tuple("Known").field(known).finish(),
@@ -46,19 +42,20 @@ impl<T: Debug + Clone, IDMarker: UUIDMarker> Debug for Interior<T, IDMarker> {
 /// - [UnifyableCell] starts out Unknown. No interior references can be taken in this state. (But the type variable we refer to *can* be updated)
 /// - At some point, it is [UnifyableCell::set()] to some Known value. After this point references to this interior value can be taken
 /// - With a shared reference, we can *never* reset a Known back to an Unknown, or mess with it in any mutable way. (Panics when trying otherwise)
-pub struct UnifyableCell<T: Debug + Clone, IDMarker: UUIDMarker>(UnsafeCell<Interior<T, IDMarker>>);
+pub struct UnifyableCell<T: Debug + Clone>(UnsafeCell<Interior<T>>);
 
-impl<T: Debug + Clone, IDMarker: UUIDMarker> Debug for UnifyableCell<T, IDMarker> {
+impl<T: Debug + Clone> Debug for UnifyableCell<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("UnifyableCell").field(&self.0).finish()
     }
 }
 
-impl<T: Debug + Clone, IDMarker: UUIDMarker> UnifyableCell<T, IDMarker> {
+impl<T: Debug + Clone> UnifyableCell<T> {
     pub const UNKNOWN: Self = Self(UnsafeCell::new(Interior::Unallocated));
+
     pub fn get(&self) -> Option<&T> {
         // We cast to a const pointer here instead, such that we never actually create a &mut that might conflict with another existing shared ref
-        let content_ptr: *const Interior<T, IDMarker> = self.0.get();
+        let content_ptr: *const Interior<T> = self.0.get();
         // SAFETY: In shared context, once we're [Interior::Known] that reference will never be invalidated.
         match unsafe { &*content_ptr } {
             Interior::Known(known) => Some(known),
@@ -74,8 +71,8 @@ impl<T: Debug + Clone, IDMarker: UUIDMarker> UnifyableCell<T, IDMarker> {
     }
     /// Panics if this has ever been unified with anything else
     pub fn set_initial(&self, v: T) {
-        let content_ptr_mut: *mut Interior<T, IDMarker> = self.0.get();
-        let context_ptr_while_maybe_shared: *const Interior<T, IDMarker> = content_ptr_mut;
+        let content_ptr_mut: *mut Interior<T> = self.0.get();
+        let context_ptr_while_maybe_shared: *const Interior<T> = content_ptr_mut;
         {
             // SAFETY: Either this is already Interior::Known, in which case we panic before messing with a shared ref, OR this is not Interior::Known, and therefore no interior shared references have been given out
             //
@@ -97,13 +94,13 @@ impl<T: Debug + Clone, IDMarker: UUIDMarker> UnifyableCell<T, IDMarker> {
     ///     [Interior::SubstitutesTo] that points to itself, signifying no substitution known yet
     fn resolve_substitution_chain<'s>(
         &'s self,
-        substitutor: &AppendOnlyAlloc<&'s UnifyableCell<T, IDMarker>, IDMarker>,
-    ) -> ChainResolution<'s, T, IDMarker> {
+        substitutor: &Substitutor<'s, T>,
+    ) -> ChainResolution<'s, T> {
         /// `ptr` must be [Interior::SubstitutesTo]
-        /*fn resolve_substitution_chain<'s, T: Debug, IDMarker: UUIDMarker>(
-            mut ptr: *mut Interior<T, IDMarker>,
-            substitutor: &AppendOnlyAlloc<&'s UnifyableCell<T, IDMarker>, IDMarker>,
-        ) -> UUID<IDMarker> {
+        /*fn resolve_substitution_chain<'s, T: Debug, >(
+            mut ptr: *mut Interior<T, >,
+            substitutor: &AppendOnlyAlloc<&'s UnifyableCell<T, >, >,
+        ) -> UUID<> {
             unsafe {
                 let_unwrap!(Interior::SubstitutesTo(to_id), &*ptr);
                 let mut to_id = *to_id;
@@ -131,13 +128,13 @@ impl<T: Debug + Clone, IDMarker: UUIDMarker> UnifyableCell<T, IDMarker> {
         }*/
 
         /// `ptr` must be [Interior::SubstitutesTo]
-        fn resolve_substitution_chain_recurse<T: Debug + Clone, IDMarker: UUIDMarker>(
-            ptr: *mut Interior<T, IDMarker>,
-            ptr_target: UUID<IDMarker>,
-            substitutor: &AppendOnlyAlloc<&UnifyableCell<T, IDMarker>, IDMarker>,
-        ) -> UUID<IDMarker> {
+        fn resolve_substitution_chain_recurse<T: Debug + Clone>(
+            ptr: *mut Interior<T>,
+            ptr_target: usize,
+            substitutor: &Substitutor<'_, T>,
+        ) -> usize {
             unsafe {
-                let target = substitutor.copy_elem(ptr_target);
+                let target = substitutor.0.copy_elem(ptr_target);
 
                 let target_ptr: *mut _ = target.0.get();
                 match &*target_ptr {
@@ -165,13 +162,13 @@ impl<T: Debug + Clone, IDMarker: UUIDMarker> UnifyableCell<T, IDMarker> {
         }
 
         unsafe {
-            let ptr: *mut Interior<T, IDMarker> = self.0.get();
+            let ptr: *mut Interior<T> = self.0.get();
             match &*ptr {
                 Interior::Known(known) => ChainResolution::Known(known),
                 Interior::SubstitutesTo(to_id) => {
                     let final_target_id =
                         resolve_substitution_chain_recurse(ptr, *to_id, substitutor);
-                    let final_target = substitutor.copy_elem(final_target_id);
+                    let final_target = substitutor.0.copy_elem(final_target_id);
                     match &*final_target.0.get() {
                         Interior::Known(known) => ChainResolution::Known(known),
                         Interior::SubstitutesTo(final_target_id_copy) => {
@@ -182,7 +179,7 @@ impl<T: Debug + Clone, IDMarker: UUIDMarker> UnifyableCell<T, IDMarker> {
                     }
                 }
                 Interior::Unallocated => {
-                    let result_id = substitutor.alloc(self);
+                    let result_id = self.alloc(substitutor);
                     *ptr = Interior::SubstitutesTo(result_id);
                     ChainResolution::Unknown(result_id)
                 }
@@ -194,7 +191,7 @@ impl<T: Debug + Clone, IDMarker: UUIDMarker> UnifyableCell<T, IDMarker> {
     pub fn unify<'s>(
         a: &'s Self,
         b: &'s Self,
-        substitutor: &AppendOnlyAlloc<&'s Self, IDMarker>,
+        substitutor: &Substitutor<'s, T>,
     ) -> SubstitutionResult<'s, T> {
         let resol_a = a.resolve_substitution_chain(substitutor);
         let resol_b = b.resolve_substitution_chain(substitutor);
@@ -208,12 +205,12 @@ impl<T: Debug + Clone, IDMarker: UUIDMarker> UnifyableCell<T, IDMarker> {
                 }
             }
             (ChainResolution::Known(_), ChainResolution::Unknown(id)) => {
-                let _ = substitutor.set_elem(id, a);
+                let _ = substitutor.0.set_elem(id, a);
                 SubstitutionResult::NoActionNeeded
             }
             (ChainResolution::Unknown(id), ChainResolution::Known(_))
             | (ChainResolution::Unknown(id), ChainResolution::Unknown(_)) => {
-                let _ = substitutor.set_elem(id, b);
+                let _ = substitutor.0.set_elem(id, b);
                 SubstitutionResult::NoActionNeeded
             }
         }
@@ -222,7 +219,7 @@ impl<T: Debug + Clone, IDMarker: UUIDMarker> UnifyableCell<T, IDMarker> {
     /// `recursively_subsitute` must call [Self::substitute] on every child [UnifyableCell]
     pub fn substitute<'s>(
         &'s self,
-        substitutor: &AppendOnlyAlloc<&'s Self, IDMarker>,
+        substitutor: &Substitutor<'s, T>,
         recursively_subsitute: impl FnOnce(&'s T),
     ) {
         if let Some(known) = self.get() {
@@ -243,13 +240,13 @@ impl<T: Debug + Clone, IDMarker: UUIDMarker> UnifyableCell<T, IDMarker> {
     }
 
     /// When constructing types regular Clone is not a good option. It'll crash due to [Interior::Unallocated]. Instead this version either allocates a new variable for it, or copies the existing substitution
-    pub fn clone_type<'s>(&'s self, substitutor: &AppendOnlyAlloc<&'s Self, IDMarker>) -> Self {
+    pub fn clone_type<'s>(&'s self, substitutor: &Substitutor<'s, T>) -> Self {
         let ptr: *mut _ = self.0.get();
         let new_id = match unsafe { &*ptr } {
-            Interior::Known(_) => substitutor.alloc(self),
+            Interior::Known(_) => self.alloc(substitutor),
             Interior::SubstitutesTo(id) => *id,
             Interior::Unallocated => {
-                let slf_id = substitutor.alloc(self);
+                let slf_id = self.alloc(substitutor);
                 unsafe {
                     *ptr = Interior::SubstitutesTo(slf_id);
                 }
@@ -258,14 +255,20 @@ impl<T: Debug + Clone, IDMarker: UUIDMarker> UnifyableCell<T, IDMarker> {
         };
         Self(UnsafeCell::new(Interior::SubstitutesTo(new_id)))
     }
+
+    fn alloc<'s>(&'s self, substitutor: &Substitutor<'s, T>) -> usize {
+        let idx = substitutor.0.len();
+        substitutor.0.push(self);
+        idx
+    }
 }
 
-impl<T: Debug + Clone, IDMarker: UUIDMarker> Deref for UnifyableCell<T, IDMarker> {
+impl<T: Debug + Clone> Deref for UnifyableCell<T> {
     type Target = T;
 
     #[track_caller]
     fn deref(&self) -> &T {
-        let content_ptr: *const Interior<T, IDMarker> = self.0.get();
+        let content_ptr: *const Interior<T> = self.0.get();
         // SAFETY: In shared context, once we're [Interior::Known] that reference will never be invalidated.
         let content = unsafe { &*content_ptr };
         let_unwrap!(Interior::Known(v), content);
@@ -273,7 +276,7 @@ impl<T: Debug + Clone, IDMarker: UUIDMarker> Deref for UnifyableCell<T, IDMarker
     }
 }
 
-impl<T: Debug + Clone, IDMarker: UUIDMarker> DerefMut for UnifyableCell<T, IDMarker> {
+impl<T: Debug + Clone> DerefMut for UnifyableCell<T> {
     #[track_caller]
     fn deref_mut(&mut self) -> &mut T {
         let_unwrap!(Interior::Known(v), self.0.get_mut());
@@ -281,16 +284,16 @@ impl<T: Debug + Clone, IDMarker: UUIDMarker> DerefMut for UnifyableCell<T, IDMar
     }
 }
 
-impl<T: Debug + Clone, IDMarker: UUIDMarker> From<T> for UnifyableCell<T, IDMarker> {
+impl<T: Debug + Clone> From<T> for UnifyableCell<T> {
     fn from(known: T) -> Self {
         Self(UnsafeCell::new(Interior::Known(known)))
     }
 }
 
-impl<T: Debug + Clone, IDMarker: UUIDMarker> Clone for UnifyableCell<T, IDMarker> {
+impl<T: Debug + Clone> Clone for UnifyableCell<T> {
     fn clone(&self) -> Self {
         // We cast to a const pointer here instead, such that we never actually create a &mut that might conflict with another existing shared ref
-        let content_ptr: *const Interior<T, IDMarker> = self.0.get();
+        let content_ptr: *const Interior<T> = self.0.get();
         // SAFETY: In shared context, once we're [Interior::Known] that reference will never be invalidated.
         let result = match unsafe { &*content_ptr } {
             Interior::Known(known) => Interior::Known(known.clone()),
@@ -303,9 +306,9 @@ impl<T: Debug + Clone, IDMarker: UUIDMarker> Clone for UnifyableCell<T, IDMarker
     }
 }
 
-pub enum ChainResolution<'s, T, IDMarker: UUIDMarker> {
+pub enum ChainResolution<'s, T> {
     Known(&'s T),
-    Unknown(UUID<IDMarker>),
+    Unknown(usize),
 }
 
 pub enum SubstitutionResult<'s, T> {
@@ -313,43 +316,53 @@ pub enum SubstitutionResult<'s, T> {
     Recurse((&'s T, &'s T)),
 }
 
-#[derive(Debug, Clone)]
-enum PeanoTypeInner {
-    Zero,
-    Succ(Box<PeanoType>),
-}
-type PeanoType = UnifyableCell<PeanoTypeInner, PeanoVariableIDMarker>;
+pub struct Substitutor<'s, Typ: Debug + Clone>(AppendOnlyVec<&'s UnifyableCell<Typ>>);
 
-impl PeanoType {
+impl<'s, Typ: Debug + Clone> Default for Substitutor<'s, Typ> {
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
+
+impl<'s, Typ: Debug + Clone> Substitutor<'s, Typ> {
+    pub fn new() -> Self {
+        Self(AppendOnlyVec::new())
+    }
+}
+
+#[derive(Debug, Clone)]
+enum PeanoType {
+    Zero,
+    Succ(Box<UnifyableCell<PeanoType>>),
+}
+
+impl UnifyableCell<PeanoType> {
     fn unify_peanos<'s>(
         l: &'s Self,
         r: &'s Self,
-        substitutor: &AppendOnlyAlloc<&'s Self, PeanoVariableIDMarker>,
+        substitutor: &Substitutor<'s, PeanoType>,
     ) -> bool {
         match Self::unify(l, r, substitutor) {
             SubstitutionResult::NoActionNeeded => true,
             SubstitutionResult::Recurse(content) => match content {
-                (PeanoTypeInner::Zero, PeanoTypeInner::Zero) => true,
-                (PeanoTypeInner::Succ(lc), PeanoTypeInner::Succ(rc)) => {
+                (PeanoType::Zero, PeanoType::Zero) => true,
+                (PeanoType::Succ(lc), PeanoType::Succ(rc)) => {
                     Self::unify_peanos(lc, rc, substitutor)
                 }
                 _ => false,
             },
         }
     }
-    fn fully_substitute<'s>(
-        &'s self,
-        substitutor: &AppendOnlyAlloc<&'s Self, PeanoVariableIDMarker>,
-    ) {
+    fn fully_substitute<'s>(&'s self, substitutor: &Substitutor<'s, PeanoType>) {
         self.substitute(substitutor, |inner| match inner {
-            PeanoTypeInner::Zero => {}
-            PeanoTypeInner::Succ(inner) => inner.fully_substitute(substitutor),
+            PeanoType::Zero => {}
+            PeanoType::Succ(inner) => inner.fully_substitute(substitutor),
         })
     }
     fn count(&self) -> usize {
         match self.get() {
-            Some(PeanoTypeInner::Zero) => 0,
-            Some(PeanoTypeInner::Succ(inner)) => inner.count() + 1,
+            Some(PeanoType::Zero) => 0,
+            Some(PeanoType::Succ(inner)) => inner.count() + 1,
             None => panic!("Unknown in Peano!"),
         }
     }
@@ -359,15 +372,15 @@ impl PeanoType {
 mod tests {
     use super::*;
 
-    fn add_to(mut cur: PeanoType, up_to: usize) -> PeanoType {
+    fn add_to(mut cur: UnifyableCell<PeanoType>, up_to: usize) -> UnifyableCell<PeanoType> {
         for _ in 0..up_to {
-            cur = PeanoTypeInner::Succ(Box::new(cur)).into();
+            cur = PeanoType::Succ(Box::new(cur)).into();
         }
 
         cur
     }
-    fn mk_peano(up_to: usize) -> PeanoType {
-        add_to(PeanoTypeInner::Zero.into(), up_to)
+    fn mk_peano(up_to: usize) -> UnifyableCell<PeanoType> {
+        add_to(PeanoType::Zero.into(), up_to)
     }
 
     #[test]
@@ -375,9 +388,9 @@ mod tests {
         let a = mk_peano(4);
         let b = mk_peano(2);
 
-        let unknown = PeanoType::UNKNOWN;
+        let unknown = UnifyableCell::<PeanoType>::UNKNOWN;
 
-        unknown.set_initial(PeanoTypeInner::Zero);
+        unknown.set_initial(PeanoType::Zero);
 
         assert_eq!(a.count(), 4);
         assert_eq!(b.count(), 2);
@@ -385,14 +398,14 @@ mod tests {
     }
     #[test]
     fn test_peano_unify() {
-        let substitutor = AppendOnlyAlloc::new();
+        let substitutor = Substitutor::new();
 
         let four = mk_peano(4);
 
-        let a = PeanoType::UNKNOWN;
+        let a = UnifyableCell::<PeanoType>::UNKNOWN;
         let three_plus_a = add_to(a.clone_type(&substitutor), 3);
 
-        PeanoType::unify_peanos(&four, &three_plus_a, &substitutor);
+        UnifyableCell::<PeanoType>::unify_peanos(&four, &three_plus_a, &substitutor);
 
         a.fully_substitute(&substitutor);
 
@@ -401,25 +414,25 @@ mod tests {
 
     #[test]
     fn test_non_infinite_peano() {
-        let substitutor = AppendOnlyAlloc::new();
+        let substitutor = Substitutor::new();
 
-        let a = PeanoType::UNKNOWN;
+        let a = UnifyableCell::<PeanoType>::UNKNOWN;
         let a_plus_zero = add_to(a.clone_type(&substitutor), 0);
 
-        PeanoType::unify_peanos(&a, &a_plus_zero, &substitutor);
+        UnifyableCell::<PeanoType>::unify_peanos(&a, &a_plus_zero, &substitutor);
 
         a.fully_substitute(&substitutor);
     }
 
     #[test]
     fn test_infinite_peano() {
-        let substitutor = AppendOnlyAlloc::new();
+        let substitutor = Substitutor::new();
 
-        let a = PeanoType::UNKNOWN;
+        let a = UnifyableCell::<PeanoType>::UNKNOWN;
         let a_plus_one = add_to(a.clone_type(&substitutor), 1);
 
         println!("Gets Stuck at Unify");
-        PeanoType::unify_peanos(&a, &a_plus_one, &substitutor);
+        UnifyableCell::<PeanoType>::unify_peanos(&a, &a_plus_one, &substitutor);
 
         println!("Gets Stuck at fully_substitute");
         a.fully_substitute(&substitutor);
