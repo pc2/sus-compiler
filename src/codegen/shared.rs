@@ -21,6 +21,6 @@ pub fn wire_name_with_latency(
     }
 }
 
-pub fn wire_name_self_latency(wire: &RealWire, use_latency: bool) -> Cow<str> {
+pub fn wire_name_self_latency(wire: &RealWire, use_latency: bool) -> Cow<'_, str> {
     wire_name_with_latency(wire, wire.absolute_latency, use_latency)
 }

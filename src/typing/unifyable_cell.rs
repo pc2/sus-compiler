@@ -1,6 +1,4 @@
-#![allow(unused)]
-
-use std::{cell::UnsafeCell, fmt::Debug};
+use std::{cell::UnsafeCell, fmt::Debug, ops::Deref};
 
 use crate::{append_only_vec::AppendOnlyVec, let_unwrap, typing::type_inference::UnifyResult};
 
@@ -124,7 +122,7 @@ impl<T: Debug + Clone> Clone for UniCell<T> {
     }
 }
 
-enum ChainResolution<'s, T> {
+pub enum ChainResolution<'s, T> {
     Known(&'s T),
     Unknown(usize),
 }
@@ -174,7 +172,7 @@ impl<'s, T: Debug + Clone> Substitutor<'s, T> {
     /// Result is either:
     ///     [Interior::Known] is then of course a known value.
     ///     [Interior::SubstitutesTo] that points to itself, signifying no substitution known yet
-    fn resolve_substitution_chain(&self, typ: &'s UniCell<T>) -> ChainResolution<'s, T> {
+    pub fn get_with_substitution(&self, typ: &'s UniCell<T>) -> ChainResolution<'s, T> {
         unsafe {
             let ptr: *mut Interior<T> = typ.0.get();
             match &*ptr {
@@ -200,29 +198,50 @@ impl<'s, T: Debug + Clone> Substitutor<'s, T> {
         }
     }
 
+    /// `contains_subtree` is used to prevent infinite types.
+    /// It must be implemented using [Self::get_with_substitution] to iterate through its subtrees.
+    /// If a subtree is found that contains the given pointer it must return true.
+    ///
+    /// `unify_subtrees` should recursively call [Self::unify] for every pair of subtrees.
+    /// If some irreconcilable difference is found it should return [UnifyResult::Failure].
+    /// Otherwise return the binary AND of subtree unifications.
+    /// Regardless of failure, all subtrees should be unified for best possible type error information.
+    /// You as the user should never return [UnifyResult::FailureInfiniteTypes]
     pub fn unify(
         &self,
         a: &'s UniCell<T>,
         b: &'s UniCell<T>,
-        recurse: impl FnOnce(&'s T, &'s T) -> UnifyResult,
+        contains_subtree: impl FnOnce(&'s T, usize) -> bool,
+        unify_subtrees: impl FnOnce(&'s T, &'s T) -> UnifyResult,
     ) -> UnifyResult {
-        let resol_a = self.resolve_substitution_chain(a);
-        let resol_b = self.resolve_substitution_chain(b);
+        let resol_a = self.get_with_substitution(a);
+        let resol_b = self.get_with_substitution(b);
 
         match (resol_a, resol_b) {
             (ChainResolution::Known(a), ChainResolution::Known(b)) => {
                 if std::ptr::eq(a, b) {
                     UnifyResult::Success // Minor optimization, when we see referential equality
                 } else {
-                    recurse(a, b)
+                    unify_subtrees(a, b)
                 }
             }
-            (ChainResolution::Known(_), ChainResolution::Unknown(id)) => {
-                let _ = self.0.set_elem(id, a);
-                UnifyResult::Success
+            (ChainResolution::Known(known), ChainResolution::Unknown(id)) => {
+                if contains_subtree(known, id) {
+                    UnifyResult::FailureInfiniteTypes
+                } else {
+                    let _ = self.0.set_elem(id, a);
+                    UnifyResult::Success
+                }
             }
-            (ChainResolution::Unknown(id), ChainResolution::Known(_))
-            | (ChainResolution::Unknown(id), ChainResolution::Unknown(_)) => {
+            (ChainResolution::Unknown(id), ChainResolution::Known(known)) => {
+                if contains_subtree(known, id) {
+                    UnifyResult::FailureInfiniteTypes
+                } else {
+                    let _ = self.0.set_elem(id, b);
+                    UnifyResult::Success
+                }
+            }
+            (ChainResolution::Unknown(id), ChainResolution::Unknown(_)) => {
                 let _ = self.0.set_elem(id, b);
                 UnifyResult::Success
             }
@@ -234,7 +253,7 @@ impl<'s, T: Debug + Clone> Substitutor<'s, T> {
         if let Some(known) = typ.get() {
             recursively_subsitute(known);
         } else {
-            match self.resolve_substitution_chain(typ) {
+            match self.get_with_substitution(typ) {
                 ChainResolution::Known(known) => unsafe {
                     recursively_subsitute(known);
 
@@ -291,12 +310,26 @@ impl PeanoType {
 }
 
 impl<'s> Substitutor<'s, PeanoType> {
+    fn contains_subtree(&self, find_in: &'s PeanoType, target: usize) -> bool {
+        match find_in {
+            PeanoType::Zero => false,
+            PeanoType::Succ(subtree_cell) => match self.get_with_substitution(subtree_cell) {
+                ChainResolution::Known(known) => self.contains_subtree(known, target),
+                ChainResolution::Unknown(var) => var == target,
+            },
+        }
+    }
     fn unify_peanos(&self, l: &'s UniCell<PeanoType>, r: &'s UniCell<PeanoType>) -> UnifyResult {
-        self.unify(l, r, |lc, rc| match (lc, rc) {
-            (PeanoType::Zero, PeanoType::Zero) => UnifyResult::Success,
-            (PeanoType::Succ(lc), PeanoType::Succ(rc)) => self.unify_peanos(lc, rc),
-            _ => UnifyResult::NoMatchingTypeFunc,
-        })
+        self.unify(
+            l,
+            r,
+            |known, to_find| self.contains_subtree(known, to_find),
+            |lc, rc| match (lc, rc) {
+                (PeanoType::Zero, PeanoType::Zero) => UnifyResult::Success,
+                (PeanoType::Succ(lc), PeanoType::Succ(rc)) => self.unify_peanos(lc, rc),
+                _ => UnifyResult::Failure,
+            },
+        )
     }
     fn fully_substitute(&self, typ: &'s UniCell<PeanoType>) {
         self.substitute(typ, |inner| match inner {
@@ -357,22 +390,114 @@ mod tests {
         let a = PeanoType::UNKNOWN;
         let a_plus_zero = add_to(substitutor.clone_type(&a), 0);
 
-        substitutor.unify_peanos(&a, &a_plus_zero);
+        assert_eq!(
+            substitutor.unify_peanos(&a, &a_plus_zero),
+            UnifyResult::Success
+        );
 
         substitutor.fully_substitute(&a);
     }
 
-    /*#[test]
+    #[test]
+    fn test_invalid_unification() {
+        let substitutor = Substitutor::new();
+
+        let three = mk_peano(3);
+        let four = mk_peano(4);
+
+        assert_eq!(
+            substitutor.unify_peanos(&three, &four),
+            UnifyResult::Failure
+        );
+
+        substitutor.fully_substitute(&three);
+        substitutor.fully_substitute(&four);
+    }
+
+    #[test]
     fn test_infinite_peano() {
         let substitutor = Substitutor::new();
 
         let a = PeanoType::UNKNOWN;
         let a_plus_one = add_to(substitutor.clone_type(&a), 1);
 
-        println!("Gets Stuck at Unify");
-        substitutor.unify_peanos(&a, &a_plus_one);
+        assert_eq!(
+            substitutor.unify_peanos(&a, &a_plus_one),
+            UnifyResult::FailureInfiniteTypes
+        );
 
-        println!("Gets Stuck at fully_substitute");
         substitutor.fully_substitute(&a);
-    }*/
+    }
+
+    #[test]
+    fn test_peano_equivalence_simple() {
+        let substitutor = Substitutor::new();
+
+        let one = mk_peano(1);
+        let two = mk_peano(2);
+        let one_plus_three = add_to(substitutor.clone_type(&one), 3);
+        let two_plus_two = add_to(substitutor.clone_type(&two), 2);
+
+        // 2+2 == 1+3
+        assert_eq!(
+            substitutor.unify_peanos(&two_plus_two, &one_plus_three),
+            UnifyResult::Success
+        );
+    }
+
+    #[test]
+    fn test_peano_multiple_variables_chain() {
+        let substitutor = Substitutor::new();
+
+        let x = PeanoType::UNKNOWN;
+        let y = PeanoType::UNKNOWN;
+        let z = PeanoType::UNKNOWN;
+
+        // x = 2, y = x + 1, z = y + 1
+        x.set_initial(PeanoType::Zero);
+        let x_plus_2 = add_to(substitutor.clone_type(&x), 2);
+        let y_val = add_to(substitutor.clone_type(&x), 1);
+        let z_val = add_to(substitutor.clone_type(&y), 1);
+
+        // Unify y with x+1, z with y+1, and z with x+2
+        assert_eq!(substitutor.unify_peanos(&y, &y_val), UnifyResult::Success);
+        assert_eq!(substitutor.unify_peanos(&z, &z_val), UnifyResult::Success);
+        assert_eq!(
+            substitutor.unify_peanos(&z, &x_plus_2),
+            UnifyResult::Success
+        );
+
+        substitutor.fully_substitute(&x);
+        substitutor.fully_substitute(&y);
+        substitutor.fully_substitute(&z);
+
+        assert_eq!(x.unwrap().count(), 0);
+        assert_eq!(y.unwrap().count(), 1);
+        assert_eq!(z.unwrap().count(), 2);
+    }
+
+    #[test]
+    fn test_peano_complex_substitution_graph() {
+        let substitutor = Substitutor::new();
+
+        let a = PeanoType::UNKNOWN;
+        let b = PeanoType::UNKNOWN;
+        let c = PeanoType::UNKNOWN;
+
+        // a = 2, b = a + 2, c = b + 1
+        a.set_initial(PeanoType::Zero);
+        let b_val = add_to(substitutor.clone_type(&a), 2);
+        let c_val = add_to(substitutor.clone_type(&b), 1);
+
+        assert_eq!(substitutor.unify_peanos(&b, &b_val), UnifyResult::Success);
+        assert_eq!(substitutor.unify_peanos(&c, &c_val), UnifyResult::Success);
+
+        substitutor.fully_substitute(&a);
+        substitutor.fully_substitute(&b);
+        substitutor.fully_substitute(&c);
+
+        assert_eq!(a.unwrap().count(), 0);
+        assert_eq!(b.unwrap().count(), 2);
+        assert_eq!(c.unwrap().count(), 3);
+    }
 }

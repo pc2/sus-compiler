@@ -66,8 +66,8 @@ impl<F: FnOnce() -> (String, Vec<ErrorInfo>)> UnifyErrorReport for F {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnifyResult {
     Success,
-    NoMatchingTypeFunc,
-    NoInfiniteTypes,
+    Failure,
+    FailureInfiniteTypes,
 }
 impl BitAnd for UnifyResult {
     type Output = UnifyResult;
@@ -128,7 +128,7 @@ impl<MyType: HindleyMilner> TypeSubstitutor<MyType> {
         }
 
         if self.does_typ_reference_var_recurse_with_substitution(replace_with, empty_var) {
-            UnifyResult::NoInfiniteTypes
+            UnifyResult::FailureInfiniteTypes
         } else {
             assert!(self[empty_var].set(replace_with.clone()).is_ok());
             UnifyResult::Success
@@ -160,7 +160,7 @@ impl<MyType: HindleyMilner> TypeSubstitutor<MyType> {
             }
             (HindleyMilnerInfo::TypeFunc(tf_a), HindleyMilnerInfo::TypeFunc(tf_b), _, _) => {
                 if tf_a != tf_b {
-                    UnifyResult::NoMatchingTypeFunc
+                    UnifyResult::Failure
                 } else {
                     MyType::unify_all_args(a, b, &mut |arg_a, arg_b| self.unify(arg_a, arg_b))
                 }
@@ -618,7 +618,7 @@ impl<S: Substitutor> TypeUnifier<S> {
         let unify_result = self.substitutor.unify_total(found, expected);
         if unify_result != UnifyResult::Success {
             let (mut context, infos) = reporter.report();
-            if unify_result == UnifyResult::NoInfiniteTypes {
+            if unify_result == UnifyResult::FailureInfiniteTypes {
                 context.push_str(": Creating Infinite Types is Forbidden!");
             }
             self.failed_unifications.push(FailedUnification {
