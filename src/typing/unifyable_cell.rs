@@ -153,13 +153,14 @@ impl<'s, T: Debug + Clone> Substitutor<'s, T> {
             match &*target_ptr {
                 Interior::Known(_) => ptr_target,
                 Interior::SubstitutesTo(targets_target) => {
+                    let targets_target = *targets_target;
                     // Yes, this gets overwritten at the end, but we need to already be updating pointers to contract the final cycle so we can detect it
-                    *ptr = Interior::SubstitutesTo(*targets_target);
+                    *ptr = Interior::SubstitutesTo(targets_target);
 
-                    if *targets_target == ptr_target {
+                    if targets_target == ptr_target {
                         ptr_target
                     } else {
-                        let new_target = self.resolve_chain_recurse(target_ptr, *targets_target);
+                        let new_target = self.resolve_chain_recurse(target_ptr, targets_target);
                         // Not strictly necessary, but this makes *all* pointers in the chain point to the final node
                         *ptr = Interior::SubstitutesTo(new_target);
                         new_target
