@@ -1,4 +1,4 @@
-use std::{cell::UnsafeCell, fmt::Debug, ops::Deref};
+use std::{cell::UnsafeCell, fmt::Debug};
 
 use crate::{append_only_vec::AppendOnlyVec, let_unwrap, typing::type_inference::UnifyResult};
 
@@ -42,7 +42,9 @@ pub struct UniCell<T: Debug + Clone>(UnsafeCell<Interior<T>>);
 
 impl<T: Debug + Clone> Debug for UniCell<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("UniCell").field(&self.0).finish()
+        let inner_ptr: *const _ = self.0.get();
+        let inner_ref = unsafe { &*inner_ptr };
+        f.debug_tuple("UniCell").field(inner_ref).finish()
     }
 }
 
@@ -112,7 +114,10 @@ impl<T: Debug + Clone> Clone for UniCell<T> {
         let content_ptr: *const Interior<T> = self.0.get();
         // SAFETY: In shared context, once we're [Interior::Known] that reference will never be invalidated.
         let result = match unsafe { &*content_ptr } {
-            Interior::Known(known) => Interior::Known(known.clone()),
+            Interior::Known(known) => {
+                let known_clone = known.clone();
+                Interior::Known(known_clone)
+            }
             Interior::SubstitutesTo(id) => Interior::SubstitutesTo(*id),
             Interior::Unallocated => {
                 panic!("Type Variables that aren't yet allocated cannot be cloned!")
@@ -131,13 +136,19 @@ pub struct Substitutor<'s, Typ: Debug + Clone>(AppendOnlyVec<&'s UniCell<Typ>>);
 
 impl<'s, Typ: Debug + Clone> Default for Substitutor<'s, Typ> {
     fn default() -> Self {
-        Self(Default::default())
+        Self::new()
     }
 }
 
 impl<'s, T: Debug + Clone> Substitutor<'s, T> {
     pub fn new() -> Self {
         Self(AppendOnlyVec::new())
+    }
+
+    fn alloc(&self, elem: &'s UniCell<T>) -> usize {
+        let idx = self.0.len();
+        self.0.push(elem);
+        idx
     }
 
     /// `ptr` must be [Interior::SubstitutesTo]
@@ -283,12 +294,6 @@ impl<'s, T: Debug + Clone> Substitutor<'s, T> {
         };
         UniCell(UnsafeCell::new(Interior::SubstitutesTo(new_id)))
     }
-
-    fn alloc(&self, elem: &'s UniCell<T>) -> usize {
-        let idx = self.0.len();
-        self.0.push(elem);
-        idx
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -343,21 +348,40 @@ impl<'s> Substitutor<'s, PeanoType> {
 mod tests {
     use super::*;
 
-    fn add_to(mut cur: UniCell<PeanoType>, up_to: usize) -> UniCell<PeanoType> {
-        for _ in 0..up_to {
-            cur = PeanoType::Succ(Box::new(cur)).into();
+    /// up_to must be > 0
+    fn add_to(to: UniCell<PeanoType>, amount: usize) -> PeanoType {
+        assert!(amount > 0);
+        let mut cur = PeanoType::Succ(Box::new(to));
+        for _ in 1..amount {
+            cur = PeanoType::Succ(Box::new(cur.into()));
         }
 
         cur
     }
-    fn mk_peano(up_to: usize) -> UniCell<PeanoType> {
-        add_to(PeanoType::Zero.into(), up_to)
+    /// up_to must be >= 1
+    fn add_to_cell(to: UniCell<PeanoType>, amount: usize) -> UniCell<PeanoType> {
+        if amount == 0 {
+            to
+        } else {
+            add_to(to, amount).into()
+        }
+    }
+    fn mk_peano(up_to: usize) -> PeanoType {
+        if up_to == 0 {
+            PeanoType::Zero
+        } else {
+            add_to(PeanoType::Zero.into(), up_to)
+        }
+    }
+    fn mk_peano_cell(up_to: usize) -> UniCell<PeanoType> {
+        mk_peano(up_to).into()
     }
 
     #[test]
     fn test_peano_initial() {
-        let a = mk_peano(4);
-        let b = mk_peano(2);
+        let a = mk_peano_cell(4);
+        let b = mk_peano_cell(2);
+        let b_clone = b.clone();
 
         let unknown = PeanoType::UNKNOWN;
 
@@ -365,16 +389,17 @@ mod tests {
 
         assert_eq!(a.unwrap().count(), 4);
         assert_eq!(b.unwrap().count(), 2);
+        assert_eq!(b_clone.unwrap().count(), 2);
         assert_eq!(unknown.unwrap().count(), 0);
     }
     #[test]
     fn test_peano_unify() {
         let substitutor = Substitutor::new();
 
-        let four = mk_peano(4);
+        let four = mk_peano_cell(4);
 
         let a = PeanoType::UNKNOWN;
-        let three_plus_a = add_to(substitutor.clone_type(&a), 3);
+        let three_plus_a = add_to_cell(substitutor.clone_type(&a), 3);
 
         substitutor.unify_peanos(&four, &three_plus_a);
 
@@ -388,10 +413,14 @@ mod tests {
         let substitutor = Substitutor::new();
 
         let a = PeanoType::UNKNOWN;
-        let a_plus_zero = add_to(substitutor.clone_type(&a), 0);
+        let a_plus_zero = add_to_cell(substitutor.clone_type(&a), 0);
 
         assert_eq!(
             substitutor.unify_peanos(&a, &a_plus_zero),
+            UnifyResult::Success
+        );
+        assert_eq!(
+            substitutor.unify_peanos(&a_plus_zero, &a),
             UnifyResult::Success
         );
 
@@ -400,13 +429,17 @@ mod tests {
 
     #[test]
     fn test_invalid_unification() {
-        let substitutor = Substitutor::new();
+        let substitutor = Substitutor::default();
 
-        let three = mk_peano(3);
-        let four = mk_peano(4);
+        let three = mk_peano_cell(3);
+        let four = mk_peano_cell(4);
 
         assert_eq!(
             substitutor.unify_peanos(&three, &four),
+            UnifyResult::Failure
+        );
+        assert_eq!(
+            substitutor.unify_peanos(&four, &three),
             UnifyResult::Failure
         );
 
@@ -419,10 +452,14 @@ mod tests {
         let substitutor = Substitutor::new();
 
         let a = PeanoType::UNKNOWN;
-        let a_plus_one = add_to(substitutor.clone_type(&a), 1);
+        let a_plus_one = add_to_cell(substitutor.clone_type(&a), 1);
 
         assert_eq!(
             substitutor.unify_peanos(&a, &a_plus_one),
+            UnifyResult::FailureInfiniteTypes
+        );
+        assert_eq!(
+            substitutor.unify_peanos(&a_plus_one, &a),
             UnifyResult::FailureInfiniteTypes
         );
 
@@ -433,10 +470,10 @@ mod tests {
     fn test_peano_equivalence_simple() {
         let substitutor = Substitutor::new();
 
-        let one = mk_peano(1);
-        let two = mk_peano(2);
-        let one_plus_three = add_to(substitutor.clone_type(&one), 3);
-        let two_plus_two = add_to(substitutor.clone_type(&two), 2);
+        let one = mk_peano_cell(1);
+        let two = mk_peano_cell(2);
+        let one_plus_three = add_to_cell(substitutor.clone_type(&one), 3);
+        let two_plus_two = add_to_cell(substitutor.clone_type(&two), 2);
 
         // 2+2 == 1+3
         assert_eq!(
@@ -455,9 +492,9 @@ mod tests {
 
         // x = 2, y = x + 1, z = y + 1
         x.set_initial(PeanoType::Zero);
-        let x_plus_2 = add_to(substitutor.clone_type(&x), 2);
-        let y_val = add_to(substitutor.clone_type(&x), 1);
-        let z_val = add_to(substitutor.clone_type(&y), 1);
+        let x_plus_2 = add_to_cell(substitutor.clone_type(&x), 2);
+        let y_val = add_to_cell(substitutor.clone_type(&x), 1);
+        let z_val = add_to_cell(substitutor.clone_type(&y), 1);
 
         // Unify y with x+1, z with y+1, and z with x+2
         assert_eq!(substitutor.unify_peanos(&y, &y_val), UnifyResult::Success);
@@ -486,8 +523,8 @@ mod tests {
 
         // a = 2, b = a + 2, c = b + 1
         a.set_initial(PeanoType::Zero);
-        let b_val = add_to(substitutor.clone_type(&a), 2);
-        let c_val = add_to(substitutor.clone_type(&b), 1);
+        let b_val = add_to_cell(substitutor.clone_type(&a), 2);
+        let c_val = add_to_cell(substitutor.clone_type(&b), 1);
 
         assert_eq!(substitutor.unify_peanos(&b, &b_val), UnifyResult::Success);
         assert_eq!(substitutor.unify_peanos(&c, &c_val), UnifyResult::Success);
@@ -499,5 +536,59 @@ mod tests {
         assert_eq!(a.unwrap().count(), 0);
         assert_eq!(b.unwrap().count(), 2);
         assert_eq!(c.unwrap().count(), 3);
+    }
+
+    /// Just a stress test to cover all possible code paths. To check under miri that everything is alright.
+    #[test]
+    fn stress_test_for_miri() {
+        use rand::prelude::IndexedRandom;
+        use rand::{Rng, SeedableRng};
+
+        use typed_arena::Arena;
+
+        let arena = Arena::new();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(42);
+
+        // Create a bunch of unknowns
+        let cells: Vec<UniCell<PeanoType>> = (0..100).map(|_| PeanoType::UNKNOWN).collect();
+
+        let mut all_peanos_pool: Vec<&UniCell<PeanoType>> = cells.iter().collect();
+
+        let substitutor = Substitutor::new();
+
+        // Randomly set some initial values
+        for cell in cells.iter().take(10) {
+            cell.set_initial(mk_peano(rng.random_range(0..5)));
+        }
+
+        for _ in 0..1000 {
+            match rng.random_range(0..3) {
+                0 => {
+                    // Add a computed successor
+                    let ontu = cells.choose(&mut rng).unwrap();
+                    let add_count = rng.random_range(0..5);
+                    let new_cell =
+                        arena.alloc(add_to_cell(substitutor.clone_type(ontu), add_count));
+                    all_peanos_pool.push(&*new_cell);
+                }
+                1 => {
+                    // Unify two peanos
+                    let a = cells.choose(&mut rng).unwrap();
+                    let b = cells.choose(&mut rng).unwrap();
+
+                    let _ = substitutor.unify_peanos(a, b);
+                }
+                2 => {
+                    // Fully substitute something
+                    let a = cells.choose(&mut rng).unwrap();
+
+                    substitutor.fully_substitute(a);
+
+                    // Can clone values after a fully_substitute
+                    let _a_clone = a.clone();
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 }
