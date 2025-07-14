@@ -45,6 +45,8 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
         link_info,
     };
 
+    context.init_all_declarations();
+
     for (_, instr) in context.instructions {
         context.type_check_instr(instr);
         context.domain_check_instr(instr);

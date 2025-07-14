@@ -18,6 +18,100 @@ use crate::typing::template::TemplateKind;
 use super::*;
 
 impl<'l> TypeCheckingContext<'l> {
+    // ===== Declaration and Global Reference Initialization =====
+    fn initialize_global_ref<ID: Copy + Into<GlobalUUID>>(
+        &mut self,
+        global_ref: &GlobalReference<ID>,
+    ) {
+        let global_obj: GlobalUUID = global_ref.id.into();
+        let target_link_info = &self.globals.get(global_obj).get_link_info();
+
+        global_ref.resolve_template_args(self.errors, target_link_info);
+
+        // This iteration has to split into two parts, because we first have to set all the type
+        // parameters for use by creating the types to compare against the value parameters
+        let template_arg_types =
+            target_link_info
+                .template_parameters
+                .map(|(id, param)| match &param.kind {
+                    TemplateKind::Type(_) => TemplateKind::Type({
+                        if let Some(wr_typ) = global_ref.get_type_arg_for(id) {
+                            self.written_to_abstract_type(wr_typ)
+                        } else {
+                            self.type_checker.alloc_unknown()
+                        }
+                    }),
+                    TemplateKind::Value(_) => TemplateKind::Value(()),
+                });
+
+        global_ref.template_arg_types.set(template_arg_types);
+    }
+    fn written_to_abstract_type(&mut self, wr_typ: &WrittenType) -> AbstractRankedType {
+        match wr_typ {
+            WrittenType::Error(_) => self.type_checker.alloc_unknown(),
+            WrittenType::TemplateVariable(_, var) => AbstractInnerType::Template(*var).scalar(),
+            WrittenType::Named(global_ref) => {
+                self.initialize_global_ref(global_ref);
+
+                AbstractInnerType::Named(global_ref.as_abstract_global_ref()).scalar()
+            }
+            WrittenType::Array(_, arr_box) => {
+                let (content_typ, _idx, _bracket_span) = arr_box.deref();
+
+                self.written_to_abstract_type(content_typ).rank_up()
+            }
+        }
+    }
+    fn init_wire_ref(&mut self, wr: &'l WireReference) {
+        match &wr.root {
+            WireReferenceRoot::LocalDecl(_)
+            | WireReferenceRoot::LocalSubmodule(_)
+            | WireReferenceRoot::LocalInterface(_)
+            | WireReferenceRoot::Error => {}
+            WireReferenceRoot::NamedConstant(global_ref) => {
+                self.initialize_global_ref(global_ref);
+            }
+            WireReferenceRoot::NamedModule(global_ref) => {
+                self.initialize_global_ref(global_ref);
+            }
+        }
+    }
+    pub fn init_all_declarations(&mut self) {
+        for (_, instr) in self.instructions {
+            match instr {
+                Instruction::SubModule(submod_instr) => {
+                    self.initialize_global_ref(&submod_instr.module_ref);
+                }
+                Instruction::Declaration(decl) => {
+                    decl.typ.set(self.written_to_abstract_type(&decl.typ_expr));
+                }
+                Instruction::Expression(expr) => {
+                    match &expr.source {
+                        ExpressionSource::WireRef(wr) => {
+                            self.init_wire_ref(wr);
+                        }
+                        ExpressionSource::FuncCall(fc) => {
+                            self.init_wire_ref(&fc.func);
+                        }
+                        ExpressionSource::UnaryOp { .. }
+                        | ExpressionSource::BinaryOp { .. }
+                        | ExpressionSource::ArrayConstruct(_)
+                        | ExpressionSource::Literal(_) => {}
+                    };
+                    if let ExpressionOutput::MultiWrite(wrs) = &expr.output {
+                        for wr in wrs {
+                            self.init_wire_ref(&wr.to);
+                        }
+                    }
+                }
+                Instruction::Interface(_)
+                | Instruction::IfStatement(_)
+                | Instruction::ForStatement(_) => {}
+            }
+        }
+    }
+
+    // ===== Further Typechecking =====
     fn typecheck_wire_reference(&mut self, wire_ref: &WireReference) {
         let root_typ = match &wire_ref.root {
             WireReferenceRoot::LocalDecl(decl_id) => {
@@ -36,7 +130,7 @@ impl<'l> TypeCheckingContext<'l> {
                 }
             }
             WireReferenceRoot::NamedConstant(cst) => {
-                self.typecheck_template_global(cst);
+                self.typecheck_global_ref(cst);
 
                 self.globals
                     .get_global_constant(cst)
@@ -44,7 +138,7 @@ impl<'l> TypeCheckingContext<'l> {
                     .get_local_type(&self.globals, &mut self.type_checker)
             }
             WireReferenceRoot::NamedModule(md) => {
-                self.typecheck_template_global(md);
+                self.typecheck_global_ref(md);
 
                 AbstractRankedType {
                     inner: AbstractInnerType::Interface(
@@ -173,46 +267,37 @@ impl<'l> TypeCheckingContext<'l> {
         wire_ref.output_typ.set(walking_typ);
     }
 
-    fn typecheck_template_global<ID: Copy + Into<GlobalUUID>>(
+    fn typecheck_global_ref<ID: Copy + Into<GlobalUUID>>(
         &mut self,
         global_ref: &GlobalReference<ID>,
     ) {
         let global_obj: GlobalUUID = global_ref.id.into();
         let target_link_info = &self.globals.get(global_obj).get_link_info();
 
-        global_ref.resolve_template_args(self.errors, target_link_info);
+        for arg in &global_ref.template_args {
+            match &arg.kind {
+                Some(TemplateKind::Type(t)) => {
+                    self.typecheck_written_type(t);
+                }
+                Some(TemplateKind::Value(from_expr)) => {
+                    if let Some(template_id) = arg.refers_to.get() {
+                        let remote_decl_instr = target_link_info.template_parameters[*template_id]
+                            .kind
+                            .unwrap_value()
+                            .declaration_instruction;
 
-        // This iteration has to split into two parts, because we first have to set all the type
-        // parameters for use by creating the types to compare against the value parameters
-        let template_arg_types =
-            target_link_info
-                .template_parameters
-                .map(|(id, param)| match &param.kind {
-                    TemplateKind::Type(_) => TemplateKind::Type({
-                        if let Some(wr_typ) = global_ref.get_type_arg_for(id) {
-                            self.typecheck_written_type(wr_typ)
-                        } else {
-                            self.type_checker.alloc_unknown()
-                        }
-                    }),
-                    TemplateKind::Value(_) => TemplateKind::Value(()),
-                });
+                        let template_types: &FlatAlloc<_, _> = &global_ref.template_arg_types;
 
-        for (id, param) in &target_link_info.template_parameters {
-            match &param.kind {
-                TemplateKind::Type(_) => {}
-                TemplateKind::Value(v) => {
-                    let target_decl = RemoteDeclaration::new(
-                        target_link_info,
-                        v.declaration_instruction,
-                        Some(&template_arg_types),
-                    );
+                        let target_decl = RemoteDeclaration::new(
+                            target_link_info,
+                            remote_decl_instr,
+                            Some(template_types),
+                        );
 
-                    let param_required_typ =
-                        target_decl.get_local_type(&self.globals, &mut self.type_checker);
+                        let param_required_typ =
+                            target_decl.get_local_type(&self.globals, &mut self.type_checker);
 
-                    if let Some(from_expr) = global_ref.get_value_arg_for(id) {
-                        let from_expr = self.instructions[from_expr].unwrap_subexpression();
+                        let from_expr = self.instructions[*from_expr].unwrap_subexpression();
 
                         self.type_checker.unify_report_error(
                             from_expr.typ,
@@ -222,25 +307,20 @@ impl<'l> TypeCheckingContext<'l> {
                         );
                     }
                 }
+                None => {}
             }
         }
-
-        global_ref.template_arg_types.set(template_arg_types);
     }
 
-    fn typecheck_written_type(&mut self, wr_typ: &WrittenType) -> AbstractRankedType {
+    fn typecheck_written_type(&mut self, wr_typ: &WrittenType) {
         match wr_typ {
-            WrittenType::Error(_) => self.type_checker.alloc_unknown(),
-            WrittenType::TemplateVariable(_, var) => AbstractInnerType::Template(*var).scalar(),
+            WrittenType::Error(_) => {}
+            WrittenType::TemplateVariable(_, _) => {}
             WrittenType::Named(global_ref) => {
-                self.typecheck_template_global(global_ref);
-
-                AbstractInnerType::Named(global_ref.as_abstract_global_ref()).scalar()
+                self.typecheck_global_ref(global_ref);
             }
             WrittenType::Array(_, arr_box) => {
-                let (content_typ, arr_idx, _bracket_span) = arr_box.deref();
-
-                let content_typ = self.typecheck_written_type(content_typ);
+                let (_content_typ, arr_idx, _bracket_span) = arr_box.deref();
 
                 let idx_expr = self.instructions[*arr_idx].unwrap_subexpression();
                 self.type_checker.unify_report_error(
@@ -249,8 +329,6 @@ impl<'l> TypeCheckingContext<'l> {
                     idx_expr.span,
                     "array size",
                 );
-
-                content_typ.rank_up()
             }
         }
     }
@@ -536,7 +614,7 @@ impl<'l> TypeCheckingContext<'l> {
     pub fn type_check_instr(&mut self, instr: &'l Instruction) {
         match instr {
             Instruction::SubModule(sm) => {
-                self.typecheck_template_global(&sm.module_ref);
+                self.typecheck_global_ref(&sm.module_ref);
                 sm.typ.set(AbstractRankedType {
                     inner: AbstractInnerType::Interface(
                         sm.module_ref.as_abstract_global_ref(),
@@ -548,7 +626,7 @@ impl<'l> TypeCheckingContext<'l> {
             Instruction::Declaration(decl) => {
                 self.typecheck_visit_latency_specifier(decl.latency_specifier);
 
-                decl.typ.set(self.typecheck_written_type(&decl.typ_expr));
+                self.typecheck_written_type(&decl.typ_expr);
             }
             Instruction::IfStatement(stm) => {
                 let condition_expr = &self.instructions[stm.condition].unwrap_subexpression();
