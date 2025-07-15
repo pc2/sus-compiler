@@ -237,6 +237,36 @@ impl Display for Value {
     }
 }
 
+pub struct PhysicalDomainDisplay<'a> {
+    domain: DomainID,
+    domains: &'a FlatAlloc<DomainInfo, DomainIDMarker>,
+}
+
+impl Display for PhysicalDomainDisplay<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if let Some(physical_domain) = self.domains.get(self.domain) {
+            f.write_fmt(format_args!("{{{}}}", physical_domain.name))
+        } else {
+            f.write_fmt(format_args!(
+                "{{unnamed domain {}}}",
+                self.domain.get_hidden_value()
+            ))
+        }
+    }
+}
+
+impl DomainID {
+    pub fn display<'d>(
+        &self,
+        domains: &'d FlatAlloc<DomainInfo, DomainIDMarker>,
+    ) -> PhysicalDomainDisplay<'d> {
+        PhysicalDomainDisplay {
+            domain: *self,
+            domains,
+        }
+    }
+}
+
 pub struct DomainDisplay<'a> {
     domain: DomainType,
     domains: &'a FlatAlloc<DomainInfo, DomainIDMarker>,
@@ -246,16 +276,7 @@ impl Display for DomainDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.domain {
             DomainType::Generative => f.write_str("gen"),
-            DomainType::Physical(physical_id) => {
-                if let Some(physical_domain) = self.domains.get(physical_id) {
-                    f.write_fmt(format_args!("{{{}}}", physical_domain.name))
-                } else {
-                    f.write_fmt(format_args!(
-                        "{{unnamed domain {}}}",
-                        physical_id.get_hidden_value()
-                    ))
-                }
-            }
+            DomainType::Physical(physical_id) => physical_id.display(self.domains).fmt(f),
             DomainType::Unknown(_) => unreachable!(),
         }
     }

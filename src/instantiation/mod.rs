@@ -4,15 +4,19 @@ mod final_checks;
 pub mod instantiation_cache;
 mod unique_names;
 
+use colored::Colorize;
 use unique_names::UniqueNames;
 
+use crate::alloc::zip_eq;
 use crate::debug::SpanDebugger;
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::LinkInfo;
 use crate::prelude::*;
+use crate::to_string::{join_string_iter, join_string_iter_formatter};
 use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
 
 use std::cell::OnceCell;
+use std::fmt::{Display, Write};
 use std::rc::Rc;
 
 use crate::flattening::{
@@ -424,16 +428,16 @@ fn perform_instantiation(
 
     if crate::debug::is_enabled("print-instantiated-modules-pre-concrete-typecheck") {
         println!("[[Executed {name}]]");
-        for (id, w) in &typed.wires {
-            println!("{id:?} -> {w:?}");
-        }
-        for (id, sm) in &typed.submodules {
-            println!("SubModule {id:?}: {sm:?}");
-        }
+        typed.print_instantiated_module();
     }
 
     println!("Concrete Typechecking {name}");
     typed.typecheck(type_var_alloc);
+
+    if crate::debug::is_enabled("print-instantiated-modules") {
+        println!("[[Instantiated {name}]]");
+        typed.print_instantiated_module();
+    }
 
     if typed.errors.did_error() {
         return typed.into_instantiated_module(name);
@@ -442,15 +446,168 @@ fn perform_instantiation(
     println!("Checking array accesses {name}");
     typed.check_subtypes();
 
-    if crate::debug::is_enabled("print-instantiated-modules") {
-        println!("[[Instantiated {name}]]");
-        for (id, w) in &typed.wires {
-            println!("{id:?} -> {w:?}");
+    typed.into_instantiated_module(name)
+}
+
+impl ModuleTypingContext<'_> {
+    fn name(&self, wire_id: WireID) -> impl Display {
+        self.wires[wire_id].name.green()
+    }
+    fn print_path(&self, path: &[RealWirePathElem]) {
+        for p in path {
+            match p {
+                RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
+                    print!("{}", self.name(*idx_wire));
+                }
+            }
         }
-        for (id, sm) in &typed.submodules {
-            println!("SubModule {id:?}: {sm:?}");
+    }
+    fn print_rank(&self, rank: &[UnifyableValue]) {
+        for r in rank {
+            print!("[{r}]")
         }
     }
 
-    typed.into_instantiated_module(name)
+    fn print_instantiated_module(&self) {
+        println!("Wires: ");
+        for (
+            _,
+            RealWire {
+                source,
+                original_instruction,
+                typ,
+                name,
+                domain,
+                specified_latency: _,
+                absolute_latency,
+                is_port,
+            },
+        ) in &self.wires
+        {
+            let is_port_str = if let Some(direction) = is_port {
+                format!("{direction} ").purple()
+            } else {
+                "".purple()
+            };
+            let typ_str = typ.display(&self.linker.globals, false).to_string().red();
+            let domain_name = domain.display(&self.md.domains);
+            let absolute_latency = if *absolute_latency == CALCULATE_LATENCY_LATER {
+                String::from("?")
+            } else {
+                absolute_latency.to_string()
+            };
+            let name = name.green();
+            print!("{name}: {is_port_str}{typ_str}'{absolute_latency} {domain_name} [{original_instruction:?}]");
+            match source {
+                RealWireDataSource::ReadOnly => println!(" = ReadOnly"),
+                RealWireDataSource::Multiplexer { is_state, sources } => {
+                    print!(": ");
+                    if let Some(initial) = is_state {
+                        print!("state (initial {initial}) ");
+                    }
+                    println!("Mux:");
+                    for MultiplexerSource {
+                        to_path,
+                        num_regs,
+                        from,
+                        condition,
+                        write_span: _,
+                    } in sources
+                    {
+                        print!("    ");
+                        let mut is_first_condition = true;
+                        for c in condition {
+                            let if_or_and = if is_first_condition {
+                                is_first_condition = false;
+                                "if "
+                            } else {
+                                " & "
+                            };
+                            let invert = if c.inverse { "!" } else { "" };
+                            print!("{if_or_and}{invert}{}", self.name(c.condition_wire));
+                        }
+                        if *num_regs != 0 {
+                            print!(": reg({num_regs}) {name}");
+                        } else {
+                            print!(": {name}");
+                        }
+                        self.print_path(to_path);
+                        println!(" = {}", self.name(*from));
+                    }
+                }
+                RealWireDataSource::UnaryOp { op, rank, right } => {
+                    print!(" = {op}");
+                    self.print_rank(rank);
+                    println!(" {}", self.name(*right))
+                }
+                RealWireDataSource::BinaryOp {
+                    op,
+                    rank,
+                    left,
+                    right,
+                } => {
+                    print!(" = {} {op}", self.name(*left));
+                    self.print_rank(rank);
+                    println!(" {}", self.name(*right))
+                }
+                RealWireDataSource::Select { root, path } => {
+                    print!(" = {}", self.name(*root));
+                    self.print_path(path);
+                    println!()
+                }
+                RealWireDataSource::ConstructArray { array_wires } => {
+                    let mut s = String::new();
+                    join_string_iter(&mut s, ", ", array_wires.iter(), |s, item| {
+                        s.write_fmt(format_args!("{}", self.name(*item))).unwrap()
+                    });
+                    print!(" = [{s}]");
+                }
+                RealWireDataSource::Constant { value } => println!(" = {value}"),
+            }
+        }
+        println!("\nSubmodules: ");
+        for (
+            _,
+            SubModule {
+                original_instruction,
+                instance,
+                refers_to,
+                port_map,
+                interface_call_sites: _,
+                name,
+            },
+        ) in &self.submodules
+        {
+            let instance_md = &self.linker.globals[refers_to.id];
+            let refers_to = refers_to.display(&self.linker.globals, false);
+            let instantiate_success = if instance.get().is_some() {
+                "Instantiation Successful!".yellow()
+            } else {
+                "No Instance".red()
+            };
+            println!("{name}: {refers_to}[{original_instruction:?}]: {instantiate_success}");
+            for (port_id, port, usage) in zip_eq(&instance_md.ports, port_map) {
+                let local_name = if let Some(p) = usage {
+                    self.name(p.maps_to_wire).to_string()
+                } else {
+                    "".into()
+                };
+                let remote_name = &port.name;
+                let direction = port.direction.to_string().purple();
+                print!("    {direction} .{remote_name}({local_name})");
+                if let Some(instance) = instance.get() {
+                    let typ_str = if let Some(port) = &instance.interface_ports[port_id] {
+                        port.typ.display(&self.linker.globals, false).to_string()
+                    } else {
+                        "/".into()
+                    }
+                    .red();
+                    print!(": {typ_str}");
+                }
+                println!();
+            }
+        }
+        println!();
+        println!();
+    }
 }
