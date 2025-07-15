@@ -58,6 +58,14 @@ impl AbstractInnerType {
     pub fn with_rank(self, rank: PeanoType) -> AbstractRankedType {
         AbstractRankedType { inner: self, rank }
     }
+    pub fn is_interface(&self) -> bool {
+        match self {
+            AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => true,
+            AbstractInnerType::Template(_)
+            | AbstractInnerType::Named(_)
+            | AbstractInnerType::Unknown(_) => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

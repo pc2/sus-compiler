@@ -90,10 +90,8 @@ impl<'l> TypeCheckingContext<'l> {
                         ExpressionSource::WireRef(wr) => {
                             self.init_wire_ref(wr);
                         }
-                        ExpressionSource::FuncCall(fc) => {
-                            self.init_wire_ref(&fc.func);
-                        }
-                        ExpressionSource::UnaryOp { .. }
+                        ExpressionSource::FuncCall(_)
+                        | ExpressionSource::UnaryOp { .. }
                         | ExpressionSource::BinaryOp { .. }
                         | ExpressionSource::ArrayConstruct(_)
                         | ExpressionSource::Literal(_) => {}
@@ -402,9 +400,16 @@ impl<'l> TypeCheckingContext<'l> {
 
     fn typecheck_func_func(
         &mut self,
-        wire_ref: &'l WireReference,
+        wire_ref_id: FlatID,
     ) -> Option<RemoteFn<'l, &'l TVec<TemplateKind<AbstractRankedType, ()>>>> {
-        self.typecheck_wire_reference(wire_ref);
+        let wire_ref_expr = self.instructions[wire_ref_id].unwrap_expression();
+        let ExpressionSource::WireRef(wire_ref) = &wire_ref_expr.source else {
+            self.errors.error(
+                wire_ref_expr.span,
+                "Cannot function-call on any expression. It must be a wire reference",
+            );
+            return None;
+        };
         match &wire_ref.output_typ.inner {
             AbstractInnerType::Interface(sm_ref, interface) => {
                 let submod = self.globals.get_submodule(sm_ref);
@@ -493,7 +498,7 @@ impl<'l> TypeCheckingContext<'l> {
                 out_typ
             }
             ExpressionSource::FuncCall(func_call) => {
-                if let Some(interface) = self.typecheck_func_func(&func_call.func) {
+                if let Some(interface) = self.typecheck_func_func(func_call.func_wire_ref) {
                     self.typecheck_func_call_args(func_call, interface);
 
                     self.report_errors_for_bad_function_call(
@@ -558,7 +563,7 @@ impl<'l> TypeCheckingContext<'l> {
         }
         match &expr.source {
             ExpressionSource::FuncCall(func_call) => {
-                if let Some(interface) = self.typecheck_func_func(&func_call.func) {
+                if let Some(interface) = self.typecheck_func_func(func_call.func_wire_ref) {
                     self.typecheck_func_call_args(func_call, interface);
 
                     self.report_errors_for_bad_function_call(
@@ -885,7 +890,6 @@ impl FinalizationContext {
                                 .fully_substitute(&self.type_checker.rank_substitutor);
                             // No need to report incomplete peano error, as one of the ports would have reported it
                         }
-                        ExpressionSource::FuncCall(fc) => self.finalize_wire_ref(&mut fc.func),
                         _ => {}
                     }
                 }

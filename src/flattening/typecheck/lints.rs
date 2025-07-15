@@ -114,10 +114,8 @@ impl LintContext<'_> {
                     match &expr.source {
                         ExpressionSource::WireRef(wire_ref) => {
                             self.lint_wire_ref(wire_ref, false);
-                            self.cant_be_interface("read from", wire_ref);
-                        }
-                        ExpressionSource::FuncCall(func_call) => {
-                            self.lint_wire_ref(&func_call.func, false);
+                            // TODO: Now that function's func is also a plain Expression, we'd have to check if it's used in a func.
+                            // self.cant_be_interface("read from", wire_ref);
                         }
                         _ => {}
                     }

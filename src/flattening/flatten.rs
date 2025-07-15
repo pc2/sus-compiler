@@ -782,7 +782,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             }),
             kind!("func_call") => cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("name"));
-                let func = self.flatten_wire_reference(cursor);
+                let func_wire_ref = self.flatten_subexpr(cursor);
 
                 cursor.field(field!("arguments"));
                 let arguments_span = BracketSpan::from_outer(cursor.span());
@@ -793,7 +793,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     });
 
                 ExpressionSource::FuncCall(FuncCall {
-                    func,
+                    func_wire_ref,
                     arguments,
                     arguments_span,
                 })

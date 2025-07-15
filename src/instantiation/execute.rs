@@ -1099,7 +1099,9 @@ impl<'l> ExecutionContext<'l> {
                 }
             }
             ExpressionSource::FuncCall(fc) => {
-                let func_interface = self.get_interface(&fc.func, original_instruction, domain)?;
+                let func_expr = self.link_info.instructions[fc.func_wire_ref].unwrap_expression();
+                let_unwrap!(ExpressionSource::WireRef(f_wr), &func_expr.source);
+                let func_interface = self.get_interface(f_wr, original_instruction, domain)?;
 
                 if let Some(condition) = func_interface.condition_wire {
                     let true_wire = self.alloc_bool(true, original_instruction, domain);
@@ -1355,6 +1357,83 @@ impl<'l> ExecutionContext<'l> {
         }))
     }
 
+    fn instantiate_expression(
+        &mut self,
+        expr: &'l Expression,
+        original_instruction: FlatID,
+    ) -> ExecutionResult<SubModuleOrWire> {
+        if let ExpressionOutput::SubExpression(typ) = &expr.output {
+            if typ.inner.is_interface() {
+                // Interface execution is up to whoever calls it
+                return Ok(SubModuleOrWire::Unassigned);
+            }
+        }
+        Ok(match expr.domain.get() {
+            DomainType::Generative => {
+                let value_computed = self.compute_compile_time(expr)?;
+                match &expr.output {
+                    ExpressionOutput::SubExpression(_full_type) => {} // Simply returning value_computed is enough
+                    ExpressionOutput::MultiWrite(write_tos) => {
+                        if let Some(single_write) = write_tos.first() {
+                            match single_write.target_domain.get() {
+                                DomainType::Generative => {
+                                    self.write_generative(
+                                        single_write,
+                                        value_computed.clone(), // We do an extra clone, maybe not needed, such that we can show the value in GenerationState
+                                    )?;
+                                }
+                                DomainType::Physical(domain) => {
+                                    let value_as_wire = self.alloc_wire_for_const(
+                                        value_computed.clone(),
+                                        &single_write.to.output_typ,
+                                        original_instruction,
+                                        domain,
+                                        expr.span,
+                                    )?;
+                                    self.write_non_generative(
+                                        single_write,
+                                        original_instruction,
+                                        value_as_wire,
+                                        single_write.to_span,
+                                        domain,
+                                    )?;
+                                }
+                                DomainType::Unknown(_) => caught_by_typecheck!(),
+                            }
+                        }
+                    }
+                }
+                SubModuleOrWire::CompileTimeValue(value_computed)
+            }
+            DomainType::Physical(domain) => {
+                let output_wires =
+                    self.expression_to_real_wire(expr, original_instruction, domain)?;
+                match &expr.output {
+                    ExpressionOutput::SubExpression(_full_type) => {
+                        let single_wire = unwrap_single_element(output_wires);
+                        SubModuleOrWire::Wire(single_wire)
+                    }
+                    ExpressionOutput::MultiWrite(write_tos) => {
+                        if write_tos.is_empty() {
+                            return Ok(SubModuleOrWire::Unassigned); // See no errors on zero outputs (#79)
+                        }
+                        for (expr_output, write) in zip_eq(output_wires, write_tos) {
+                            self.write_non_generative(
+                                write,
+                                original_instruction,
+                                expr_output,
+                                write.to_span,
+                                domain,
+                            )?;
+                        }
+                        SubModuleOrWire::Unassigned
+                    }
+                }
+            }
+            DomainType::Unknown(_) => caught_by_typecheck!(),
+        })
+    }
+
     fn instantiate_code_block(&mut self, block_range: FlatIDRange) -> ExecutionResult<()> {
         let mut instruction_range = block_range.into_iter();
         while let Some(original_instruction) = instruction_range.next() {
@@ -1374,70 +1453,7 @@ impl<'l> ExecutionContext<'l> {
                     self.instantiate_declaration(wire_decl, original_instruction)?
                 }
                 Instruction::Expression(expr) => {
-                    match expr.domain.get() {
-                        DomainType::Generative => {
-                            let value_computed = self.compute_compile_time(expr)?;
-                            match &expr.output {
-                                ExpressionOutput::SubExpression(_full_type) => {} // Simply returning value_computed is enough
-                                ExpressionOutput::MultiWrite(write_tos) => {
-                                    if let Some(single_write) = write_tos.first() {
-                                        match single_write.target_domain.get() {
-                                            DomainType::Generative => {
-                                                self.write_generative(
-                                                    single_write,
-                                                    value_computed.clone(), // We do an extra clone, maybe not needed, such that we can show the value in GenerationState
-                                                )?;
-                                            }
-                                            DomainType::Physical(domain) => {
-                                                let value_as_wire = self.alloc_wire_for_const(
-                                                    value_computed.clone(),
-                                                    &single_write.to.output_typ,
-                                                    original_instruction,
-                                                    domain,
-                                                    expr.span,
-                                                )?;
-                                                self.write_non_generative(
-                                                    single_write,
-                                                    original_instruction,
-                                                    value_as_wire,
-                                                    single_write.to_span,
-                                                    domain,
-                                                )?;
-                                            }
-                                            DomainType::Unknown(_) => caught_by_typecheck!(),
-                                        }
-                                    }
-                                }
-                            }
-                            SubModuleOrWire::CompileTimeValue(value_computed)
-                        }
-                        DomainType::Physical(domain) => {
-                            let output_wires =
-                                self.expression_to_real_wire(expr, original_instruction, domain)?;
-                            match &expr.output {
-                                ExpressionOutput::SubExpression(_full_type) => {
-                                    let single_wire = unwrap_single_element(output_wires);
-                                    SubModuleOrWire::Wire(single_wire)
-                                }
-                                ExpressionOutput::MultiWrite(write_tos) => {
-                                    if write_tos.is_empty() {
-                                        continue; // See no errors on zero outputs (#79)
-                                    }
-                                    for (expr_output, write) in zip_eq(output_wires, write_tos) {
-                                        self.write_non_generative(
-                                            write,
-                                            original_instruction,
-                                            expr_output,
-                                            write.to_span,
-                                            domain,
-                                        )?;
-                                    }
-                                    continue;
-                                }
-                            }
-                        }
-                        DomainType::Unknown(_) => caught_by_typecheck!(),
-                    }
+                    self.instantiate_expression(expr, original_instruction)?
                 }
                 Instruction::IfStatement(stm) => {
                     if stm.is_generative {

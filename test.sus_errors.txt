@@ -2441,13 +2441,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                           ──┬─  
      │                             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Can't read from an interface. Use a function call or interface connector instead
-     ╭─[ test.sus:636:7 ]
-     │
- 636 │     when write {
-     │          ──┬──  
-     │            ╰──── Can't read from an interface. Use a function call or interface connector instead
-─────╯
 Error: Typing Error: if statement condition expects 'bool' but was given 'Local Interface write'
      ╭─[ test.sus:636:7 ]
      │
@@ -2473,13 +2466,6 @@ interface out:
  641 │     cr_m.i = mem
      │          ┬  
      │          ╰── No such field 'i' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
-─────╯
-Error: Can't read from an interface. Use a function call or interface connector instead
-     ╭─[ test.sus:642:7 ]
-     │
- 642 │     when read {
-     │          ──┬─  
-     │            ╰─── Can't read from an interface. Use a function call or interface connector instead
 ─────╯
 Error: Typing Error: if statement condition expects 'bool' but was given 'Local Interface read'
      ╭─[ test.sus:642:7 ]
@@ -2745,13 +2731,6 @@ interface out:
  730 │     start_cr.i = start
      │              ┬  
      │              ╰── No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
-─────╯
-Error: Can't read from an interface. Use a function call or interface connector instead
-     ╭─[ test.sus:730:15 ]
-     │
- 730 │     start_cr.i = start
-     │                  ──┬──  
-     │                    ╰──── Can't read from an interface. Use a function call or interface connector instead
 ─────╯
 Error: No such field 'i' on cross_int. Available fields are 'cross_int', 'in', 'out'
      ╭─[ test.sus:733:10 ]

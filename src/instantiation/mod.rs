@@ -133,7 +133,9 @@ impl SubModule {
                 let ExpressionSource::FuncCall(fc) = &expression.source else {
                     unreachable!()
                 };
-                fc.func.get_total_span()
+                let func_wire_ref_expr =
+                    link_info.instructions[fc.func_wire_ref].unwrap_expression();
+                func_wire_ref_expr.span
             }
             _ => unreachable!(),
         }

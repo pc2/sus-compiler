@@ -66,21 +66,15 @@ impl<'l> TypeCheckingContext<'l> {
                 }
             }
             Instruction::Expression(expression) => {
-                let mut total_domain = match &expression.source {
-                    ExpressionSource::WireRef(wire_ref) => {
+                let mut total_domain =
+                    if let ExpressionSource::WireRef(wire_ref) = &expression.source {
                         let domain = self
                             .get_wireref_root_domain(wire_ref)
                             .unwrap_or(DomainType::Generative);
                         (domain, wire_ref.root_span)
-                    }
-                    ExpressionSource::FuncCall(func_call) => {
-                        let domain = self
-                            .get_wireref_root_domain(&func_call.func)
-                            .unwrap_or(DomainType::Generative);
-                        (domain, func_call.func.root_span)
-                    }
-                    _ => (DomainType::Generative, Span::MAX_POSSIBLE_SPAN),
-                };
+                    } else {
+                        (DomainType::Generative, Span::MAX_POSSIBLE_SPAN)
+                    };
 
                 expression.source.for_each_input_wire(&mut |id| {
                     let expr = self.instructions[id].unwrap_subexpression();

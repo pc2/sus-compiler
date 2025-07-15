@@ -10,14 +10,8 @@ impl ExpressionSource {
     /// Enumerates all instructions that this instruction depends on. This includes (maybe compiletime) wires, and submodules.
     pub fn for_each_dependency(&self, collect: &mut impl FnMut(FlatID)) {
         self.for_each_input_wire(collect);
-        match self {
-            ExpressionSource::WireRef(wire_ref) => {
-                wire_ref.for_each_generative_input_in_root(collect)
-            }
-            ExpressionSource::FuncCall(func_call) => {
-                func_call.func.for_each_generative_input(collect);
-            }
-            _ => {}
+        if let ExpressionSource::WireRef(wire_ref) = self {
+            wire_ref.for_each_generative_input_in_root(collect)
         }
     }
 
@@ -37,7 +31,7 @@ impl ExpressionSource {
                 collect(*right)
             }
             ExpressionSource::FuncCall(func_call) => {
-                func_call.func.for_each_input_wire_in_path(collect);
+                collect(func_call.func_wire_ref);
                 for arg in &func_call.arguments {
                     collect(*arg)
                 }

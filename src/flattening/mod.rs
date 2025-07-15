@@ -702,7 +702,7 @@ pub struct SubModuleInstance {
 /// ```
 #[derive(Debug)]
 pub struct FuncCall {
-    pub func: WireReference,
+    pub func_wire_ref: FlatID,
 
     /// Points to a list of [Expression]
     pub arguments: Vec<FlatID>,

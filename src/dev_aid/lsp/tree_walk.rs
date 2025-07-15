@@ -408,9 +408,6 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                             ExpressionSource::WireRef(wire_ref) => {
                                 self.walk_wire_ref(obj_id, link_info, wire_ref)
                             }
-                            ExpressionSource::FuncCall(func_call) => {
-                                self.walk_wire_ref(obj_id, link_info, &func_call.func);
-                            }
                             _ => {
                                 if let Some(single_output_expr) = expr.as_single_output_expr() {
                                     self.visit(
