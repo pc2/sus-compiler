@@ -958,10 +958,11 @@ impl<'l> ExecutionContext<'l> {
 
         let interface = md.link_info.instructions[interface_id].unwrap_interface();
 
-        let cond = if let InterfaceKind::Action(condition_port) = interface.interface_kind {
-            Some(self.get_submodule_port(submod_id, condition_port, Some(interface_span), domain))
-        } else {
-            None
+        let condition_wire = match interface.interface_kind {
+            InterfaceKind::Action(condition_port) | InterfaceKind::Trigger(condition_port) => Some(
+                self.get_submodule_port(submod_id, condition_port, Some(interface_span), domain),
+            ),
+            InterfaceKind::RegularInterface => None,
         };
 
         let inputs = interface
@@ -969,7 +970,8 @@ impl<'l> ExecutionContext<'l> {
             .iter()
             .map(|decl_id| {
                 let (port, direction) = md.get_port_for_decl(*decl_id);
-                assert_eq!(direction, Direction::Input);
+                // Triggers have Outputs as their "function input"
+                // assert_eq!(direction, Direction::Input);
                 self.get_submodule_port(submod_id, port, None, domain)
             })
             .collect();
@@ -978,13 +980,14 @@ impl<'l> ExecutionContext<'l> {
             .iter()
             .map(|decl_id| {
                 let (port, direction) = md.get_port_for_decl(*decl_id);
-                assert_eq!(direction, Direction::Output);
+                // Triggers have Inputs as their "function output"
+                // assert_eq!(direction, Direction::Output);
                 self.get_submodule_port(submod_id, port, None, domain)
             })
             .collect();
 
         InterfaceWires {
-            condition_wire: cond,
+            condition_wire,
             inputs,
             outputs,
             interface_span,
@@ -1099,7 +1102,8 @@ impl<'l> ExecutionContext<'l> {
                 }
             }
             ExpressionSource::FuncCall(fc) => {
-                let func_expr = self.link_info.instructions[fc.func_wire_ref].unwrap_expression();
+                let func_expr =
+                    self.link_info.instructions[fc.func_wire_ref].unwrap_subexpression();
                 let_unwrap!(ExpressionSource::WireRef(f_wr), &func_expr.source);
                 let func_interface = self.get_interface(f_wr, original_instruction, domain)?;
 
@@ -1178,18 +1182,14 @@ impl<'l> ExecutionContext<'l> {
                 };
             SubModuleOrWire::CompileTimeValue(value)
         } else {
-            let source = if wire_decl.decl_kind.is_read_only() {
-                RealWireDataSource::ReadOnly
+            let is_state = if wire_decl.decl_kind.is_state() {
+                Some(typ.get_initial_val())
             } else {
-                let is_state = if wire_decl.decl_kind.is_state() {
-                    Some(typ.get_initial_val())
-                } else {
-                    None
-                };
-                RealWireDataSource::Multiplexer {
-                    is_state,
-                    sources: Vec::new(),
-                }
+                None
+            };
+            let source = RealWireDataSource::Multiplexer {
+                is_state,
+                sources: Vec::new(),
             };
 
             let specified_latency = self.get_specified_latency(wire_decl.latency_specifier)?;
@@ -1455,33 +1455,81 @@ impl<'l> ExecutionContext<'l> {
                 Instruction::Expression(expr) => {
                     self.instantiate_expression(expr, original_instruction)?
                 }
-                Instruction::IfStatement(stm) => {
-                    if stm.is_generative {
-                        let condition_val =
-                            self.generation_state.get_generation_value(stm.condition)?;
+                Instruction::IfStatement(if_stm) => {
+                    if if_stm.is_generative {
+                        let condition_val = self
+                            .generation_state
+                            .get_generation_value(if_stm.condition)?;
                         let run_range = if condition_val.unwrap_bool() {
-                            stm.then_block
+                            if_stm.then_block
                         } else {
-                            stm.else_block
+                            if_stm.else_block
                         };
                         self.instantiate_code_block(run_range)?;
                     } else {
-                        let condition_wire = self.generation_state[stm.condition].unwrap_wire();
-                        self.condition_stack.push(ConditionStackElem {
-                            condition_wire,
-                            inverse: false,
-                        });
-                        self.instantiate_code_block(stm.then_block)?;
+                        let condition_expr =
+                            self.link_info.instructions[if_stm.condition].unwrap_subexpression();
 
-                        if !stm.else_block.is_empty() {
+                        if condition_expr.typ.inner.is_interface() {
+                            let wr_expr = self.link_info.instructions[if_stm.condition]
+                                .unwrap_subexpression();
+                            let_unwrap!(ExpressionSource::WireRef(interface), &wr_expr.source);
+                            let domain = wr_expr.domain.unwrap_physical();
+                            let trig_interface =
+                                self.get_interface(interface, original_instruction, domain)?;
+
+                            self.condition_stack.push(ConditionStackElem {
+                                condition_wire: trig_interface.condition_wire.unwrap(),
+                                inverse: false,
+                            });
+
+                            self.instantiate_code_block(if_stm.then_block)?;
+
+                            for (port_wire, binding) in
+                                zip_eq(&trig_interface.inputs, &if_stm.bindings_read_only)
+                            {
+                                let binding_span = self.link_info.instructions[*binding].get_span();
+                                let binding = self.generation_state[*binding].unwrap_wire();
+                                self.instantiate_write_to_wire(
+                                    binding,
+                                    Vec::new(),
+                                    *port_wire,
+                                    0,
+                                    binding_span,
+                                );
+                            }
+
+                            for (port_wire, binding) in
+                                zip_eq(&trig_interface.outputs, &if_stm.bindings_writable)
+                            {
+                                let binding_span = self.link_info.instructions[*binding].get_span();
+                                let binding = self.generation_state[*binding].unwrap_wire();
+                                self.instantiate_write_to_wire(
+                                    *port_wire,
+                                    Vec::new(),
+                                    binding,
+                                    0,
+                                    binding_span,
+                                );
+                            }
+                        } else {
+                            let condition_wire =
+                                self.generation_state[if_stm.condition].unwrap_wire();
+                            self.condition_stack.push(ConditionStackElem {
+                                condition_wire,
+                                inverse: false,
+                            });
+                            self.instantiate_code_block(if_stm.then_block)?;
+                        }
+                        if !if_stm.else_block.is_empty() {
                             self.condition_stack.last_mut().unwrap().inverse = true;
-                            self.instantiate_code_block(stm.else_block)?;
+                            self.instantiate_code_block(if_stm.else_block)?;
                         }
 
                         // Get rid of the condition
                         let _ = self.condition_stack.pop().unwrap();
                     }
-                    instruction_range.skip_to(stm.else_block.1);
+                    instruction_range.skip_to(if_stm.else_block.1);
                     continue;
                 }
                 Instruction::Interface(interface) => {

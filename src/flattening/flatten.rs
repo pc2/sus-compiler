@@ -1041,19 +1041,25 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     conditional_bindings_span: None,
                 }));
 
+            let bindings_start_at = self.instructions.get_next_alloc_id();
+
             let ((bindings_inputs, bindings_outputs), conditional_binding_span) =
                 if cursor.optional_field(field!("conditional_bindings")) {
                     let conditional_bindings_span = cursor.span();
-                    (
-                        self.flatten_conditional_bindings(if_id, cursor),
-                        Some(conditional_bindings_span),
-                    )
+                    cursor.go_down(kind!("interface_ports"), |cursor| {
+                        (
+                            self.flatten_conditional_bindings(if_id, cursor),
+                            Some(conditional_bindings_span),
+                        )
+                    })
                 } else {
                     ((Vec::new(), Vec::new()), None)
                 };
 
             let (then_block, else_block, then_block_span, _else_span) =
                 self.flatten_then_else_blocks(cursor, (!expects_generative).then_some(if_id));
+
+            let then_block = UUIDRange(bindings_start_at, then_block.1);
 
             assert!(then_block_span.is_some());
 

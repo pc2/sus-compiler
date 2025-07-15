@@ -1416,3 +1416,19 @@ module use_trigger {
 		beep(7)
 	}
 }
+
+module use_use_trigger {
+	bool b
+
+	trigger pass_it_up
+
+	use_trigger submod
+
+	submod.maybe_use_trigger()
+
+	when submod.beep : int x {
+		int y = x
+
+		pass_it_up()
+	}
+}

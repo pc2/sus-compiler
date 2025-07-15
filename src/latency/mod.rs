@@ -327,7 +327,9 @@ impl ModuleTypingContext<'_> {
 
         // Finally update interface absolute latencies
         for (_id, port) in self.interface_ports.iter_valids_mut() {
-            port.absolute_latency = self.wires[port.wire].absolute_latency;
+            let port_wire = &self.wires[port.wire];
+            port.absolute_latency = port_wire.absolute_latency;
+            port.typ = port_wire.typ.clone();
         }
     }
 

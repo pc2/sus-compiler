@@ -111,13 +111,10 @@ impl LintContext<'_> {
                 Instruction::SubModule(_) => {}
                 Instruction::Declaration(_) => {}
                 Instruction::Expression(expr) => {
-                    match &expr.source {
-                        ExpressionSource::WireRef(wire_ref) => {
-                            self.lint_wire_ref(wire_ref, false);
-                            // TODO: Now that function's func is also a plain Expression, we'd have to check if it's used in a func.
-                            // self.cant_be_interface("read from", wire_ref);
-                        }
-                        _ => {}
+                    if let ExpressionSource::WireRef(wire_ref) = &expr.source {
+                        self.lint_wire_ref(wire_ref, false);
+                        // TODO: Now that function's func is also a plain Expression, we'd have to check if it's used in a func.
+                        // self.cant_be_interface("read from", wire_ref);
                     }
                     match &expr.output {
                         ExpressionOutput::MultiWrite(writes) => {

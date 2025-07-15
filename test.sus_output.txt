@@ -169,6 +169,7 @@ Flattening SameNameAsType
 Flattening InstantiateTransmutes
 Flattening StraightTransmute
 Flattening use_trigger
+Flattening use_use_trigger
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -324,6 +325,7 @@ Typechecking SameNameAsType
 Typechecking InstantiateTransmutes
 Typechecking StraightTransmute
 Typechecking use_trigger
+Typechecking use_use_trigger
 Typechecking bool
 Typechecking int
 Typechecking float
@@ -495,6 +497,7 @@ Lints SameNameAsType
 Lints InstantiateTransmutes
 Lints StraightTransmute
 Lints use_trigger
+Lints use_use_trigger
 Lints bool
 Lints int
 Lints float
@@ -522,6 +525,7 @@ Concrete Typechecking test_pow17
 Instantiating pow17
 Concrete Typechecking pow17
 Checking array accesses pow17
+Checking array accesses test_pow17
 Instantiating fibonnaci
 Concrete Typechecking fibonnaci
 Checking array accesses fibonnaci
@@ -837,3 +841,6 @@ Checking array accesses transmute #(T1: type int #(MIN: 0, MAX: 255)[2], T2: typ
 Instantiating use_trigger
 Concrete Typechecking use_trigger
 Checking array accesses use_trigger
+Instantiating use_use_trigger
+Concrete Typechecking use_use_trigger
+Checking array accesses use_use_trigger

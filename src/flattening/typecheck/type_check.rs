@@ -86,16 +86,9 @@ impl<'l> TypeCheckingContext<'l> {
                     decl.typ.set(self.written_to_abstract_type(&decl.typ_expr));
                 }
                 Instruction::Expression(expr) => {
-                    match &expr.source {
-                        ExpressionSource::WireRef(wr) => {
-                            self.init_wire_ref(wr);
-                        }
-                        ExpressionSource::FuncCall(_)
-                        | ExpressionSource::UnaryOp { .. }
-                        | ExpressionSource::BinaryOp { .. }
-                        | ExpressionSource::ArrayConstruct(_)
-                        | ExpressionSource::Literal(_) => {}
-                    };
+                    if let ExpressionSource::WireRef(wr) = &expr.source {
+                        self.init_wire_ref(wr);
+                    }
                     if let ExpressionOutput::MultiWrite(wrs) = &expr.output {
                         for wr in wrs {
                             self.init_wire_ref(&wr.to);
@@ -414,8 +407,8 @@ impl<'l> TypeCheckingContext<'l> {
     ) {
         let fn_decl = &interface.fn_decl;
         for (bindings, interface_args, name) in [
-            (read_only_decls, &fn_decl.outputs, "read-only bindings"),
-            (writable_decls, &fn_decl.inputs, "return bindings"),
+            (read_only_decls, &fn_decl.inputs, "read-only bindings"),
+            (writable_decls, &fn_decl.outputs, "writable bindings"),
         ] {
             let arg_count = bindings.len();
             let expected_arg_count = interface_args.len();
@@ -766,8 +759,8 @@ impl<'l> TypeCheckingContext<'l> {
         );
 
         for (ports, bindings, binding_name) in [
-            (&f.outputs, &if_stm.bindings_read_only, "read-only binding"),
-            (&f.inputs, &if_stm.bindings_writable, "writeable binding"),
+            (&f.inputs, &if_stm.bindings_read_only, "read-only binding"),
+            (&f.outputs, &if_stm.bindings_writable, "writeable binding"),
         ] {
             for (port_decl_id, binding) in std::iter::zip(ports, bindings) {
                 let port_decl = trig.parent.get_decl(*port_decl_id);

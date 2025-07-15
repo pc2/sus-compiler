@@ -404,23 +404,18 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                         }
                     }
                     Instruction::Expression(expr) => {
-                        match &expr.source {
-                            ExpressionSource::WireRef(wire_ref) => {
-                                self.walk_wire_ref(obj_id, link_info, wire_ref)
-                            }
-                            _ => {
-                                if let Some(single_output_expr) = expr.as_single_output_expr() {
-                                    self.visit(
-                                        expr.span,
-                                        LocationInfo::InGlobal(
-                                            obj_id,
-                                            link_info,
-                                            id,
-                                            InGlobal::Temporary(single_output_expr),
-                                        ),
-                                    )
-                                }
-                            }
+                        if let ExpressionSource::WireRef(wire_ref) = &expr.source {
+                            self.walk_wire_ref(obj_id, link_info, wire_ref)
+                        } else if let Some(single_output_expr) = expr.as_single_output_expr() {
+                            self.visit(
+                                expr.span,
+                                LocationInfo::InGlobal(
+                                    obj_id,
+                                    link_info,
+                                    id,
+                                    InGlobal::Temporary(single_output_expr),
+                                ),
+                            )
                         };
 
                         match &expr.output {

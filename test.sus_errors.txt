@@ -12,38 +12,12 @@ Warning: The result of this expression is not used. Only function calls can retu
      │          ────────┬────────  
      │                  ╰────────── The result of this expression is not used. Only function calls can return nothing. 
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-    ╭─[ test.sus:26:6 ]
-    │
- 26 │     int a = pow17(2)
-    │         ┬  
-    │         ╰── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
  26 │     int a = pow17(2)
     │         ┬  
     │         ╰── Unused Variable: This variable does not affect the output ports of this module
-────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-    ╭─[ test.sus:26:10 ]
-    │
- 26 │     int a = pow17(2)
-    │             ────┬───  
-    │                 ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
 ────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:60:10 ]
@@ -349,19 +323,6 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)[4]
-     ╭─[ test.sus:225:9 ]
-     │
- 225 │     int[4] offsets
-     │            ───┬───  
-     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)[4]
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:225:9 ]
      │
@@ -397,58 +358,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                ┬  
      │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:234:7 ]
-     │
- 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │            ───┬──  
-     │               ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:234:7 ]
-     │
- 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │            ───┬──  
-     │               ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:234:7 ]
-     │
- 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │            ───┬──  
-     │               ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:234:7 ]
-     │
- 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │            ───┬──  
-     │               ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:234:7 ]
      │
@@ -462,110 +371,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
      │                         ─────┬─────  
      │                              ╰─────── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:234:34 ]
-     │
- 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │                                       ─────────────┬─────────────  
-     │                                                    ╰─────────────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:234:34 ]
-     │
- 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │                                       ─────────────┬─────────────  
-     │                                                    ╰─────────────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:234:34 ]
-     │
- 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │                                       ─────────────┬─────────────  
-     │                                                    ╰─────────────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:234:34 ]
-     │
- 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │                                       ─────────────┬─────────────  
-     │                                                    ╰─────────────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:235:16 ]
-     │
- 235 │        offsets[i] = offset
-     │                     ───┬──  
-     │                        ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:235:16 ]
-     │
- 235 │        offsets[i] = offset
-     │                     ───┬──  
-     │                        ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:235:16 ]
-     │
- 235 │        offsets[i] = offset
-     │                     ───┬──  
-     │                        ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:235:16 ]
-     │
- 235 │        offsets[i] = offset
-     │                     ───┬──  
-     │                        ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
 ─────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'mbf'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
@@ -2452,7 +2257,7 @@ Error: Can only use conditional bindings on triggers. 'write' is an interface
      │          ──┬──  
      │            ╰──── Can only use conditional bindings on triggers. 'write' is an interface
 ─────╯
-Error: Too few bindings. This interface provides 3 return bindings, but 0 were provided.
+Error: Too few bindings. This interface provides 3 read-only bindings, but 0 were provided.
      ╭─[ test.sus:636:7 ]
      │
  632 │     interface write : bool write, bool[20] wr_data, int#(MIN:0, MAX: 511) wr_addr
@@ -2461,7 +2266,7 @@ Error: Too few bindings. This interface provides 3 return bindings, but 0 were p
      │ 
  636 │     when write {
      │          ──┬──  
-     │            ╰──── Too few bindings. This interface provides 3 return bindings, but 0 were provided.
+     │            ╰──── Too few bindings. This interface provides 3 read-only bindings, but 0 were provided.
 ─────╯
 Error: No such field 'i' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
      ╭─[ test.sus:641:7 ]
@@ -2493,7 +2298,7 @@ Error: Can only use conditional bindings on triggers. 'read' is an interface
      │          ──┬─  
      │            ╰─── Can only use conditional bindings on triggers. 'read' is an interface
 ─────╯
-Error: Too few bindings. This interface provides 1 read-only bindings, but 0 were provided.
+Error: Too few bindings. This interface provides 1 writable bindings, but 0 were provided.
      ╭─[ test.sus:642:7 ]
      │
  634 │     interface read : bool read, int#(MIN:0, MAX: 511) rd_addr -> bool[20] rd_data
@@ -2502,9 +2307,9 @@ Error: Too few bindings. This interface provides 1 read-only bindings, but 0 wer
      │ 
  642 │     when read {
      │          ──┬─  
-     │            ╰─── Too few bindings. This interface provides 1 read-only bindings, but 0 were provided.
+     │            ╰─── Too few bindings. This interface provides 1 writable bindings, but 0 were provided.
 ─────╯
-Error: Too few bindings. This interface provides 2 return bindings, but 0 were provided.
+Error: Too few bindings. This interface provides 2 read-only bindings, but 0 were provided.
      ╭─[ test.sus:642:7 ]
      │
  634 │     interface read : bool read, int#(MIN:0, MAX: 511) rd_addr -> bool[20] rd_data
@@ -2513,7 +2318,7 @@ Error: Too few bindings. This interface provides 2 return bindings, but 0 were p
      │ 
  642 │     when read {
      │          ──┬─  
-     │            ╰─── Too few bindings. This interface provides 2 return bindings, but 0 were provided.
+     │            ╰─── Too few bindings. This interface provides 2 read-only bindings, but 0 were provided.
 ─────╯
 Error: No such field 'o' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
      ╭─[ test.sus:643:18 ]
@@ -10815,6 +10620,13 @@ Error: Cannot use conditional bingings because the condition isn't an action or 
      │                            ────────┬────────  
      │                                    ╰────────── Cannot use conditional bingings because the condition isn't an action or a trigger
 ─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:894:31 ]
+     │
+ 894 │     when decoder.is_jump() : int target_addr {
+     │                                  ─────┬─────  
+     │                                       ╰─────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
 Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test.sus:897:7 ]
      │
@@ -10833,6 +10645,20 @@ Error: Cannot use conditional bingings because the condition isn't an action or 
      │                            ───────────┬──────────  
      │                                       ╰──────────── Cannot use conditional bingings because the condition isn't an action or a trigger
 ─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:897:31 ]
+     │
+ 897 │     when decoder.is_load() : int reg_to, int addr {
+     │                                  ───┬──  
+     │                                     ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:897:43 ]
+     │
+ 897 │     when decoder.is_load() : int reg_to, int addr {
+     │                                              ──┬─  
+     │                                                ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
 Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test.sus:900:7 ]
      │
@@ -10850,6 +10676,34 @@ Error: Cannot use conditional bingings because the condition isn't an action or 
  900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
      │                             ─────────────────┬─────────────────  
      │                                              ╰─────────────────── Cannot use conditional bingings because the condition isn't an action or a trigger
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:900:32 ]
+     │
+ 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │                                   ──┬──  
+     │                                     ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:900:43 ]
+     │
+ 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │                                              ──┬──  
+     │                                                ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: No Global of the name 'Operator' was found. Did you forget to import it?
+     ╭─[ test.sus:900:50 ]
+     │
+ 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │                                                     ────┬───  
+     │                                                         ╰───── No Global of the name 'Operator' was found. Did you forget to import it?
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:900:59 ]
+     │
+ 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │                                                              ─┬  
+     │                                                               ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:913:6 ]
@@ -12655,6 +12509,13 @@ Error: Cannot use conditional bingings because the condition isn't an action or 
       │                       ────────┬────────  
       │                               ╰────────── Cannot use conditional bingings because the condition isn't an action or a trigger
 ──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1263:28 ]
+      │
+ 1263 │     when loop.process : float cur_state {
+      │                               ────┬────  
+      │                                   ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
 Error: Typing Error: writing the output of this expression expects 'float' but was given 'int'
       ╭─[ test.sus:1264:3 ]
       │
@@ -12669,33 +12530,26 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │              ─────┬────  
       │                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: No Global of the name 'cur_state' was found. Did you forget to import it?
+Error: Typing Error: binop left side expects 'int' but was given 'float'
       ╭─[ test.sus:1264:22 ]
       │
  1264 │        float next_state = cur_state * cur_state
       │                           ────┬────  
-      │                               ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+      │                               ╰────── Typing Error: binop left side expects 'int' but was given 'float'
 ──────╯
-Error: No Global of the name 'cur_state' was found. Did you forget to import it?
+Error: Typing Error: binop right side expects 'int' but was given 'float'
       ╭─[ test.sus:1264:34 ]
       │
  1264 │        float next_state = cur_state * cur_state
       │                                       ────┬────  
-      │                                           ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+      │                                           ╰────── Typing Error: binop right side expects 'int' but was given 'float'
 ──────╯
-Warning: Used 'when' in a generative context, use 'if' instead
-      ╭─[ test.sus:1265:3 ]
-      │
- 1265 │        when cur_state >= 2.0 {
-      │        ──┬─  
-      │          ╰─── Used 'when' in a generative context, use 'if' instead
-──────╯
-Error: No Global of the name 'cur_state' was found. Did you forget to import it?
+Error: Typing Error: binop left side expects 'int' but was given 'float'
       ╭─[ test.sus:1265:8 ]
       │
  1265 │        when cur_state >= 2.0 {
       │             ────┬────  
-      │                 ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+      │                 ╰────── Typing Error: binop left side expects 'int' but was given 'float'
 ──────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
       ╭─[ test.sus:1265:22 ]
@@ -13083,4 +12937,25 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1406 │     int #(MIN: 5, MAX: 3) v
       │                           ┬  
       │                           ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1421:7 ]
+      │
+ 1421 │     bool b
+      │          ┬  
+      │          ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1429:25 ]
+      │
+ 1429 │     when submod.beep : int x {
+      │                            ┬  
+      │                            ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1430:7 ]
+      │
+ 1430 │        int y = x
+      │            ┬  
+      │            ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
