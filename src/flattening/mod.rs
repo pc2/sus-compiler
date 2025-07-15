@@ -1,29 +1,26 @@
 mod flatten;
 mod initialization;
-mod lints;
 mod name_context;
 mod parser;
-mod typechecking;
+pub mod typecheck;
 mod walk;
 
-use crate::alloc::UUIDAllocator;
+use crate::flattening::typecheck::TyCell;
 use crate::prelude::*;
-use crate::typing::abstract_type::{AbstractRankedType, DomainType, PeanoType};
-use crate::typing::written_type::WrittenType;
+use crate::typing::abstract_type::{AbstractGlobalReference, AbstractRankedType, PeanoType};
+use crate::typing::domain_type::DomainType;
 
-use std::cell::OnceCell;
-use std::ops::Deref;
+use std::cell::{Cell, OnceCell};
+use std::fmt::Display;
 
 use crate::latency::port_latency_inference::PortLatencyInferenceInfo;
 pub use flatten::flatten_all_globals;
 pub use initialization::gather_initial_file_data;
-pub use lints::perform_lints;
-pub use typechecking::typecheck_all_modules;
 
 use crate::linker::{Documentation, LinkInfo};
 use crate::value::Value;
 
-use crate::typing::{abstract_type::FullType, template::GlobalReference};
+use crate::typing::template::{TVec, TemplateArg, TemplateKind};
 
 /// Modules are compiled in 4 stages. All modules must pass through each stage before advancing to the next stage.
 ///
@@ -47,86 +44,52 @@ pub struct Module {
     /// Created in Stage 1: Initialization
     pub link_info: LinkInfo,
 
-    /// Created in Stage 1: Initialization
+    /// Created in Stage 2: Initialization
     ///
-    /// [Port::declaration_instruction] are set in Stage 2: Flattening
+    /// Ports can only use domains in [Self::domains]
     ///
-    /// Ports can only use domains in [Self::named_domains]
+    /// These are used by instantiation. They directly correspond to the ports that are actually used in the generated code
     pub ports: FlatAlloc<Port, PortIDMarker>,
 
     /// Created in Stage 2: Flattening
     pub latency_inference_info: PortLatencyInferenceInfo,
 
-    /// Created in Stage 1: Initialization
+    /// Created in Stage 2: Initialization
     pub domains: FlatAlloc<DomainInfo, DomainIDMarker>,
 
-    /// Created in Stage 1: Initialization
+    /// Created in Stage 2: Initialization
+    ///
+    /// Used for resolving the names. These shouldn't really occur in Instantiation
     pub interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
 }
 
 impl Module {
-    pub fn get_main_interface(&self) -> Option<(InterfaceID, &Interface)> {
-        self.interfaces
-            .iter()
-            .find(|(_, interf)| interf.name == self.link_info.name)
-    }
-
-    pub fn get_port_decl(&self, port: PortID) -> &Declaration {
-        let flat_port = self.ports[port].declaration_instruction;
-
-        self.link_info.instructions[flat_port].unwrap_declaration()
-    }
-
-    /// Get a port by the given name. Reports non existing ports errors
-    ///
-    /// Prefer interfaces over ports in name conflicts
-    pub fn get_port_or_interface_by_name(
-        &self,
-        name_span: Span,
-        name: &str,
-        errors: &ErrorCollector,
-    ) -> Option<PortOrInterface> {
-        for (id, data) in &self.interfaces {
-            if data.name == name {
-                return Some(PortOrInterface::Interface(id));
-            }
-        }
-        for (id, data) in &self.ports {
-            if data.name == name {
-                return Some(PortOrInterface::Port(id));
-            }
-        }
-        errors
-            .error(
-                name_span,
-                format!(
-                    "There is no port or interface of name '{name}' on module {}",
-                    self.link_info.name
-                ),
-            )
-            .info_obj(self);
-        None
-    }
-
     /// Temporary upgrade such that we can name the singular clock of the module, such that weirdly-named external module clocks can be used
     ///
     /// See #7
     pub fn get_clock_name(&self) -> &str {
         &self.domains.iter().next().unwrap().1.name
     }
-}
+    pub fn get_fn_interface(&self, interface_id: InterfaceID) -> &InterfaceDeclaration {
+        let interface = &self.interfaces[interface_id];
+        let_unwrap!(
+            Some(InterfaceDeclKind::Interface(i)),
+            interface.declaration_instruction
+        );
+        self.link_info.instructions[i].unwrap_interface()
+    }
 
-impl LinkInfo {
-    pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
-        match &self.instructions[instr_id] {
-            Instruction::SubModule(sm) => sm.module_ref.get_total_span(),
-            Instruction::Declaration(decl) => decl.decl_span,
-            Instruction::Expression(w) => w.span,
-            Instruction::IfStatement(if_stmt) => self.get_instruction_span(if_stmt.condition),
-            Instruction::ForStatement(for_stmt) => {
-                self.get_instruction_span(for_stmt.loop_var_decl)
-            }
-        }
+    pub fn get_port_for_decl(&self, decl_id: FlatID) -> (PortID, Direction) {
+        let decl = self.link_info.instructions[decl_id].unwrap_declaration();
+        let_unwrap!(
+            DeclarationKind::Port {
+                direction,
+                port_id,
+                ..
+            },
+            decl.decl_kind
+        );
+        (port_id, direction)
     }
 }
 
@@ -146,15 +109,6 @@ pub struct StructType {
     fields: FlatAlloc<StructField, FieldIDMarker>,
 }
 
-/// Global constant, like `true`, `false`, or user-defined constants (TODO #19)
-///
-/// All Constants are stored in [Linker::constants] and indexed by [ConstantUUID]
-#[derive(Debug)]
-pub struct NamedConstant {
-    pub link_info: LinkInfo,
-    pub output_decl: FlatID,
-}
-
 /// Represents a field in a struct
 ///
 /// UNFINISHED
@@ -164,20 +118,21 @@ pub struct NamedConstant {
 pub struct StructField {
     #[allow(unused)]
     pub name: String,
+    #[allow(unused)]
     pub name_span: Span,
     #[allow(unused)]
     pub decl_span: Span,
-    /// This is only set after flattening is done. Initially just [UUID::PLACEHOLDER]
+
     pub declaration_instruction: FlatID,
 }
 
-/// In SUS, when you write `my_submodule.abc`, `abc` could refer to an interface or to a port.
+/// Global constant, like `true`, `false`, or user-defined constants (TODO #19)
 ///
-/// See [Module::get_port_or_interface_by_name]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PortOrInterface {
-    Port(PortID),
-    Interface(InterfaceID),
+/// All Constants are stored in [Linker::constants] and indexed by [ConstantUUID]
+#[derive(Debug)]
+pub struct NamedConstant {
+    pub link_info: LinkInfo,
+    pub output_decl: FlatID,
 }
 
 /// Information about a (clock) domain.
@@ -196,39 +151,6 @@ pub struct DomainInfo {
 pub struct InterfaceToDomainMap<'linker> {
     pub local_domain_map: &'linker FlatAlloc<DomainType, DomainIDMarker>,
     pub domains: &'linker FlatAlloc<DomainInfo, DomainIDMarker>,
-}
-
-/// What kind of wire/value does this identifier represent?
-///
-/// We already know it's not a submodule
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IdentifierType {
-    /// Local temporary
-    /// ```sus
-    /// int v = val
-    /// ```
-    Local,
-    /// ```sus
-    /// state int v
-    /// ```
-    State,
-    /// ```sus
-    /// gen int V = 3
-    /// ```
-    Generative,
-}
-
-impl IdentifierType {
-    pub fn get_keyword(&self) -> &'static str {
-        match self {
-            IdentifierType::Local => "",
-            IdentifierType::State => "state",
-            IdentifierType::Generative => "gen",
-        }
-    }
-    pub fn is_generative(&self) -> bool {
-        *self == IdentifierType::Generative
-    }
 }
 
 /// A port of a module. Not to be confused with [PortReference], which is a reference to a submodule port.
@@ -257,10 +179,62 @@ pub struct Port {
     pub name: String,
     pub name_span: Span,
     pub decl_span: Span,
-    pub is_input: bool,
+    pub direction: Direction,
     pub domain: DomainID,
-    /// This is only set after flattening is done. Initially just [crate::alloc::UUID::PLACEHOLDER]
+    /// Points to a [Declaration]
     pub declaration_instruction: FlatID,
+    pub latency_specifier: Option<FlatID>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Direction {
+    Input,
+    Output,
+}
+impl Direction {
+    pub fn invert(self) -> Direction {
+        match self {
+            Direction::Input => Direction::Output,
+            Direction::Output => Direction::Input,
+        }
+    }
+}
+impl Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Direction::Input => "input",
+            Direction::Output => "output",
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InterfaceKind {
+    RegularInterface,
+    Action(PortID),
+    Trigger(PortID),
+}
+
+impl InterfaceKind {
+    pub fn is_conditional(&self) -> bool {
+        match self {
+            InterfaceKind::RegularInterface => false,
+            InterfaceKind::Action(_) | InterfaceKind::Trigger(_) => true,
+        }
+    }
+    pub fn as_string(&self) -> &'static str {
+        match self {
+            InterfaceKind::RegularInterface => "interface",
+            InterfaceKind::Action(_) => "action",
+            InterfaceKind::Trigger(_) => "trigger",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum InterfaceDeclKind {
+    Interface(FlatID),
+    SinglePort(FlatID),
 }
 
 /// An interface, like:
@@ -284,29 +258,40 @@ pub struct Port {
 pub struct Interface {
     pub name_span: Span,
     pub name: String,
-    /// All the interface's ports have this domain too
-    pub domain: DomainID,
-    pub func_call_inputs: PortIDRange,
-    pub func_call_outputs: PortIDRange,
+    pub domain: Option<DomainID>,
+    pub declaration_instruction: Option<InterfaceDeclKind>,
 }
 
-impl Interface {
-    pub fn all_ports(&self) -> PortIDRange {
-        assert_eq!(self.func_call_inputs.1, self.func_call_outputs.0);
-        PortIDRange::new(self.func_call_inputs.0, self.func_call_outputs.1)
-    }
+#[derive(Debug, Clone, Copy)]
+pub enum PathElemRefersTo {
+    Interface(InterfaceID),
 }
 
 /// An element in a [WireReference] path. Could be array accesses, slice accesses, field accesses, etc
 ///
 /// When executing, this turns into [crate::instantiation::RealWirePathElem]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum WireReferencePathElement {
+    FieldAccess {
+        name: String,
+        name_span: Span,
+        refers_to: OnceCell<PathElemRefersTo>,
+        input_typ: TyCell<AbstractRankedType>,
+    },
     ArrayAccess {
         idx: FlatID,
         bracket_span: BracketSpan,
-        output_typ: AbstractRankedType,
+        input_typ: TyCell<AbstractRankedType>,
     },
+}
+
+impl WireReferencePathElement {
+    pub fn get_span(&self) -> Span {
+        match self {
+            WireReferencePathElement::FieldAccess { name_span, .. } => *name_span,
+            WireReferencePathElement::ArrayAccess { bracket_span, .. } => bracket_span.outer_span(),
+        }
+    }
 }
 
 /// The root of a [WireReference]. Basically where the wire reference starts.
@@ -322,14 +307,29 @@ pub enum WireReferenceRoot {
     /// [FlatID] points to [Instruction::Declaration]
     LocalDecl(FlatID),
     /// ```sus
+    /// FIFO fifo
+    /// fifo = 3
+    /// ```
+    ///
+    /// [FlatID] points to [Instruction::SubModule]
+    LocalSubmodule(FlatID),
+    /// ```sus
+    /// trigger xyz: int a
+    /// when something {
+    ///     xyz(5)
+    /// }
+    /// ```
+    ///
+    /// [FlatID] points to [Instruction::Interface]
+    LocalInterface(FlatID),
+    /// ```sus
     /// bool b = true // root is global constant `true`
     /// ```
     NamedConstant(GlobalReference<ConstantUUID>),
     /// ```sus
-    /// FIFO local_submodule
-    /// local_submodule.data_in = 3 // root is local_submodule.data_in (yes, both)
+    /// Repeat(...) // root is global constant `Repeat`
     /// ```
-    SubModulePort(PortReference),
+    NamedModule(GlobalReference<ModuleUUID>),
     /// Used to conveniently represent errors
     Error,
 }
@@ -338,8 +338,10 @@ impl WireReferenceRoot {
     pub fn get_root_flat(&self) -> Option<FlatID> {
         match self {
             WireReferenceRoot::LocalDecl(f) => Some(*f),
+            WireReferenceRoot::LocalSubmodule(f) => Some(*f),
+            WireReferenceRoot::LocalInterface(f) => Some(*f),
             WireReferenceRoot::NamedConstant(_) => None,
-            WireReferenceRoot::SubModulePort(port) => Some(port.submodule_decl),
+            WireReferenceRoot::NamedModule(_) => None,
             WireReferenceRoot::Error => None,
         }
     }
@@ -363,7 +365,7 @@ impl WireReferenceRoot {
 pub struct WireReference {
     pub root: WireReferenceRoot,
     pub path: Vec<WireReferencePathElement>,
-    pub root_typ: FullType,
+    pub output_typ: TyCell<AbstractRankedType>,
     pub root_span: Span,
 }
 
@@ -371,13 +373,21 @@ impl WireReference {
     pub fn is_error(&self) -> bool {
         matches!(&self.root, WireReferenceRoot::Error)
     }
-    pub fn get_output_typ(&self) -> &AbstractRankedType {
-        if let Some(last) = self.path.last() {
-            match last {
-                WireReferencePathElement::ArrayAccess { output_typ, .. } => output_typ,
+    pub fn get_root_typ(&self) -> &AbstractRankedType {
+        if let Some(first) = self.path.first() {
+            match first {
+                WireReferencePathElement::ArrayAccess { input_typ, .. }
+                | WireReferencePathElement::FieldAccess { input_typ, .. } => input_typ,
             }
         } else {
-            &self.root_typ.typ
+            &self.output_typ
+        }
+    }
+    pub fn get_total_span(&self) -> Span {
+        if let Some(last) = self.path.last() {
+            Span::new_overarching(self.root_span, last.get_span())
+        } else {
+            self.root_span
         }
     }
 }
@@ -423,6 +433,7 @@ pub struct WriteTo {
     pub to: WireReference,
     pub to_span: Span,
     pub write_modifiers: WriteModifiers,
+    pub target_domain: Cell<DomainType>,
 }
 
 /// -x
@@ -469,21 +480,6 @@ pub enum BinaryOperator {
     LesserEq,
 }
 
-/// A reference to a port within a submodule.
-/// Not to be confused with [Port], which is the declaration of the port itself in the [Module]
-#[derive(Debug, Clone, Copy)]
-pub struct PortReference {
-    pub submodule_decl: FlatID,
-    pub port: PortID,
-    pub is_input: bool,
-    /// Only set if the port is named as an explicit field. If the port name is implicit, such as in the function call syntax, then it is not present.
-    pub port_name_span: Option<Span>,
-    /// Even this can be implicit. In the inline function call instantiation syntax there's no named submodule. my_mod(a, b, c)
-    ///
-    /// Finally, if [Self::port_name_span].is_none(), then for highlighting and renaming, this points to a duplicate of a Function Call
-    pub submodule_name_span: Option<Span>,
-}
-
 /// See [Expression]
 #[derive(Debug)]
 pub enum ExpressionSource {
@@ -492,18 +488,18 @@ pub enum ExpressionSource {
     UnaryOp {
         op: UnaryOperator,
         /// Operators automatically parallelize across arrays
-        rank: PeanoType,
+        rank: TyCell<PeanoType>,
         right: FlatID,
     },
     BinaryOp {
         op: BinaryOperator,
         /// Operators automatically parallelize across arrays
-        rank: PeanoType,
+        rank: TyCell<PeanoType>,
         left: FlatID,
         right: FlatID,
     },
     ArrayConstruct(Vec<FlatID>),
-    Constant(Value),
+    Literal(Value),
 }
 /// [FuncCall]s (and potentially, in the future, other things) can have multiple outputs.
 /// We make the distinction between [SubExpression] that can only represent one output, and [MultiWrite], which can represent multiple outputs.
@@ -514,7 +510,7 @@ pub enum ExpressionSource {
 /// - We refuse to have tuple types
 #[derive(Debug)]
 pub enum ExpressionOutput {
-    SubExpression(AbstractRankedType),
+    SubExpression(TyCell<AbstractRankedType>),
     MultiWrite(Vec<WriteTo>),
 }
 /// An [Instruction] that represents a single expression in the program. Like ((3) + (x))
@@ -525,9 +521,10 @@ pub enum ExpressionOutput {
 #[derive(Debug)]
 pub struct Expression {
     pub span: Span,
+    pub parent_condition: Option<ParentCondition>,
     pub source: ExpressionSource,
     /// Means [Self::source] can be computed at compiletime, not that [Self::output] neccesarily requires a generative result
-    pub domain: DomainType,
+    pub domain: Cell<DomainType>,
 
     /// If [None], then this function returns a single result like a normal expression
     /// If Some(outputs), then this function is a dead-end expression, and does it's outputs manually
@@ -535,19 +532,19 @@ pub struct Expression {
 }
 
 impl Expression {
-    pub fn as_single_output_expr(&self) -> Option<SingleOutputExpression> {
+    pub fn as_single_output_expr(&self) -> Option<SingleOutputExpression<'_>> {
         let typ = match &self.output {
             ExpressionOutput::SubExpression(typ) => typ,
             ExpressionOutput::MultiWrite(write_tos) => {
                 let [single_write] = write_tos.as_slice() else {
                     return None;
                 };
-                single_write.to.get_output_typ()
+                &single_write.to.output_typ
             }
         };
         Some(SingleOutputExpression {
             typ,
-            domain: self.domain,
+            domain: self.domain.get(),
             span: self.span,
             source: &self.source,
         })
@@ -567,34 +564,67 @@ impl Expression {
 /// Is it a Port, Template argument, A struct field, or just a regular temporary?
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeclarationKind {
-    NotPort,
-    StructField { field_id: FieldID },
-    RegularPort { is_input: bool, port_id: PortID },
-    GenerativeInput(TemplateID),
+    RegularWire {
+        is_state: bool,
+        read_only: bool,
+    },
+    StructField(FieldID),
+    Port {
+        direction: Direction,
+        is_state: bool,
+        port_id: PortID,
+        parent_interface: InterfaceID,
+        domain: DomainID,
+    },
+    ConditionalBinding {
+        when_id: FlatID,
+        direction: Direction,
+        is_state: bool,
+    },
+    RegularGenerative {
+        read_only: bool,
+    },
+    TemplateParameter(TemplateID),
 }
 
 impl DeclarationKind {
-    /// Basically an unwrap to see if this [Declaration] refers to a [Port], and returns `Some(is_input)` if so.
-    pub fn is_io_port(&self) -> Option<bool> {
-        if let DeclarationKind::RegularPort {
-            is_input,
-            port_id: _,
-        } = self
-        {
-            Some(*is_input)
+    /// Basically an unwrap to see if this [Declaration] refers to a [Port], and returns `Some(direction)` if so.
+    pub fn is_io_port(&self) -> Option<Direction> {
+        if let DeclarationKind::Port { direction, .. } = self {
+            Some(*direction)
         } else {
             None
         }
     }
-    pub fn implies_read_only(&self) -> bool {
+    pub fn is_read_only(&self) -> bool {
         match self {
-            DeclarationKind::NotPort => false,
-            DeclarationKind::StructField { field_id: _ } => false,
-            DeclarationKind::RegularPort {
-                is_input,
-                port_id: _,
-            } => *is_input,
-            DeclarationKind::GenerativeInput(_) => true,
+            DeclarationKind::RegularWire { read_only, .. } => *read_only,
+            DeclarationKind::ConditionalBinding { direction, .. } => *direction == Direction::Input,
+            DeclarationKind::StructField(_) => false,
+            DeclarationKind::Port { direction, .. } => *direction == Direction::Input,
+            DeclarationKind::RegularGenerative { read_only } => *read_only,
+            DeclarationKind::TemplateParameter(_) => true,
+        }
+    }
+    pub fn is_generative(&self) -> bool {
+        match self {
+            DeclarationKind::RegularWire { .. }
+            | DeclarationKind::ConditionalBinding { .. }
+            | DeclarationKind::StructField(_)
+            | DeclarationKind::Port { .. } => false,
+            DeclarationKind::RegularGenerative { .. } | DeclarationKind::TemplateParameter(..) => {
+                true
+            }
+        }
+    }
+    pub fn is_state(&self) -> bool {
+        match self {
+            DeclarationKind::RegularWire { is_state, .. }
+            | DeclarationKind::Port { is_state, .. }
+            | DeclarationKind::ConditionalBinding { is_state, .. } => *is_state,
+            DeclarationKind::StructField(_)
+            | DeclarationKind::RegularGenerative { .. }
+            | DeclarationKind::TemplateParameter(..) => false,
         }
     }
 }
@@ -606,20 +636,16 @@ impl DeclarationKind {
 /// A Declaration Instruction always corresponds to a new entry in the [self::name_context::LocalVariableContext].
 #[derive(Debug)]
 pub struct Declaration {
+    pub parent_condition: Option<ParentCondition>,
     pub typ_expr: WrittenType,
-    pub typ: FullType,
+    pub typ: TyCell<AbstractRankedType>,
+    pub domain: Cell<DomainType>,
     pub decl_span: Span,
     pub name_span: Span,
     pub name: String,
-    pub declaration_runtime_depth: OnceCell<usize>,
-    /// Variables are read_only when they may not be controlled by the current block of code.
-    /// This is for example, the inputs of the current module, or the outputs of nested modules.
-    /// But could also be the iterator of a for loop.
-    pub read_only: bool,
     /// If the program text already covers the write, then lsp stuff on this declaration shouldn't use it.
     pub declaration_itself_is_not_written_to: bool,
     pub decl_kind: DeclarationKind,
-    pub identifier_type: IdentifierType,
     pub latency_specifier: Option<FlatID>,
     pub documentation: Documentation,
 }
@@ -633,47 +659,17 @@ pub struct Declaration {
 /// When instantiating, creates a [crate::instantiation::SubModule]
 #[derive(Debug)]
 pub struct SubModuleInstance {
+    pub parent_condition: Option<ParentCondition>,
     pub module_ref: GlobalReference<ModuleUUID>,
-    /// Name is not always present in source code. Such as in inline function call syntax: my_mod(a, b, c)
-    pub name: Option<(String, Span)>,
+
+    pub name: String,
+    pub name_span: Span,
     /// Maps each of the module's local domains to the domain that it is used in.
     ///
     /// These are *always* [DomainType::Physical] (of course, start out as [DomainType::Unknown] before typing)
-    pub local_interface_domains: FlatAlloc<DomainType, DomainIDMarker>,
+    pub local_domain_map: TyCell<FlatAlloc<DomainType, DomainIDMarker>>,
+    pub typ: TyCell<AbstractRankedType>,
     pub documentation: Documentation,
-}
-
-impl SubModuleInstance {
-    pub fn get_name<'o, 's: 'o, 'l: 'o>(&'s self, corresponding_module: &'l Module) -> &'o str {
-        if let Some((n, _span)) = &self.name {
-            n
-        } else {
-            &corresponding_module.link_info.name
-        }
-    }
-    /// If it is named, then return the [Span] of the name, otherwise return the span of the module ref
-    pub fn get_most_relevant_span(&self) -> Span {
-        if let Some((_name, span)) = &self.name {
-            *span
-        } else {
-            self.module_ref.get_total_span()
-        }
-    }
-}
-
-/// See [FuncCallInstruction]
-#[derive(Debug)]
-pub struct ModuleInterfaceReference {
-    pub submodule_decl: FlatID,
-    pub submodule_interface: InterfaceID,
-
-    /// If this is None, that means the submodule was declared implicitly. Hence it could also be used at compiletime
-    pub name_span: Option<Span>,
-
-    /// Best-effort span for the interface that is called. [my_mod<abc>](), my_mod<abc> mm; [mm]() or mm.[my_interface]()
-    ///
-    /// if interface_span == name_span then no specific interface is selected, so the main interface is used
-    pub interface_span: Span,
 }
 
 /// An [Expression] that represents the calling on an interface of a [SubModuleInstance].
@@ -713,7 +709,7 @@ pub struct ModuleInterfaceReference {
 /// ```
 #[derive(Debug)]
 pub struct FuncCall {
-    pub interface_reference: ModuleInterfaceReference,
+    pub func_wire_ref: FlatID,
 
     /// Points to a list of [Expression]
     pub arguments: Vec<FlatID>,
@@ -727,22 +723,221 @@ impl FuncCall {
     }
 }
 
+/// References any [crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant],
+/// and includes any template arguments.
+///
+/// As an example, this is the struct in charge of representing:
+/// ```sus
+/// FIFO #(DEPTH : 32, T : type int)
+/// ```
+#[derive(Debug)]
+pub struct GlobalReference<ID> {
+    pub name_span: Span,
+    pub id: ID,
+    pub template_args: Vec<WrittenTemplateArg>,
+    pub template_arg_types: TyCell<TVec<TemplateKind<AbstractRankedType, ()>>>,
+    pub template_span: Option<BracketSpan>,
+}
+
+impl<ID: Copy> GlobalReference<ID> {
+    pub fn get_total_span(&self) -> Span {
+        let mut result = self.name_span;
+        if let Some(template_span) = self.template_span {
+            result = Span::new_overarching(result, template_span.outer_span());
+        }
+        result
+    }
+
+    pub fn as_abstract_global_ref(&self) -> AbstractGlobalReference<ID> {
+        AbstractGlobalReference {
+            id: self.id,
+            template_arg_types: self.template_arg_types.clone(),
+        }
+    }
+
+    pub fn resolve_template_args(&self, errors: &ErrorCollector, target: &LinkInfo) {
+        let full_object_name = target.get_full_name();
+
+        let mut previous_uses: TVec<Option<Span>> = target.template_parameters.map(|_| None);
+
+        for arg in &self.template_args {
+            let name = &arg.name;
+            if let Some(refers_to) = target
+                .template_parameters
+                .find(|_, param| param.name == arg.name)
+            {
+                arg.refers_to.set(refers_to).unwrap();
+            }
+
+            if let Some(&refer_to) = arg.refers_to.get() {
+                let param = &target.template_parameters[refer_to];
+
+                match (&param.kind, &arg.kind) {
+                    (TemplateKind::Type(_), Some(TemplateKind::Value(_))) => {
+                        errors
+                            .error(
+                                arg.name_span,
+                                format!(
+                                "'{name}' is not a value. `type` keyword cannot be used for values"
+                            ),
+                            )
+                            .info((param.name_span, target.file), "Declared here");
+                    }
+                    (TemplateKind::Value(_), Some(TemplateKind::Type(_))) => {
+                        errors
+                            .error(arg.name_span, format!("'{name}' is not a type. To use template type arguments use the `type` keyword like `T: type int[123]`"))
+                            .info((param.name_span, target.file), "Declared here");
+                    }
+                    _ => {}
+                }
+
+                if let Some(prev_use) = previous_uses[refer_to] {
+                    errors
+                        .error(
+                            arg.name_span,
+                            format!("'{name}' has already been defined previously"),
+                        )
+                        .info_same_file(prev_use, format!("'{name}' specified here previously"));
+                } else {
+                    previous_uses[refer_to] = Some(arg.name_span);
+                }
+            } else {
+                errors
+                    .error(
+                        arg.name_span,
+                        format!("'{name}' is not a valid template argument of {full_object_name}"),
+                    )
+                    .info_obj(target);
+            }
+        }
+    }
+    pub fn get_arg_for(&self, id: TemplateID) -> Option<&WrittenTemplateArg> {
+        self.template_args
+            .iter()
+            .find(|arg| arg.refers_to.get().copied() == Some(id))
+    }
+    pub fn get_type_arg_for(&self, id: TemplateID) -> Option<&WrittenType> {
+        let arg = self.get_arg_for(id)?;
+        let Some(TemplateKind::Type(t)) = &arg.kind else {
+            return None;
+        };
+        Some(t)
+    }
+    pub fn get_value_arg_for(&self, id: TemplateID) -> Option<FlatID> {
+        let arg = self.get_arg_for(id)?;
+        let Some(TemplateKind::Value(v)) = &arg.kind else {
+            return None;
+        };
+        Some(*v)
+    }
+}
+
+#[derive(Debug)]
+pub struct WrittenTemplateArg {
+    pub name: String,
+    pub name_span: Span,
+    pub value_span: Span,
+    pub refers_to: OnceCell<TemplateID>,
+    pub kind: Option<TemplateKind<WrittenType, FlatID>>,
+}
+
+pub type AbstractTemplateArg = TemplateKind<TemplateArg<WrittenType>, TemplateArg<FlatID>>;
+
+impl AbstractTemplateArg {
+    pub fn map_is_provided(&self) -> Option<(Span, Span, TemplateKind<&WrittenType, &FlatID>)> {
+        match self {
+            TemplateKind::Type(TemplateArg::Provided {
+                name_span,
+                value_span,
+                arg,
+                ..
+            }) => Some((*name_span, *value_span, TemplateKind::Type(arg))),
+            TemplateKind::Value(TemplateArg::Provided {
+                name_span,
+                value_span,
+                arg,
+                ..
+            }) => Some((*name_span, *value_span, TemplateKind::Value(arg))),
+            TemplateKind::Type(TemplateArg::NotProvided { .. }) => None,
+            TemplateKind::Value(TemplateArg::NotProvided { .. }) => None,
+        }
+    }
+}
+
+/// The textual representation of a type expression in the source code.
+///
+/// Not to be confused with [crate::typing::abstract_type::AbstractType] which is for working with types in the flattening stage,
+/// or [crate::typing::concrete_type::ConcreteType], which is for working with types post instantiation.
+#[derive(Debug)]
+pub enum WrittenType {
+    Error(Span),
+    TemplateVariable(Span, TemplateID),
+    Named(GlobalReference<TypeUUID>),
+    Array(Span, Box<(WrittenType, FlatID, BracketSpan)>),
+}
+
+impl WrittenType {
+    pub fn get_span(&self) -> Span {
+        match self {
+            WrittenType::Error(total_span)
+            | WrittenType::TemplateVariable(total_span, ..)
+            | WrittenType::Array(total_span, _) => *total_span,
+            WrittenType::Named(global_ref) => global_ref.get_total_span(),
+        }
+    }
+}
+
 /// A control-flow altering [Instruction] to represent compiletime and runtime if & when statements.
 #[derive(Debug)]
 pub struct IfStatement {
+    pub if_keyword_span: Span,
+    pub parent_condition: Option<ParentCondition>,
     pub condition: FlatID,
     pub is_generative: bool,
     pub then_block: FlatIDRange,
     pub else_block: FlatIDRange,
+    pub bindings_read_only: Vec<FlatID>,
+    pub bindings_writable: Vec<FlatID>,
+    pub conditional_bindings_span: Option<Span>,
 }
 
 /// A control-flow altering [Instruction] to represent compiletime looping on a generative index
 #[derive(Debug)]
 pub struct ForStatement {
+    pub parent_condition: Option<ParentCondition>,
     pub loop_var_decl: FlatID,
     pub start: FlatID,
     pub end: FlatID,
     pub loop_body: FlatIDRange,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParentCondition {
+    parent_when: FlatID,
+    is_else_branch: bool,
+}
+
+#[derive(Debug)]
+pub struct InterfaceDeclaration {
+    pub parent_condition: Option<ParentCondition>,
+    pub name: String,
+    pub name_span: Span,
+    pub decl_span: Span,
+    pub interface_kw_span: Span,
+    pub documentation: Documentation,
+    pub latency_specifier: Option<FlatID>,
+    pub is_local: bool,
+    pub interface_id: InterfaceID,
+    pub interface_kind: InterfaceKind,
+    /// These and [Self::outputs] are respective to the function-call syntax!
+    ///
+    /// Do not be confused by [InterfaceKind::Trigger], where [Self::inputs] corresponds to module Output ports!
+    pub inputs: Vec<FlatID>,
+    /// See [Self::inputs]
+    pub outputs: Vec<FlatID>,
+    pub then_block: FlatIDRange,
+    pub else_block: FlatIDRange,
+    pub domain: DomainType,
 }
 
 /// When a module has been parsed and flattened, it is turned into a large list of instructions,
@@ -759,6 +954,7 @@ pub struct ForStatement {
 pub enum Instruction {
     SubModule(SubModuleInstance),
     Declaration(Declaration),
+    Interface(InterfaceDeclaration),
     Expression(Expression),
     IfStatement(IfStatement),
     ForStatement(ForStatement),
@@ -782,14 +978,14 @@ impl Instruction {
         expr
     }
     #[track_caller]
-    pub fn unwrap_subexpression(&self) -> SingleOutputExpression {
+    pub fn unwrap_subexpression(&self) -> SingleOutputExpression<'_> {
         let expr = self.unwrap_expression();
         let ExpressionOutput::SubExpression(typ) = &expr.output else {
             unreachable!("unwrap_subexpression on not a SubExpression")
         };
         SingleOutputExpression {
             typ,
-            domain: expr.domain,
+            domain: expr.domain.get(),
             span: expr.span,
             source: &expr.source,
         }
@@ -802,22 +998,80 @@ impl Instruction {
         decl
     }
     #[track_caller]
+    pub fn unwrap_interface(&self) -> &InterfaceDeclaration {
+        let Self::Interface(interf) = self else {
+            panic!("unwrap_declaration on not a Declaration! Found {self:?}")
+        };
+        interf
+    }
+    #[track_caller]
     pub fn unwrap_submodule(&self) -> &SubModuleInstance {
         let Self::SubModule(sm) = self else {
             panic!("unwrap_submodule on not a SubModule! Found {self:?}")
         };
         sm
     }
+    #[track_caller]
+    pub fn unwrap_if(&self) -> &IfStatement {
+        let Self::IfStatement(ii) = self else {
+            panic!("unwrap_if on not a IfStatement! Found {self:?}")
+        };
+        ii
+    }
 
+    pub fn get_parent_condition(&self) -> Option<ParentCondition> {
+        match self {
+            Instruction::SubModule(SubModuleInstance {
+                parent_condition, ..
+            })
+            | Instruction::Declaration(Declaration {
+                parent_condition, ..
+            })
+            | Instruction::Expression(Expression {
+                parent_condition, ..
+            })
+            | Instruction::IfStatement(IfStatement {
+                parent_condition, ..
+            })
+            | Instruction::ForStatement(ForStatement {
+                parent_condition, ..
+            })
+            | Instruction::Interface(InterfaceDeclaration {
+                parent_condition, ..
+            }) => *parent_condition,
+        }
+    }
     pub fn get_span(&self) -> Span {
         match self {
-            Instruction::SubModule(sub_module_instance) => {
-                sub_module_instance.get_most_relevant_span()
-            }
-            Instruction::Declaration(declaration) => declaration.decl_span,
+            Instruction::SubModule(sub_module_instance) => sub_module_instance.name_span,
+            Instruction::Declaration(declaration) => declaration.name_span,
+            Instruction::Interface(act_trig) => act_trig.name_span,
             Instruction::Expression(expression) => expression.span,
-            Instruction::IfStatement(_) => unreachable!(),
-            Instruction::ForStatement(_) => unreachable!(),
+            Instruction::IfStatement(_) | Instruction::ForStatement(_) => {
+                unreachable!("{self:?} is control flow! Shouldn't ask it's span")
+            }
+        }
+    }
+    pub fn get_name(&self) -> &str {
+        match self {
+            Instruction::Declaration(declaration) => &declaration.name,
+            Instruction::Interface(interface_declaration) => &interface_declaration.name,
+            Instruction::SubModule(submod) => &submod.name,
+            Instruction::Expression(_)
+            | Instruction::IfStatement(_)
+            | Instruction::ForStatement(_) => unreachable!("{self:?} is not nameable!"),
+        }
+    }
+    pub fn get_latency_specifier(&self) -> Option<FlatID> {
+        match self {
+            Instruction::Declaration(declaration) => declaration.latency_specifier,
+            Instruction::Interface(interface) => interface.latency_specifier,
+            Instruction::SubModule(_)
+            | Instruction::Expression(_)
+            | Instruction::IfStatement(_)
+            | Instruction::ForStatement(_) => {
+                unreachable!("{self:?} Cannot have Latency Specifier!")
+            }
         }
     }
 }

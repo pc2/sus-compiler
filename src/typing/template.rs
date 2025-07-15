@@ -1,10 +1,9 @@
+use super::abstract_type::AbstractRankedType;
+use crate::prelude::*;
 use ibig::IBig;
 
-use super::{
-    abstract_type::AbstractRankedType, concrete_type::ConcreteTemplateArg,
-    value_unifier::UnifyableValue, written_type::WrittenType,
-};
-use crate::{prelude::*, typing::set_unifier::Unifyable, value::Value};
+use super::{concrete_type::ConcreteTemplateArg, value_unifier::UnifyableValue};
+use crate::{typing::set_unifier::Unifyable, value::Value};
 
 /// See [TVec]. All circumstances handling Templates need to handle both Types and Values.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -71,54 +70,6 @@ impl<T> TemplateKind<T, T> {
     }
 }
 
-/// References any [crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant],
-/// and includes any template arguments.
-///
-/// As an example, this is the struct in charge of representing:
-/// ```sus
-/// FIFO #(DEPTH : 32, T : type int)
-/// ```
-#[derive(Debug)]
-pub struct GlobalReference<ID> {
-    pub name_span: Span,
-    pub id: ID,
-    pub template_args: TVec<AbstractTemplateArg>,
-    pub template_span: Option<BracketSpan>,
-}
-
-impl<ID> GlobalReference<ID> {
-    pub fn get_total_span(&self) -> Span {
-        let mut result = self.name_span;
-        if let Some(template_span) = self.template_span {
-            result = Span::new_overarching(result, template_span.outer_span());
-        }
-        result
-    }
-}
-
-pub type AbstractTemplateArg = TemplateKind<TemplateArg<WrittenType>, TemplateArg<FlatID>>;
-
-impl AbstractTemplateArg {
-    pub fn map_is_provided(&self) -> Option<(Span, Span, TemplateKind<&WrittenType, &FlatID>)> {
-        match self {
-            TemplateKind::Type(TemplateArg::Provided {
-                name_span,
-                value_span,
-                arg,
-                ..
-            }) => Some((*name_span, *value_span, TemplateKind::Type(arg))),
-            TemplateKind::Value(TemplateArg::Provided {
-                name_span,
-                value_span,
-                arg,
-                ..
-            }) => Some((*name_span, *value_span, TemplateKind::Value(arg))),
-            TemplateKind::Type(TemplateArg::NotProvided { .. }) => None,
-            TemplateKind::Value(TemplateArg::NotProvided { .. }) => None,
-        }
-    }
-}
-
 /// The template parameters of an object ([crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant])
 ///
 /// See [crate::linker::LinkInfo]
@@ -178,22 +129,6 @@ impl<T> TemplateArg<T> {
 
 /// A convienent type alias for all places where lists of template args are needed
 pub type TVec<T> = FlatAlloc<T, TemplateIDMarker>;
-
-pub fn for_each_generative_input_in_template_args(
-    template_args: &TVec<AbstractTemplateArg>,
-    f: &mut impl FnMut(FlatID),
-) {
-    for (_id, t_arg) in template_args {
-        match t_arg {
-            TemplateKind::Type(TemplateArg::Provided { arg: wr_typ, .. }) => {
-                wr_typ.for_each_generative_input(f)
-            }
-            TemplateKind::Value(TemplateArg::Provided { arg: val, .. }) => f(*val),
-            TemplateKind::Type(TemplateArg::NotProvided { .. })
-            | TemplateKind::Value(TemplateArg::NotProvided { .. }) => {}
-        }
-    }
-}
 
 impl TVec<ConcreteTemplateArg> {
     pub fn cast_to_unifyable_array<const N: usize>(&self) -> [&UnifyableValue; N] {

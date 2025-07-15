@@ -1,0 +1,1 @@
+cargo +nightly miri test

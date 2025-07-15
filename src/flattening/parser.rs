@@ -1,7 +1,7 @@
 use crate::{linker::FileData, prelude::*};
 
 use sus_proc_macro::{field, kind, kw};
-use tree_sitter::{Tree, TreeCursor};
+use tree_sitter::TreeCursor;
 
 use crate::{file_position::FileText, linker::Documentation};
 
@@ -45,9 +45,9 @@ pub struct Cursor<'t> {
 }
 
 impl<'t> Cursor<'t> {
-    pub fn new_at_root(tree: &'t Tree, file_data: &'t FileData) -> Result<Self, Span> {
+    pub fn new_at_root(file_data: &'t FileData) -> Result<Self, Span> {
         let result = Self {
-            cursor: tree.walk(),
+            cursor: file_data.tree.walk(),
             file_data,
             gathered_comments: Vec::new(),
             current_field_was_already_consumed: false,

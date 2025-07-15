@@ -8,7 +8,7 @@ pub fn wire_name_with_latency(
     wire: &RealWire,
     absolute_latency: i64,
     use_latency: bool,
-) -> Cow<str> {
+) -> Cow<'_, str> {
     assert!(wire.absolute_latency <= absolute_latency);
     if use_latency && (wire.absolute_latency != absolute_latency) {
         if absolute_latency < 0 {
@@ -21,6 +21,6 @@ pub fn wire_name_with_latency(
     }
 }
 
-pub fn wire_name_self_latency(wire: &RealWire, use_latency: bool) -> Cow<str> {
+pub fn wire_name_self_latency(wire: &RealWire, use_latency: bool) -> Cow<'_, str> {
     wire_name_with_latency(wire, wire.absolute_latency, use_latency)
 }

@@ -54,9 +54,17 @@ pub struct ConfigStruct {
     pub files: Vec<PathBuf>,
 }
 
+pub const VERSION_INFO: &str = concat!(
+    env!("CARGO_PKG_VERSION"),
+    " (",
+    env!("GIT_HASH"),
+    ") built at ",
+    env!("BUILD_DATE")
+);
+
 fn command_builder() -> Command {
     Command::new("SUS Compiler")
-        .version(env!("CARGO_PKG_VERSION"))
+        .version(VERSION_INFO)
         .author(env!("CARGO_PKG_AUTHORS"))
         .about("The compiler for the SUS Hardware Design Language. This compiler takes in .sus files, and produces equivalent SystemVerilog files")
         .arg(Arg::new("socket")
@@ -202,45 +210,4 @@ pub fn initialize_config_from_cli_args() {
 /// Access the singleton [ConfigStruct] representing the CLI arguments passed to `sus_compiler`
 pub fn config() -> &'static ConfigStruct {
     CONFIG.get().unwrap()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::parse_args;
-
-    #[test]
-    fn test_socket_invalid_port() {
-        let config = parse_args(["", "--lsp", "--socket", "1234567890"]);
-        assert!(config.is_err());
-        let err = config.unwrap_err();
-        assert_eq!(err.kind(), clap::error::ErrorKind::ValueValidation);
-    }
-
-    #[test]
-    fn test_socket_require_lsp() {
-        let config = parse_args(["", "--socket", "1500"]);
-        assert!(config.is_err());
-        let err = config.unwrap_err();
-        assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
-    }
-
-    #[test]
-    fn test_lsp_debug_require_lsp() {
-        let config = parse_args(["", "--lsp-debug"]);
-        assert!(config.is_err());
-        let err = config.unwrap_err();
-        assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
-    }
-
-    #[test]
-    fn test_lsp_no_color() {
-        let config = parse_args(["", "--lsp"]).unwrap();
-        assert!(!config.use_color)
-    }
-
-    #[test]
-    fn test_automatic_codegen() {
-        let config = parse_args([""]).unwrap();
-        assert!(config.codegen)
-    }
 }

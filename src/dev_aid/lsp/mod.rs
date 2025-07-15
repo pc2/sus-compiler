@@ -91,7 +91,7 @@ impl Linker {
         } else {
             let file_text = std::fs::read_to_string(uri.to_file_path().unwrap()).unwrap();
 
-            let file_uuid = self.add_file(uri.to_string(), file_text, manager);
+            let file_uuid = self.add_file_text(uri.to_string(), file_text, manager);
             self.recompile_all();
             file_uuid
         }
@@ -201,7 +201,13 @@ fn initialize_all_files(init_params: &InitializeParams) -> (Linker, LSPFileManag
 
     linker.add_standard_library(&mut manager);
 
-    if let Some(workspace_folder) = &init_params.workspace_folders {
+    let files = &config().files;
+    if !files.is_empty() {
+        for f in files {
+            let path = f.canonicalize().unwrap();
+            linker.add_file(&path, &mut manager);
+        }
+    } else if let Some(workspace_folder) = &init_params.workspace_folders {
         for folder in workspace_folder {
             let Ok(path) = folder.uri.to_file_path() else {
                 continue;
@@ -210,6 +216,7 @@ fn initialize_all_files(init_params: &InitializeParams) -> (Linker, LSPFileManag
             linker.add_all_files_in_directory(&path, &mut manager);
         }
     }
+
     linker.recompile_all();
     (linker, manager)
 }
@@ -331,6 +338,39 @@ fn gather_all_references_across_all_files(
     ref_locations
 }
 
+fn goto_definition(linker: &mut Linker, file_uuid: FileUUID, pos: usize) -> Vec<(Span, FileUUID)> {
+    let mut goto_definition_list: Vec<SpanFile> = Vec::new();
+
+    let Some((_location, info)) = get_selected_object(linker, file_uuid, pos) else {
+        return Vec::new();
+    };
+    match info {
+        LocationInfo::InGlobal(_obj_id, link_info, _, InGlobal::NamedLocal(decl)) => {
+            goto_definition_list.push((decl.name_span, link_info.file));
+        }
+        LocationInfo::InGlobal(_obj_id, link_info, _, InGlobal::NamedSubmodule(submod_decl)) => {
+            goto_definition_list.push((submod_decl.name_span, link_info.file))
+        }
+        LocationInfo::InGlobal(_obj_id, link_info, _, InGlobal::LocalInterface(interface)) => {
+            goto_definition_list.push((interface.name_span, link_info.file))
+        }
+        LocationInfo::InGlobal(_, _, _, InGlobal::Temporary(_)) => {}
+        LocationInfo::Type(_, _) => {}
+        LocationInfo::Parameter(_, link_info, _, template_arg) => {
+            goto_definition_list.push((template_arg.name_span, link_info.file))
+        }
+        LocationInfo::Global(id) => {
+            let link_info = &linker.globals[id];
+            goto_definition_list.push((link_info.name_span, link_info.file));
+        }
+        LocationInfo::Interface(_md_uuid, md, _interface_id, interface) => {
+            goto_definition_list.push((interface.name_span, md.link_info.file));
+        }
+    }
+
+    goto_definition_list
+}
+
 fn handle_request(
     method: &str,
     params: serde_json::Value,
@@ -372,42 +412,7 @@ fn handle_request(
             let (file_uuid, pos) =
                 linker.location_in_file(&params.text_document_position_params, manager);
 
-            let mut goto_definition_list: Vec<SpanFile> = Vec::new();
-
-            if let Some((_location, info)) = get_selected_object(linker, file_uuid, pos) {
-                match info {
-                    LocationInfo::InGlobal(
-                        _obj_id,
-                        link_info,
-                        _decl_id,
-                        InGlobal::NamedLocal(decl),
-                    ) => {
-                        goto_definition_list.push((decl.name_span, link_info.file));
-                    }
-                    LocationInfo::InGlobal(
-                        _obj_id,
-                        link_info,
-                        _decl_id,
-                        InGlobal::NamedSubmodule(submod_decl),
-                    ) => goto_definition_list
-                        .push((submod_decl.name.as_ref().unwrap().1, link_info.file)),
-                    LocationInfo::InGlobal(_, _, _, InGlobal::Temporary(_)) => {}
-                    LocationInfo::Type(_, _) => {}
-                    LocationInfo::Parameter(_, link_info, _, template_arg) => {
-                        goto_definition_list.push((template_arg.name_span, link_info.file))
-                    }
-                    LocationInfo::Global(id) => {
-                        let link_info = linker.get_link_info(id);
-                        goto_definition_list.push((link_info.name_span, link_info.file));
-                    }
-                    LocationInfo::Port(_sm, md, port_id) => {
-                        goto_definition_list.push((md.ports[port_id].name_span, md.link_info.file));
-                    }
-                    LocationInfo::Interface(_md_uuid, md, _interface_id, interface) => {
-                        goto_definition_list.push((interface.name_span, md.link_info.file));
-                    }
-                }
-            }
+            let goto_definition_list = goto_definition(linker, file_uuid, pos);
 
             serde_json::to_value(GotoDefinitionResponse::Array(cvt_location_list(
                 goto_definition_list,

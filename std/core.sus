@@ -9,9 +9,9 @@ __builtin__ module LatencyOffset #(T, int OFFSET) {
 /// Important: Does not perform any kind of Clock Domain Crossing!
 __builtin__ module CrossDomain #(T) {
     domain in_clk
-    interface in_domain : T in'0
+    input T in'0
     domain out_clk
-    interface out_domain : -> T out'0
+    output T out'0
 }
 
 __builtin__ module IntToBits #(int NUM_BITS) {
@@ -19,7 +19,7 @@ __builtin__ module IntToBits #(int NUM_BITS) {
 }
 
 __builtin__ module BitsToInt #(int NUM_BITS) {
-    interface IntToBits : bool[NUM_BITS] bits'0 -> int #(MIN: -pow2 #(E: NUM_BITS - 1), MAX: pow2 #(E: NUM_BITS - 1) - 1) value'0
+    interface BitsToInt : bool[NUM_BITS] bits'0 -> int #(MIN: -pow2 #(E: NUM_BITS - 1), MAX: pow2 #(E: NUM_BITS - 1) - 1) value'0
 }
 
 __builtin__ module UIntToBits #(int NUM_BITS) {
@@ -28,6 +28,25 @@ __builtin__ module UIntToBits #(int NUM_BITS) {
 
 __builtin__ module BitsToUInt #(int NUM_BITS) {
     interface BitsToUInt : bool[NUM_BITS] bits'0 -> int #(MIN: 0, MAX: pow2 #(E: NUM_BITS) - 1) value'0
+}
+
+__builtin__ module transmute_to_bits #(T) {
+    interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+}
+
+__builtin__ module transmute_from_bits #(T) {
+    interface transmute_from_bits : bool[sizeof #(T)] bits'0 -> T value'0
+}
+
+module transmute #(T1, T2) {
+    interface transmute : T1 a'0 -> T2 b'0
+
+    gen int SIZE = sizeof #(T: type T1)
+    
+    assert #(C: SIZE == sizeof #(T: type T2))
+
+    bool[SIZE] as_bits = transmute_to_bits #(T: type T1)(a)
+    b = transmute_from_bits #(T: type T2)(as_bits)
 }
 
 // For now these builtin declarations must be in this order, because they're constants in the code. 

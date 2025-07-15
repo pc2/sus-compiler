@@ -117,9 +117,11 @@ impl LatencyCountingProblem {
 
         // Ports
         let mut ports = LatencyCountingPorts::default();
-        for (_id, p) in ctx.interface_ports.iter_valids() {
-            let node = map_wire_to_latency_node[p.wire];
-            ports.push(node, p.is_input);
+        for (wire_id, w) in &ctx.wires {
+            if let Some(direction) = w.is_port {
+                let node = map_wire_to_latency_node[wire_id];
+                ports.push(node, direction);
+            }
         }
 
         // Basic wire-based edges
@@ -256,6 +258,11 @@ impl InstantiatedModule {
 
         for (_id, w) in &self.wires {
             w.source.iter_sources_with_min_latency(|other, _| {
+                let other = match &self.wires[other].source {
+                    // For inlining path-less Selects
+                    RealWireDataSource::Select { root, path } if path.is_empty() => *root,
+                    _ => other,
+                };
                 let nu = &mut result[other];
 
                 *nu = max(*nu, w.absolute_latency);
@@ -270,28 +277,6 @@ impl ModuleTypingContext<'_> {
     // Returns a proper interface if all ports involved did not produce an error. If a port did produce an error then returns None.
     // Computes all latencies involved
     pub fn compute_latencies(&mut self, unifier: &ValueUnifierStore) {
-        let mut any_invalid_port = false;
-        for (port_id, p) in self.interface_ports.iter_valids() {
-            if !p.is_input {
-                let port_wire = &self.wires[p.wire];
-                let RealWireDataSource::Multiplexer {
-                    is_state: _,
-                    sources,
-                } = &port_wire.source
-                else {
-                    unreachable!()
-                };
-                if sources.is_empty() && port_wire.specified_latency == CALCULATE_LATENCY_LATER {
-                    any_invalid_port = true;
-                    let port = &self.md.ports[port_id];
-                    self.errors.error(port.name_span, format!("Pre-emptive error because latency-unspecified '{}' is never written to. \n(This is because work-in-progress code would get a lot of latency counting errors while unfinished)", port.name));
-                }
-            }
-        }
-        if any_invalid_port {
-            return; // Early exit so we don't flood WIP modules with "Node not reached by Latency Counting" errors
-        }
-
         let mut problem = LatencyCountingProblem::new(self, unifier);
         // Remove all poisoned edges as solve_latencies doesn't deal with them
         problem.remove_poison_edges();
@@ -342,7 +327,9 @@ impl ModuleTypingContext<'_> {
 
         // Finally update interface absolute latencies
         for (_id, port) in self.interface_ports.iter_valids_mut() {
-            port.absolute_latency = self.wires[port.wire].absolute_latency;
+            let port_wire = &self.wires[port.wire];
+            port.absolute_latency = port_wire.absolute_latency;
+            port.typ = port_wire.typ.clone();
         }
     }
 
@@ -383,11 +370,11 @@ impl ModuleTypingContext<'_> {
     fn gather_all_mux_inputs(
         &self,
         latency_node_meanings: &[WireID],
-        conflict_iter: &[SpecifiedLatency],
+        conflicts: &[SpecifiedLatency],
     ) -> Vec<PathMuxSource<'_>> {
         let mut connection_list = Vec::new();
-        for window in conflict_iter.windows(2) {
-            let [from, to] = window else { unreachable!() };
+        for (idx, from) in conflicts.iter().enumerate() {
+            let to = &conflicts[(idx + 1) % conflicts.len()];
             let from_wire_id = latency_node_meanings[from.node];
             //let from_wire = &self.wires[from_wire_id];
             let to_wire_id = latency_node_meanings[to.node];
@@ -489,10 +476,9 @@ impl ModuleTypingContext<'_> {
             }
             LatencyCountingError::IndeterminablePortLatency { bad_ports } => {
                 for (port, a, b) in bad_ports {
-                    let port_decl = self.md.link_info.instructions
-                        [self.wires[latency_node_meanings[port]].original_instruction]
-                        .unwrap_declaration();
-                    error(port_decl.name_span, format!("Cannot determine port latency. Options are {a} and {b}\nTry specifying an explicit latency or rework the module to remove this ambiguity"));
+                    let port_instr = self.wires[latency_node_meanings[port]].original_instruction;
+                    let port_name_span = self.md.link_info.instructions[port_instr].get_span();
+                    error(port_name_span, format!("Cannot determine port latency. Options are {a} and {b}\nTry specifying an explicit latency or rework the module to remove this ambiguity"));
                 }
             }
             LatencyCountingError::UnreachablePortInThisDomain { hit_and_not_hit } => {
@@ -508,19 +494,14 @@ impl ModuleTypingContext<'_> {
                     let hit_names: Vec<_> = hit_instrs
                         .iter()
                         .map(|instr| {
-                            format!(
-                                "'{}'",
-                                self.md.link_info.instructions[*instr]
-                                    .unwrap_declaration()
-                                    .name
-                            )
+                            let name = self.md.link_info.instructions[*instr].get_name();
+                            format!("'{name}'")
                         })
                         .collect();
                     let hit_names_error_infos: Vec<_> = hit_instrs
                         .iter()
                         .map(|instr| {
                             self.md.link_info.instructions[*instr]
-                                .unwrap_declaration()
                                 .make_info(self.md.link_info.file)
                                 .unwrap()
                         })
@@ -528,9 +509,7 @@ impl ModuleTypingContext<'_> {
                     let strongly_connected_port_list = hit_names.join(", ");
 
                     for non_hit in non_hit_instrs {
-                        let node_instr_span = self.md.link_info.instructions[*non_hit]
-                            .unwrap_declaration()
-                            .name_span;
+                        let node_instr_span = self.md.link_info.instructions[*non_hit].get_span();
 
                         error(node_instr_span, format!("This port is not strongly connected to the strongly connected port cluster {strongly_connected_port_list}.\nAn input and output port are strongly connected if there is a direct dependency path from the input port to the output port.\nStrongly connected ports are also transitive.\nIf you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.")).add_info_list(hit_names_error_infos.clone());
                     }
@@ -541,12 +520,10 @@ impl ModuleTypingContext<'_> {
                     &self.wires[latency_node_meanings[conflict_path.first().unwrap().node]];
                 let end_wire =
                     &self.wires[latency_node_meanings[conflict_path.last().unwrap().node]];
-                let start_decl = self.md.link_info.instructions[start_wire.original_instruction]
-                    .unwrap_declaration();
-                let end_decl = self.md.link_info.instructions[end_wire.original_instruction]
-                    .unwrap_declaration();
+                let start_decl = &self.md.link_info.instructions[start_wire.original_instruction];
+                let end_decl = &self.md.link_info.instructions[end_wire.original_instruction];
                 let end_latency_decl = self.md.link_info.instructions
-                    [end_decl.latency_specifier.unwrap()]
+                    [end_decl.get_latency_specifier().unwrap()]
                 .unwrap_expression();
 
                 let writes_involved =

@@ -91,7 +91,7 @@ pub fn compile_all(file_paths: Vec<PathBuf>) -> (Linker, FileSourcesManager) {
             }
         };
 
-        linker.add_file(
+        linker.add_file_text(
             file_path.to_string_lossy().into_owned(),
             file_text,
             &mut file_source_manager,

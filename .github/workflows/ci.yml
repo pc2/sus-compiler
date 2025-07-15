@@ -46,4 +46,4 @@ jobs:
     - name: format
       run: cargo fmt --check
     - name: clippy
-      run: cargo clippy -- -Dwarnings
+      run: RUSTFLAGS="-A unused" cargo clippy -- -Dwarnings

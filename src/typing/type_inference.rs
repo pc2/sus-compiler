@@ -7,10 +7,13 @@ use std::ops::{BitAnd, BitAndAssign, Deref, DerefMut};
 use crate::errors::ErrorInfo;
 use crate::prelude::*;
 
-use crate::alloc::{UUIDMarker, UUID};
+use crate::alloc::{zip_eq, UUIDMarker, UUID};
+use crate::typing::abstract_type::AbstractGlobalReference;
+use crate::typing::domain_type::DomainType;
+use crate::typing::template::TemplateKind;
 
+use super::abstract_type::AbstractRankedType;
 use super::abstract_type::{AbstractInnerType, PeanoType};
-use super::abstract_type::{AbstractRankedType, DomainType};
 
 pub struct InnerTypeVariableIDMarker;
 impl UUIDMarker for InnerTypeVariableIDMarker {
@@ -63,8 +66,8 @@ impl<F: FnOnce() -> (String, Vec<ErrorInfo>)> UnifyErrorReport for F {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnifyResult {
     Success,
-    NoMatchingTypeFunc,
-    NoInfiniteTypes,
+    Failure,
+    FailureInfiniteTypes,
 }
 impl BitAnd for UnifyResult {
     type Output = UnifyResult;
@@ -125,7 +128,7 @@ impl<MyType: HindleyMilner> TypeSubstitutor<MyType> {
         }
 
         if self.does_typ_reference_var_recurse_with_substitution(replace_with, empty_var) {
-            UnifyResult::NoInfiniteTypes
+            UnifyResult::FailureInfiniteTypes
         } else {
             assert!(self[empty_var].set(replace_with.clone()).is_ok());
             UnifyResult::Success
@@ -157,7 +160,7 @@ impl<MyType: HindleyMilner> TypeSubstitutor<MyType> {
             }
             (HindleyMilnerInfo::TypeFunc(tf_a), HindleyMilnerInfo::TypeFunc(tf_b), _, _) => {
                 if tf_a != tf_b {
-                    UnifyResult::NoMatchingTypeFunc
+                    UnifyResult::Failure
                 } else {
                     MyType::unify_all_args(a, b, &mut |arg_a, arg_b| self.unify(arg_a, arg_b))
                 }
@@ -307,6 +310,8 @@ pub trait HindleyMilner: Sized + Clone {
 pub enum AbstractTypeHMInfo {
     Template(TemplateID),
     Named(TypeUUID),
+    Interface(ModuleUUID, InterfaceID),
+    LocalInterface(FlatID),
 }
 
 impl HindleyMilner for AbstractInnerType {
@@ -319,8 +324,14 @@ impl HindleyMilner for AbstractInnerType {
             AbstractInnerType::Template(template_id) => {
                 HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Template(*template_id))
             }
-            AbstractInnerType::Named(named_id) => {
-                HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Named(*named_id))
+            AbstractInnerType::Named(named) => {
+                HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Named(named.id))
+            }
+            AbstractInnerType::Interface(md_ref, interface) => {
+                HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Interface(md_ref.id, *interface))
+            }
+            AbstractInnerType::LocalInterface(decl) => {
+                HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::LocalInterface(*decl))
             }
         }
     }
@@ -336,16 +347,39 @@ impl HindleyMilner for AbstractInnerType {
                 UnifyResult::Success
             } // Already covered by get_hm_info
             (AbstractInnerType::Named(na), AbstractInnerType::Named(nb)) => {
-                assert!(*na == *nb);
+                assert!(na.id == nb.id);
+
+                for (_, a, b) in zip_eq(&na.template_arg_types, &nb.template_arg_types) {
+                    match a.and_by_ref(b) {
+                        TemplateKind::Type((a, b)) => {
+                            todo!("Abstract Type Type Parameter Unification")
+                        }
+                        TemplateKind::Value(((), ())) => {}
+                    }
+                }
+
                 UnifyResult::Success
             } // Already covered by get_hm_info
             (_, _) => unreachable!("All others should have been eliminated by get_hm_info check"),
         }
     }
 
+    /// Doesn't cover the PeanoType Unknowns
     fn for_each_unknown(&self, f: &mut impl FnMut(InnerTypeVariableID)) {
         match self {
-            AbstractInnerType::Template(_) | AbstractInnerType::Named(_) => {}
+            AbstractInnerType::Template(_)
+            | AbstractInnerType::Named(_)
+            | AbstractInnerType::LocalInterface(_) => {}
+            AbstractInnerType::Interface(md_ref, _) => {
+                for (_, arg) in &md_ref.template_arg_types {
+                    match arg {
+                        TemplateKind::Type(arg) => {
+                            arg.inner.for_each_unknown(f);
+                        }
+                        TemplateKind::Value(()) => {}
+                    }
+                }
+            }
             AbstractInnerType::Unknown(uuid) => f(*uuid),
         }
     }
@@ -425,13 +459,6 @@ impl HindleyMilner for DomainType {
 pub trait Substitutor {
     type MyType: Clone + Debug;
     fn unify_total(&mut self, from: &Self::MyType, to: &Self::MyType) -> UnifyResult;
-
-    fn unify_must_succeed(&mut self, a: &Self::MyType, b: &Self::MyType) {
-        assert!(
-            self.unify_total(a, b) == UnifyResult::Success,
-            "This unification cannot fail. Usually because we're unifying with a Written Type: {a:?} <-> {b:?}"
-        );
-    }
 }
 
 impl Substitutor for TypeSubstitutor<DomainType> {
@@ -475,6 +502,11 @@ impl Substitutor for AbstractTypeSubstitutor {
             & self.rank_substitutor.unify(&from.rank, &to.rank)
     }
 }
+impl TypeSubstitutor<AbstractInnerType> {
+    pub fn alloc_unknown(&mut self) -> AbstractInnerType {
+        AbstractInnerType::Unknown(self.alloc(OnceCell::new()))
+    }
+}
 
 impl AbstractTypeSubstitutor {
     pub fn alloc_unknown(&mut self) -> AbstractRankedType {
@@ -514,10 +546,29 @@ impl PeanoType {
     }
 }
 
+impl<ID> AbstractGlobalReference<ID> {
+    pub fn fully_substitute(&mut self, substitutor: &AbstractTypeSubstitutor) -> bool {
+        let mut success = true;
+        for (_, arg) in &mut self.template_arg_types {
+            match arg {
+                TemplateKind::Type(arg) => {
+                    if !arg.fully_substitute(substitutor) {
+                        success = false;
+                    }
+                }
+                TemplateKind::Value(()) => {}
+            }
+        }
+        success
+    }
+}
 impl AbstractRankedType {
     pub fn fully_substitute(&mut self, substitutor: &AbstractTypeSubstitutor) -> bool {
         let inner_success = match &mut self.inner {
-            AbstractInnerType::Named(_) | AbstractInnerType::Template(_) => true, // Template Name & Name is included in get_hm_info
+            // Template Name & Name is included in get_hm_info
+            AbstractInnerType::Template(_) | AbstractInnerType::LocalInterface(_) => true,
+            AbstractInnerType::Named(typ_ref) => typ_ref.fully_substitute(substitutor),
+            AbstractInnerType::Interface(md_ref, _) => md_ref.fully_substitute(substitutor),
             AbstractInnerType::Unknown(var) => {
                 if let Some(replacement) = substitutor.inner_substitutor[*var].get() {
                     assert!(!std::ptr::eq(&self.inner, replacement));
@@ -567,7 +618,7 @@ impl<S: Substitutor> TypeUnifier<S> {
         let unify_result = self.substitutor.unify_total(found, expected);
         if unify_result != UnifyResult::Success {
             let (mut context, infos) = reporter.report();
-            if unify_result == UnifyResult::NoInfiniteTypes {
+            if unify_result == UnifyResult::FailureInfiniteTypes {
                 context.push_str(": Creating Infinite Types is Forbidden!");
             }
             self.failed_unifications.push(FailedUnification {

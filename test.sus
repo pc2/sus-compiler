@@ -1156,18 +1156,18 @@ module infer_from_local_context {
 }
 
 module instantiate_fifo {
-	output bool request_data'0
-	input int data_received'3
+	trigger request_data'0 : -> int#(MIN: 0, MAX: 6) data_received'3
 
 	FIFO #(DEPTH: 30) fifo
 
-	request_data = fifo.ready
 	when fifo.ready {
-		reg reg reg reg reg int heavy_computation = data_received
+		reg reg reg reg reg int heavy_computation = request_data()
 
-		fifo.push(true, heavy_computation)
+		fifo.push(heavy_computation)
 	}
 }
+
+
 
 // This produces a graph much like this:
 // a'0-.     .- b'3
@@ -1374,4 +1374,61 @@ module use_FIFO {
     FIFO #(DEPTH: 53, READY_SLACK: 3) f
 
     f.push(true, 3)
+}
+
+module write_to_generative_through_when {
+	gen bool a
+
+	bool b
+
+	when b {
+		a = true
+	}
+}
+
+module SameNameAsType #(NUM_INPUTS) {
+    gen int NUM_INPUTS = 500
+}
+
+module InstantiateTransmutes {
+	transmute_from_bits #(T: type int[30]) a
+	transmute_to_bits #(T: type bool[60]) b
+	transmute_to_bits #(T: type int[3][3][5]) c
+}
+
+module StraightTransmute {
+	int#(MIN: 0, MAX: 255)[2] a
+
+	gen int SZ = sizeof #(T: type int#(MIN: 0, MAX: 256*256-1))
+
+	int b = transmute #(T2: type int#(MIN: 0, MAX: 256*256-1)) (a)
+
+	int #(MIN: 5, MAX: 3) v
+}
+
+module use_trigger {
+
+	trigger beep : int boop
+
+	action maybe_use_trigger {
+		beep(5)
+	} else {
+		beep(7)
+	}
+}
+
+module use_use_trigger {
+	bool b
+
+	trigger pass_it_up
+
+	use_trigger submod
+
+	submod.maybe_use_trigger()
+
+	when submod.beep : int x {
+		int y = x
+
+		pass_it_up()
+	}
 }

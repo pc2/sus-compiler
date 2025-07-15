@@ -1,22 +1,18 @@
 
-module DualPortMem #(T, int MAX) {
-
-	state T[MAX+1] mem
+module DualPortMem #(T, int SIZE) {
+	state T[SIZE] mem
+	CrossDomain #(T: type T[SIZE]) cross_mem
+	cross_mem.in = mem
 
 	domain write_clk
-	interface write : bool write'0, int#(MIN: 0, MAX) addr'0, T data'0
-
-	when write {
+	action write'0 : int#(MIN: 0, MAX: SIZE - 1) addr'0, T data'0 {
 		mem[addr] = data
 	}
 
 	domain read_clk
-	interface read : int#(MIN: 0, MAX)  read_addr'0 -> T read_data'0
-
-	CrossDomain #(T: type T[MAX+1]) cross_mem
-	cross_mem.in = mem
-	
-	read_data = cross_mem.out[read_addr]
+	action read'0: int#(MIN: 0, MAX: SIZE - 1)  read_addr'0 -> T read_data'0 {
+		read_data = cross_mem.out[read_addr]
+	}
 }
 
 module FIFO #(
@@ -31,13 +27,6 @@ module FIFO #(
 
 	initial read_addr = 0
 	initial write_addr = 0
-
-	domain push_clk
-	output bool ready'0
-	interface push : bool push'READY_SLACK, T data_in'READY_SLACK
-
-	domain pop_clk
-	interface pop : bool pop -> bool data_valid, T data_out
 	
 	CrossDomain write_to_pop
 	write_to_pop.in = write_addr
@@ -48,18 +37,21 @@ module FIFO #(
 	CrossDomain mem_to_pop
 	mem_to_pop.in = mem
 
-	when pop {
+	domain push_clk
+	output bool ready'0
+	action push'READY_SLACK: T data_in'READY_SLACK {
+		mem[write_addr] = data_in
+		write_addr = (write_addr + 1) % DEPTH
+	}
+
+	domain pop_clk
+	action pop: -> bool data_valid, T data_out {
 		data_valid = read_addr != write_to_pop.out
 		when data_valid {
 			// Add a pipelining register, because it can usually be fitted to the 
 			reg data_out = mem_to_pop.out[read_addr]
 			read_addr = (read_addr + 1) % DEPTH
 		}
-	}
-
-	when push {
-		mem[write_addr] = data_in
-		write_addr = (write_addr + 1) % DEPTH
 	}
 	
 	// Wrapping subtract
@@ -78,16 +70,15 @@ module JoinDomains #(T1, T2, int OFFSET) {
 }
 
 module Iterator #(int MAX) {
-	// action
-	interface start : bool start, int #(MIN: 0, MAX) up_to
-	// trigger
-	interface iter : -> bool valid, state int #(MIN: 0, MAX) value
-
 	state int #(MIN: 0, MAX) current_limit
 
+	// trigger
+	interface iter : -> bool valid, state int #(MIN: 0, MAX) value
+	
 	valid = value != current_limit
 
-	when start {
+	// action
+	action start : int #(MIN: 0, MAX) up_to {
 		current_limit = up_to
 		value = 0
 	} else when valid {
@@ -102,18 +93,16 @@ module FixedSizeIterator #(int MAX) {
 
 	initial value = 0
 
-	interface start : bool start
-
-	last = value == MAX - 1
-	valid = value != MAX
-
-	when start {
+	action start {
 		value = 0
 	} else {
 		when valid {
 			value = value + 1
 		}
 	}
+
+	last = value == MAX - 1
+	valid = value != MAX
 }
 
 module SlowClockGenerator #(int PERIOD) {
@@ -149,12 +138,33 @@ module Abs #(int MAX) {
 	}
 }
 
-// Temporary, to be replaced with slice syntax : result = vals[FROM +: OUT_SIZE]
+/// Temporary, to be replaced with slice syntax : result = vals[FROM +: OUT_SIZE]
 module Slice #(T, int SIZE, int OUT_SIZE, int FROM) {
 	interface Slice : T[SIZE] vals -> T[OUT_SIZE] result
 
 	for int I in 0..OUT_SIZE {
 		result[I] = vals[I + FROM]
+	}
+}
+
+/// Concatenate two arrays, such that the elements of b come after the elements of a
+module Concat #(T, int SIZE_A, int SIZE_B) {
+	interface Concat : T[SIZE_A] a, T[SIZE_B] b -> T[SIZE_A + SIZE_B] result
+
+	for int I in 0..SIZE_A {
+		result[I] = a[I]
+	}
+	for int I in 0..SIZE_B {
+		result[I + SIZE_A] = b[I]
+	}
+}
+
+/// Concatenate two arrays, such that the elements of b come after the elements of a
+module Repeat #(T, int SIZE) {
+	interface Repeat : T v -> T[SIZE] result
+
+	for int I in 0..SIZE {
+		result[I] = v
 	}
 }
 
@@ -172,10 +182,12 @@ module PopCount #(int WIDTH) {
 	// Should be chosen based on what's most efficient for the target architecture
 	gen int BASE_CASE_SIZE = 5
 
-	interface PopCount : bool[WIDTH] bits -> int#(MIN: 0, MAX: WIDTH) popcount
+	interface PopCount : bool[WIDTH] bits'0 -> int#(MIN: 0, MAX: WIDTH) popcount
 
-
-	if WIDTH <= BASE_CASE_SIZE {
+	if WIDTH == 0 {
+		int zero'0 = 0
+		popcount = zero
+	} else if WIDTH <= BASE_CASE_SIZE {
 		int[WIDTH] cvt
 		for int I in 0..WIDTH {
 			when bits[I] {
@@ -184,7 +196,19 @@ module PopCount #(int WIDTH) {
 				cvt[I] = 0
 			}
 		}
-		reg popcount = +cvt
+		if WIDTH == 1 {
+			popcount = cvt[0]
+		} else if WIDTH == 2 {
+			popcount = cvt[0] + cvt[1]
+		} else if WIDTH == 3 {
+			popcount = cvt[0] + cvt[1] + cvt[2]
+		} else if WIDTH == 4 {
+			popcount = cvt[0] + cvt[1] + cvt[2] + cvt[3]
+		} else if WIDTH == 5 {
+			popcount = cvt[0] + cvt[1] + cvt[2] + cvt[3]  + cvt[4]
+		} else {
+			assert#(C: false)
+		}
 	} else {
 		gen int LEFT_WIDTH = WIDTH / 2
 		gen int RIGHT_WIDTH = WIDTH - LEFT_WIDTH

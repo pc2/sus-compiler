@@ -7,7 +7,6 @@ pub mod dot_graphs;
 pub mod dot_graphs {
     pub fn display_generated_hardware_structure(
         _md_instance: &crate::instantiation::InstantiatedModule,
-        _linker: &crate::linker::Linker,
     ) {
         panic!("sus_compiler was not compiled with the 'dot' feature!");
     }

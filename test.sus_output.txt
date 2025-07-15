@@ -4,6 +4,9 @@ Flattening IntToBits
 Flattening BitsToInt
 Flattening UIntToBits
 Flattening BitsToUInt
+Flattening transmute_to_bits
+Flattening transmute_from_bits
+Flattening transmute
 Flattening bool
 Flattening int
 Flattening float
@@ -27,6 +30,8 @@ Flattening SlowClockGenerator
 Flattening SplitAt
 Flattening Abs
 Flattening Slice
+Flattening Concat
+Flattening Repeat
 Flattening BitSelect
 Flattening PopCount
 Flattening TreeAdd
@@ -159,12 +164,21 @@ Flattening use_infer_me_inputs_only
 Flattening use_ranks
 Flattening testInts
 Flattening use_FIFO
+Flattening write_to_generative_through_when
+Flattening SameNameAsType
+Flattening InstantiateTransmutes
+Flattening StraightTransmute
+Flattening use_trigger
+Flattening use_use_trigger
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
 Typechecking BitsToInt
 Typechecking UIntToBits
 Typechecking BitsToUInt
+Typechecking transmute_to_bits
+Typechecking transmute_from_bits
+Typechecking transmute
 Typechecking DualPortMem
 Typechecking FIFO
 Typechecking JoinDomains
@@ -174,6 +188,8 @@ Typechecking SlowClockGenerator
 Typechecking SplitAt
 Typechecking Abs
 Typechecking Slice
+Typechecking Concat
+Typechecking Repeat
 Typechecking BitSelect
 Typechecking PopCount
 Typechecking TreeAdd
@@ -304,6 +320,200 @@ Typechecking use_infer_me_inputs_only
 Typechecking use_ranks
 Typechecking testInts
 Typechecking use_FIFO
+Typechecking write_to_generative_through_when
+Typechecking SameNameAsType
+Typechecking InstantiateTransmutes
+Typechecking StraightTransmute
+Typechecking use_trigger
+Typechecking use_use_trigger
+Typechecking bool
+Typechecking int
+Typechecking float
+Typechecking __crash_compiler
+Typechecking true
+Typechecking false
+Typechecking assert
+Typechecking sizeof
+Typechecking clog2
+Typechecking pow2
+Typechecking pow
+Typechecking factorial
+Typechecking falling_factorial
+Typechecking comb
+Typechecking SUM_UP
+Typechecking dont_care
+Lints LatencyOffset
+Lints CrossDomain
+Lints IntToBits
+Lints BitsToInt
+Lints UIntToBits
+Lints BitsToUInt
+Lints transmute_to_bits
+Lints transmute_from_bits
+Lints transmute
+Lints DualPortMem
+Lints FIFO
+Lints JoinDomains
+Lints Iterator
+Lints FixedSizeIterator
+Lints SlowClockGenerator
+Lints SplitAt
+Lints Abs
+Lints Slice
+Lints Concat
+Lints Repeat
+Lints BitSelect
+Lints PopCount
+Lints TreeAdd
+Lints example_md
+Lints multiply_add
+Lints test_pow17
+Lints pow17
+Lints fibonnaci
+Lints blur2
+Lints Tree_Multiply
+Lints Accumulator
+Lints blur
+Lints Unpack4
+Lints generative
+Lints add_indices_to_array
+Lints assignment_producer
+Lints test_various_assignments
+Lints first_bit_idx_6
+Lints multiply_add_with_latencies
+Lints first_bit_idx_24
+Lints permute
+Lints permute24
+Lints test_single_wire
+Lints disjoint_ports
+Lints undeteriminable_input_latency
+Lints specified_input_latency
+Lints determinable_input_latency
+Lints determinable_because_no_input_output_ports
+Lints conflicting_latency_declarations
+Lints bad_cycle
+Lints module_taking_time
+Lints matrix_vector_mul
+Lints bad_cycle2
+Lints module_taking_a_lot_of_time
+Lints offset_latency
+Lints good_cycle
+Lints input_only
+Lints multiple_inputs_only
+Lints output_only
+Lints multiple_outputs_only
+Lints submodule
+Lints doNothing
+Lints contains_submodule_submodule
+Lints xor
+Lints use_xor
+Lints fizz_buzz
+Lints fizz_buzz_gen
+Lints mbf_dual
+Lints monotonize_down
+Lints my_mod
+Lints use_my_mod
+Lints submodule_named_ports
+Lints use_submodule_named_ports
+Lints contains_submodule_submodule
+Lints cross_bool
+Lints cross_int
+Lints cross_memory
+Lints offset_backwards
+Lints dual_port_mem
+Lints use_fifo
+Lints test_separated_domain
+Lints no_port_module
+Lints use_no_input_module
+Lints mod_with_unused_interface
+Lints test_write_to_gen_var
+Lints use_bad_interface
+Lints sequenceDownFrom
+Lints sumUpTo
+Lints test
+Lints use_test
+Lints tinyTestMod
+Lints testTinyTestMod
+Lints tree_add
+Lints make_tree_add
+Lints replicate
+Lints use_replicate
+Lints permute_t
+Lints use_permute
+Lints instruction_decoder
+Lints run_instruction
+Lints no_main_interface
+Lints use_no_main_interface
+Lints moduleWithBadDeclaration
+Lints moduleWithBadInterface
+Lints useModuleWithBadInterface
+Lints m
+Lints xyz
+Lints numbersToAddUp
+Lints sized_int_add
+Lints use_sized_int_add
+Lints implicit_domain_forbidden
+Lints conflicting_domain_with_port_name
+Lints make_infinite_type_help
+Lints make_infinite_type
+Lints UseDualPortMem
+Lints example_FIFO
+Lints use_Iterator
+Lints UseSlice
+Lints UseBuiltinConstants
+Lints FailingAssert
+Lints IfTesting
+Lints latency_counting_disjoint_blocks
+Lints latency_counting_disjoint_blocks_merge_error
+Lints use_infer_me
+Lints infer_me
+Lints infer_from_local_context
+Lints instantiate_fifo
+Lints inference_edge_case
+Lints specified_latencies_not_ports_edge_case
+Lints testArrayWrite
+Lints infer_me_with_poison_output
+Lints instantiate_infer_me_with_poison_output
+Lints __add__
+Lints ShiftReg
+Lints MultiStateLoop
+Lints use_MultiStateLoop
+Lints CombineArray
+Lints unknownLatency
+Lints useUnknownLatency
+Lints infer_me_conflicting_directions
+Lints use_infer_me_conflicting_directions
+Lints infer_me_with_delta
+Lints use_infer_me_with_delta
+Lints infer_me_with_negative_delta
+Lints use_infer_me_with_negative_delta
+Lints infer_me_inputs_only
+Lints use_infer_me_inputs_only
+Lints use_ranks
+Lints testInts
+Lints use_FIFO
+Lints write_to_generative_through_when
+Lints SameNameAsType
+Lints InstantiateTransmutes
+Lints StraightTransmute
+Lints use_trigger
+Lints use_use_trigger
+Lints bool
+Lints int
+Lints float
+Lints __crash_compiler
+Lints true
+Lints false
+Lints assert
+Lints sizeof
+Lints clog2
+Lints pow2
+Lints pow
+Lints factorial
+Lints falling_factorial
+Lints comb
+Lints SUM_UP
+Lints dont_care
 Instantiating example_md
 Concrete Typechecking example_md
 Checking array accesses example_md
@@ -315,6 +525,7 @@ Concrete Typechecking test_pow17
 Instantiating pow17
 Concrete Typechecking pow17
 Checking array accesses pow17
+Checking array accesses test_pow17
 Instantiating fibonnaci
 Concrete Typechecking fibonnaci
 Checking array accesses fibonnaci
@@ -426,8 +637,7 @@ Checking array accesses use_my_mod
 Instantiating submodule_named_ports
 Concrete Typechecking submodule_named_ports
 Checking array accesses submodule_named_ports
-Instantiating use_submodule_named_ports
-Concrete Typechecking use_submodule_named_ports
+Not Instantiating use_submodule_named_ports due to flattening errors
 Not Instantiating contains_submodule_submodule due to flattening errors
 Instantiating cross_bool
 Concrete Typechecking cross_bool
@@ -441,14 +651,9 @@ Checking array accesses cross_memory
 Instantiating offset_backwards
 Concrete Typechecking offset_backwards
 Checking array accesses offset_backwards
-Instantiating dual_port_mem
-Concrete Typechecking dual_port_mem
-Checking array accesses dual_port_mem
-Instantiating use_fifo
-Concrete Typechecking use_fifo
-Instantiating test_separated_domain
-Concrete Typechecking test_separated_domain
-Checking array accesses test_separated_domain
+Not Instantiating dual_port_mem due to flattening errors
+Not Instantiating use_fifo due to flattening errors
+Not Instantiating test_separated_domain due to flattening errors
 Instantiating no_port_module
 Concrete Typechecking no_port_module
 Checking array accesses no_port_module
@@ -457,10 +662,8 @@ Instantiating mod_with_unused_interface
 Concrete Typechecking mod_with_unused_interface
 Checking array accesses mod_with_unused_interface
 Not Instantiating test_write_to_gen_var due to flattening errors
-Instantiating use_bad_interface
-Concrete Typechecking use_bad_interface
-Instantiating sequenceDownFrom
-Concrete Typechecking sequenceDownFrom
+Not Instantiating use_bad_interface due to flattening errors
+Not Instantiating sequenceDownFrom due to flattening errors
 Instantiating sumUpTo
 Concrete Typechecking sumUpTo
 Not Instantiating use_test due to flattening errors
@@ -549,14 +752,7 @@ Checking array accesses use_sized_int_add
 Not Instantiating implicit_domain_forbidden due to flattening errors
 Not Instantiating conflicting_domain_with_port_name due to flattening errors
 Not Instantiating make_infinite_type due to flattening errors
-Instantiating UseDualPortMem
-Concrete Typechecking UseDualPortMem
-Instantiating DualPortMem #(T: type bool[500], MAX: 128)
-Concrete Typechecking DualPortMem #(T: type bool[500], MAX: 128)
-Instantiating CrossDomain #(T: type bool[500][129])
-Concrete Typechecking CrossDomain #(T: type bool[500][129])
-Checking array accesses CrossDomain #(T: type bool[500][129])
-Checking array accesses DualPortMem #(T: type bool[500], MAX: 128)
+Not Instantiating UseDualPortMem due to flattening errors
 Instantiating example_FIFO
 Concrete Typechecking example_FIFO
 Not Instantiating use_Iterator due to flattening errors
@@ -577,6 +773,19 @@ Checking array accesses infer_me #(A: 5)
 Checking array accesses infer_from_local_context
 Instantiating instantiate_fifo
 Concrete Typechecking instantiate_fifo
+Instantiating FIFO #(T: type int #(MIN: 0, MAX: 6), DEPTH: 30, READY_SLACK: 8)
+Concrete Typechecking FIFO #(T: type int #(MIN: 0, MAX: 6), DEPTH: 30, READY_SLACK: 8)
+Instantiating CrossDomain #(T: type int #(MIN: 0, MAX: 29))
+Concrete Typechecking CrossDomain #(T: type int #(MIN: 0, MAX: 29))
+Checking array accesses CrossDomain #(T: type int #(MIN: 0, MAX: 29))
+Instantiating CrossDomain #(T: type int #(MIN: 0, MAX: 6)[30])
+Concrete Typechecking CrossDomain #(T: type int #(MIN: 0, MAX: 6)[30])
+Checking array accesses CrossDomain #(T: type int #(MIN: 0, MAX: 6)[30])
+Instantiating LatencyOffset #(T: type bool, OFFSET: -9)
+Concrete Typechecking LatencyOffset #(T: type bool, OFFSET: -9)
+Checking array accesses LatencyOffset #(T: type bool, OFFSET: -9)
+Checking array accesses FIFO #(T: type int #(MIN: 0, MAX: 6), DEPTH: 30, READY_SLACK: 8)
+Checking array accesses instantiate_fifo
 Instantiating inference_edge_case
 Concrete Typechecking inference_edge_case
 Instantiating specified_latencies_not_ports_edge_case
@@ -611,18 +820,27 @@ Instantiating use_ranks
 Instantiating testInts
 Concrete Typechecking testInts
 Checking array accesses testInts
-Instantiating use_FIFO
-Concrete Typechecking use_FIFO
-Instantiating FIFO #(T: type int #(MIN: 3, MAX: 3), DEPTH: 53, READY_SLACK: 3)
-Concrete Typechecking FIFO #(T: type int #(MIN: 3, MAX: 3), DEPTH: 53, READY_SLACK: 3)
-Instantiating CrossDomain #(T: type int #(MIN: 0, MAX: 52))
-Concrete Typechecking CrossDomain #(T: type int #(MIN: 0, MAX: 52))
-Checking array accesses CrossDomain #(T: type int #(MIN: 0, MAX: 52))
-Instantiating CrossDomain #(T: type int #(MIN: 3, MAX: 3)[53])
-Concrete Typechecking CrossDomain #(T: type int #(MIN: 3, MAX: 3)[53])
-Checking array accesses CrossDomain #(T: type int #(MIN: 3, MAX: 3)[53])
-Instantiating LatencyOffset #(T: type bool, OFFSET: -4)
-Concrete Typechecking LatencyOffset #(T: type bool, OFFSET: -4)
-Checking array accesses LatencyOffset #(T: type bool, OFFSET: -4)
-Checking array accesses FIFO #(T: type int #(MIN: 3, MAX: 3), DEPTH: 53, READY_SLACK: 3)
-Checking array accesses use_FIFO
+Not Instantiating use_FIFO due to flattening errors
+Not Instantiating write_to_generative_through_when due to flattening errors
+Instantiating InstantiateTransmutes
+Concrete Typechecking InstantiateTransmutes
+Instantiating transmute_to_bits #(T: type bool[60])
+Concrete Typechecking transmute_to_bits #(T: type bool[60])
+Checking array accesses transmute_to_bits #(T: type bool[60])
+Instantiating StraightTransmute
+Concrete Typechecking StraightTransmute
+Instantiating transmute #(T1: type int #(MIN: 0, MAX: 255)[2], T2: type int #(MIN: 0, MAX: 65535))
+Concrete Typechecking transmute #(T1: type int #(MIN: 0, MAX: 255)[2], T2: type int #(MIN: 0, MAX: 65535))
+Instantiating transmute_to_bits #(T: type int #(MIN: 0, MAX: 255)[2])
+Concrete Typechecking transmute_to_bits #(T: type int #(MIN: 0, MAX: 255)[2])
+Checking array accesses transmute_to_bits #(T: type int #(MIN: 0, MAX: 255)[2])
+Instantiating transmute_from_bits #(T: type int #(MIN: 0, MAX: 65535))
+Concrete Typechecking transmute_from_bits #(T: type int #(MIN: 0, MAX: 65535))
+Checking array accesses transmute_from_bits #(T: type int #(MIN: 0, MAX: 65535))
+Checking array accesses transmute #(T1: type int #(MIN: 0, MAX: 255)[2], T2: type int #(MIN: 0, MAX: 65535))
+Instantiating use_trigger
+Concrete Typechecking use_trigger
+Checking array accesses use_trigger
+Instantiating use_use_trigger
+Concrete Typechecking use_use_trigger
+Checking array accesses use_use_trigger

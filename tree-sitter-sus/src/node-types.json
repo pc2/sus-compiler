@@ -540,26 +540,8 @@
         "required": false,
         "types": [
           {
-            "type": "gen",
-            "named": false
-          },
-          {
-            "type": "state",
-            "named": false
-          }
-        ]
-      },
-      "io_port_modifiers": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "input",
-            "named": false
-          },
-          {
-            "type": "output",
-            "named": false
+            "type": "declaration_modifiers",
+            "named": true
           }
         ]
       },
@@ -610,6 +592,34 @@
           {
             "type": "declaration",
             "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "declaration_modifiers",
+    "named": true,
+    "fields": {
+      "item": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "gen",
+            "named": false
+          },
+          {
+            "type": "input",
+            "named": false
+          },
+          {
+            "type": "output",
+            "named": false
+          },
+          {
+            "type": "state",
+            "named": false
           }
         ]
       }
@@ -991,6 +1001,16 @@
           }
         ]
       },
+      "conditional_bindings": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "interface_ports",
+            "named": true
+          }
+        ]
+      },
       "else_block": {
         "multiple": false,
         "required": false,
@@ -1057,6 +1077,34 @@
     "type": "interface_statement",
     "named": true,
     "fields": {
+      "else_block": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "else_block",
+            "named": true
+          }
+        ]
+      },
+      "interface_kind": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "action",
+            "named": false
+          },
+          {
+            "type": "interface",
+            "named": false
+          },
+          {
+            "type": "trigger",
+            "named": false
+          }
+        ]
+      },
       "interface_ports": {
         "multiple": false,
         "required": false,
@@ -1067,12 +1115,42 @@
           }
         ]
       },
+      "latency_specifier": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "latency_specifier",
+            "named": true
+          }
+        ]
+      },
+      "local": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "local",
+            "named": false
+          }
+        ]
+      },
       "name": {
         "multiple": false,
         "required": true,
         "types": [
           {
             "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "then_block": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "block",
             "named": true
           }
         ]
@@ -1635,6 +1713,10 @@
     "named": false
   },
   {
+    "type": "action",
+    "named": false
+  },
+  {
     "type": "const",
     "named": false
   },
@@ -1687,6 +1769,10 @@
     "named": false
   },
   {
+    "type": "local",
+    "named": false
+  },
+  {
     "type": "module",
     "named": false
   },
@@ -1716,6 +1802,10 @@
   },
   {
     "type": "struct",
+    "named": false
+  },
+  {
+    "type": "trigger",
     "named": false
   },
   {

@@ -1,21 +1,19 @@
 use crate::{
+    debug::SpanDebugger,
     flattening::{Instruction, NamedConstant},
     instantiation::instantiation_cache::Instantiator,
+    linker::passes::ResolvedGlobals,
     prelude::*,
-    typing::{
-        abstract_type::DomainType,
-        template::{GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind},
-        type_inference::{AbstractTypeSubstitutor, TypeSubstitutor},
-    },
+    typing::template::{GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind},
 };
 
 pub mod checkpoint;
-mod resolver;
-pub use resolver::*;
+pub mod passes;
 
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
+    ops::{Deref, DerefMut, Index, IndexMut},
 };
 
 use tree_sitter::Tree;
@@ -79,11 +77,6 @@ pub enum IsExtern {
     Builtin,
 }
 
-pub const AFTER_INITIAL_PARSE_CP: usize = 0;
-pub const AFTER_FLATTEN_CP: usize = 1;
-pub const AFTER_TYPECHECK_CP: usize = 2;
-pub const AFTER_LINTS_CP: usize = 3;
-
 /// Represents any global. Stored in [Linker] and each is uniquely indexed by [GlobalUUID]
 ///
 /// Base class for [Module], [StructType], [NamedConstant]
@@ -97,13 +90,6 @@ pub struct LinkInfo {
     pub errors: ErrorStore,
     pub resolved_globals: ResolvedGlobals,
     pub is_extern: IsExtern,
-
-    /// Created in Stage 2: Flattening
-    ///
-    /// Removed in Stage 3: Typechecking
-    ///
-    /// Is only temporary. It's used during typechecking to allocate the type unification block
-    pub type_variable_alloc: Option<Box<(AbstractTypeSubstitutor, TypeSubstitutor<DomainType>)>>,
 
     pub template_parameters: TVec<Parameter>,
 
@@ -141,6 +127,18 @@ impl LinkInfo {
 
         format!("{} #({})", self.get_full_name(), template_args.join(", "))
     }
+    pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
+        match &self.instructions[instr_id] {
+            Instruction::SubModule(sm) => sm.module_ref.get_total_span(),
+            Instruction::Declaration(decl) => decl.decl_span,
+            Instruction::Expression(w) => w.span,
+            Instruction::IfStatement(if_stmt) => if_stmt.if_keyword_span,
+            Instruction::Interface(act_trig) => act_trig.name_span,
+            Instruction::ForStatement(for_stmt) => {
+                self.get_instruction_span(for_stmt.loop_var_decl)
+            }
+        }
+    }
 }
 
 /// Data associated with a file. Such as the text, the parse tree, and all [Module]s, [StructType]s, or [NamedConstant]s.
@@ -157,11 +155,15 @@ pub struct FileData {
 
 /// Globally references any [Module], [StructType], or [NamedConstant] in [Linker]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum GlobalUUID {
-    Module(ModuleUUID),
-    Type(TypeUUID),
-    Constant(ConstantUUID),
+pub enum GlobalObj<M, T, C> {
+    Module(M),
+    Type(T),
+    Constant(C),
 }
+
+pub type GlobalUUID = GlobalObj<ModuleUUID, TypeUUID, ConstantUUID>;
+pub type GlobalRef<'l> = GlobalObj<&'l Module, &'l StructType, &'l NamedConstant>;
+pub type GlobalRefMut<'l> = GlobalObj<&'l mut Module, &'l mut StructType, &'l mut NamedConstant>;
 
 impl GlobalUUID {
     #[track_caller]
@@ -204,10 +206,115 @@ impl From<ConstantUUID> for GlobalUUID {
         GlobalUUID::Constant(value)
     }
 }
+impl<'info> GlobalRef<'info> {
+    pub fn get_link_info(&self) -> &'info LinkInfo {
+        match self {
+            GlobalObj::Module(md) => &md.link_info,
+            GlobalObj::Type(typ) => &typ.link_info,
+            GlobalObj::Constant(cst) => &cst.link_info,
+        }
+    }
+}
+impl<'info> GlobalRefMut<'info> {
+    pub fn get_link_info(&mut self) -> &mut LinkInfo {
+        match self {
+            GlobalObj::Module(md) => &mut md.link_info,
+            GlobalObj::Type(typ) => &mut typ.link_info,
+            GlobalObj::Constant(cst) => &mut cst.link_info,
+        }
+    }
+}
 
+impl Deref for GlobalRef<'_> {
+    type Target = LinkInfo;
+
+    fn deref(&self) -> &LinkInfo {
+        self.get_link_info()
+    }
+}
 enum NamespaceElement {
     Global(GlobalUUID),
     Colission(Box<[GlobalUUID]>),
+}
+
+pub struct LinkerGlobals {
+    pub types: ArenaAllocator<StructType, TypeUUIDMarker>,
+    pub modules: ArenaAllocator<Module, ModuleUUIDMarker>,
+    pub constants: ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
+}
+
+impl Index<ModuleUUID> for LinkerGlobals {
+    type Output = Module;
+
+    fn index(&self, index: ModuleUUID) -> &Module {
+        &self.modules[index]
+    }
+}
+impl Index<TypeUUID> for LinkerGlobals {
+    type Output = StructType;
+
+    fn index(&self, index: TypeUUID) -> &StructType {
+        &self.types[index]
+    }
+}
+impl Index<ConstantUUID> for LinkerGlobals {
+    type Output = NamedConstant;
+
+    fn index(&self, index: ConstantUUID) -> &NamedConstant {
+        &self.constants[index]
+    }
+}
+impl Index<GlobalUUID> for LinkerGlobals {
+    type Output = LinkInfo;
+
+    fn index(&self, index: GlobalUUID) -> &LinkInfo {
+        match index {
+            GlobalObj::Module(md_id) => &self.modules[md_id].link_info,
+            GlobalObj::Type(typ_id) => &self.types[typ_id].link_info,
+            GlobalObj::Constant(cst_id) => &self.constants[cst_id].link_info,
+        }
+    }
+}
+impl IndexMut<ModuleUUID> for LinkerGlobals {
+    fn index_mut(&mut self, index: ModuleUUID) -> &mut Module {
+        &mut self.modules[index]
+    }
+}
+impl IndexMut<TypeUUID> for LinkerGlobals {
+    fn index_mut(&mut self, index: TypeUUID) -> &mut StructType {
+        &mut self.types[index]
+    }
+}
+impl IndexMut<ConstantUUID> for LinkerGlobals {
+    fn index_mut(&mut self, index: ConstantUUID) -> &mut NamedConstant {
+        &mut self.constants[index]
+    }
+}
+impl IndexMut<GlobalUUID> for LinkerGlobals {
+    fn index_mut(&mut self, index: GlobalUUID) -> &mut LinkInfo {
+        match index {
+            GlobalObj::Module(md_id) => &mut self.modules[md_id].link_info,
+            GlobalObj::Type(typ_id) => &mut self.types[typ_id].link_info,
+            GlobalObj::Constant(cst_id) => &mut self.constants[cst_id].link_info,
+        }
+    }
+}
+
+impl<'slf> LinkerGlobals {
+    pub fn get(&'slf self, id: GlobalUUID) -> GlobalRef<'slf> {
+        match id {
+            GlobalObj::Module(md_id) => GlobalObj::Module(&self.modules[md_id]),
+            GlobalObj::Type(typ_id) => GlobalObj::Type(&self.types[typ_id]),
+            GlobalObj::Constant(cst_id) => GlobalObj::Constant(&self.constants[cst_id]),
+        }
+    }
+    pub fn get_mut(&'slf mut self, id: GlobalUUID) -> GlobalRefMut<'slf> {
+        match id {
+            GlobalObj::Module(md_id) => GlobalObj::Module(&mut self.modules[md_id]),
+            GlobalObj::Type(typ_id) => GlobalObj::Type(&mut self.types[typ_id]),
+            GlobalObj::Constant(cst_id) => GlobalObj::Constant(&mut self.constants[cst_id]),
+        }
+    }
 }
 
 /// The global singleton object that collects all [Module]s, [StructType]s, and [NamedConstant]s that are in the current SUS codebase.
@@ -220,10 +327,8 @@ enum NamespaceElement {
 ///
 /// Incremental operations such as adding and removing files can be performed on this
 pub struct Linker {
-    pub types: ArenaAllocator<StructType, TypeUUIDMarker>,
-    pub modules: ArenaAllocator<Module, ModuleUUIDMarker>,
-    pub constants: ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
     pub files: ArenaAllocator<FileData, FileUUIDMarker>,
+    pub globals: LinkerGlobals,
     pub instantiator: Instantiator,
     global_namespace: HashMap<String, NamespaceElement>,
 }
@@ -234,37 +339,34 @@ impl Default for Linker {
     }
 }
 
+impl Deref for Linker {
+    type Target = LinkerGlobals;
+
+    fn deref(&self) -> &Self::Target {
+        &self.globals
+    }
+}
+
+impl DerefMut for Linker {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.globals
+    }
+}
+
 impl Linker {
     pub fn new() -> Linker {
         Linker {
-            types: ArenaAllocator::new(),
-            modules: ArenaAllocator::new(),
-            constants: ArenaAllocator::new(),
+            globals: LinkerGlobals {
+                types: ArenaAllocator::new(),
+                modules: ArenaAllocator::new(),
+                constants: ArenaAllocator::new(),
+            },
             files: ArenaAllocator::new(),
             instantiator: Instantiator::new(),
             global_namespace: HashMap::new(),
         }
     }
 
-    pub fn get_link_info(&self, global: GlobalUUID) -> &LinkInfo {
-        match global {
-            GlobalUUID::Module(md_id) => &self.modules[md_id].link_info,
-            GlobalUUID::Type(typ_id) => &self.types[typ_id].link_info,
-            GlobalUUID::Constant(cst_id) => &self.constants[cst_id].link_info,
-        }
-    }
-    pub fn get_link_info_mut<'l>(
-        modules: &'l mut ArenaAllocator<Module, ModuleUUIDMarker>,
-        types: &'l mut ArenaAllocator<StructType, TypeUUIDMarker>,
-        constants: &'l mut ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
-        global: GlobalUUID,
-    ) -> &'l mut LinkInfo {
-        match global {
-            GlobalUUID::Module(md_id) => &mut modules[md_id].link_info,
-            GlobalUUID::Type(typ_id) => &mut types[typ_id].link_info,
-            GlobalUUID::Constant(cst_id) => &mut constants[cst_id].link_info,
-        }
-    }
     fn iter_link_infos(&self) -> impl Iterator<Item = (GlobalUUID, &LinkInfo)> {
         let md_iter = self
             .modules
@@ -291,8 +393,7 @@ impl Linker {
             let NamespaceElement::Colission(colission) = &item.1 else {
                 continue;
             };
-            let infos: Vec<&LinkInfo> =
-                colission.iter().map(|id| self.get_link_info(*id)).collect();
+            let infos: Vec<&LinkInfo> = colission.iter().map(|id| &self.globals[*id]).collect();
 
             for (idx, info) in infos.iter().enumerate() {
                 let mut conflict_infos = Vec::new();
@@ -363,13 +464,13 @@ impl Linker {
             assert!(was_new_item_in_set);
             match v {
                 GlobalUUID::Module(id) => {
-                    self.modules.free(id);
+                    self.globals.modules.free(id);
                 }
                 GlobalUUID::Type(id) => {
-                    self.types.free(id);
+                    self.globals.types.free(id);
                 }
                 GlobalUUID::Constant(id) => {
-                    self.constants.free(id);
+                    self.globals.constants.free(id);
                 }
             }
         }
@@ -411,9 +512,9 @@ impl Linker {
             other_parsing_errors: &other_parsing_errors,
             associated_values: &mut associated_values,
             global_namespace: &mut self.global_namespace,
-            types: &mut self.types,
-            modules: &mut self.modules,
-            constants: &mut self.constants,
+            types: &mut self.globals.types,
+            modules: &mut self.globals.modules,
+            constants: &mut self.globals.constants,
         });
 
         let parsing_errors = other_parsing_errors.into_storage();

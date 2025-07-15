@@ -70,19 +70,41 @@ impl<OA, OB, IterA: Iterator<Item = OA>, IterB: Iterator<Item = OB>> Iterator
 macro_rules! let_unwrap {
     ($pat:pat, $val:expr) => {
         // First try matching by reference to avoid consuming
-        let let_unwrap_executed_expr = $val;
+        let __val = $val;
         #[allow(unused_variables)]
-        let $pat = &let_unwrap_executed_expr
+        let $pat = &__val
         else {
             panic!(
                 "let_unwrap! failed: expected {}, found {:?}",
                 stringify!($pat),
-                let_unwrap_executed_expr
+                __val
             );
         };
         // Now match by value (may move)
-        let $pat = let_unwrap_executed_expr else {
+        let $pat = __val else {
             unreachable!("let_unwrap! internal error: pattern matched by ref, but failed by value")
         };
     };
+}
+
+#[macro_export]
+macro_rules! unwrap_variant {
+    ($variant:path, $val:expr) => {{
+        // First try matching by reference to avoid consuming
+        let __val = $val;
+        #[allow(unused_variables)]
+        let $variant(__content) = &__val
+        else {
+            panic!(
+                "let_unwrap! failed: expected {}(_), found {:?}",
+                stringify!($variant),
+                __val
+            );
+        };
+        // Now match by value (may move)
+        let $variant(__content) = __val else {
+            unreachable!("let_unwrap! internal error: pattern matched by ref, but failed by value")
+        };
+        __content
+    }};
 }
