@@ -222,6 +222,13 @@ impl InterfaceKind {
             InterfaceKind::Action(_) | InterfaceKind::Trigger(_) => true,
         }
     }
+    pub fn as_string(&self) -> &'static str {
+        match self {
+            InterfaceKind::RegularInterface => "interface",
+            InterfaceKind::Action(_) => "action",
+            InterfaceKind::Trigger(_) => "trigger",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -525,7 +532,7 @@ pub struct Expression {
 }
 
 impl Expression {
-    pub fn as_single_output_expr(&self) -> Option<SingleOutputExpression> {
+    pub fn as_single_output_expr(&self) -> Option<SingleOutputExpression<'_>> {
         let typ = match &self.output {
             ExpressionOutput::SubExpression(typ) => typ,
             ExpressionOutput::MultiWrite(write_tos) => {
@@ -889,7 +896,9 @@ pub struct IfStatement {
     pub is_generative: bool,
     pub then_block: FlatIDRange,
     pub else_block: FlatIDRange,
-    pub conditional_bindings: Option<(Vec<FlatID>, Vec<FlatID>)>,
+    pub bindings_read_only: Vec<FlatID>,
+    pub bindings_writable: Vec<FlatID>,
+    pub conditional_bindings_span: Option<Span>,
 }
 
 /// A control-flow altering [Instruction] to represent compiletime looping on a generative index
@@ -969,7 +978,7 @@ impl Instruction {
         expr
     }
     #[track_caller]
-    pub fn unwrap_subexpression(&self) -> SingleOutputExpression {
+    pub fn unwrap_subexpression(&self) -> SingleOutputExpression<'_> {
         let expr = self.unwrap_expression();
         let ExpressionOutput::SubExpression(typ) = &expr.output else {
             unreachable!("unwrap_subexpression on not a SubExpression")

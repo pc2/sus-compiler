@@ -315,12 +315,12 @@ Error: Error instantiating submodule
      │                                   ──────────┬──────────  
      │                                             ╰──────────── Error instantiating submodule
 ─────╯
-Error: A Function call expects this to be an interface, but found a regular wire
+Error: A function call expects this to be an interface, but found a regular wire
      ╭─[ test.sus:219:17 ]
      │
  219 │     int tmp'1 = multiply(a, b)
      │                 ────┬───  
-     │                     ╰───── A Function call expects this to be an interface, but found a regular wire
+     │                     ╰───── A function call expects this to be an interface, but found a regular wire
 ─────╯
 Error: No Global of the name 'multiply' was found. Did you forget to import it?
      ╭─[ test.sus:219:17 ]
@@ -639,12 +639,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │             ──┬──  
      │               ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: A Function call expects this to be an interface, but found a regular wire
+Error: A function call expects this to be an interface, but found a regular wire
      ╭─[ test.sus:267:2 ]
      │
  267 │     aaaaa()
      │     ──┬──  
-     │       ╰──── A Function call expects this to be an interface, but found a regular wire
+     │       ╰──── A function call expects this to be an interface, but found a regular wire
 ─────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
@@ -2290,7 +2290,7 @@ Error: 'contains_submodule_submodule' conflicts with other declarations:
      │        ──────────────┬─────────────  
      │                      ╰─────────────── Conflicts with
 ─────╯
-Error: A Function call expects this to be a callable interface, the interface `doNothing` is not callable
+Error: A function call expects this to be a callable interface, the interface `doNothing` is not callable
      ╭─[ test.sus:445:2 ]
      │
  431 │ module doNothing {}
@@ -2299,7 +2299,7 @@ Error: A Function call expects this to be a callable interface, the interface `d
      │ 
  445 │     doNothing()
      │     ────┬────  
-     │         ╰────── A Function call expects this to be a callable interface, the interface `doNothing` is not callable
+     │         ╰────── A function call expects this to be a callable interface, the interface `doNothing` is not callable
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:462:7 ]
@@ -2370,7 +2370,7 @@ Error: 'contains_submodule_submodule' conflicts with other declarations:
      │        ──────────────┬─────────────  
      │                      ╰─────────────── 'contains_submodule_submodule' conflicts with other declarations:
 ─────╯
-Error: A Function call expects this to be a callable interface, the interface `doNothing` is not callable
+Error: A function call expects this to be a callable interface, the interface `doNothing` is not callable
      ╭─[ test.sus:601:2 ]
      │
  431 │ module doNothing {}
@@ -2379,7 +2379,7 @@ Error: A Function call expects this to be a callable interface, the interface `d
      │ 
  601 │     doNothing()
      │     ────┬────  
-     │         ╰────── A Function call expects this to be a callable interface, the interface `doNothing` is not callable
+     │         ╰────── A function call expects this to be a callable interface, the interface `doNothing` is not callable
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:608:22 ]
@@ -2441,12 +2441,27 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                           ──┬─  
      │                             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Typing Error: if statement condition expects 'bool' but was given 'Local Interface write'
+Error: Can only use conditional bindings on triggers. 'write' is an interface
      ╭─[ test.sus:636:7 ]
      │
+ 632 │     interface write : bool write, bool[20] wr_data, int#(MIN:0, MAX: 511) wr_addr
+     │               ──┬──  
+     │                 ╰──── Interface 'write' defined here
+     │ 
  636 │     when write {
      │          ──┬──  
-     │            ╰──── Typing Error: if statement condition expects 'bool' but was given 'Local Interface write'
+     │            ╰──── Can only use conditional bindings on triggers. 'write' is an interface
+─────╯
+Error: Too few bindings. This interface provides 3 return bindings, but 0 were provided.
+     ╭─[ test.sus:636:7 ]
+     │
+ 632 │     interface write : bool write, bool[20] wr_data, int#(MIN:0, MAX: 511) wr_addr
+     │               ──┬──  
+     │                 ╰──── Interface 'write' defined here
+     │ 
+ 636 │     when write {
+     │          ──┬──  
+     │            ╰──── Too few bindings. This interface provides 3 return bindings, but 0 were provided.
 ─────╯
 Error: No such field 'i' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
      ╭─[ test.sus:641:7 ]
@@ -2467,12 +2482,38 @@ interface out:
      │          ┬  
      │          ╰── No such field 'i' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
 ─────╯
-Error: Typing Error: if statement condition expects 'bool' but was given 'Local Interface read'
+Error: Can only use conditional bindings on triggers. 'read' is an interface
      ╭─[ test.sus:642:7 ]
      │
+ 634 │     interface read : bool read, int#(MIN:0, MAX: 511) rd_addr -> bool[20] rd_data
+     │               ──┬─  
+     │                 ╰─── Interface 'read' defined here
+     │ 
  642 │     when read {
      │          ──┬─  
-     │            ╰─── Typing Error: if statement condition expects 'bool' but was given 'Local Interface read'
+     │            ╰─── Can only use conditional bindings on triggers. 'read' is an interface
+─────╯
+Error: Too few bindings. This interface provides 1 read-only bindings, but 0 were provided.
+     ╭─[ test.sus:642:7 ]
+     │
+ 634 │     interface read : bool read, int#(MIN:0, MAX: 511) rd_addr -> bool[20] rd_data
+     │               ──┬─  
+     │                 ╰─── Interface 'read' defined here
+     │ 
+ 642 │     when read {
+     │          ──┬─  
+     │            ╰─── Too few bindings. This interface provides 1 read-only bindings, but 0 were provided.
+─────╯
+Error: Too few bindings. This interface provides 2 return bindings, but 0 were provided.
+     ╭─[ test.sus:642:7 ]
+     │
+ 634 │     interface read : bool read, int#(MIN:0, MAX: 511) rd_addr -> bool[20] rd_data
+     │               ──┬─  
+     │                 ╰─── Interface 'read' defined here
+     │ 
+ 642 │     when read {
+     │          ──┬─  
+     │            ╰─── Too few bindings. This interface provides 2 return bindings, but 0 were provided.
 ─────╯
 Error: No such field 'o' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
      ╭─[ test.sus:643:18 ]
@@ -2607,7 +2648,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                             ───┬──  
      │                                ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: A Function call expects this to be a callable interface, the interface `no_port_module` is not callable
+Error: A function call expects this to be a callable interface, the interface `no_port_module` is not callable
      ╭─[ test.sus:678:2 ]
      │
  675 │ module no_port_module {}
@@ -2616,7 +2657,7 @@ Error: A Function call expects this to be a callable interface, the interface `n
      │ 
  678 │     no_port_module()
      │     ───────┬──────  
-     │            ╰──────── A Function call expects this to be a callable interface, the interface `no_port_module` is not callable
+     │            ╰──────── A function call expects this to be a callable interface, the interface `no_port_module` is not callable
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:681:6 ]
@@ -2625,7 +2666,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │         ┬  
      │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: A Function call expects this to be a callable interface, the interface `no_port_module` is not callable
+Error: A function call expects this to be a callable interface, the interface `no_port_module` is not callable
      ╭─[ test.sus:681:10 ]
      │
  675 │ module no_port_module {}
@@ -2634,7 +2675,7 @@ Error: A Function call expects this to be a callable interface, the interface `n
      │ 
  681 │     int x = no_port()
      │             ───┬───  
-     │                ╰───── A Function call expects this to be a callable interface, the interface `no_port_module` is not callable
+     │                ╰───── A function call expects this to be a callable interface, the interface `no_port_module` is not callable
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:686:40 ]
@@ -10767,6 +10808,13 @@ Error: Excess output targets. Function returns 0 results, but 1 targets were giv
      │          ────────┬────────  
      │                  ╰────────── Excess output targets. Function returns 0 results, but 1 targets were given.
 ─────╯
+Error: Cannot use conditional bingings because the condition isn't an action or a trigger
+     ╭─[ test.sus:894:25 ]
+     │
+ 894 │     when decoder.is_jump() : int target_addr {
+     │                            ────────┬────────  
+     │                                    ╰────────── Cannot use conditional bingings because the condition isn't an action or a trigger
+─────╯
 Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test.sus:897:7 ]
      │
@@ -10777,6 +10825,13 @@ Error: Excess output targets. Function returns 0 results, but 1 targets were giv
  897 │     when decoder.is_load() : int reg_to, int addr {
      │          ────────┬────────  
      │                  ╰────────── Excess output targets. Function returns 0 results, but 1 targets were given.
+─────╯
+Error: Cannot use conditional bingings because the condition isn't an action or a trigger
+     ╭─[ test.sus:897:25 ]
+     │
+ 897 │     when decoder.is_load() : int reg_to, int addr {
+     │                            ───────────┬──────────  
+     │                                       ╰──────────── Cannot use conditional bingings because the condition isn't an action or a trigger
 ─────╯
 Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test.sus:900:7 ]
@@ -10789,6 +10844,13 @@ Error: Excess output targets. Function returns 0 results, but 1 targets were giv
      │          ─────────┬────────  
      │                   ╰────────── Excess output targets. Function returns 0 results, but 1 targets were given.
 ─────╯
+Error: Cannot use conditional bingings because the condition isn't an action or a trigger
+     ╭─[ test.sus:900:26 ]
+     │
+ 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │                             ─────────────────┬─────────────────  
+     │                                              ╰─────────────────── Cannot use conditional bingings because the condition isn't an action or a trigger
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:913:6 ]
      │
@@ -10796,7 +10858,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │         ┬  
      │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: A Function call expects this to be a callable interface, the interface `no_main_interface` is not callable
+Error: A function call expects this to be a callable interface, the interface `no_main_interface` is not callable
      ╭─[ test.sus:913:10 ]
      │
  906 │ module no_main_interface {
@@ -10805,7 +10867,7 @@ Error: A Function call expects this to be a callable interface, the interface `n
      │ 
  913 │     int x = no_interface_named()
      │             ─────────┬────────  
-     │                      ╰────────── A Function call expects this to be a callable interface, the interface `no_main_interface` is not callable
+     │                      ╰────────── A function call expects this to be a callable interface, the interface `no_main_interface` is not callable
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:914:6 ]
@@ -10814,7 +10876,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │         ┬  
      │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: A Function call expects this to be a callable interface, the interface `no_main_interface` is not callable
+Error: A function call expects this to be a callable interface, the interface `no_main_interface` is not callable
      ╭─[ test.sus:914:10 ]
      │
  906 │ module no_main_interface {
@@ -10823,7 +10885,7 @@ Error: A Function call expects this to be a callable interface, the interface `n
      │ 
  914 │     int y = no_main_interface()
      │             ────────┬────────  
-     │                     ╰────────── A Function call expects this to be a callable interface, the interface `no_main_interface` is not callable
+     │                     ╰────────── A function call expects this to be a callable interface, the interface `no_main_interface` is not callable
 ─────╯
 Error: Typing Error: array size expects 'int' but was given 'bool'
      ╭─[ test.sus:918:6 ]
@@ -12585,6 +12647,13 @@ action request_output:
  1263 │     when loop.process : float cur_state {
       │               ───┬───  
       │                  ╰───── No such field 'process' on MultiStateLoop #(T: ?[...], II: _). Available fields are 'MultiStateLoop', 'may_process', 'next_state', 'request_output'
+──────╯
+Error: Cannot use conditional bingings because the condition isn't an action or a trigger
+      ╭─[ test.sus:1263:20 ]
+      │
+ 1263 │     when loop.process : float cur_state {
+      │                       ────────┬────────  
+      │                               ╰────────── Cannot use conditional bingings because the condition isn't an action or a trigger
 ──────╯
 Error: Typing Error: writing the output of this expression expects 'float' but was given 'int'
       ╭─[ test.sus:1264:3 ]

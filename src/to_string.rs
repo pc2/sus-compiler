@@ -85,7 +85,7 @@ impl Display for AbstractRankedTypeDisplay<'_> {
                 ))
             }
             AbstractInnerType::LocalInterface(local_interface) => f.write_fmt(format_args!(
-                "Local Interface {}",
+                "Local Interface '{}'",
                 self.link_info.instructions[*local_interface]
                     .unwrap_interface()
                     .name,

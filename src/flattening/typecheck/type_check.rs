@@ -398,9 +398,67 @@ impl<'l> TypeCheckingContext<'l> {
         }
     }
 
-    fn typecheck_func_func(
+    /// ```sus
+    /// when myMod.f : int a, int b -> bool c {
+    ///     c = a == b
+    /// }
+    /// ```
+    /// `a` and `b` are read_only_decls
+    /// `c` is the only writable_decls
+    fn report_errors_for_bad_binding(
+        &self,
+        read_only_decls: &[FlatID],
+        writable_decls: &[FlatID],
+        interface: &RemoteFn<'l, &'l TVec<TemplateKind<AbstractRankedType, ()>>>,
+        interface_name_span: Span,
+    ) {
+        let fn_decl = &interface.fn_decl;
+        for (bindings, interface_args, name) in [
+            (read_only_decls, &fn_decl.outputs, "read-only bindings"),
+            (writable_decls, &fn_decl.inputs, "return bindings"),
+        ] {
+            let arg_count = bindings.len();
+            let expected_arg_count = interface_args.len();
+
+            if arg_count != expected_arg_count {
+                if arg_count > expected_arg_count {
+                    // Too many args, complain about excess args at the end
+                    let excess_args_span = Span::new_overarching(
+                        self.instructions[bindings[expected_arg_count]]
+                            .unwrap_declaration()
+                            .decl_span,
+                        self.instructions[*bindings.last().unwrap()]
+                            .unwrap_declaration()
+                            .decl_span,
+                    );
+
+                    self.errors
+                        .error(excess_args_span, format!("Excess bindings. This interface provides {expected_arg_count} {name}, but {arg_count} were provided."))
+                        .info_obj(interface);
+                } else {
+                    // Too few args, mention missing argument names
+                    let too_few_args_span = if let Some(last) = bindings.last() {
+                        self.instructions[*last]
+                            .unwrap_declaration()
+                            .decl_span
+                            .empty_span_at_end()
+                    } else {
+                        interface_name_span
+                    };
+
+                    self.errors
+                        .error(too_few_args_span, format!("Too few bindings. This interface provides {expected_arg_count} {name}, but {arg_count} were provided."))
+                        .info_obj(interface);
+                }
+            }
+        }
+    }
+
+    /// If the wire_ref refers to a callable (so not just a hierarchical) interface, then this returns a RemoteFn. Handles the needed error reporting
+    fn get_callable_func(
         &mut self,
         wire_ref_id: FlatID,
+        context: &'static str,
     ) -> Option<RemoteFn<'l, &'l TVec<TemplateKind<AbstractRankedType, ()>>>> {
         let wire_ref_expr = self.instructions[wire_ref_id].unwrap_expression();
         let ExpressionSource::WireRef(wire_ref) = &wire_ref_expr.source else {
@@ -416,7 +474,7 @@ impl<'l> TypeCheckingContext<'l> {
                 let interface = &submod.md.interfaces[*interface];
                 let Some(interface) = interface.declaration_instruction else {
                     let name = &interface.name;
-                    let err_text = format!("A Function call expects this to be a callable interface, the interface `{name}` is not callable");
+                    let err_text = format!("{context} expects this to be a callable interface, the interface `{name}` is not callable");
                     self.errors
                         .error(wire_ref.get_total_span(), err_text)
                         .info_obj_different_file(interface, submod.md.link_info.file);
@@ -437,7 +495,7 @@ impl<'l> TypeCheckingContext<'l> {
             | AbstractInnerType::Unknown(_) => {
                 self.errors.error(
                     wire_ref.get_total_span(),
-                    "A Function call expects this to be an interface, but found a regular wire",
+                    format!("{context} expects this to be an interface, but found a regular wire"),
                 );
                 None
             }
@@ -498,15 +556,15 @@ impl<'l> TypeCheckingContext<'l> {
                 out_typ
             }
             ExpressionSource::FuncCall(func_call) => {
-                if let Some(interface) = self.typecheck_func_func(func_call.func_wire_ref) {
-                    self.typecheck_func_call_args(func_call, interface);
-
+                if let Some(interface) = self.get_callable_func(func_call.func_wire_ref, "A function call") {
                     self.report_errors_for_bad_function_call(
                         func_call,
                         &interface,
                         expr.span,
                         std::iter::once(expr.span),
                     );
+
+                    self.typecheck_func_call_args(func_call, interface);
 
                     if let Some(first_output) = interface.fn_decl.outputs.first() {
                         let port_decl = interface.parent.get_decl(*first_output);
@@ -563,15 +621,17 @@ impl<'l> TypeCheckingContext<'l> {
         }
         match &expr.source {
             ExpressionSource::FuncCall(func_call) => {
-                if let Some(interface) = self.typecheck_func_func(func_call.func_wire_ref) {
-                    self.typecheck_func_call_args(func_call, interface);
-
+                if let Some(interface) =
+                    self.get_callable_func(func_call.func_wire_ref, "A function call")
+                {
                     self.report_errors_for_bad_function_call(
                         func_call,
                         &interface,
                         expr.span,
                         multi_write.iter().map(|v| v.to_span),
                     );
+
+                    self.typecheck_func_call_args(func_call, interface);
 
                     for (decl_id, to) in std::iter::zip(&interface.fn_decl.outputs, multi_write) {
                         let port_decl = interface.parent.get_decl(*decl_id);
@@ -633,14 +693,26 @@ impl<'l> TypeCheckingContext<'l> {
 
                 self.typecheck_written_type(&decl.typ_expr);
             }
-            Instruction::IfStatement(stm) => {
-                let condition_expr = &self.instructions[stm.condition].unwrap_subexpression();
-                self.type_checker.unify_report_error(
-                    condition_expr.typ,
-                    &BOOL_SCALAR,
-                    condition_expr.span,
-                    "if statement condition",
-                );
+            Instruction::IfStatement(if_stm) => {
+                let condition_expr = &self.instructions[if_stm.condition].unwrap_subexpression();
+                if condition_expr.typ.inner.is_interface() {
+                    if let Some(trig) =
+                        self.get_callable_func(if_stm.condition, "A conditional binding")
+                    {
+                        self.type_check_conditional_bindings(if_stm, condition_expr, trig);
+                    }
+                } else {
+                    if let Some(bindings_span) = if_stm.conditional_bindings_span {
+                        self.errors.error(bindings_span, "Cannot use conditional bingings because the condition isn't an action or a trigger");
+                    }
+
+                    self.type_checker.unify_report_error(
+                        condition_expr.typ,
+                        &BOOL_SCALAR,
+                        condition_expr.span,
+                        "if statement condition",
+                    );
+                }
             }
             Instruction::ForStatement(stm) => {
                 let loop_var = self.instructions[stm.loop_var_decl].unwrap_declaration();
@@ -669,6 +741,47 @@ impl<'l> TypeCheckingContext<'l> {
                 }
             },
             Instruction::Interface(_act_trig) => {}
+        }
+    }
+
+    fn type_check_conditional_bindings(
+        &mut self,
+        if_stm: &IfStatement,
+        condition_expr: &SingleOutputExpression<'_>,
+        trig: RemoteFn<'l, &'l TVec<TemplateKind<AbstractRankedType, ()>>>,
+    ) {
+        let f = &trig.fn_decl;
+        if !matches!(&f.interface_kind, InterfaceKind::Trigger(_)) {
+            let interface_name = &f.name;
+            let kind_str = f.interface_kind.as_string();
+            let err = format!("Can only use conditional bindings on triggers. '{interface_name}' is an {kind_str}");
+            self.errors.error(condition_expr.span, err).info_obj(&trig);
+        }
+
+        self.report_errors_for_bad_binding(
+            &if_stm.bindings_read_only,
+            &if_stm.bindings_writable,
+            &trig,
+            condition_expr.span,
+        );
+
+        for (ports, bindings, binding_name) in [
+            (&f.outputs, &if_stm.bindings_read_only, "read-only binding"),
+            (&f.inputs, &if_stm.bindings_writable, "writeable binding"),
+        ] {
+            for (port_decl_id, binding) in std::iter::zip(ports, bindings) {
+                let port_decl = trig.parent.get_decl(*port_decl_id);
+                let port_type = port_decl.get_local_type(&self.globals, &mut self.type_checker);
+
+                let binding_decl = self.instructions[*binding].unwrap_declaration();
+
+                self.type_checker.unify_report_error(
+                    &binding_decl.typ,
+                    &port_type,
+                    binding_decl.decl_span,
+                    || (binding_name.to_string(), vec![port_decl.make_info()]),
+                );
+            }
         }
     }
 }
