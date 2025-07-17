@@ -118,6 +118,35 @@ impl core::fmt::Display for BinaryOperator {
     }
 }
 
+impl core::fmt::Display for PartSelectDirection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            PartSelectDirection::Up => "+:",
+            PartSelectDirection::Down => "-:",
+        })
+    }
+}
+
+impl SliceType {
+    pub fn from_kind_id(kind_id: u16) -> Self {
+        match kind_id {
+            kw!(":") => SliceType::Normal,
+            kw!("+:") => SliceType::PartSelect(PartSelectDirection::Up),
+            kw!("-:") => SliceType::PartSelect(PartSelectDirection::Down),
+            _ => unreachable!(),
+        }
+    }
+}
+impl core::fmt::Display for SliceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            SliceType::Normal => ":",
+            SliceType::PartSelect(PartSelectDirection::Up) => "+:",
+            SliceType::PartSelect(PartSelectDirection::Down) => "-:",
+        })
+    }
+}
+
 #[derive(Debug)]
 enum ModuleOrWrittenType {
     WrittenType(WrittenType),
@@ -687,17 +716,90 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         })
     }
 
+    // function to flatten a straightforward xxx[size] array type expression (no slicing)
     fn flatten_array_bracket(&mut self, cursor: &mut Cursor<'c>) -> (FlatID, BracketSpan) {
         let bracket_span = BracketSpan::from_outer(cursor.span());
-        cursor.go_down_content(kind!("array_bracket_expression"), |cursor| {
+        cursor.go_down_content(kind!("array_type_bracket"), |cursor| {
             let expr = self.flatten_subexpr(cursor);
             (expr, bracket_span)
         })
     }
 
+    fn flatten_array_access_bracket(
+        &mut self,
+        cursor: &mut Cursor<'c>,
+    ) -> (WireReferencePathElement, BracketSpan) {
+        let bracket_span = BracketSpan::from_outer(cursor.span());
+        let path_elem = cursor.go_down(kind!("array_access_bracket_expression"), |cursor| {
+            if cursor.optional_field(field!("index")) {
+                let expr = self.flatten_subexpr(cursor);
+
+                WireReferencePathElement::ArrayAccess {
+                    idx: expr,
+                    bracket_span,
+                    input_typ: TyCell::new(),
+                }
+            } else {
+                cursor.field(field!("slice"));
+                cursor.go_down(kind!("slice"), |cursor| {
+                    let from = if cursor.optional_field(field!("index_a")) {
+                        let idx_a = self.flatten_subexpr(cursor);
+                        Some(idx_a)
+                    } else {
+                        None
+                    };
+                    cursor.field(field!("type"));
+                    let (slice_op_kind, slice_op_span) = cursor.kind_span();
+                    let slice_kind = SliceType::from_kind_id(slice_op_kind);
+
+                    let to = if cursor.optional_field(field!("index_b")) {
+                        let idx_b = self.flatten_subexpr(cursor);
+                        Some(idx_b)
+                    } else {
+                        None
+                    };
+
+                    match slice_kind {
+                        SliceType::PartSelect(direction) => {
+                            let from = from.unwrap_or_else(|| {
+                                self.errors.error(
+                                    bracket_span.inner_span().empty_span_at_front(),
+                                    "Missing indexed part-select slices start index",
+                                );
+
+                                self.new_error_subexpr(slice_op_span)
+                            });
+                            let width = to.unwrap_or_else(|| {
+                                self.errors.error(
+                                    bracket_span.inner_span().empty_span_at_front(),
+                                    "Missing indexed part-select slices width",
+                                );
+
+                                self.new_error_subexpr(slice_op_span)
+                            });
+                            WireReferencePathElement::ArrayPartSelect {
+                                from,
+                                width,
+                                bracket_span,
+                                input_typ: TyCell::new(),
+                                direction,
+                            }
+                        }
+                        SliceType::Normal => WireReferencePathElement::ArraySlice {
+                            from,
+                            to,
+                            bracket_span,
+                            input_typ: TyCell::new(),
+                        },
+                    }
+                })
+            }
+        });
+        (path_elem, bracket_span)
+    }
+
     fn flatten_subexpr(&mut self, cursor: &mut Cursor<'c>) -> FlatID {
         let (source, span) = self.flatten_expr_source(cursor);
-
         let wire_instance = Expression {
             parent_condition: self.current_parent_condition,
             domain: Cell::new(DomainType::PLACEHOLDER),
@@ -739,6 +841,18 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             root_span,
             output_typ: TyCell::new(),
         }
+    }
+
+    fn new_error_subexpr(&mut self, root_span: Span) -> FlatID {
+        let wire_ref = self.new_error(root_span);
+
+        self.instructions.alloc(Instruction::Expression(Expression {
+            span: root_span,
+            parent_condition: self.current_parent_condition,
+            source: ExpressionSource::WireRef(wire_ref),
+            domain: Cell::new(DomainType::Generative),
+            output: ExpressionOutput::SubExpression(TyCell::new()),
+        }))
     }
 
     fn flatten_expr_source(&mut self, cursor: &mut Cursor<'c>) -> (ExpressionSource, Span) {
@@ -910,14 +1024,11 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 cursor.field(field!("arr"));
                 let mut wire_ref = self.flatten_wire_reference(cursor);
 
+                // only unpack the subexpr after flattening the idx, so we catch all errors
                 cursor.field(field!("arr_idx"));
-                let (idx, bracket_span) = self.flatten_array_bracket(cursor);
+                let (access, _) = self.flatten_array_access_bracket(cursor);
 
-                wire_ref.path.push(WireReferencePathElement::ArrayAccess {
-                    idx,
-                    bracket_span,
-                    input_typ: TyCell::new(),
-                });
+                wire_ref.path.push(access);
 
                 wire_ref
             }),
@@ -1084,7 +1195,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         instr_range
     }
-    /// Returns the range in the [self.instructions] buffer corresponding to the flattened instructions
+    /// Returns the range in the [Self::instructions] buffer corresponding to the flattened instructions
     fn flatten_code_keep_context(&mut self, cursor: &mut Cursor<'c>) -> FlatIDRange {
         let start_of_code = self.instructions.get_next_alloc_id();
 

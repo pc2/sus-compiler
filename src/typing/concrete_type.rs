@@ -204,6 +204,9 @@ impl ConcreteType {
                 RealWirePathElem::ArrayAccess { .. } => {
                     cur_typ = &cur_typ.unwrap_array().0;
                 }
+                RealWirePathElem::ArrayPartSelectDown { .. }
+                | RealWirePathElem::ArrayPartSelectUp { .. }
+                | RealWirePathElem::ArraySlice { .. } => {}
             }
         }
 

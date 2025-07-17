@@ -113,6 +113,19 @@ impl PeanoType {
             PeanoType::Unknown(_) => None,
         }
     }
+    pub fn count_unwrap(&self) -> usize {
+        let Some(cnt) = self.count() else {
+            panic!("Peano Number {self:?} still contains Unknown!");
+        };
+        cnt
+    }
+    pub fn from_natural(count: usize) -> Self {
+        if count == 0 {
+            PeanoType::Zero
+        } else {
+            PeanoType::Succ(Box::new(PeanoType::from_natural(count - 1)))
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

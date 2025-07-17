@@ -70,6 +70,18 @@ impl WireReference {
             match p {
                 WireReferencePathElement::FieldAccess { .. } => {}
                 WireReferencePathElement::ArrayAccess { idx, .. } => collect(*idx),
+                WireReferencePathElement::ArraySlice { from, to, .. } => {
+                    if let Some(from) = from {
+                        collect(*from);
+                    }
+                    if let Some(to) = to {
+                        collect(*to);
+                    }
+                }
+                WireReferencePathElement::ArrayPartSelect { from, width, .. } => {
+                    collect(*from);
+                    collect(*width);
+                }
             }
         }
     }

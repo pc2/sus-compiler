@@ -283,13 +283,30 @@ pub enum WireReferencePathElement {
         bracket_span: BracketSpan,
         input_typ: TyCell<AbstractRankedType>,
     },
+    ArraySlice {
+        from: Option<FlatID>,
+        to: Option<FlatID>,
+        bracket_span: BracketSpan,
+        input_typ: TyCell<AbstractRankedType>,
+    },
+    ArrayPartSelect {
+        from: FlatID,
+        width: FlatID,
+        bracket_span: BracketSpan,
+        input_typ: TyCell<AbstractRankedType>,
+        direction: PartSelectDirection,
+    },
 }
 
 impl WireReferencePathElement {
     pub fn get_span(&self) -> Span {
         match self {
             WireReferencePathElement::FieldAccess { name_span, .. } => *name_span,
-            WireReferencePathElement::ArrayAccess { bracket_span, .. } => bracket_span.outer_span(),
+            WireReferencePathElement::ArrayAccess { bracket_span, .. }
+            | WireReferencePathElement::ArraySlice { bracket_span, .. }
+            | WireReferencePathElement::ArrayPartSelect { bracket_span, .. } => {
+                bracket_span.outer_span()
+            }
         }
     }
 }
@@ -377,7 +394,9 @@ impl WireReference {
         if let Some(first) = self.path.first() {
             match first {
                 WireReferencePathElement::ArrayAccess { input_typ, .. }
-                | WireReferencePathElement::FieldAccess { input_typ, .. } => input_typ,
+                | WireReferencePathElement::FieldAccess { input_typ, .. }
+                | WireReferencePathElement::ArrayPartSelect { input_typ, .. }
+                | WireReferencePathElement::ArraySlice { input_typ, .. } => input_typ,
             }
         } else {
             &self.output_typ
@@ -478,6 +497,32 @@ pub enum BinaryOperator {
     GreaterEq,
     Lesser,
     LesserEq,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PartSelectDirection {
+    Up,
+    Down,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SliceType {
+    Normal,
+    PartSelect(PartSelectDirection),
+}
+
+/// A reference to a port within a submodule.
+/// Not to be confused with [Port], which is the declaration of the port itself in the [Module]
+#[derive(Debug, Clone, Copy)]
+pub struct PortReference {
+    pub submodule_decl: FlatID,
+    pub port: PortID,
+    pub is_input: bool,
+    /// Only set if the port is named as an explicit field. If the port name is implicit, such as in the function call syntax, then it is not present.
+    pub port_name_span: Option<Span>,
+    /// Even this can be implicit. In the inline function call instantiation syntax there's no named submodule. my_mod(a, b, c)
+    ///
+    /// Finally, if [Self::port_name_span].is_none(), then for highlighting and renaming, this points to a duplicate of a Function Call
+    pub submodule_name_span: Option<Span>,
 }
 
 /// See [Expression]

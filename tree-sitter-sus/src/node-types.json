@@ -1,11 +1,11 @@
 [
   {
-    "type": "array_bracket_expression",
+    "type": "array_access_bracket_expression",
     "named": true,
     "fields": {
-      "content": {
+      "index": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "array_list_expression",
@@ -36,11 +36,25 @@
             "named": true
           },
           {
+            "type": "range",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
           {
             "type": "unary_op",
+            "named": true
+          }
+        ]
+      },
+      "slice": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "slice",
             "named": true
           }
         ]
@@ -81,6 +95,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "range",
             "named": true
           },
           {
@@ -132,6 +150,10 @@
             "named": true
           },
           {
+            "type": "range",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -146,7 +168,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_bracket_expression",
+            "type": "array_access_bracket_expression",
             "named": true
           }
         ]
@@ -176,7 +198,59 @@
         "required": true,
         "types": [
           {
-            "type": "array_bracket_expression",
+            "type": "array_type_bracket",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "array_type_bracket",
+    "named": true,
+    "fields": {
+      "content": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "array_list_expression",
+            "named": true
+          },
+          {
+            "type": "array_op",
+            "named": true
+          },
+          {
+            "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "field_access",
+            "named": true
+          },
+          {
+            "type": "func_call",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "range",
+            "named": true
+          },
+          {
+            "type": "template_global",
+            "named": true
+          },
+          {
+            "type": "unary_op",
             "named": true
           }
         ]
@@ -240,6 +314,10 @@
             "named": true
           },
           {
+            "type": "range",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -295,6 +373,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "range",
             "named": true
           },
           {
@@ -399,6 +481,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "range",
             "named": true
           },
           {
@@ -517,6 +603,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "range",
             "named": true
           },
           {
@@ -698,6 +788,10 @@
             "named": true
           },
           {
+            "type": "range",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -776,6 +870,10 @@
             "named": true
           },
           {
+            "type": "range",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -815,6 +913,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "range",
             "named": true
           },
           {
@@ -873,6 +975,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "range",
             "named": true
           },
           {
@@ -989,6 +1095,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "range",
             "named": true
           },
           {
@@ -1194,6 +1304,10 @@
             "named": true
           },
           {
+            "type": "range",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -1258,6 +1372,10 @@
             "named": true
           },
           {
+            "type": "range",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -1306,12 +1424,230 @@
             "named": true
           },
           {
+            "type": "range",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
           {
             "type": "unary_op",
             "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "range",
+    "named": true,
+    "fields": {
+      "end": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "array_list_expression",
+            "named": true
+          },
+          {
+            "type": "array_op",
+            "named": true
+          },
+          {
+            "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "field_access",
+            "named": true
+          },
+          {
+            "type": "func_call",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "range",
+            "named": true
+          },
+          {
+            "type": "template_global",
+            "named": true
+          },
+          {
+            "type": "unary_op",
+            "named": true
+          }
+        ]
+      },
+      "start": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "array_list_expression",
+            "named": true
+          },
+          {
+            "type": "array_op",
+            "named": true
+          },
+          {
+            "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "field_access",
+            "named": true
+          },
+          {
+            "type": "func_call",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "range",
+            "named": true
+          },
+          {
+            "type": "template_global",
+            "named": true
+          },
+          {
+            "type": "unary_op",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "slice",
+    "named": true,
+    "fields": {
+      "index_a": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "array_list_expression",
+            "named": true
+          },
+          {
+            "type": "array_op",
+            "named": true
+          },
+          {
+            "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "field_access",
+            "named": true
+          },
+          {
+            "type": "func_call",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "range",
+            "named": true
+          },
+          {
+            "type": "template_global",
+            "named": true
+          },
+          {
+            "type": "unary_op",
+            "named": true
+          }
+        ]
+      },
+      "index_b": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "array_list_expression",
+            "named": true
+          },
+          {
+            "type": "array_op",
+            "named": true
+          },
+          {
+            "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "field_access",
+            "named": true
+          },
+          {
+            "type": "func_call",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "range",
+            "named": true
+          },
+          {
+            "type": "template_global",
+            "named": true
+          },
+          {
+            "type": "unary_op",
+            "named": true
+          }
+        ]
+      },
+      "type": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "+:",
+            "named": false
+          },
+          {
+            "type": "-:",
+            "named": false
+          },
+          {
+            "type": ":",
+            "named": false
           }
         ]
       }
@@ -1392,6 +1728,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "range",
             "named": true
           },
           {
@@ -1565,6 +1905,10 @@
             "named": true
           },
           {
+            "type": "range",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -1641,11 +1985,19 @@
     "named": false
   },
   {
+    "type": "+:",
+    "named": false
+  },
+  {
     "type": ",",
     "named": false
   },
   {
     "type": "-",
+    "named": false
+  },
+  {
+    "type": "-:",
     "named": false
   },
   {

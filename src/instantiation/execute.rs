@@ -4,7 +4,8 @@
 //!
 //! As for typing, it only instantiates written types and leaves the rest for further typechecking.
 
-use std::ops::{Deref, Index, IndexMut};
+use std::borrow::Cow;
+use std::ops::{Deref, Index, IndexMut, Range};
 
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::let_unwrap;
@@ -87,6 +88,70 @@ macro_rules! caught_by_typecheck {
     };
 }
 
+enum GenerativeWireRefPathElem {
+    ArrayAccess {
+        idx: IBig,
+        span: Span,
+    },
+    Slice {
+        from: Option<IBig>,
+        to: Option<IBig>,
+        span: Span,
+    },
+}
+
+fn make_array_bounds<'v>(
+    from_maybe: Option<IBig>,
+    to_maybe: Option<IBig>,
+    mut values: impl Iterator<Item = &'v Value>,
+    span: Span,
+) -> ExecutionResult<Range<usize>> {
+    if let Some(first) = values.next() {
+        let_unwrap!(Value::Array(arr), first);
+
+        let arr_sz = arr.len();
+
+        let is_dynamic_range = from_maybe.is_none() || to_maybe.is_none();
+
+        let from = from_maybe.unwrap_or_else(|| IBig::from(0));
+        let to = to_maybe.unwrap_or_else(|| IBig::from(arr_sz));
+
+        assert!(from <= to);
+
+        let (from_valid, to_valid) = match (usize::try_from(&from), usize::try_from(&to)) {
+            (Ok(from), Ok(to)) if to <= arr_sz => (from, to), // && from >= 0, but it's usize
+            _ => {
+                let e = format!(
+                    "Slice {from}:{to} is out of bounds. The size of this array is {arr_sz}"
+                );
+                return Err((span, e));
+            }
+        };
+
+        for v in values {
+            let_unwrap!(Value::Array(arr), v);
+
+            let other_arr_sz = arr.len();
+
+            if is_dynamic_range && other_arr_sz != arr_sz {
+                let e = "Using a variable index on a jagged array".to_string();
+                return Err((span, e));
+            }
+
+            if to_valid > other_arr_sz {
+                let e = format!(
+                    "Slice {from}:{to} is out of bounds. The size of this array is {other_arr_sz}"
+                );
+                return Err((span, e));
+            }
+        }
+
+        Ok(from_valid..to_valid)
+    } else {
+        Ok(0..0)
+    }
+}
+
 pub type ExecutionResult<T> = Result<T, (Span, String)>;
 
 /// Every [crate::flattening::Instruction] has an associated value (See [SubModuleOrWire]).
@@ -110,43 +175,158 @@ impl GenerationState<'_> {
 
     fn write_gen_variable(
         &self,
-        mut target: &mut Value,
+        target: &mut Value,
         conn_path: &[WireReferencePathElement],
         to_write: Value,
     ) -> ExecutionResult<()> {
-        for p in conn_path {
-            match p {
-                WireReferencePathElement::FieldAccess { refers_to, .. } => {
-                    match refers_to.get().unwrap() {
-                        PathElemRefersTo::Interface(_) => {
-                            unreachable!("Not possible in generative context!")
-                        }
+        fn array_access<'t>(
+            tgt_ref: &'t mut Value,
+            idx: &IBig,
+            span: Span,
+        ) -> (ExecutionResult<()>, &'t mut Value) {
+            let idx_as_usize = usize::try_from(idx).ok();
+
+            let Value::Array(tgt_arr) = tgt_ref else {
+                unreachable!()
+            };
+            let arr_sz = tgt_arr.len();
+
+            if idx_as_usize.and_then(|idx| tgt_arr.get_mut(idx)).is_some() {
+                // Once we know we're safe, we have to do the little dance again, such that this time we *consume* tgt_ref
+                let Value::Array(tgt_arr) = tgt_ref else {
+                    unreachable!()
+                };
+                (Ok(()), &mut tgt_arr[idx_as_usize.unwrap()])
+            } else {
+                let err = Err((
+                    span,
+                    format!("Index {idx} out of bounds for array of size {arr_sz}"),
+                ));
+                (err, tgt_ref)
+            }
+        }
+
+        fn slice(
+            cur_targets: Vec<(&mut Value, Value)>,
+            from: Option<IBig>,
+            to: Option<IBig>,
+            span: Span,
+        ) -> ExecutionResult<Vec<(&mut Value, Value)>> {
+            let slice = make_array_bounds(from, to, cur_targets.iter().map(|t| &*t.0), span)?;
+
+            let new_len = cur_targets.len() * slice.len();
+
+            let mut new_targets = Vec::with_capacity(new_len);
+
+            for (target, from) in cur_targets {
+                let_unwrap!(Value::Array(target), target);
+                let Value::Array(mut from) = from else {
+                    unreachable!()
+                };
+
+                for new_pair in zip_eq(&mut target[slice.clone()], from.drain(slice.clone())) {
+                    new_targets.push(new_pair)
+                }
+            }
+
+            Ok(new_targets)
+        }
+
+        // must be an array, from earlier typechecking
+
+        let mut cur_targets: Vec<(&mut Value, Value)> = vec![(target, to_write)];
+        let executed_path = self.execute_path(conn_path)?;
+
+        for path_elem in executed_path {
+            match path_elem {
+                GenerativeWireRefPathElem::ArrayAccess { idx, span } => {
+                    for target in &mut cur_targets {
+                        replace_with::replace_with_or_abort_and_return(&mut target.0, |tgt| {
+                            array_access(tgt, &idx, span)
+                        })?;
                     }
                 }
-                WireReferencePathElement::ArrayAccess {
-                    idx, bracket_span, ..
-                } => {
-                    let idx = self.get_generation_integer(*idx)?; // Caught by typecheck
-                    let Value::Array(a_box) = target else {
-                        caught_by_typecheck!("Non-array")
-                    };
-                    let array_len = a_box.len();
-                    let Some(tt) = usize::try_from(idx).ok().and_then(|pos| a_box.get_mut(pos))
-                    else {
-                        return Err((
-                            bracket_span.inner_span(),
-                            format!(
-                                "Index {idx} is out of bounds for this array of size {}",
-                                array_len
-                            ),
-                        ));
-                    };
-                    target = tt
+                GenerativeWireRefPathElem::Slice { from, to, span } => {
+                    cur_targets = slice(cur_targets, from, to, span)?;
                 }
             }
         }
-        *target = to_write;
+
+        for (t, f) in cur_targets {
+            *t = f;
+        }
         Ok(())
+    }
+    fn read_from_path(
+        &self,
+        value: &Value,
+        conn_path: &[WireReferencePathElement],
+    ) -> ExecutionResult<Value> {
+        let executed_path = self.execute_path(conn_path)?;
+
+        let mut flattened_result_tensor: Vec<&Value> = vec![value];
+        let mut create_array_layers = Vec::new();
+
+        // First we expand the result tensor by digging down
+        for p in executed_path {
+            match p {
+                GenerativeWireRefPathElem::ArrayAccess { idx, span } => {
+                    for vp in &mut flattened_result_tensor {
+                        let_unwrap!(Value::Array(arr), *vp);
+                        let arr_sz = arr.len();
+                        let Some(v) = usize::try_from(&idx).ok().and_then(|idx| arr.get(idx))
+                        else {
+                            return Err((
+                                span,
+                                format!("Index {idx} out of bounds for array of size {arr_sz}"),
+                            ));
+                        };
+                        *vp = v;
+                    }
+                }
+                GenerativeWireRefPathElem::Slice { from, to, span } => {
+                    let slice =
+                        make_array_bounds(from, to, flattened_result_tensor.iter().copied(), span)?;
+
+                    let mut new_value_parts =
+                        Vec::with_capacity(flattened_result_tensor.len() * slice.len());
+
+                    for vp in &mut flattened_result_tensor {
+                        let_unwrap!(Value::Array(arr), *vp);
+
+                        for a in &arr[slice.clone()] {
+                            new_value_parts.push(a);
+                        }
+                    }
+
+                    create_array_layers.push(slice.len());
+                    flattened_result_tensor = new_value_parts;
+                }
+            }
+        }
+
+        // Then we re-consitute the array until we have one element again
+        let mut flattened_result_tensor: Vec<Value> =
+            flattened_result_tensor.into_iter().cloned().collect();
+        for dimension_len in create_array_layers.into_iter().rev() {
+            let num_sub_tensors = flattened_result_tensor.len() / dimension_len;
+            assert_eq!(flattened_result_tensor.len() % dimension_len, 0);
+
+            let mut result_iter = flattened_result_tensor.into_iter();
+            flattened_result_tensor = (0..num_sub_tensors)
+                .map(|_| {
+                    Value::Array(
+                        (0..dimension_len)
+                            .map(|_| result_iter.next().unwrap())
+                            .collect(),
+                    )
+                })
+                .collect();
+
+            assert!(result_iter.next().is_none());
+        }
+
+        Ok(unwrap_single_element(flattened_result_tensor))
     }
     fn get_generation_value(&self, v: FlatID) -> ExecutionResult<&Value> {
         let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] else {
@@ -179,6 +359,77 @@ impl GenerationState<'_> {
             )
         })
     }
+
+    fn execute_path(
+        &self,
+        path: &[WireReferencePathElement],
+    ) -> ExecutionResult<Vec<GenerativeWireRefPathElem>> {
+        let mut resulting_path = Vec::with_capacity(path.len());
+        for p in path {
+            let new_elem = match p {
+                WireReferencePathElement::FieldAccess { refers_to, .. } => {
+                    match refers_to.get().unwrap() {
+                        PathElemRefersTo::Interface(_) => {
+                            unreachable!("Not possible in generative context!")
+                        }
+                    }
+                }
+                WireReferencePathElement::ArrayAccess {
+                    idx, bracket_span, ..
+                } => {
+                    let idx = self.get_generation_integer(*idx)?.clone();
+                    GenerativeWireRefPathElem::ArrayAccess {
+                        idx,
+                        span: bracket_span.inner_span(),
+                    }
+                }
+                WireReferencePathElement::ArraySlice {
+                    from,
+                    to,
+                    bracket_span,
+                    ..
+                } => {
+                    let from = if let Some(from) = from {
+                        Some(self.get_generation_integer(*from)?.clone())
+                    } else {
+                        None
+                    };
+                    let to = if let Some(to) = to {
+                        Some(self.get_generation_integer(*to)?.clone())
+                    } else {
+                        None
+                    };
+                    GenerativeWireRefPathElem::Slice {
+                        from,
+                        to,
+                        span: bracket_span.inner_span(),
+                    }
+                }
+                WireReferencePathElement::ArrayPartSelect {
+                    from,
+                    width,
+                    bracket_span,
+                    direction,
+                    ..
+                } => {
+                    let from = self.get_generation_integer(*from)?;
+                    let width = self.get_generation_integer(*width)?;
+
+                    let (from, to) = match direction {
+                        PartSelectDirection::Up => (Some(from.clone()), Some(from + width - 1)),
+                        PartSelectDirection::Down => (Some(from - width + 1), Some(from.clone())),
+                    };
+                    GenerativeWireRefPathElem::Slice {
+                        from,
+                        to,
+                        span: bracket_span.inner_span(),
+                    }
+                }
+            };
+            resulting_path.push(new_elem);
+        }
+        Ok(resulting_path)
+    }
 }
 
 impl Index<FlatID> for GenerationState<'_> {
@@ -192,28 +443,6 @@ impl Index<FlatID> for GenerationState<'_> {
 impl IndexMut<FlatID> for GenerationState<'_> {
     fn index_mut(&mut self, index: FlatID) -> &mut Self::Output {
         &mut self.generation_state[index]
-    }
-}
-
-fn array_access<'v>(
-    arr_val: &'v Value,
-    idx: &IBig,
-    span: BracketSpan,
-) -> ExecutionResult<&'v Value> {
-    let Value::Array(arr) = arr_val else {
-        caught_by_typecheck!("Value must be an array")
-    };
-
-    if let Some(elem) = usize::try_from(idx).ok().and_then(|idx| arr.get(idx)) {
-        Ok(elem)
-    } else {
-        Err((
-            span.outer_span(),
-            format!(
-                "Compile-Time Array index is out of range: idx: {idx}, array size: {}",
-                arr.len()
-            ),
-        ))
     }
 }
 
@@ -651,6 +880,64 @@ impl<'l> ExecutionContext<'l> {
                         interface_found = (*interface, *name_span);
                     }
                 },
+                WireReferencePathElement::ArraySlice {
+                    from,
+                    to,
+                    bracket_span,
+                    ..
+                } => {
+                    let (from, from_span) = match from {
+                        Some(from) => (
+                            self.generation_state[*from]
+                                .unwrap_generation_value()
+                                .clone()
+                                .into(),
+                            self.link_info.instructions[*from].get_span(),
+                        ),
+                        None => (
+                            self.type_substitutor.alloc_unknown(),
+                            bracket_span.inner_span().empty_span_at_front(),
+                        ),
+                    };
+                    let (to, to_span) = match to {
+                        Some(to) => (
+                            self.generation_state[*to]
+                                .unwrap_generation_value()
+                                .clone()
+                                .into(),
+                            self.link_info.instructions[*to].get_span(),
+                        ),
+                        None => (
+                            self.type_substitutor.alloc_unknown(),
+                            bracket_span.inner_span().empty_span_at_end(),
+                        ),
+                    };
+
+                    path.push(RealWirePathElem::ArraySlice {
+                        from_span,
+                        to_span,
+                        from,
+                        to,
+                    });
+                }
+                WireReferencePathElement::ArrayPartSelect {
+                    from,
+                    width,
+                    bracket_span,
+                    direction,
+                    ..
+                } => {
+                    let from_wire = self.get_wire_or_constant_as_wire(*from, domain)?;
+
+                    let width = self.generation_state[*width].unwrap_generation_value();
+
+                    path.push(RealWirePathElem::ArrayPartSelect {
+                        span: *bracket_span,
+                        from_wire,
+                        width: width.clone().into(),
+                        direction: *direction,
+                    });
+                }
             }
         }
         Ok((interface_found.0, interface_found.1, path))
@@ -1215,12 +1502,13 @@ impl<'l> ExecutionContext<'l> {
     }
 
     fn compute_compile_time_wireref(&mut self, wire_ref: &WireReference) -> ExecutionResult<Value> {
-        let mut work_on_value: Value = match &wire_ref.root {
-            WireReferenceRoot::LocalDecl(decl_id) => self
-                .generation_state
-                .get_generation_value(*decl_id)?
-                .clone(),
-            WireReferenceRoot::NamedConstant(cst) => self.get_named_constant_value(cst)?,
+        let work_on_value = match &wire_ref.root {
+            WireReferenceRoot::LocalDecl(decl_id) => {
+                Cow::Borrowed(self.generation_state.get_generation_value(*decl_id)?)
+            }
+            WireReferenceRoot::NamedConstant(cst) => {
+                Cow::Owned(self.get_named_constant_value(cst)?)
+            }
             WireReferenceRoot::LocalSubmodule(_)
             | WireReferenceRoot::NamedModule(_)
             | WireReferenceRoot::LocalInterface(_) => {
@@ -1229,26 +1517,8 @@ impl<'l> ExecutionContext<'l> {
             WireReferenceRoot::Error => caught_by_typecheck!(),
         };
 
-        for path_elem in &wire_ref.path {
-            work_on_value = match path_elem {
-                WireReferencePathElement::FieldAccess { refers_to, .. } => {
-                    match refers_to.get().unwrap() {
-                        PathElemRefersTo::Interface(_) => {
-                            unreachable!("Don't support compiletime submodules")
-                        }
-                    }
-                }
-                WireReferencePathElement::ArrayAccess {
-                    idx, bracket_span, ..
-                } => {
-                    let idx = self.generation_state.get_generation_integer(*idx)?;
-
-                    array_access(&work_on_value, idx, *bracket_span)?.clone()
-                }
-            }
-        }
-
-        Ok(work_on_value)
+        self.generation_state
+            .read_from_path(&work_on_value, &wire_ref.path)
     }
     fn compute_compile_time(&mut self, expr: &Expression) -> ExecutionResult<Value> {
         fn duplicate_for_all_array_ranks<const SZ: usize>(
