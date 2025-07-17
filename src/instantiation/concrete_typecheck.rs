@@ -2,7 +2,6 @@ use ibig::IBig;
 use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::{zip_eq, zip_eq3};
-use crate::typing::abstract_type::PeanoType;
 use crate::typing::set_unifier::{DelayedErrorCollector, FullySubstitutable};
 use crate::typing::value_unifier::{ValueErrorReporter, ValueUnifierStore};
 use crate::typing::{concrete_type::ConcreteType, value_unifier::ValueUnifier};
@@ -35,8 +34,6 @@ fn unify_rank<'inst>(
         unifier.unify(r, &arr.1)
     })
 }
-
-use crate::typing::type_inference::{Substitutor, TypeSubstitutor, TypeUnifier};
 
 impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
     pub fn typecheck(&mut self, type_substitutor_alloc: ValueUnifierAlloc) {

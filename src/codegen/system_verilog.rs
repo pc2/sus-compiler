@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::ops::Deref;
-use std::slice::SliceIndex;
 
 use ibig::IBig;
 use sus_proc_macro::get_builtin_type;
@@ -253,59 +252,23 @@ impl<'g> CodeGenerationContext<'g> {
                     let idx_wire_name = self.wire_name(wire, absolute_latency);
                     write!(result, "[{idx_wire_name}]").unwrap();
                 }
-                RealWirePathElem::ArraySlice {
-                    span: _,
-                    idx_a_wire,
-                    idx_b_wire,
-                } => {
-                    write!(result, "[").unwrap();
-                    match idx_a_wire {
-                        crate::instantiation::SliceIndex::Wire(idx_a_wire) => {
-                            let wire_a = &self.instance.wires[*idx_a_wire];
-                            let idx_wire_name_a = self.wire_name(wire_a, absolute_latency);
-                            write!(result, "{idx_wire_name_a}").unwrap();
-                        }
-                        crate::instantiation::SliceIndex::Unknown(_) => {
-                            write!(result, "0").unwrap();
-                        }
-                    };
-                    write!(result, ":").unwrap();
-                    match idx_b_wire {
-                        crate::instantiation::SliceIndex::Wire(idx_b_wire) => {
-                            let wire_b = &self.instance.wires[*idx_b_wire];
-                            let idx_wire_name_b = self.wire_name(wire_b, absolute_latency);
-                            write!(result, "{idx_wire_name_b}").unwrap();
-                        }
-                        crate::instantiation::SliceIndex::Unknown(v) => {
-                            let v = v.unwrap_integer();
-                            write!(result, "{v}").unwrap();
-                        }
-                    }
-                    write!(result, "]").unwrap();
+                RealWirePathElem::ArraySlice { from, to, .. } => {
+                    let from = from.unwrap_integer();
+                    let to = to.unwrap_integer();
+
+                    write!(result, "[{from}:{to}-1]").unwrap();
                 }
-                RealWirePathElem::ArrayPartSelectDown {
+                RealWirePathElem::ArrayPartSelect {
                     span: _,
-                    idx_a_wire,
-                    width_wire,
-                }
-                | RealWirePathElem::ArrayPartSelectUp {
-                    span: _,
-                    idx_a_wire,
-                    width_wire,
+                    from_wire,
+                    width,
+                    direction,
                 } => {
-                    let wire_a = &self.instance.wires[*idx_a_wire];
+                    let wire_a = &self.instance.wires[*from_wire];
                     let idx_wire_name_a = self.wire_name(wire_a, absolute_latency);
-                    let wire_width = &self.instance.wires[*width_wire];
-                    let idx_wire_width_name = self.wire_name(wire_width, absolute_latency);
-                    match path_elem {
-                        RealWirePathElem::ArrayPartSelectDown { .. } => {
-                            write!(result, "[{idx_wire_name_a}-:{idx_wire_width_name}]").unwrap();
-                        }
-                        RealWirePathElem::ArrayPartSelectUp { .. } => {
-                            write!(result, "[{idx_wire_name_a}+:{idx_wire_width_name}]").unwrap();
-                        }
-                        _ => unreachable!(),
-                    }
+                    let width = width.unwrap_integer();
+
+                    write!(result, "[{idx_wire_name_a}{direction}{width}]").unwrap();
                 }
             }
         }

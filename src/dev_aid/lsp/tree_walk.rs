@@ -314,7 +314,9 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                     };
                     self.visit(*name_span, target);
                 }
-                WireReferencePathElement::ArrayAccess { .. } => {}
+                WireReferencePathElement::ArrayAccess { .. }
+                | WireReferencePathElement::ArraySlice { .. }
+                | WireReferencePathElement::ArrayPartSelect { .. } => {}
             }
         }
     }

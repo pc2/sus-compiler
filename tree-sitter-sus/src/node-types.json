@@ -36,10 +36,6 @@
             "named": true
           },
           {
-            "type": "range",
-            "named": true
-          },
-          {
             "type": "template_global",
             "named": true
           },
@@ -98,10 +94,6 @@
             "named": true
           },
           {
-            "type": "range",
-            "named": true
-          },
-          {
             "type": "template_global",
             "named": true
           },
@@ -147,10 +139,6 @@
           },
           {
             "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "range",
             "named": true
           },
           {
@@ -242,10 +230,6 @@
             "named": true
           },
           {
-            "type": "range",
-            "named": true
-          },
-          {
             "type": "template_global",
             "named": true
           },
@@ -314,10 +298,6 @@
             "named": true
           },
           {
-            "type": "range",
-            "named": true
-          },
-          {
             "type": "template_global",
             "named": true
           },
@@ -373,10 +353,6 @@
           },
           {
             "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "range",
             "named": true
           },
           {
@@ -481,10 +457,6 @@
           },
           {
             "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "range",
             "named": true
           },
           {
@@ -603,10 +575,6 @@
           },
           {
             "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "range",
             "named": true
           },
           {
@@ -788,10 +756,6 @@
             "named": true
           },
           {
-            "type": "range",
-            "named": true
-          },
-          {
             "type": "template_global",
             "named": true
           },
@@ -870,10 +834,6 @@
             "named": true
           },
           {
-            "type": "range",
-            "named": true
-          },
-          {
             "type": "template_global",
             "named": true
           },
@@ -913,10 +873,6 @@
           },
           {
             "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "range",
             "named": true
           },
           {
@@ -975,10 +931,6 @@
           },
           {
             "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "range",
             "named": true
           },
           {
@@ -1095,10 +1047,6 @@
           },
           {
             "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "range",
             "named": true
           },
           {
@@ -1304,10 +1252,6 @@
             "named": true
           },
           {
-            "type": "range",
-            "named": true
-          },
-          {
             "type": "template_global",
             "named": true
           },
@@ -1372,10 +1316,6 @@
             "named": true
           },
           {
-            "type": "range",
-            "named": true
-          },
-          {
             "type": "template_global",
             "named": true
           },
@@ -1421,108 +1361,6 @@
           },
           {
             "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "range",
-            "named": true
-          },
-          {
-            "type": "template_global",
-            "named": true
-          },
-          {
-            "type": "unary_op",
-            "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
-    "type": "range",
-    "named": true,
-    "fields": {
-      "end": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "array_list_expression",
-            "named": true
-          },
-          {
-            "type": "array_op",
-            "named": true
-          },
-          {
-            "type": "binary_op",
-            "named": true
-          },
-          {
-            "type": "field_access",
-            "named": true
-          },
-          {
-            "type": "func_call",
-            "named": true
-          },
-          {
-            "type": "number",
-            "named": true
-          },
-          {
-            "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "range",
-            "named": true
-          },
-          {
-            "type": "template_global",
-            "named": true
-          },
-          {
-            "type": "unary_op",
-            "named": true
-          }
-        ]
-      },
-      "start": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "array_list_expression",
-            "named": true
-          },
-          {
-            "type": "array_op",
-            "named": true
-          },
-          {
-            "type": "binary_op",
-            "named": true
-          },
-          {
-            "type": "field_access",
-            "named": true
-          },
-          {
-            "type": "func_call",
-            "named": true
-          },
-          {
-            "type": "number",
-            "named": true
-          },
-          {
-            "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "range",
             "named": true
           },
           {
@@ -1574,10 +1412,6 @@
             "named": true
           },
           {
-            "type": "range",
-            "named": true
-          },
-          {
             "type": "template_global",
             "named": true
           },
@@ -1617,10 +1451,6 @@
           },
           {
             "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "range",
             "named": true
           },
           {
@@ -1728,10 +1558,6 @@
           },
           {
             "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "range",
             "named": true
           },
           {
@@ -1902,10 +1728,6 @@
           },
           {
             "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "range",
             "named": true
           },
           {

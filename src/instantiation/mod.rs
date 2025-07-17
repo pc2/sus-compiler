@@ -12,7 +12,7 @@ use crate::debug::SpanDebugger;
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::LinkInfo;
 use crate::prelude::*;
-use crate::to_string::{join_string_iter, join_string_iter_formatter};
+use crate::to_string::join_string_iter;
 use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
 
 use std::cell::OnceCell;
@@ -20,17 +20,12 @@ use std::fmt::{Display, Write};
 use std::rc::Rc;
 
 use crate::flattening::{
-    BinaryOperator, Direction, ExpressionSource, Instruction, Module, UnaryOperator,
+    BinaryOperator, Direction, ExpressionSource, Instruction, Module, PartSelectDirection,
+    UnaryOperator,
 };
 use crate::{errors::ErrorStore, value::Value};
 
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
-
-#[derive(Debug, Clone)]
-pub enum SliceIndex {
-    Wire(WireID),
-    Unknown(UnifyableValue),
-}
 
 /// See [MultiplexerSource]
 ///
@@ -42,19 +37,16 @@ pub enum RealWirePathElem {
         idx_wire: WireID,
     },
     ArraySlice {
-        span: BracketSpan,
-        idx_a_wire: SliceIndex,
-        idx_b_wire: SliceIndex,
+        from_span: Span,
+        to_span: Span,
+        from: UnifyableValue,
+        to: UnifyableValue,
     },
-    ArrayPartSelectUp {
+    ArrayPartSelect {
         span: BracketSpan,
-        idx_a_wire: WireID,
-        width_wire: WireID,
-    },
-    ArrayPartSelectDown {
-        span: BracketSpan,
-        idx_a_wire: WireID,
-        width_wire: WireID,
+        from_wire: WireID,
+        width: UnifyableValue,
+        direction: PartSelectDirection,
     },
 }
 
@@ -278,32 +270,9 @@ impl ForEachContainedWire for RealWirePathElem {
             RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
                 f(*idx_wire);
             }
-            RealWirePathElem::ArraySlice {
-                span: _,
-                idx_a_wire,
-                idx_b_wire,
-            } => {
-                match idx_a_wire {
-                    SliceIndex::Wire(w) => f(*w),
-                    _ => {}
-                }
-                match idx_b_wire {
-                    SliceIndex::Wire(w) => f(*w),
-                    _ => {}
-                }
-            }
-            RealWirePathElem::ArrayPartSelectDown {
-                span: _,
-                idx_a_wire,
-                width_wire: idx_b_wire,
-            }
-            | RealWirePathElem::ArrayPartSelectUp {
-                span: _,
-                idx_a_wire,
-                width_wire: idx_b_wire,
-            } => {
-                f(*idx_a_wire);
-                f(*idx_b_wire);
+            RealWirePathElem::ArraySlice { .. } => {}
+            RealWirePathElem::ArrayPartSelect { from_wire, .. } => {
+                f(*from_wire);
             }
         }
     }
@@ -507,8 +476,20 @@ impl ModuleTypingContext<'_> {
     fn print_path(&self, path: &[RealWirePathElem]) {
         for p in path {
             match p {
-                RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
-                    print!("{}", self.name(*idx_wire));
+                RealWirePathElem::ArrayAccess { idx_wire, .. } => {
+                    print!("[{}]", self.name(*idx_wire));
+                }
+                RealWirePathElem::ArraySlice { from, to, .. } => {
+                    print!("[{from}:{to}]");
+                }
+                RealWirePathElem::ArrayPartSelect {
+                    from_wire,
+                    width,
+                    direction,
+                    ..
+                } => {
+                    let from = self.name(*from_wire);
+                    print!("[{from}{direction}{width}]");
                 }
             }
         }
