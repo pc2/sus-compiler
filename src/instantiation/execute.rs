@@ -866,7 +866,7 @@ impl<'l> ExecutionContext<'l> {
                     idx, bracket_span, ..
                 } => {
                     let idx_wire = self.get_wire_or_constant_as_wire(*idx, domain)?;
-                    path.push(RealWirePathElem::ArrayAccess {
+                    path.push(RealWirePathElem::Index {
                         span: *bracket_span,
                         idx_wire,
                     });
@@ -913,7 +913,7 @@ impl<'l> ExecutionContext<'l> {
                         ),
                     };
 
-                    path.push(RealWirePathElem::ArraySlice {
+                    path.push(RealWirePathElem::Slice {
                         from_span,
                         to_span,
                         from,
@@ -931,7 +931,7 @@ impl<'l> ExecutionContext<'l> {
 
                     let width = self.generation_state[*width].unwrap_generation_value();
 
-                    path.push(RealWirePathElem::ArrayPartSelect {
+                    path.push(RealWirePathElem::PartSelect {
                         span: *bracket_span,
                         from_wire,
                         width: width.clone().into(),

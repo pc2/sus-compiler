@@ -247,18 +247,18 @@ impl<'g> CodeGenerationContext<'g> {
         let mut result = String::new();
         for path_elem in path {
             match path_elem {
-                RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
+                RealWirePathElem::Index { span: _, idx_wire } => {
                     let wire = &self.instance.wires[*idx_wire];
                     let idx_wire_name = self.wire_name(wire, absolute_latency);
                     write!(result, "[{idx_wire_name}]").unwrap();
                 }
-                RealWirePathElem::ArraySlice { from, to, .. } => {
+                RealWirePathElem::Slice { from, to, .. } => {
                     let from = from.unwrap_integer();
                     let to = to.unwrap_integer();
 
                     write!(result, "[{from}:{to}-1]").unwrap();
                 }
-                RealWirePathElem::ArrayPartSelect {
+                RealWirePathElem::PartSelect {
                     span: _,
                     from_wire,
                     width,

@@ -510,21 +510,6 @@ pub enum SliceType {
     PartSelect(PartSelectDirection),
 }
 
-/// A reference to a port within a submodule.
-/// Not to be confused with [Port], which is the declaration of the port itself in the [Module]
-#[derive(Debug, Clone, Copy)]
-pub struct PortReference {
-    pub submodule_decl: FlatID,
-    pub port: PortID,
-    pub is_input: bool,
-    /// Only set if the port is named as an explicit field. If the port name is implicit, such as in the function call syntax, then it is not present.
-    pub port_name_span: Option<Span>,
-    /// Even this can be implicit. In the inline function call instantiation syntax there's no named submodule. my_mod(a, b, c)
-    ///
-    /// Finally, if [Self::port_name_span].is_none(), then for highlighting and renaming, this points to a duplicate of a Function Call
-    pub submodule_name_span: Option<Span>,
-}
-
 /// See [Expression]
 #[derive(Debug)]
 pub enum ExpressionSource {

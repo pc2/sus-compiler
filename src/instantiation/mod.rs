@@ -32,17 +32,17 @@ use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
 /// This is the post-instantiation equivalent of [crate::flattening::WireReferencePathElement]
 #[derive(Debug, Clone)]
 pub enum RealWirePathElem {
-    ArrayAccess {
+    Index {
         span: BracketSpan,
         idx_wire: WireID,
     },
-    ArraySlice {
+    Slice {
         from_span: Span,
         to_span: Span,
         from: UnifyableValue,
         to: UnifyableValue,
     },
-    ArrayPartSelect {
+    PartSelect {
         span: BracketSpan,
         from_wire: WireID,
         width: UnifyableValue,
@@ -267,11 +267,11 @@ impl ForEachContainedWire for WireID {
 impl ForEachContainedWire for RealWirePathElem {
     fn for_each_wire(&self, f: &mut impl FnMut(WireID)) {
         match self {
-            RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
+            RealWirePathElem::Index { span: _, idx_wire } => {
                 f(*idx_wire);
             }
-            RealWirePathElem::ArraySlice { .. } => {}
-            RealWirePathElem::ArrayPartSelect { from_wire, .. } => {
+            RealWirePathElem::Slice { .. } => {}
+            RealWirePathElem::PartSelect { from_wire, .. } => {
                 f(*from_wire);
             }
         }
@@ -417,7 +417,11 @@ fn perform_instantiation(
 
     let name = global_ref.display(linker, false).to_string();
 
-    let _panic_guard = SpanDebugger::new("instantiating", &name, &linker.files[md.link_info.file]);
+    let _panic_guard = SpanDebugger::new(
+        "instantiating",
+        name.clone(),
+        &linker.files[md.link_info.file],
+    );
 
     // Don't instantiate modules that already errored. Otherwise instantiator may crash
     if md.link_info.errors.did_error {
@@ -476,13 +480,13 @@ impl ModuleTypingContext<'_> {
     fn print_path(&self, path: &[RealWirePathElem]) {
         for p in path {
             match p {
-                RealWirePathElem::ArrayAccess { idx_wire, .. } => {
+                RealWirePathElem::Index { idx_wire, .. } => {
                     print!("[{}]", self.name(*idx_wire));
                 }
-                RealWirePathElem::ArraySlice { from, to, .. } => {
+                RealWirePathElem::Slice { from, to, .. } => {
                     print!("[{from}:{to}]");
                 }
-                RealWirePathElem::ArrayPartSelect {
+                RealWirePathElem::PartSelect {
                     from_wire,
                     width,
                     direction,

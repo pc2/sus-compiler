@@ -10,6 +10,7 @@ use std::{
 };
 
 use circular_buffer::CircularBuffer;
+use colored::Colorize;
 
 use crate::{
     config::config, linker::FileData, prelude::Span, pretty_print_span,
@@ -23,11 +24,12 @@ const NUM_SPANS_TO_PRINT: usize = 10;
 
 struct PerThreadDebugInfo {
     debug_stack: Vec<SpanDebuggerStackElement>,
-    recent_debug_options: CircularBuffer<RECENT_DEBUG_FLAG_SIZE, &'static str>,
+    recent_debug_options: CircularBuffer<RECENT_DEBUG_FLAG_SIZE, (Option<String>, &'static str)>,
 }
 
 struct SpanDebuggerStackElement {
-    context: String,
+    stage: &'static str,
+    global_obj_name: String,
     debugging_enabled: bool,
     span_history: CircularBuffer<SPAN_TOUCH_HISTORY_SIZE, Span>,
 }
@@ -94,7 +96,6 @@ pub fn debug_print_span(span: Span, label: String) {
 /// Maybe future work can remove dependency on Linker lifetime with some unsafe code.
 pub struct SpanDebugger<'text> {
     file_data: &'text FileData,
-    stage: &'static str,
     started_at: std::time::Instant,
     /// Kills the process if a SpanDebugger lives longer than config.kill_timeout
     #[allow(unused)]
@@ -113,9 +114,10 @@ fn print_stack_top(enter_exit: &str) {
                 ""
             };
             println!(
-                "{enter_exit}SpanDebugger (x{}) {}{debug_enabled}",
+                "{enter_exit}SpanDebugger (x{}) {} for {}{debug_enabled}",
                 stack.debug_stack.len(),
-                top.context
+                top.stage,
+                top.global_obj_name
             );
         } else {
             println!("SpanDebugger (x0)")
@@ -124,7 +126,7 @@ fn print_stack_top(enter_exit: &str) {
 }
 
 impl<'text> SpanDebugger<'text> {
-    pub fn new(stage: &'static str, global_obj_name: &str, file_data: &'text FileData) -> Self {
+    pub fn new(stage: &'static str, global_obj_name: String, file_data: &'text FileData) -> Self {
         MOST_RECENT_FILE_DATA.with(|ptr| {
             let file_data = file_data as *const FileData;
             ptr.store(
@@ -132,8 +134,9 @@ impl<'text> SpanDebugger<'text> {
                 std::sync::atomic::Ordering::SeqCst,
             )
         });
-        let context = format!("{stage} {global_obj_name}");
         let config = config();
+
+        let oot_killer_str = format!("{stage} {global_obj_name}");
 
         DEBUG_STACK.with_borrow_mut(|history| {
             let debugging_enabled = config.debug_whitelist.is_empty()
@@ -144,7 +147,8 @@ impl<'text> SpanDebugger<'text> {
                     .any(|v| global_obj_name.contains(v));
 
             history.debug_stack.push(SpanDebuggerStackElement {
-                context: context.clone(),
+                stage,
+                global_obj_name,
                 debugging_enabled,
                 span_history: CircularBuffer::new(),
             });
@@ -153,9 +157,8 @@ impl<'text> SpanDebugger<'text> {
 
         Self {
             file_data,
-            stage,
             started_at: std::time::Instant::now(),
-            out_of_time_killer: OutOfTimeKiller::new(context),
+            out_of_time_killer: OutOfTimeKiller::new(oot_killer_str),
         }
     }
 }
@@ -176,7 +179,8 @@ impl Drop for SpanDebugger<'_> {
         if std::thread::panicking() {
             eprintln!(
                 "Panic happened in Span-guarded context {} in {}",
-                self.stage, last_stack_elem.context
+                last_stack_elem.stage.red(),
+                last_stack_elem.global_obj_name.red()
             );
             print_most_recent_spans(self.file_data, last_stack_elem)
         }
@@ -186,13 +190,20 @@ impl Drop for SpanDebugger<'_> {
 /// Check if the debug path is enabled
 pub fn is_enabled(path_id: &'static str) -> bool {
     DEBUG_STACK.with_borrow_mut(|stack| {
-        stack.recent_debug_options.push_back(path_id);
-        let Some(last) = stack.debug_stack.last() else {
+        let last = stack.debug_stack.last();
+        stack
+            .recent_debug_options
+            .push_back((last.map(|last| last.global_obj_name.clone()), path_id));
+
+        if !matches!(
+            last,
+            Some(SpanDebuggerStackElement {
+                debugging_enabled: true,
+                ..
+            })
+        ) {
             return false;
         };
-        if !last.debugging_enabled {
-            return false;
-        }
 
         config().enabled_debug_paths.contains(path_id)
     })
@@ -215,8 +226,12 @@ pub fn setup_panic_handler() {
 
         DEBUG_STACK.with_borrow(|history| {
             println!("Most recent available debug paths:");
-            for d in &history.recent_debug_options {
-                println!("--debug {d}");
+            for (ctx, d) in &history.recent_debug_options {
+                if let Some(ctx) = ctx {
+                    println!("--debug-whitelist {ctx} --debug {d}");
+                } else {
+                    println!("(no SpanDebugger Context) --debug {d}");
+                }
             }
         })
     }));

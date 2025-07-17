@@ -68,13 +68,13 @@ impl<'l> ModuleTypingContext<'l> {
             let arr_sz = arr_sz.unwrap_integer();
             typ = content;
             match elem {
-                RealWirePathElem::ArrayAccess { span, idx_wire } => {
+                RealWirePathElem::Index { span, idx_wire } => {
                     let span = span.inner_span();
                     let wire = &self.wires[*idx_wire];
                     let (min, max) = wire.typ.unwrap_integer_bounds();
                     self.check_array_bound_min_max(min, max, arr_sz, span, "index");
                 }
-                RealWirePathElem::ArraySlice {
+                RealWirePathElem::Slice {
                     from_span,
                     to_span,
                     from,
@@ -83,7 +83,7 @@ impl<'l> ModuleTypingContext<'l> {
                     self.check_array_bound_gen(from, arr_sz, *from_span, "lower bound");
                     self.check_array_bound_gen(to, arr_sz, *to_span, "upper bound");
                 }
-                RealWirePathElem::ArrayPartSelect {
+                RealWirePathElem::PartSelect {
                     span,
                     from_wire,
                     width,

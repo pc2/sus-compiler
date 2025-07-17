@@ -145,7 +145,7 @@ impl Linker {
         self.with_file_builder(file_id, |builder| {
             let _panic_guard = SpanDebugger::new(
                 "gather_initial_file_data in add_file",
-                &builder.file_data.file_identifier,
+                builder.file_data.file_identifier.clone(),
                 builder.file_data,
             );
             gather_initial_file_data(builder);
@@ -180,7 +180,7 @@ impl Linker {
             self.with_file_builder(file_id, |builder| {
                 let _panic_guard = SpanDebugger::new(
                     "gather_initial_file_data in update_file",
-                    &builder.file_data.file_identifier,
+                    builder.file_data.file_identifier.clone(),
                     builder.file_data,
                 );
                 gather_initial_file_data(builder);

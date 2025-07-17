@@ -137,7 +137,7 @@ impl ConcreteType {
 
                 a.is_subtype_of(b) && (sz_a.unwrap_integer() == sz_b.unwrap_integer())
             }
-            _ => unreachable!(),
+            (a, b) => unreachable!("{a:?}, {b:?}"),
         }
     }
     /// Returns the size of this type in *wires*. So int #(MAX: 255) would return '8'
@@ -201,10 +201,10 @@ impl ConcreteType {
         let mut cur_typ = self;
         for p in path {
             match p {
-                RealWirePathElem::ArrayAccess { .. } => {
+                RealWirePathElem::Index { .. } => {
                     cur_typ = &cur_typ.unwrap_array().0;
                 }
-                RealWirePathElem::ArrayPartSelect { .. } | RealWirePathElem::ArraySlice { .. } => {}
+                RealWirePathElem::PartSelect { .. } | RealWirePathElem::Slice { .. } => {}
             }
         }
 
