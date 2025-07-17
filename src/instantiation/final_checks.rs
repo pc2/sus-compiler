@@ -64,8 +64,7 @@ impl<'l> ModuleTypingContext<'l> {
         path: &[RealWirePathElem],
     ) -> &'c ConcreteType {
         for elem in path {
-            let (content, arr_sz) = typ.unwrap_array();
-            let arr_sz = arr_sz.unwrap_integer();
+            let (content, arr_sz) = typ.unwrap_array_known_size();
             typ = content;
             match elem {
                 RealWirePathElem::Index { span, idx_wire } => {
@@ -151,13 +150,15 @@ impl<'l> ModuleTypingContext<'l> {
                     }
                 }
                 RealWireDataSource::ConstructArray { array_wires } => {
-                    let (arr_content, array_size) = w.typ.unwrap_array();
+                    let (arr_content, array_typ_size) = w.typ.unwrap_array_known_size();
 
                     let array_wires_len = array_wires.len();
-                    let expected_array_size: usize = array_size.unwrap_int();
 
-                    if array_wires_len != expected_array_size {
-                        self.errors.error(w.get_span(self.link_info), format!("This construct creates an array of size {array_wires_len}, but the expected size is {expected_array_size}"));
+                    match usize::try_from(array_typ_size) {
+                        Ok(array_typ_size) if array_typ_size == array_wires_len => {}
+                        _ => {
+                            self.errors.error(w.get_span(self.link_info), format!("This construct creates an array of size {array_wires_len}, but the expected size is {array_typ_size}"));
+                        }
                     }
 
                     for arr_wire in array_wires {

@@ -141,8 +141,8 @@ impl Value {
                 min <= v && max >= v
             }
             Value::Array(values) => {
-                let (content, sz) = typ.unwrap_array();
-                values.len() == sz.unwrap_int::<usize>()
+                let (content, sz) = typ.unwrap_array_known_size();
+                values.len() == usize::try_from(sz).unwrap()
                     && values.iter().all(|v| v.is_of_type(content))
             }
             Value::Unset => true,

@@ -32,6 +32,16 @@ impl ConcreteTemplateArg {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SubtypeRelation {
+    /// For any param
+    Exact,
+    /// Only integers. Take the min of values assigned
+    Min,
+    /// Only integers. Take the max of values assigned
+    Max,
+}
+
 /// A post-instantiation type. These fully define what wires should be generated for a given object.
 /// So as opposed to [crate::typing::abstract_type::AbstractType], type parameters are filled out with concrete values.
 ///
@@ -80,6 +90,11 @@ impl ConcreteType {
         arr_box
     }
     #[track_caller]
+    pub fn unwrap_array_known_size(&self) -> (&ConcreteType, &IBig) {
+        let (arr, sz) = self.unwrap_array();
+        (arr, sz.unwrap_integer())
+    }
+    #[track_caller]
     pub fn unwrap_integer_bounds(&self) -> (&IBig, &IBig) {
         let ConcreteType::Named(v) = self else {
             unreachable!("unwrap_integer_bounds")
@@ -107,38 +122,61 @@ impl ConcreteType {
             }
         }
     }
-    /// Requires all parameters to be known and already substituted!
-    ///
-    /// a return value of true means that `self` can be assigned to `other`
-    pub fn is_subtype_of(&self, other: &Self) -> bool {
-        match (self, other) {
-            (ConcreteType::Named(a), ConcreteType::Named(b)) => {
-                assert_eq!(a.id, b.id);
-                match all_equal([a.id, b.id]) {
-                    get_builtin_type!("int") => {
-                        let [a_min, a_max] = a.template_args.cast_to_int_array();
-                        let [b_min, b_max] = b.template_args.cast_to_int_array();
+    pub fn co_iterate_parameters<'a>(
+        a: &'a Self,
+        b: &'a Self,
+        f: &mut impl FnMut(&'a UnifyableValue, &'a UnifyableValue, SubtypeRelation),
+    ) {
+        match (a, b) {
+            (ConcreteType::Named(a), ConcreteType::Named(b)) => match all_equal([a.id, b.id]) {
+                get_builtin_type!("int") => {
+                    let [a_min, a_max] = a.template_args.cast_to_unifyable_array();
+                    let [b_min, b_max] = b.template_args.cast_to_unifyable_array();
 
-                        (a_min >= b_min) && (a_max <= b_max)
-                    }
-                    _ => {
-                        crate::alloc::zip_eq(&a.template_args, &b.template_args).all(|(_, a, b)| {
-                            match a.and_by_ref(b) {
-                                TemplateKind::Type((a, b)) => a.is_subtype_of(b),
-                                TemplateKind::Value((a, b)) => a.unwrap_set() == b.unwrap_set(),
-                            }
-                        })
+                    f(a_min, b_min, SubtypeRelation::Min);
+                    f(a_max, b_max, SubtypeRelation::Max);
+                }
+                _ => {
+                    for (_, a, b) in crate::alloc::zip_eq(&a.template_args, &b.template_args) {
+                        match a.and_by_ref(b) {
+                            TemplateKind::Type((a, b)) => Self::co_iterate_parameters(a, b, f),
+                            TemplateKind::Value((a, b)) => f(a, b, SubtypeRelation::Exact),
+                        }
                     }
                 }
-            }
+            },
             (ConcreteType::Array(arr_a), ConcreteType::Array(arr_b)) => {
                 let (a, sz_a) = arr_a.deref();
                 let (b, sz_b) = arr_b.deref();
 
-                a.is_subtype_of(b) && (sz_a.unwrap_integer() == sz_b.unwrap_integer())
+                f(sz_a, sz_b, SubtypeRelation::Exact);
+
+                Self::co_iterate_parameters(a, b, f);
             }
             (a, b) => unreachable!("{a:?}, {b:?}"),
         }
+    }
+    /// Requires all parameters to be known and already substituted!
+    ///
+    /// a return value of true means that `self` can be assigned to `other`
+    pub fn is_subtype_of(&self, other: &Self) -> bool {
+        let mut total_is_subtype = true;
+        Self::co_iterate_parameters(self, other, &mut |a, b, relation| match relation {
+            SubtypeRelation::Exact => {
+                assert_eq!(a.unwrap_set(), b.unwrap_set()); // Assert, because non-matching exact values should have been caught by unification
+            }
+            SubtypeRelation::Min => {
+                if a.unwrap_integer() < b.unwrap_integer() {
+                    total_is_subtype = false;
+                }
+            }
+            SubtypeRelation::Max => {
+                if a.unwrap_integer() > b.unwrap_integer() {
+                    total_is_subtype = false;
+                }
+            }
+        });
+        total_is_subtype
     }
     /// Returns the size of this type in *wires*. So int #(MAX: 255) would return '8'
     ///

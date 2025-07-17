@@ -9,8 +9,7 @@ use sus_proc_macro::get_builtin_type;
 use crate::{
     let_unwrap,
     prelude::*,
-    typing::{abstract_type::AbstractInnerType, template::TVec},
-    util::all_equal,
+    typing::{abstract_type::AbstractInnerType, concrete_type::SubtypeRelation, template::TVec},
     value::Value,
 };
 
@@ -89,38 +88,11 @@ impl<'inst> ValueUnifier<'inst> {
         source_gather: &mut SubTypeSourceGatherer<'_, 'a>,
     ) -> bool {
         let mut unify_success = true;
-        match (a, b) {
-            (ConcreteType::Named(global_ref_a), ConcreteType::Named(global_ref_b)) => {
-                match all_equal([global_ref_a.id, global_ref_b.id]) {
-                    get_builtin_type!("int") => {
-                        let [min_a, max_a] = global_ref_a.template_args.cast_to_unifyable_array();
-                        let [min_b, max_b] = global_ref_b.template_args.cast_to_unifyable_array();
-                        source_gather.add_relation(ValueUnificationRelation::Min, min_a, min_b);
-                        source_gather.add_relation(ValueUnificationRelation::Max, max_a, max_b);
-                    }
-                    _ => {
-                        for (_, arg_a, arg_b) in crate::alloc::zip_eq(
-                            &global_ref_a.template_args,
-                            &global_ref_b.template_args,
-                        ) {
-                            unify_success &= match arg_a.and_by_ref(arg_b) {
-                                TemplateKind::Type((t_a, t_b)) => {
-                                    self.unify_gather_subtype_relations(t_a, t_b, source_gather)
-                                }
-                                TemplateKind::Value((v_a, v_b)) => self.unify(v_a, v_b),
-                            }
-                        }
-                    }
-                }
-            }
-            (ConcreteType::Array(arr_box_a), ConcreteType::Array(arr_box_b)) => {
-                let (content_a, sz_a) = arr_box_a.deref();
-                let (content_b, sz_b) = arr_box_b.deref();
-                unify_success &= self.unify(sz_a, sz_b);
-                self.unify_gather_subtype_relations(content_a, content_b, source_gather);
-            }
-            _ => unreachable!("Caught by typecheck"),
-        }
+        ConcreteType::co_iterate_parameters(a, b, &mut |a, b, relation| match relation {
+            SubtypeRelation::Exact => unify_success &= self.unify(a, b),
+            SubtypeRelation::Min => source_gather.add_relation(ValueUnificationRelation::Min, a, b),
+            SubtypeRelation::Max => source_gather.add_relation(ValueUnificationRelation::Max, a, b),
+        });
         unify_success
     }
 
