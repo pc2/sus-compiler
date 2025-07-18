@@ -8,6 +8,7 @@ use crate::{
     errors::ErrorReference,
     instantiation::PartSelectDirection,
     typing::{concrete_type::ConcreteType, value_unifier::UnifyableValue},
+    value::Value,
 };
 
 use super::{ModuleTypingContext, RealWire, RealWireDataSource, RealWirePathElem};
@@ -38,15 +39,6 @@ impl<'l> ModuleTypingContext<'l> {
         (!wire.typ.is_subtype_of(expected))
             .then(|| self.typecheck_error(&wire.typ, expected, wire.get_span(self.link_info)))
     }
-    fn check_array_bound_gen(&self, idx: &UnifyableValue, sz: &IBig, span: Span, ctx: &str) {
-        let idx = idx.unwrap_integer();
-        if idx < &IBig::from(0) || idx >= sz {
-            self.errors.error(
-                span,
-                format!("Out of bounds! The array is of size {sz}, but the {ctx} is {idx}"),
-            );
-        }
-    }
     fn check_array_bound_min_max(&self, min: &IBig, max: &IBig, sz: &IBig, span: Span, ctx: &str) {
         if min < &IBig::from(0) || max >= sz {
             self.errors.error(
@@ -58,69 +50,72 @@ impl<'l> ModuleTypingContext<'l> {
         }
     }
 
-    fn check_wire_ref_bounds<'c>(
-        &self,
-        mut typ: &'c ConcreteType,
-        path: &[RealWirePathElem],
-    ) -> &'c ConcreteType {
-        for elem in path {
-            let (content, arr_sz) = typ.unwrap_array_known_size();
-            typ = content;
-            match elem {
-                RealWirePathElem::Index { span, idx_wire } => {
-                    let span = span.inner_span();
-                    let wire = &self.wires[*idx_wire];
-                    let (min, max) = wire.typ.unwrap_integer_bounds();
-                    self.check_array_bound_min_max(min, max, arr_sz, span, "index");
-                }
-                RealWirePathElem::Slice {
-                    from_span,
-                    to_span,
-                    from,
-                    to,
-                } => {
-                    self.check_array_bound_gen(from, arr_sz, *from_span, "lower bound");
-                    self.check_array_bound_gen(to, arr_sz, *to_span, "upper bound");
-                }
-                RealWirePathElem::PartSelect {
-                    span,
-                    from_wire,
-                    width,
-                    direction,
-                } => {
-                    let from_wire = &self.wires[*from_wire];
+    fn check_wire_ref_bounds(&self, typ: &ConcreteType, path: &[RealWirePathElem]) -> ConcreteType {
+        let Some((fst, rest_of_path)) = path.split_first() else {
+            return typ.clone();
+        };
+        match fst {
+            RealWirePathElem::Index { span, idx_wire } => {
+                let (content, arr_sz) = typ.unwrap_array_known_size();
 
-                    let (min_a, max_a) = from_wire.typ.unwrap_integer_bounds();
+                let span = span.inner_span();
+                let wire = &self.wires[*idx_wire];
+                let (min, max) = wire.typ.unwrap_integer_bounds();
+                self.check_array_bound_min_max(min, max, arr_sz, span, "index");
 
-                    let width = width.unwrap_integer();
+                self.check_wire_ref_bounds(content, rest_of_path)
+            }
+            RealWirePathElem::Slice {
+                from_span,
+                to_span,
+                from,
+                to,
+            } => {
+                let from = from.unwrap_integer();
+                let to = to.unwrap_integer();
+                let (content, arr_sz) = typ.unwrap_array_known_size();
 
-                    match direction {
-                        PartSelectDirection::Up => {
-                            let upper_bound = max_a + width - 1;
+                let span = Span::new_overarching(*from_span, *to_span);
+                self.check_array_bound_min_max(from, to, arr_sz, span, "slice bound");
 
-                            self.check_array_bound_min_max(
-                                min_a,
-                                &upper_bound,
-                                arr_sz,
-                                span.inner_span(),
-                                "indexed part-select",
-                            );
-                        }
-                        PartSelectDirection::Down => {
-                            let lower_bound = min_a - width + 1;
-                            self.check_array_bound_min_max(
-                                &lower_bound,
-                                max_a,
-                                arr_sz,
-                                span.inner_span(),
-                                "indexed part-select",
-                            );
-                        }
-                    }
-                }
+                ConcreteType::Array(Box::new((
+                    self.check_wire_ref_bounds(content, rest_of_path),
+                    UnifyableValue::from(Value::Integer(to - from)),
+                )))
+            }
+            RealWirePathElem::PartSelect {
+                span,
+                from_wire,
+                width,
+                direction,
+            } => {
+                let (content, arr_sz) = typ.unwrap_array_known_size();
+
+                let from_wire = &self.wires[*from_wire];
+
+                let (min_a, max_a) = from_wire.typ.unwrap_integer_bounds();
+
+                let width = width.unwrap_integer();
+
+                let (lower, upper) = match direction {
+                    PartSelectDirection::Up => (min_a.clone(), max_a + width - 1),
+                    PartSelectDirection::Down => (min_a - width + 1, max_a.clone()),
+                };
+
+                self.check_array_bound_min_max(
+                    &lower,
+                    &upper,
+                    arr_sz,
+                    span.inner_span(),
+                    "indexed part-select",
+                );
+
+                ConcreteType::Array(Box::new((
+                    self.check_wire_ref_bounds(content, rest_of_path),
+                    UnifyableValue::from(Value::Integer(width.clone())),
+                )))
             }
         }
-        typ
     }
     fn check_all_subtypes_in_wires(&self) {
         for (_, w) in &self.wires {
@@ -137,7 +132,7 @@ impl<'l> ModuleTypingContext<'l> {
                     }
                     for s in sources {
                         let target_typ = self.check_wire_ref_bounds(&w.typ, &s.to_path);
-                        if let Some(e) = self.wire_must_be_subtype(&self.wires[s.from], target_typ)
+                        if let Some(e) = self.wire_must_be_subtype(&self.wires[s.from], &target_typ)
                         {
                             e.info_same_file(
                                 s.write_span,
@@ -173,9 +168,9 @@ impl<'l> ModuleTypingContext<'l> {
                     // Yes, we do a comparison here, rather than found_typ.is_subtype_of(expected_typ).
                     // That is because the value of subtype-able parameters should never be able to bubble up into a Select.
                     // Of course, non-subtypeable parameters *can* bubble up, and so we need to check against these.
-                    if expected_typ != found_typ {
-                        assert!(!expected_typ.is_subtype_of(found_typ), "Subtype-able parameters should never be able to bubble up into a Select!");
-                        self.typecheck_error(found_typ, expected_typ, w.get_span(self.link_info))
+                    if expected_typ != &found_typ {
+                        assert!(!expected_typ.is_subtype_of(&found_typ), "Subtype-able parameters should never be able to bubble up into a Select!");
+                        self.typecheck_error(&found_typ, expected_typ, w.get_span(self.link_info))
                             .info_same_file(
                                 root_wire.get_span(self.link_info),
                                 format!(

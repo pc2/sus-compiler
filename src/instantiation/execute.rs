@@ -949,7 +949,9 @@ impl<'l> ExecutionContext<'l> {
         original_instruction: FlatID,
         domain: DomainID,
     ) -> ExecutionResult<(WireID, Vec<RealWirePathElem>)> {
-        __debug_span!(self.link_info.instructions[original_instruction].get_span());
+        self.link_info.instructions[original_instruction]
+            .get_span()
+            .debug();
         let (port_interface, port_span, path) = self.execute_wire_ref_path(wire_ref, domain)?;
         let wire_id = match &wire_ref.root {
             &WireReferenceRoot::LocalDecl(decl_id) => {
