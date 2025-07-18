@@ -7,6 +7,7 @@ use crate::linker::GlobalUUID;
 use crate::prelude::*;
 use crate::util::all_equal;
 use std::ops::Deref;
+use std::ops::DerefMut;
 
 use crate::value::Value;
 
@@ -152,6 +153,40 @@ impl ConcreteType {
                 f(sz_a, sz_b, SubtypeRelation::Exact);
 
                 Self::co_iterate_parameters(a, b, f);
+            }
+            (a, b) => unreachable!("{a:?}, {b:?}"),
+        }
+    }
+    pub fn co_iterate_parameters_mut<'a>(
+        a: &'a mut Self,
+        b: &'a Self,
+        f: &mut impl FnMut(&'a mut UnifyableValue, &'a UnifyableValue, SubtypeRelation),
+    ) {
+        match (a, b) {
+            (ConcreteType::Named(a), ConcreteType::Named(b)) => match all_equal([a.id, b.id]) {
+                get_builtin_type!("int") => {
+                    let [a_min, a_max] = a.template_args.cast_to_unifyable_array_mut();
+                    let [b_min, b_max] = b.template_args.cast_to_unifyable_array();
+
+                    f(a_min, b_min, SubtypeRelation::Min);
+                    f(a_max, b_max, SubtypeRelation::Max);
+                }
+                _ => {
+                    for (_, a, b) in crate::alloc::zip_eq(&mut a.template_args, &b.template_args) {
+                        match a.and_by_ref_mut(b) {
+                            TemplateKind::Type((a, b)) => Self::co_iterate_parameters_mut(a, b, f),
+                            TemplateKind::Value((a, b)) => f(a, b, SubtypeRelation::Exact),
+                        }
+                    }
+                }
+            },
+            (ConcreteType::Array(arr_a), ConcreteType::Array(arr_b)) => {
+                let (a, sz_a) = arr_a.deref_mut();
+                let (b, sz_b) = arr_b.deref();
+
+                f(sz_a, sz_b, SubtypeRelation::Exact);
+
+                Self::co_iterate_parameters_mut(a, b, f);
             }
             (a, b) => unreachable!("{a:?}, {b:?}"),
         }

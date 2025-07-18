@@ -329,6 +329,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                             if !unifier.unify_concrete_only_exact(left_root, right_root) {
                                 errors.error(move |substitutor| {
                                     self.errors.type_error(
+                                        "operator ==",
                                         span,
                                         right_root.display_substitute(self.linker, substitutor),
                                         left_root.display_substitute(self.linker, substitutor),
@@ -355,6 +356,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         errors.error(move |substitutor| {
                             self.errors
                                 .type_error(
+                                    "select",
                                     out.get_span(self.link_info),
                                     found_typ.display_substitute(self.linker, substitutor),
                                     out.typ.display_substitute(self.linker, substitutor),
@@ -364,7 +366,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                                     format!(
                                         "{} declared here of type {}",
                                         &root_wire.name,
-                                        root_wire.typ.display(&self.linker.globals, true)
+                                        root_wire.typ.display_substitute(self.linker, substitutor)
                                     ),
                                 );
                         });

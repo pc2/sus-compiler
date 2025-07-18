@@ -213,17 +213,19 @@ impl<'linker> ErrorCollector<'linker> {
 
     pub fn type_error(
         &self,
+        context: &'static str,
         position: Span,
         found: impl Display,
         expected: impl Display,
     ) -> ErrorReference<'_> {
         self.error(
             position,
-            format!("Typecheck error: Found {found}, but expected {expected}"),
+            format!("Typecheck error: In {context}, found {found}, but expected {expected}"),
         )
     }
     pub fn subtype_error(
         &self,
+        context: &'static str,
         span: Span,
         found: impl Display,
         expected: impl Display,
@@ -231,7 +233,7 @@ impl<'linker> ErrorCollector<'linker> {
         self.error(
             span,
             format!(
-                "Typecheck error: Found {found}, which is not a subtype of the expected type {expected}"
+                "Typecheck error: In {context}, found {found}, which is not a subtype of the expected type {expected}"
             ),
         )
     }

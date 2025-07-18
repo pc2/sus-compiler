@@ -49,11 +49,13 @@ fn make_output_typ<'c>(typ: &'c ConcreteType, path: &[RealWirePathElem]) -> Cow<
 impl<'l> ModuleTypingContext<'l> {
     fn wire_must_be_subtype(
         &self,
+        context: &'static str,
         wire: &RealWire,
         expected: &ConcreteType,
     ) -> Option<ErrorReference<'_>> {
         (!wire.typ.is_subtype_of(expected)).then(|| {
             self.errors.subtype_error(
+                context,
                 wire.get_span(self.link_info),
                 wire.typ.display(&self.linker.globals, true),
                 expected.display(&self.linker.globals, true),
@@ -150,8 +152,11 @@ impl<'l> ModuleTypingContext<'l> {
                     for s in sources {
                         self.check_wire_ref_bounds(&w.typ, &s.to_path);
                         let target_typ = make_output_typ(&w.typ, &s.to_path);
-                        if let Some(e) = self.wire_must_be_subtype(&self.wires[s.from], &target_typ)
-                        {
+                        if let Some(e) = self.wire_must_be_subtype(
+                            "multiplexer",
+                            &self.wires[s.from],
+                            &target_typ,
+                        ) {
                             e.info_same_file(
                                 s.write_span,
                                 format!(
@@ -166,7 +171,11 @@ impl<'l> ModuleTypingContext<'l> {
                     let (arr_content, _sz) = w.typ.unwrap_array_known_size();
 
                     for arr_wire in array_wires {
-                        self.wire_must_be_subtype(&self.wires[*arr_wire], arr_content);
+                        self.wire_must_be_subtype(
+                            "array construct",
+                            &self.wires[*arr_wire],
+                            arr_content,
+                        );
                     }
                 }
             }
