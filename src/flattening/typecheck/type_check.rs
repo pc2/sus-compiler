@@ -330,7 +330,7 @@ impl<'l> TypeCheckingContext<'l> {
                             from_expr.typ,
                             &param_required_typ,
                             from_expr.span,
-                            "Template argument",
+                            "template argument",
                         );
                     }
                 }

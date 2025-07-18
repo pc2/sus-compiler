@@ -42,42 +42,24 @@ impl From<Value> for UnifyableValue {
 }
 
 impl<'inst> ValueUnifier<'inst> {
-    /// Unifies all [UnifyableValue] parameters contained in the [ConcreteType]s that are not used in subtyping relations.
-    /// Parameters that are involved in subtyping relations (like int::MIN & int::MAX) are ignored. Retrieve these with
-    /// [ConcreteType::retreive_unifyable_parameters]
-    pub fn unify_concrete<const UNIFY_EVERYTHING: bool>(
-        &mut self,
-        from: &ConcreteType,
-        to: &ConcreteType,
-    ) -> bool {
-        match (from, to) {
-            (ConcreteType::Named(a), ConcreteType::Named(b)) => {
-                assert_eq!(a.id, b.id);
-                if !UNIFY_EVERYTHING && a.id == get_builtin_type!("int") {
-                    // Int args are part of subtyping.
-                    return true;
-                }
-                let mut success = true;
-                for (_, a, b) in crate::alloc::zip_eq(&a.template_args, &b.template_args) {
-                    success &= match a.and_by_ref(b) {
-                        TemplateKind::Type((a, b)) => self.unify_concrete::<UNIFY_EVERYTHING>(a, b),
-                        TemplateKind::Value((a, b)) => self.unify(a, b),
-                    };
-                }
-                success
-            }
-            (ConcreteType::Array(a), ConcreteType::Array(b)) => {
-                let (a_content, a_sz) = a.deref();
-                let (b_content, b_sz) = b.deref();
+    /// Unifies all [UnifyableValue] parameters contained in the [ConcreteType]. This includes values in subtyping relations [SubtypeRelation::Min] and [SubtypeRelation::Max].
+    pub fn unify_concrete_all(&mut self, from: &ConcreteType, to: &ConcreteType) -> bool {
+        let mut success = true;
+        ConcreteType::co_iterate_parameters(from, to, &mut |f, t, _relation| {
+            success &= self.unify(f, t);
+        });
+        success
+    }
 
-                self.unify_concrete::<UNIFY_EVERYTHING>(a_content, b_content)
-                    & self.unify(a_sz, b_sz)
+    /// Unifies all [UnifyableValue] parameters contained in the [ConcreteType]. This only includes [SubtypeRelation::Exact]
+    pub fn unify_concrete_only_exact(&mut self, from: &ConcreteType, to: &ConcreteType) -> bool {
+        let mut success = true;
+        ConcreteType::co_iterate_parameters(from, to, &mut |f, t, relation| {
+            if relation == SubtypeRelation::Exact {
+                success &= self.unify(f, t);
             }
-            (ConcreteType::Named(_), ConcreteType::Array(_))
-            | (ConcreteType::Array(_), ConcreteType::Named(_)) => {
-                unreachable!("Caught by abstract typecheck")
-            }
-        }
+        });
+        success
     }
 
     /// Gathers values for subtype relations for a's parameters
@@ -86,14 +68,15 @@ impl<'inst> ValueUnifier<'inst> {
         a: &'a ConcreteType,
         b: &'a ConcreteType,
         source_gather: &mut SubTypeSourceGatherer<'_, 'a>,
-    ) -> bool {
-        let mut unify_success = true;
+    ) {
         ConcreteType::co_iterate_parameters(a, b, &mut |a, b, relation| match relation {
-            SubtypeRelation::Exact => unify_success &= self.unify(a, b),
+            SubtypeRelation::Exact => {
+                // Errors are reported by final_checks
+                let _ = self.unify(a, b);
+            }
             SubtypeRelation::Min => source_gather.add_relation(ValueUnificationRelation::Min, a, b),
             SubtypeRelation::Max => source_gather.add_relation(ValueUnificationRelation::Max, a, b),
         });
-        unify_success
     }
 
     /// In type_iter: The first type represents the target, the second type represents the source
@@ -112,8 +95,7 @@ impl<'inst> ValueUnifier<'inst> {
                 source_gather: &mut source_gather_hashmap,
                 expected_num_targets,
             };
-            // Errors are reported by final_checks
-            let _ = self.unify_gather_subtype_relations(to_typ, from_typ, &mut source_gather);
+            self.unify_gather_subtype_relations(to_typ, from_typ, &mut source_gather);
         }
 
         for var_sources in source_gather_hashmap.into_values() {
@@ -137,10 +119,8 @@ impl<'inst> ValueUnifier<'inst> {
                         let common_subtype = common_subtype.unwrap().clone();
 
                         // Values used in subtyping relations are always resolved in a forward direction (so a value b that depends on value a only gets resolved after a is resolved)
-                        // That's why we can safely call unwrap()
-                        unifier
-                            .set(var_sources.target, Value::Integer(common_subtype))
-                            .unwrap();
+                        // That's why we can safely assert
+                        assert!(unifier.set(var_sources.target, Value::Integer(common_subtype)));
                     });
                 }
             }
@@ -342,7 +322,7 @@ impl ConcreteType {
         let_unwrap!(ConcreteType::Named(typ), &self);
         assert_eq!(typ.id, expected);
         crate::util::zip_eq(typ.template_args.iter(), args)
-            .all(|((_, to_unify), arg)| unifier.set(to_unify.unwrap_value(), arg.into()).is_ok())
+            .all(|((_, to_unify), arg)| unifier.set(to_unify.unwrap_value(), arg.into()))
     }
     pub fn new_named_with_args<const N: usize>(
         id: TypeUUID,

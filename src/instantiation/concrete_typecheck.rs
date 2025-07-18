@@ -326,15 +326,12 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                             );
                         }
                         BinaryOperator::Equals | BinaryOperator::NotEquals => {
-                            if !unifier.unify_concrete::<false>(left_root, right_root) {
+                            if !unifier.unify_concrete_only_exact(left_root, right_root) {
                                 errors.error(move |substitutor| {
-                                    self.errors.error(
+                                    self.errors.type_error(
                                         span,
-                                        format!(
-                                            "Typecheck error: Found {}, but expected {}",
-                                            right_root.display_substitute(self.linker, substitutor),
-                                            left_root.display_substitute(self.linker, substitutor)
-                                        ),
+                                        right_root.display_substitute(self.linker, substitutor),
+                                        left_root.display_substitute(self.linker, substitutor),
                                     );
                                 });
                             }
@@ -351,8 +348,27 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     }
                 }
                 RealWireDataSource::Select { root, path } => {
-                    let found_typ = self.wires[*root].typ.walk_path(path);
-                    let _ = unifier.unify_concrete::<true>(&out.typ, found_typ);
+                    let root_wire = &self.wires[*root];
+                    let found_typ = root_wire.typ.walk_path(path);
+
+                    if !unifier.unify_concrete_all(&out.typ, found_typ) {
+                        errors.error(move |substitutor| {
+                            self.errors
+                                .type_error(
+                                    out.get_span(self.link_info),
+                                    found_typ.display_substitute(self.linker, substitutor),
+                                    out.typ.display_substitute(self.linker, substitutor),
+                                )
+                                .info_same_file(
+                                    root_wire.get_span(self.link_info),
+                                    format!(
+                                        "{} declared here of type {}",
+                                        &root_wire.name,
+                                        root_wire.typ.display(&self.linker.globals, true)
+                                    ),
+                                );
+                        });
+                    }
                 }
                 RealWireDataSource::ConstructArray { array_wires } => {
                     let (array_content_supertyp, array_size) = out.typ.unwrap_array();
@@ -362,8 +378,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         (array_content_supertyp, &w.typ)
                     }));
 
-                    // Error is reported in final_checks
-                    let _ = unifier.set(array_size, Value::Integer(IBig::from(array_wires.len())));
+                    // The output's size cannot have already been unified, this is the first time we see it
+                    assert!(unifier.set(array_size, Value::Integer(IBig::from(array_wires.len()))));
                 }
                 // type is already set when the wire was created
                 RealWireDataSource::Constant { value: _ } => {}
@@ -429,10 +445,12 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                                 match source_code_port.direction {
                                     // Subtype relations always flow FORWARD.
                                     Direction::Input => {
-                                        unifier.unify_concrete::<false>(&wire.typ, &concrete_port.typ);
+                                        let _ = unifier.unify_concrete_only_exact(&wire.typ, &concrete_port.typ);
                                     }
                                     Direction::Output => {
-                                        unifier.unify_concrete::<true>(&wire.typ, &concrete_port.typ);
+                                        if !unifier.unify_concrete_all(&wire.typ, &concrete_port.typ) {
+
+                                        }
                                     }
                                 }
                             }

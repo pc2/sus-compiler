@@ -357,12 +357,11 @@ impl ModuleTypingContext<'_> {
             if let Some(inferred_value) = var.get() {
                 let (submod_id, arg_id) = var.back_reference;
 
-                assert!(unifier
-                    .set(
-                        self.submodules[submod_id].refers_to.template_args[arg_id].unwrap_value(),
-                        Value::Integer(IBig::from(inferred_value)),
-                    )
-                    .is_ok());
+                // The value wasn't known before, now it is
+                assert!(unifier.set(
+                    self.submodules[submod_id].refers_to.template_args[arg_id].unwrap_value(),
+                    Value::Integer(IBig::from(inferred_value)),
+                ));
             }
         }
     }

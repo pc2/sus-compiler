@@ -2,6 +2,7 @@ use crate::append_only_vec::AppendOnlyVec;
 use crate::prelude::*;
 
 use std::cell::Cell;
+use std::fmt::Display;
 
 use crate::{alloc::ArenaAllocator, typing::template::Parameter};
 
@@ -207,6 +208,31 @@ impl<'linker> ErrorCollector<'linker> {
             position,
             format!("TODO: {}", reason.into()),
             ErrorLevel::Error,
+        )
+    }
+
+    pub fn type_error(
+        &self,
+        position: Span,
+        found: impl Display,
+        expected: impl Display,
+    ) -> ErrorReference<'_> {
+        self.error(
+            position,
+            format!("Typecheck error: Found {found}, but expected {expected}"),
+        )
+    }
+    pub fn subtype_error(
+        &self,
+        span: Span,
+        found: impl Display,
+        expected: impl Display,
+    ) -> ErrorReference<'_> {
+        self.error(
+            span,
+            format!(
+                "Typecheck error: Found {found}, which is not a subtype of the expected type {expected}"
+            ),
         )
     }
 
