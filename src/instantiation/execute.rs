@@ -116,7 +116,9 @@ fn make_array_bounds<'v>(
         let from = from_maybe.unwrap_or_else(|| IBig::from(0));
         let to = to_maybe.unwrap_or_else(|| IBig::from(arr_sz));
 
-        assert!(from <= to);
+        if from > to {
+            return Err((span, format!("Slice {from}:{to} has a negative length.")));
+        }
 
         let (from_valid, to_valid) = match (usize::try_from(&from), usize::try_from(&to)) {
             (Ok(from), Ok(to)) if to <= arr_sz => (from, to), // && from >= 0, but it's usize
@@ -305,6 +307,10 @@ impl GenerationState<'_> {
             }
         }
 
+        // If we've created a zero-sized tensor, this prevents a div-by-zero error downstream
+        if flattened_result_tensor.is_empty() {
+            return Ok(Value::Array(Vec::new()));
+        }
         // Then we re-consitute the array until we have one element again
         let mut flattened_result_tensor: Vec<Value> =
             flattened_result_tensor.into_iter().cloned().collect();
