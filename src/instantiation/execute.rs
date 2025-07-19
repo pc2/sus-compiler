@@ -208,32 +208,6 @@ impl GenerationState<'_> {
             }
         }
 
-        fn slice(
-            cur_targets: Vec<(&mut Value, Value)>,
-            from: Option<IBig>,
-            to: Option<IBig>,
-            span: Span,
-        ) -> ExecutionResult<Vec<(&mut Value, Value)>> {
-            let slice = make_array_bounds(from, to, cur_targets.iter().map(|t| &*t.0), span)?;
-
-            let new_len = cur_targets.len() * slice.len();
-
-            let mut new_targets = Vec::with_capacity(new_len);
-
-            for (target, from) in cur_targets {
-                let_unwrap!(Value::Array(target), target);
-                let Value::Array(mut from) = from else {
-                    unreachable!()
-                };
-
-                for new_pair in zip_eq(&mut target[slice.clone()], from.drain(slice.clone())) {
-                    new_targets.push(new_pair)
-                }
-            }
-
-            Ok(new_targets)
-        }
-
         // must be an array, from earlier typechecking
 
         let mut cur_targets: Vec<(&mut Value, Value)> = vec![(target, to_write)];
@@ -249,7 +223,32 @@ impl GenerationState<'_> {
                     }
                 }
                 GenerativeWireRefPathElem::Slice { from, to, span } => {
-                    cur_targets = slice(cur_targets, from, to, span)?;
+                    let slice =
+                        make_array_bounds(from, to, cur_targets.iter().map(|t| &*t.0), span)?;
+
+                    let new_len = cur_targets.len() * slice.len();
+
+                    let mut new_targets = Vec::with_capacity(new_len);
+
+                    for (target, value) in cur_targets {
+                        let_unwrap!(Value::Array(target), target);
+                        let Value::Array(value) = value else {
+                            unreachable!()
+                        };
+
+                        let slice_len = slice.len();
+                        let from_len = value.len();
+                        if from_len != slice_len {
+                            let from = slice.start;
+                            let to = slice.end;
+                            return Err((span, format!("Attempting to write to this slice {from}:{to} (length {slice_len}) with an array of length {from_len}.")));
+                        }
+                        for new_pair in zip_eq(&mut target[slice.clone()], value.into_iter()) {
+                            new_targets.push(new_pair)
+                        }
+                    }
+
+                    cur_targets = new_targets;
                 }
             }
         }
