@@ -2,7 +2,7 @@ use ibig::IBig;
 use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::{zip_eq, zip_eq3};
-use crate::typing::set_unifier::{DelayedErrorCollector, FullySubstitutable};
+use crate::typing::set_unifier::{DelayedErrorCollector, FullySubstitutable, Unifyable};
 use crate::typing::value_unifier::{ValueErrorReporter, ValueUnifierStore};
 use crate::typing::{concrete_type::ConcreteType, value_unifier::ValueUnifier};
 
@@ -33,6 +33,61 @@ fn unify_rank<'inst>(
         typ = &arr.0;
         unifier.unify(r, &arr.1)
     })
+}
+
+/// Walks a path `b == a[x][y][z:w]`, and returns `a[x][y][z:w]` and `b[]` (take one array from b). Also unifies this one array with w - z
+pub fn co_walk_path<'inst>(
+    mut a: &'inst ConcreteType,
+    mut b: &'inst ConcreteType,
+    path: &'inst [RealWirePathElem],
+    unifier: &mut ValueUnifier<'inst>,
+) -> (&'inst ConcreteType, &'inst ConcreteType) {
+    for p in path {
+        match p {
+            RealWirePathElem::Index { .. } => {
+                a = &a.unwrap_array().0;
+            }
+            RealWirePathElem::PartSelect { width, .. } => {
+                a = &a.unwrap_array().0;
+                let (new_b, b_sz) = b.unwrap_array();
+                b = new_b;
+
+                // Is checked in final_checks
+                let _ = unifier.set(b_sz, Value::Integer(width.clone()));
+            }
+            RealWirePathElem::Slice { bounds, .. } => {
+                let (new_a, a_sz) = a.unwrap_array();
+                a = new_a;
+                let (new_b, b_sz) = b.unwrap_array();
+                b = new_b;
+
+                match bounds {
+                    PartialBound::Known(from, to) => {
+                        // Is checked in final_checks
+                        let _ = unifier.set(b_sz, Value::Integer(to - from));
+                    }
+                    PartialBound::From(from) => {
+                        unifier_constraint_ints!(unifier, [a_sz], {
+                            // TODO #88, Slices of variable base offset
+                            // Is checked in final_checks
+                            let _ = unifier.set(b_sz, Value::Integer(a_sz - from));
+                        })
+                    }
+                    PartialBound::To(to) => {
+                        // TODO #88, Slices of variable base offset
+                        // Is checked in final_checks
+                        let _ = unifier.set(b_sz, Value::Integer(to.clone()));
+                    }
+                    PartialBound::WholeSlice => {
+                        // Is checked in final_checks
+                        let _ = unifier.unify(b_sz, a_sz);
+                    }
+                }
+            }
+        }
+    }
+
+    (a, b)
 }
 
 impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
@@ -149,11 +204,16 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 is_state: _,
                 sources,
             } => {
-                unifier.create_subtype_constraint(sources.iter().map(|s| {
-                    let source_wire = &self.wires[s.from];
-                    let destination_typ = out.typ.walk_path(&s.to_path);
-                    (destination_typ, &source_wire.typ)
-                }));
+                // Temporary vector because borrow checker doesn't like constructing the iter with unifier
+                let pairs: Vec<_> = sources
+                    .iter()
+                    .map(|s| {
+                        let source_wire = &self.wires[s.from];
+                        co_walk_path(&out.typ, &source_wire.typ, &s.to_path, unifier)
+                    })
+                    .collect();
+
+                unifier.create_subtype_constraint(pairs.iter().copied());
             }
             RealWireDataSource::UnaryOp { op, rank, right } => {
                 // TODO overloading
@@ -354,27 +414,11 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
             }
             RealWireDataSource::Select { root, path } => {
                 let root_wire = &self.wires[*root];
-                let found_typ = root_wire.typ.walk_path(path);
 
-                if !unifier.unify_concrete_all(&out.typ, found_typ) {
-                    errors.error(move |substitutor| {
-                        self.errors
-                            .type_error(
-                                "select",
-                                out.get_span(self.link_info),
-                                found_typ.display_substitute(self.linker, substitutor),
-                                out.typ.display_substitute(self.linker, substitutor),
-                            )
-                            .info_same_file(
-                                root_wire.get_span(self.link_info),
-                                format!(
-                                    "{} declared here of type {}",
-                                    &root_wire.name,
-                                    root_wire.typ.display_substitute(self.linker, substitutor)
-                                ),
-                            );
-                    });
-                }
+                let (found, expected) = co_walk_path(&root_wire.typ, &out.typ, path, unifier);
+
+                // Checked in final_check
+                let _ = unifier.unify_concrete_all(found, expected);
             }
             RealWireDataSource::ConstructArray { array_wires } => {
                 let (array_content_supertyp, array_size) = out.typ.unwrap_array();
@@ -477,7 +521,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
 
     /// Calls [FullySubstitutable::fully_substitute] on everything. From this point on the substitutor is unneccesary
     fn finalize(&mut self, substitutor: &ValueUnifierStore) {
-        for (_id, w) in &mut self.wires {
+        let mut selects_to_check = Vec::new();
+        for (w_id, w) in &mut self.wires {
             if !w.typ.fully_substitute(substitutor) {
                 let span = w.get_span(self.link_info);
                 span.debug();
@@ -505,8 +550,23 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         let _ = r.fully_substitute(substitutor);
                     }
                 }
+                RealWireDataSource::Multiplexer { sources, .. } => {
+                    for s in sources {
+                        Self::finalize_partial_bounds(&mut s.to_path, &w.typ);
+                    }
+                }
+                RealWireDataSource::Select { root, .. } => selects_to_check.push((w_id, *root)),
                 _ => {}
             }
+        }
+
+        for (target, root) in selects_to_check {
+            let (target, root) = self.wires.get2_mut(target, root).unwrap();
+            let_unwrap!(
+                RealWireDataSource::Select { root: _, path },
+                &mut target.source
+            );
+            Self::finalize_partial_bounds(path, &root.typ);
         }
 
         for (_, sm) in &mut self.submodules {
@@ -533,6 +593,36 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     // We overwrite the ports, to have the Multiplexer inputs correctly call type errors on submodule inputs
                     let connecting_wire = &mut self.wires[connecting_wire.maps_to_wire];
                     connecting_wire.typ.clone_from(&concrete_port.typ);
+                }
+            }
+        }
+    }
+
+    fn finalize_partial_bounds(path: &mut [RealWirePathElem], mut typ: &ConcreteType) {
+        for pe in path {
+            match pe {
+                RealWirePathElem::Index { .. } => {
+                    typ = &typ.unwrap_array().0;
+                }
+                RealWirePathElem::PartSelect { .. } => {
+                    typ = &typ.unwrap_array().0;
+                }
+                RealWirePathElem::Slice { bounds, .. } => {
+                    // TODO: #88: Variable base arrays, that's why this is part here
+                    let (new_typ, sz) = typ.unwrap_array();
+                    typ = new_typ;
+
+                    if let Unifyable::Set(sz) = sz {
+                        let sz = sz.unwrap_integer();
+                        *bounds = match std::mem::replace(bounds, PartialBound::WholeSlice) {
+                            PartialBound::Known(from, to) => PartialBound::Known(from, to),
+                            PartialBound::From(from) => PartialBound::Known(from, sz.clone()),
+                            PartialBound::To(to) => PartialBound::Known(IBig::from(0), to),
+                            PartialBound::WholeSlice => {
+                                PartialBound::Known(IBig::from(0), sz.clone())
+                            }
+                        };
+                    }
                 }
             }
         }

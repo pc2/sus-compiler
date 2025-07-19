@@ -170,6 +170,7 @@ Flattening InstantiateTransmutes
 Flattening StraightTransmute
 Flattening use_trigger
 Flattening use_use_trigger
+Flattening testSlicing
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -326,6 +327,7 @@ Typechecking InstantiateTransmutes
 Typechecking StraightTransmute
 Typechecking use_trigger
 Typechecking use_use_trigger
+Typechecking testSlicing
 Typechecking bool
 Typechecking int
 Typechecking float
@@ -498,6 +500,7 @@ Lints InstantiateTransmutes
 Lints StraightTransmute
 Lints use_trigger
 Lints use_use_trigger
+Lints testSlicing
 Lints bool
 Lints int
 Lints float
@@ -844,3 +847,6 @@ Checking array accesses use_trigger
 Instantiating use_use_trigger
 Concrete Typechecking use_use_trigger
 Checking array accesses use_use_trigger
+Instantiating testSlicing
+Concrete Typechecking testSlicing
+Checking array accesses testSlicing

@@ -17,6 +17,7 @@ use super::{ModuleTypingContext, RealWire, RealWireDataSource, RealWirePathElem}
 
 use crate::prelude::*;
 
+/// Takes a type, and a bunch of slicing operations applied to it, and it returns the resulting type
 fn make_output_typ<'c>(typ: &'c ConcreteType, path: &[RealWirePathElem]) -> Cow<'c, ConcreteType> {
     let Some((fst, rest_of_path)) = path.split_first() else {
         return Cow::Borrowed(typ);
@@ -27,20 +28,20 @@ fn make_output_typ<'c>(typ: &'c ConcreteType, path: &[RealWirePathElem]) -> Cow<
             let (content, _) = typ.unwrap_array();
             make_output_typ(content, rest_of_path)
         }
-        RealWirePathElem::Slice { from, to, .. } => {
-            let (content, _) = typ.unwrap_array();
-            let content = make_output_typ(content, rest_of_path).into_owned();
-            Cow::Owned(ConcreteType::Array(Box::new((
-                content,
-                UnifyableValue::from(Value::Integer(to.unwrap_integer() - from.unwrap_integer())),
-            ))))
-        }
         RealWirePathElem::PartSelect { width, .. } => {
             let (content, _) = typ.unwrap_array();
             let content = make_output_typ(content, rest_of_path).into_owned();
             Cow::Owned(ConcreteType::Array(Box::new((
                 content,
-                UnifyableValue::from(Value::Integer(width.unwrap_integer().clone())),
+                UnifyableValue::from(Value::Integer(width.clone())),
+            ))))
+        }
+        RealWirePathElem::Slice { bounds, .. } => {
+            let (content, _) = typ.unwrap_array();
+            let content = make_output_typ(content, rest_of_path).into_owned();
+            Cow::Owned(ConcreteType::Array(Box::new((
+                content,
+                UnifyableValue::from(Value::Integer(bounds.unwrap_width())),
             ))))
         }
     }
@@ -85,19 +86,18 @@ impl<'l> ModuleTypingContext<'l> {
                     let (min, max) = wire.typ.unwrap_integer_bounds();
                     self.check_array_bound_min_max(min, max, arr_sz, span, "index");
                 }
-                RealWirePathElem::Slice {
-                    from_span,
-                    to_span,
-                    from,
-                    to,
-                } => {
-                    let from = from.unwrap_integer();
-                    let to = to.unwrap_integer();
+                RealWirePathElem::Slice { span, bounds, .. } => {
+                    let (from, to) = bounds.unwrap_valid();
                     let (content, arr_sz) = typ.unwrap_array_known_size();
                     typ = content;
 
-                    let span = Span::new_overarching(*from_span, *to_span);
-                    self.check_array_bound_min_max(from, to, arr_sz, span, "slice bound");
+                    self.check_array_bound_min_max(
+                        from,
+                        &(to - 1),
+                        arr_sz,
+                        span.inner_span(),
+                        "slice bound",
+                    );
                 }
                 RealWirePathElem::PartSelect {
                     span,
@@ -111,8 +111,6 @@ impl<'l> ModuleTypingContext<'l> {
                     let from_wire = &self.wires[*from_wire];
 
                     let (min_a, max_a) = from_wire.typ.unwrap_integer_bounds();
-
-                    let width = width.unwrap_integer();
 
                     let (lower, upper) = match direction {
                         PartSelectDirection::Up => (min_a.clone(), max_a + width - 1),
@@ -130,6 +128,7 @@ impl<'l> ModuleTypingContext<'l> {
             }
         }
     }
+
     fn check_all_subtypes_in_wires(&self) {
         for (_, w) in &self.wires {
             match &w.source {
@@ -138,7 +137,27 @@ impl<'l> ModuleTypingContext<'l> {
                 | RealWireDataSource::BinaryOp { .. }
                 | RealWireDataSource::Constant { .. } => {}
                 RealWireDataSource::Select { root, path } => {
-                    self.check_wire_ref_bounds(&self.wires[*root].typ, path);
+                    let root_wire = &self.wires[*root];
+                    self.check_wire_ref_bounds(&root_wire.typ, path);
+                    let found_output_typ = make_output_typ(&root_wire.typ, path);
+
+                    if !found_output_typ.is_identical_to(&w.typ) {
+                        self.errors
+                            .type_error(
+                                "select",
+                                w.get_span(self.link_info),
+                                found_output_typ.display(self.linker, true),
+                                w.typ.display(self.linker, true),
+                            )
+                            .info_same_file(
+                                root_wire.get_span(self.link_info),
+                                format!(
+                                    "{} declared here of type {}",
+                                    &root_wire.name,
+                                    root_wire.typ.display(self.linker, true),
+                                ),
+                            );
+                    }
                 }
                 RealWireDataSource::Multiplexer { is_state, sources } => {
                     if let Some(is_state) = is_state {

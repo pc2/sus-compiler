@@ -1071,6 +1071,13 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 );
                 self.new_error(expr_span)
             }
+            kind!("array_list_expression") => {
+                self.errors.error(
+                    expr_span,
+                    "array literals are not allowed within a wire reference",
+                );
+                self.new_error(expr_span)
+            }
             _other => cursor.could_not_match(),
         }
     }

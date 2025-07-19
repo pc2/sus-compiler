@@ -252,9 +252,8 @@ impl<'g> CodeGenerationContext<'g> {
                     let idx_wire_name = self.wire_name(wire, absolute_latency);
                     write!(result, "[{idx_wire_name}]").unwrap();
                 }
-                RealWirePathElem::Slice { from, to, .. } => {
-                    let from = from.unwrap_integer();
-                    let to = to.unwrap_integer();
+                RealWirePathElem::Slice { bounds, .. } => {
+                    let (from, to) = bounds.unwrap_valid();
 
                     write!(result, "[{from}:{to}-1]").unwrap();
                 }
@@ -266,7 +265,6 @@ impl<'g> CodeGenerationContext<'g> {
                 } => {
                     let wire_a = &self.instance.wires[*from_wire];
                     let idx_wire_name_a = self.wire_name(wire_a, absolute_latency);
-                    let width = width.unwrap_integer();
 
                     write!(result, "[{idx_wire_name_a}{direction}{width}]").unwrap();
                 }

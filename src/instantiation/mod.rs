@@ -5,6 +5,7 @@ pub mod instantiation_cache;
 mod unique_names;
 
 use colored::Colorize;
+use ibig::IBig;
 use unique_names::UniqueNames;
 
 use crate::alloc::zip_eq;
@@ -27,6 +28,26 @@ use crate::{errors::ErrorStore, value::Value};
 
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
 
+/// In valid programs, this becomes [PartialBound::Known] after concrete typecheck
+#[derive(Debug, Clone)]
+pub enum PartialBound {
+    Known(IBig, IBig),
+    From(IBig),
+    To(IBig),
+    WholeSlice,
+}
+
+impl PartialBound {
+    pub fn unwrap_valid(&self) -> (&IBig, &IBig) {
+        let_unwrap!(Self::Known(from, to), self);
+        (from, to)
+    }
+    pub fn unwrap_width(&self) -> IBig {
+        let_unwrap!(Self::Known(from, to), self);
+        to - from
+    }
+}
+
 /// See [MultiplexerSource]
 ///
 /// This is the post-instantiation equivalent of [crate::flattening::WireReferencePathElement]
@@ -36,17 +57,15 @@ pub enum RealWirePathElem {
         span: BracketSpan,
         idx_wire: WireID,
     },
-    Slice {
-        from_span: Span,
-        to_span: Span,
-        from: UnifyableValue,
-        to: UnifyableValue,
-    },
     PartSelect {
         span: BracketSpan,
         from_wire: WireID,
-        width: UnifyableValue,
+        width: IBig,
         direction: PartSelectDirection,
+    },
+    Slice {
+        span: BracketSpan,
+        bounds: PartialBound,
     },
 }
 
@@ -270,10 +289,10 @@ impl ForEachContainedWire for RealWirePathElem {
             RealWirePathElem::Index { span: _, idx_wire } => {
                 f(*idx_wire);
             }
-            RealWirePathElem::Slice { .. } => {}
             RealWirePathElem::PartSelect { from_wire, .. } => {
                 f(*from_wire);
             }
+            RealWirePathElem::Slice { .. } => {}
         }
     }
 }
@@ -483,9 +502,12 @@ impl ModuleTypingContext<'_> {
                 RealWirePathElem::Index { idx_wire, .. } => {
                     print!("[{}]", self.name(*idx_wire));
                 }
-                RealWirePathElem::Slice { from, to, .. } => {
-                    print!("[{from}:{to}]");
-                }
+                RealWirePathElem::Slice { bounds, .. } => match bounds {
+                    PartialBound::Known(from, to) => print!("[{from}:{to}]"),
+                    PartialBound::From(from) => print!("[{from}:]"),
+                    PartialBound::To(to) => print!("[:{to}]"),
+                    PartialBound::WholeSlice => print!("[:]"),
+                },
                 RealWirePathElem::PartSelect {
                     from_wire,
                     width,

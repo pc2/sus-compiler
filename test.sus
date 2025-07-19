@@ -1432,3 +1432,18 @@ module use_use_trigger {
 		pass_it_up()
 	}
 }
+
+
+
+module testSlicing {
+	gen int[10][20] INTS
+
+	for int i in 0..10 {
+		for int j in 0..20 {
+			INTS[j][i] = i + j * 10
+		}
+	}
+
+	gen int[5][30] SUBSLICE = INTS[11:14][2:5]
+}
+

@@ -12959,3 +12959,31 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │            ┬  
       │            ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1439:18 ]
+      │
+ 1439 │     gen int[10][20] INTS
+      │                     ──┬─  
+      │                       ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1441:10 ]
+      │
+ 1441 │     for int i in 0..10 {
+      │             ┬  
+      │             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1442:11 ]
+      │
+ 1442 │        for int j in 0..20 {
+      │                ┬  
+      │                ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1447:17 ]
+      │
+ 1447 │     gen int[5][30] SUBSLICE = INTS[11:14][2:5]
+      │                    ────┬───  
+      │                        ╰───── Unused Variable: This variable does not affect the output ports of this module
+──────╯

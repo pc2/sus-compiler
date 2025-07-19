@@ -886,38 +886,23 @@ impl<'l> ExecutionContext<'l> {
                     bracket_span,
                     ..
                 } => {
-                    let (from, from_span) = match from {
-                        Some(from) => (
-                            self.generation_state[*from]
-                                .unwrap_generation_value()
-                                .clone()
-                                .into(),
-                            self.link_info.instructions[*from].get_span(),
+                    let bounds = match (from, to) {
+                        (None, None) => PartialBound::WholeSlice,
+                        (None, Some(to)) => PartialBound::To(
+                            self.generation_state.get_generation_integer(*to)?.clone(),
                         ),
-                        None => (
-                            self.type_substitutor.alloc_unknown(),
-                            bracket_span.inner_span().empty_span_at_front(),
+                        (Some(from), None) => PartialBound::From(
+                            self.generation_state.get_generation_integer(*from)?.clone(),
                         ),
-                    };
-                    let (to, to_span) = match to {
-                        Some(to) => (
-                            self.generation_state[*to]
-                                .unwrap_generation_value()
-                                .clone()
-                                .into(),
-                            self.link_info.instructions[*to].get_span(),
-                        ),
-                        None => (
-                            self.type_substitutor.alloc_unknown(),
-                            bracket_span.inner_span().empty_span_at_end(),
+                        (Some(from), Some(to)) => PartialBound::Known(
+                            self.generation_state.get_generation_integer(*from)?.clone(),
+                            self.generation_state.get_generation_integer(*to)?.clone(),
                         ),
                     };
 
                     path.push(RealWirePathElem::Slice {
-                        from_span,
-                        to_span,
-                        from,
-                        to,
+                        span: *bracket_span,
+                        bounds,
                     });
                 }
                 WireReferencePathElement::ArrayPartSelect {
@@ -934,7 +919,7 @@ impl<'l> ExecutionContext<'l> {
                     path.push(RealWirePathElem::PartSelect {
                         span: *bracket_span,
                         from_wire,
-                        width: width.clone().into(),
+                        width: width.unwrap_integer().clone(),
                         direction: *direction,
                     });
                 }

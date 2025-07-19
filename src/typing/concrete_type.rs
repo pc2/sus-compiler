@@ -2,10 +2,11 @@ use ibig::IBig;
 use ibig::UBig;
 use sus_proc_macro::get_builtin_type;
 
-use crate::instantiation::RealWirePathElem;
 use crate::linker::GlobalUUID;
 use crate::prelude::*;
+use crate::to_string::join_string_iter_formatter;
 use crate::util::all_equal;
+use std::fmt::Write;
 use std::ops::Deref;
 use std::ops::DerefMut;
 
@@ -50,10 +51,43 @@ pub enum SubtypeRelation {
 ///
 /// Not to be confused with [crate::typing::abstract_type::AbstractType] which represents pre-instantiation types,
 /// or [crate::flattening::WrittenType] which represents the textual in-editor data.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteType {
     Named(ConcreteGlobalReference<TypeUUID>),
     Array(Box<(ConcreteType, UnifyableValue)>),
+}
+
+impl std::fmt::Debug for ConcreteType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Named(global_ref) => {
+                let name = global_ref.id;
+                f.write_fmt(format_args!("{name:?} #("))?;
+                join_string_iter_formatter(
+                    ", ",
+                    f,
+                    global_ref.template_args.iter(),
+                    |(arg_id, arg), f| {
+                        f.write_fmt(format_args!("{arg_id:?}: "))?;
+                        match arg {
+                            TemplateKind::Type(t) => {
+                                f.write_fmt(format_args!("type {t:?}"))?;
+                            }
+                            TemplateKind::Value(v) => {
+                                f.write_fmt(format_args!("{v:?}"))?;
+                            }
+                        }
+                        Ok(())
+                    },
+                )?;
+                f.write_char(')')
+            }
+            Self::Array(arr_box) => {
+                let (content, sz) = arr_box.deref();
+                f.write_fmt(format_args!("{content:?}[{sz:?}]"))
+            }
+        }
+    }
 }
 
 impl ConcreteType {
@@ -198,7 +232,7 @@ impl ConcreteType {
         let mut total_is_subtype = true;
         Self::co_iterate_parameters(self, other, &mut |a, b, relation| match relation {
             SubtypeRelation::Exact => {
-                assert_eq!(a.unwrap_set(), b.unwrap_set()); // Assert, because non-matching exact values should have been caught by unification
+                total_is_subtype &= a.unwrap_set() == b.unwrap_set();
             }
             SubtypeRelation::Min => {
                 if a.unwrap_integer() < b.unwrap_integer() {
@@ -212,6 +246,16 @@ impl ConcreteType {
             }
         });
         total_is_subtype
+    }
+    /// Requires all parameters to be known and already substituted!
+    ///
+    /// a return value of true means that `self` can be assigned to `other`, and `other` can be assigned to `self`
+    pub fn is_identical_to(&self, other: &Self) -> bool {
+        let mut total_is_identical = true;
+        Self::co_iterate_parameters(self, other, &mut |a, b, _relation| {
+            total_is_identical &= a.unwrap_set() == b.unwrap_set()
+        });
+        total_is_identical
     }
     /// Returns the size of this type in *wires*. So int #(MAX: 255) would return '8'
     ///
@@ -269,19 +313,6 @@ impl ConcreteType {
             typ = &typ.unwrap_array().0;
         }
         typ
-    }
-    pub fn walk_path(&self, path: &[RealWirePathElem]) -> &ConcreteType {
-        let mut cur_typ = self;
-        for p in path {
-            match p {
-                RealWirePathElem::Index { .. } => {
-                    cur_typ = &cur_typ.unwrap_array().0;
-                }
-                RealWirePathElem::PartSelect { .. } | RealWirePathElem::Slice { .. } => {}
-            }
-        }
-
-        cur_typ
     }
 }
 
