@@ -1445,5 +1445,11 @@ module testSlicing {
 	}
 
 	gen int[5][30] SUBSLICE = INTS[11:14][2:5]
+
+	int x
+
+	int y
+
+	int z = INTS[x][y]
 }
 

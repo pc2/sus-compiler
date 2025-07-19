@@ -941,7 +941,7 @@ impl<'l> ExecutionContext<'l> {
         let wire_id = match &wire_ref.root {
             &WireReferenceRoot::LocalDecl(decl_id) => {
                 let _ = self.link_info.instructions[decl_id].unwrap_declaration();
-                self.generation_state[decl_id].unwrap_wire()
+                self.get_wire_or_constant_as_wire(decl_id, domain)?
             }
             WireReferenceRoot::LocalSubmodule(submod_id) => {
                 let submod = self.link_info.instructions[*submod_id].unwrap_submodule();
@@ -1122,15 +1122,15 @@ impl<'l> ExecutionContext<'l> {
             SubModuleOrWire::Wire(w) => Ok(*w),
             SubModuleOrWire::CompileTimeValue(v) => {
                 let value = v.clone();
-                let original_expr =
-                    self.link_info.instructions[original_instruction].unwrap_subexpression();
-                self.alloc_wire_for_const(
-                    value,
-                    original_expr.typ,
-                    original_instruction,
-                    domain,
-                    original_expr.span,
-                )
+                let (typ, span) = match &self.link_info.instructions[original_instruction] {
+                    Instruction::Declaration(decl) => (decl.typ.deref(), decl.name_span),
+                    Instruction::Expression(expr) => {
+                        let expr = expr.as_single_output_expr().unwrap();
+                        (expr.typ, expr.span)
+                    }
+                    _ => unreachable!(),
+                };
+                self.alloc_wire_for_const(value, typ, original_instruction, domain, span)
             }
         }
     }
