@@ -2,50 +2,6 @@
 // DO NOT COMMIT
 // To use with VSCode debugger, name the module "TEST", and in the code use `if crate::debug::is_enabled("TEST") {}` to enable breakpoint code
 
-module infff #(int DELAY) {
-    interface infff : bool a'-DELAY -> bool b'0
-}
-
 module TEST {
 
-    interface TEST : bool a'0 -> bool b'20
-
-    infff x
-
-    b = x(a)
-}
-
-module min #(T){
-    interface min : T a, T b -> T c
-
-    when a < b {
-        c = a
-    } else {
-        c = b
-    }
-}
-
-module tensorSum {
-    
-    gen int[3] a = [0, 5, 7]
-    gen int[3] b = [5, 3, 3]
-
-    a + b
-
-//    int[3] x = min(a, b)
-}
-
-module ReorderedLoop#(T1, T2, ..., int D, int O1, int O2, int MAX_ITERATIONS) {
-    state int#(MIN: 0, MAX: D * MAX_ITERATIONS - 1) cur_idx
-    next cur_idx = LatencyOffset #(OFFSET: -D)(cur_idx)
-
-    state Tuple2#(T1, T2)[D * MAX_ITERATIONS] reorder_buffer
-
-    trigger loop'0: T1 v1'O1, T2 v2'O2
-
-    action push'D: T1 next_v1'O1, T2 next_v2'O2 {}
-
-    action finish: T1 f1, T2 f2 {}
-
-    trigger result_valid: T1 r1, T2 r2
 }

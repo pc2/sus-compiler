@@ -1444,12 +1444,43 @@ module testSlicing {
 		}
 	}
 
+	INTS[11:14][2:5] = [[1,1,1], [1,1,1], [1,1,1]]
+
 	gen int[5][30] SUBSLICE = INTS[11:14][2:5]
 
-	int x
+	int x = 3
 
-	int y
+	int y = 1
 
 	int z = INTS[x][y]
+
+	int[3][4] w = INTS[x+:4][y-:3]
+
+	int#(MIN:0, MAX: 6)[0] zero_slice = INTS[5][4:4]
 }
 
+module wrong_slice_length {
+ 
+	gen int[10][20] INTS
+
+	for int i in 0..10 {
+		for int j in 0..20 {
+			INTS[j][i] = i + j * 10
+		}
+	}
+
+	INTS[11:14][2:5] = []
+}
+
+module negative_slice {
+ 
+	gen int[10][20] INTS
+
+	for int i in 0..10 {
+		for int j in 0..20 {
+			INTS[j][i] = i + j * 10
+		}
+	}
+
+	int#(MIN:0, MAX: 6)[0] negative_slice = INTS[5][4:3]
+}

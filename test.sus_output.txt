@@ -171,6 +171,8 @@ Flattening StraightTransmute
 Flattening use_trigger
 Flattening use_use_trigger
 Flattening testSlicing
+Flattening wrong_slice_length
+Flattening negative_slice
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -328,6 +330,8 @@ Typechecking StraightTransmute
 Typechecking use_trigger
 Typechecking use_use_trigger
 Typechecking testSlicing
+Typechecking wrong_slice_length
+Typechecking negative_slice
 Typechecking bool
 Typechecking int
 Typechecking float
@@ -501,6 +505,8 @@ Lints StraightTransmute
 Lints use_trigger
 Lints use_use_trigger
 Lints testSlicing
+Lints wrong_slice_length
+Lints negative_slice
 Lints bool
 Lints int
 Lints float
@@ -849,4 +855,5 @@ Concrete Typechecking use_use_trigger
 Checking array accesses use_use_trigger
 Instantiating testSlicing
 Concrete Typechecking testSlicing
-Checking array accesses testSlicing
+Instantiating wrong_slice_length
+Instantiating negative_slice

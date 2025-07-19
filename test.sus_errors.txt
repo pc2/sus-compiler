@@ -12981,9 +12981,120 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1447:17 ]
+      ╭─[ test.sus:1449:17 ]
       │
- 1447 │     gen int[5][30] SUBSLICE = INTS[11:14][2:5]
+ 1449 │     gen int[5][30] SUBSLICE = INTS[11:14][2:5]
       │                    ────┬───  
       │                        ╰───── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1451:6 ]
+      │
+ 1451 │     int x = 3
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1453:6 ]
+      │
+ 1453 │     int y = 1
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1455:6 ]
+      │
+ 1455 │     int z = INTS[x][y]
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1457:12 ]
+      │
+ 1457 │     int[3][4] w = INTS[x+:4][y-:3]
+      │               ┬  
+      │               ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1459:25 ]
+      │
+ 1459 │     int#(MIN:0, MAX: 6)[0] zero_slice = INTS[5][4:4]
+      │                            ─────┬────  
+      │                                 ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[0]
+      ╭─[ test.sus:1459:38 ]
+      │
+ 1459 │     int#(MIN:0, MAX: 6)[0] zero_slice = INTS[5][4:4]
+      │                                         ──────┬─────  
+      │                                               ╰─────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[0]
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1464:18 ]
+      │
+ 1464 │     gen int[10][20] INTS
+      │                     ──┬─  
+      │                       ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1466:10 ]
+      │
+ 1466 │     for int i in 0..10 {
+      │             ┬  
+      │             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1467:11 ]
+      │
+ 1467 │        for int j in 0..20 {
+      │                ┬  
+      │                ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Attempting to write to this slice 11:14 (length 3) with an array of length 0.
+      ╭─[ test.sus:1472:7 ]
+      │
+ 1472 │     INTS[11:14][2:5] = []
+      │          ──┬──  
+      │            ╰──── Attempting to write to this slice 11:14 (length 3) with an array of length 0.
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1477:18 ]
+      │
+ 1477 │     gen int[10][20] INTS
+      │                     ──┬─  
+      │                       ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1479:10 ]
+      │
+ 1479 │     for int i in 0..10 {
+      │             ┬  
+      │             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1480:11 ]
+      │
+ 1480 │        for int j in 0..20 {
+      │                ┬  
+      │                ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1485:25 ]
+      │
+ 1485 │     int#(MIN:0, MAX: 6)[0] negative_slice = INTS[5][4:3]
+      │                            ───────┬──────  
+      │                                   ╰──────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Slice 4:3 has a negative length.
+      ╭─[ test.sus:1485:50 ]
+      │
+ 1485 │     int#(MIN:0, MAX: 6)[0] negative_slice = INTS[5][4:3]
+      │                                                     ─┬─  
+      │                                                      ╰─── Slice 4:3 has a negative length.
 ──────╯
