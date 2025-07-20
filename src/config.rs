@@ -155,7 +155,9 @@ where
     T: Into<OsString> + Clone,
 {
     let matches = command_builder().try_get_matches_from(itr)?;
-    let codegen = matches.get_flag("codegen") || matches.get_many::<PathBuf>("files").is_none();
+    let codegen = matches.get_flag("codegen")
+        || matches.get_many::<PathBuf>("files").is_none()
+        || matches.contains_id("standalone");
     let debug_whitelist = matches
         .get_many("debug-whitelist")
         .unwrap_or_default()
