@@ -1461,14 +1461,18 @@ impl<'l> ExecutionContext<'l> {
                 };
             SubModuleOrWire::CompileTimeValue(value)
         } else {
-            let is_state = if wire_decl.decl_kind.is_state() {
-                Some(typ.get_initial_val())
+            let source = if wire_decl.decl_kind.is_io_port() == Some(Direction::Input) {
+                RealWireDataSource::ReadOnly
             } else {
-                None
-            };
-            let source = RealWireDataSource::Multiplexer {
-                is_state,
-                sources: Vec::new(),
+                let is_state = if wire_decl.decl_kind.is_state() {
+                    Some(typ.get_initial_val())
+                } else {
+                    None
+                };
+                RealWireDataSource::Multiplexer {
+                    is_state,
+                    sources: Vec::new(),
+                }
             };
 
             let specified_latency = self.get_specified_latency(wire_decl.latency_specifier)?;
