@@ -47,6 +47,8 @@ impl super::CodeGenBackend for VerilogCodegenBackend {
 /// Creates the Verilog variable declaration for tbis variable.
 ///
 /// IE for `int[15] myVar` it creates `[31:0] myVar[14:0]`
+///
+/// May return something with a leading space, to accomodate `logic`, `input`, etc.
 fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
     let mut array_string = String::new();
 
@@ -68,6 +70,10 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
                 id: get_builtin_type!("bool"),
                 ..
             }) => return format!(" {var_name}{array_string}"),
+            ConcreteType::Named(ConcreteGlobalReference {
+                id: get_builtin_type!("float"),
+                ..
+            }) => return format!("[31:0] {var_name}{array_string}"),
             ConcreteType::Named(ConcreteGlobalReference { id: _, .. }) => {
                 todo!("Structs")
             }
@@ -166,6 +172,15 @@ impl<'g> CodeGenerationContext<'g> {
                             .write_fmt(format_args!("{bitwidth}'d{cst_str}"))
                             .unwrap()
                     }
+                }
+                get_builtin_type!("float") => {
+                    assert!(
+                        matches!(cst, Value::Unset),
+                        "TODO: Generative non-Unset floats"
+                    );
+                    result
+                        .write_str("32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+                        .unwrap();
                 }
                 _ => todo!("Structs"),
             },
