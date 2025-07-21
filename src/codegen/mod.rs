@@ -11,6 +11,7 @@ use crate::{InstantiatedModule, Linker, Module};
 
 use crate::config::VERSION_INFO;
 
+use std::path::Path;
 use std::{
     fs::{self, File},
     io::Write,
@@ -31,7 +32,7 @@ pub trait CodeGenBackend {
         use_latency: bool,
     ) -> String;
 
-    fn make_output_file(&self, name: &str) -> File {
+    fn make_output_file_path(&self, name: &str) -> PathBuf {
         let mut path = PathBuf::with_capacity(
             name.len() + self.output_dir_name().len() + self.file_extension().len() + 2,
         );
@@ -39,6 +40,9 @@ pub trait CodeGenBackend {
         fs::create_dir_all(&path).unwrap();
         path.push(name);
         path.set_extension(self.file_extension());
+        path
+    }
+    fn make_output_file(&self, path: &Path) -> File {
         let mut file = File::create(path).unwrap();
 
         let generation_time =
@@ -74,15 +78,17 @@ pub trait CodeGenBackend {
             .iter_for_module(id)
             .any(|(_, inst)| !inst.errors.did_error)
         {
-            let mut out_file = self.make_output_file(&md.link_info.name);
+            let path = self.make_output_file_path(&md.link_info.name);
+            let mut out_file = self.make_output_file(&path);
             for (_global_ref, inst) in instantiatior_borrow.iter_for_module(id) {
                 self.codegen_instance(inst.as_ref(), md, linker, &mut out_file)
             }
         }
     }
 
-    fn codegen_with_dependencies(&self, linker: &Linker, md_id: ModuleUUID, file_name: &str) {
-        let mut out_file = self.make_output_file(file_name);
+    fn codegen_with_dependencies(&self, linker: &Linker, md_id: ModuleUUID, path: &Path) {
+        println!("Codegen to {}", path.to_string_lossy());
+        let mut out_file = self.make_output_file(path);
         let mut to_process_queue: Vec<Rc<InstantiatedModule>> = Vec::new();
         for (_template_args, inst) in linker.instantiator.borrow().iter_for_module(md_id) {
             to_process_queue.push(inst.clone());
@@ -111,6 +117,7 @@ pub trait CodeGenBackend {
                 to_process_queue.push(new_inst);
             }
 
+            println!("Codegen instance {}", cur_instance.name);
             self.codegen_instance(
                 cur_instance,
                 &linker.modules[cur_instance.global_ref.id],

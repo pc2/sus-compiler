@@ -62,22 +62,19 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     }
 
     if config.codegen {
-        if let Some(md_name) = &config.codegen_module_and_dependencies_one_file {
+        if let Some(standalone) = &config.standalone {
+            let top_md_name = &standalone.top_module;
             let Some(md) = linker
                 .modules
                 .iter()
-                .find(|(_, md)| &md.link_info.name == md_name)
+                .find(|(_, md)| &md.link_info.name == top_md_name)
             else {
                 let mut err_lock = std::io::stderr().lock();
-                writeln!(err_lock, "Unknown module {md_name}").unwrap();
+                writeln!(err_lock, "Unknown module {top_md_name}").unwrap();
                 std::process::exit(1);
             };
 
-            codegen_backend.codegen_with_dependencies(
-                &linker,
-                md.0,
-                &format!("{md_name}_standalone"),
-            );
+            codegen_backend.codegen_with_dependencies(&linker, md.0, &standalone.file_path);
         } else {
             for (id, md) in &linker.modules {
                 codegen_backend.codegen_to_file(id, md, &linker);

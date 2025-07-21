@@ -27,6 +27,12 @@ pub enum TargetLanguage {
     Vhdl,
 }
 
+#[derive(Debug)]
+pub struct StandaloneCodegenSettings {
+    pub top_module: String,
+    pub file_path: PathBuf,
+}
+
 /// All command-line flags are converted to this struct, of which the singleton instance can be acquired using [crate::config::config]
 #[derive(Debug)]
 pub struct ConfigStruct {
@@ -46,7 +52,7 @@ pub struct ConfigStruct {
     pub debug_whitelist: Vec<String>,
     pub kill_timeout: std::time::Duration,
     pub enabled_debug_paths: HashSet<String>,
-    pub codegen_module_and_dependencies_one_file: Option<String>,
+    pub standalone: Option<StandaloneCodegenSettings>,
     pub early_exit: EarlyExitUpTo,
     pub use_color: bool,
     pub ci: bool,
@@ -114,6 +120,14 @@ fn command_builder() -> Command {
         .arg(Arg::new("standalone")
             .long("standalone")
             .help("Generate standalone code with all dependencies in one file of the module specified."))
+        .arg(Arg::new("standalone-file")
+            .long("standalone-file")
+            .requires("standalone")
+            .help("Set the output file of --standalone code generation")
+            .value_parser(|file_path_str : &str| {
+                let file_path = PathBuf::from(file_path_str);
+                Result::<PathBuf, &'static str>::Ok(file_path)
+            }))
         .arg(Arg::new("upto")
             .long("upto")
             .help("Describes at what point in the compilation process we should exit early. This is mainly to aid in debugging, where incorrect results from flattening/typechecking may lead to errors, which we still wish to see in say the LSP")
@@ -181,6 +195,19 @@ where
             .collect(),
     };
 
+    let standalone =
+        matches
+            .get_one("standalone")
+            .map(|top_module: &String| StandaloneCodegenSettings {
+                top_module: top_module.to_string(),
+                file_path: matches
+                    .get_one::<PathBuf>("standalone-file")
+                    .cloned()
+                    .unwrap_or_else(|| {
+                        PathBuf::from(format!("verilog_output/{top_module}_standalone.sv"))
+                    }),
+            });
+
     Ok(ConfigStruct {
         use_lsp: matches.get_flag("lsp"),
         lsp_debug_mode: matches.get_flag("lsp-debug"),
@@ -191,7 +218,7 @@ where
         kill_timeout: *matches
             .get_one::<std::time::Duration>("kill-timeout")
             .unwrap(),
-        codegen_module_and_dependencies_one_file: matches.get_one("standalone").cloned(),
+        standalone,
         early_exit: *matches.get_one("upto").unwrap(),
         use_color,
         ci: matches.get_flag("ci"),
