@@ -1451,6 +1451,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             name: domain_name.to_owned(),
             name_span: Some(domain_name_span),
         });
+        self.current_domain = domain_id;
 
         self.alloc_local_name(
             domain_name_span,
