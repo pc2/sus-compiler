@@ -335,8 +335,17 @@ impl Module {
         &self,
         interface: &InterfaceDeclaration,
         file_text: &FileText,
+        may_print_domain: bool,
         result: &mut String,
     ) {
+        if may_print_domain {
+            result
+                .write_fmt(format_args!(
+                    "{{{}}} ",
+                    self.domains[interface.domain.unwrap_physical()].name
+                ))
+                .unwrap();
+        }
         result.write_str(&file_text[interface.decl_span]).unwrap();
         result.write_str(":\n").unwrap();
         for decl_id in &interface.inputs {
@@ -344,13 +353,14 @@ impl Module {
             result.write_str("\t").unwrap();
             self.make_port_info_fmt(port_decl, file_text, result);
         }
-        result.write_str("\t->\n").unwrap();
-        for decl_id in &interface.outputs {
-            let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
-            result.write_str("\t").unwrap();
-            self.make_port_info_fmt(port_decl, file_text, result);
+        if !interface.outputs.is_empty() {
+            result.write_str("\t->\n").unwrap();
+            for decl_id in &interface.outputs {
+                let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
+                result.write_str("\t").unwrap();
+                self.make_port_info_fmt(port_decl, file_text, result);
+            }
         }
-        result.pop().unwrap();
     }
 
     pub fn make_all_ports_info_string(
@@ -377,7 +387,7 @@ impl Module {
                     Some(InterfaceDeclKind::Interface(decl_id)) => {
                         let interface = self.link_info.instructions[decl_id].unwrap_interface();
                         if interface.domain.unwrap_physical() == domain_id {
-                            self.make_interface_info_fmt(interface, file_text, &mut result);
+                            self.make_interface_info_fmt(interface, file_text, false, &mut result);
                         }
                     }
                     Some(InterfaceDeclKind::SinglePort(decl_id)) => {
@@ -388,7 +398,6 @@ impl Module {
                     }
                     None => {}
                 }
-                result.write_char('\n').unwrap();
             }
         }
 

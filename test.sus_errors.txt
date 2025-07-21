@@ -2261,10 +2261,8 @@ Error: No such field 'i' on cross_memory. Available fields are 'cross_memory', '
      │        ──────┬─────  
      │              ╰─────── Module 'cross_memory' defined here. module cross_memory #():
 domain clk:
-
 interface in:
 	input bool[20][512] i'0
-	->
 interface out:
 	->
 	output bool[20][512] o'0
@@ -2313,10 +2311,8 @@ Error: No such field 'o' on cross_memory. Available fields are 'cross_memory', '
      │        ──────┬─────  
      │              ╰─────── Module 'cross_memory' defined here. module cross_memory #():
 domain clk:
-
 interface in:
 	input bool[20][512] i'0
-	->
 interface out:
 	->
 	output bool[20][512] o'0
@@ -2394,10 +2390,8 @@ Error: No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in',
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
 domain clk:
-
 interface in:
 	input bool i'0
-	->
 interface out:
 	->
 	output bool o'0
@@ -2413,10 +2407,8 @@ Error: No such field 'o' on cross_bool. Available fields are 'cross_bool', 'in',
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
 domain clk:
-
 interface in:
 	input bool i'0
-	->
 interface out:
 	->
 	output bool o'0
@@ -2512,7 +2504,6 @@ Error: No such field 'a' on mod_with_unused_interface. Available fields are 'mod
      │        ────────────┬────────────  
      │                    ╰────────────── Module 'mod_with_unused_interface' defined here. module mod_with_unused_interface #():
 domain clk:
-
 interface v:
 	input int#(MIN: 0, MAX: 100) a
 	->
@@ -2552,10 +2543,8 @@ Error: No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in',
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
 domain clk:
-
 interface in:
 	input bool i'0
-	->
 interface out:
 	->
 	output bool o'0
@@ -2571,10 +2560,8 @@ Error: No such field 'i' on cross_int. Available fields are 'cross_int', 'in', '
      │        ────┬────  
      │            ╰────── Module 'cross_int' defined here. module cross_int #():
 domain clk:
-
 interface in:
 	input int#(MIN: 0, MAX: 100) i'0
-	->
 interface out:
 	->
 	output int o'0
@@ -2590,10 +2577,8 @@ Error: No such field 'o' on cross_bool. Available fields are 'cross_bool', 'in',
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
 domain clk:
-
 interface in:
 	input bool i'0
-	->
 interface out:
 	->
 	output bool o'0
@@ -2609,10 +2594,8 @@ Error: No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in',
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
 domain clk:
-
 interface in:
 	input bool i'0
-	->
 interface out:
 	->
 	output bool o'0
@@ -2628,10 +2611,8 @@ Error: No such field 'o' on cross_bool. Available fields are 'cross_bool', 'in',
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
 domain clk:
-
 interface in:
 	input bool i'0
-	->
 interface out:
 	->
 	output bool o'0
@@ -2647,10 +2628,8 @@ Error: No such field 'o' on cross_int. Available fields are 'cross_int', 'in', '
      │        ────┬────  
      │            ╰────── Module 'cross_int' defined here. module cross_int #():
 domain clk:
-
 interface in:
 	input int#(MIN: 0, MAX: 100) i'0
-	->
 interface out:
 	->
 	output int o'0
@@ -12438,16 +12417,12 @@ Error: No such field 'process' on MultiStateLoop #(T: ?[...], II: _). Available 
       │        ───────┬──────  
       │               ╰──────── Module 'MultiStateLoop' defined here. module MultiStateLoop #(T, int II):
 domain clk:
-
 trigger may_process'0:
 	output T cur_state
-	->
 action next_state'II:
 	input T next_state_value
-	->
 action request_output:
 	input T result
-	->
       │ 
  1263 │     when loop.process : float cur_state {
       │               ───┬───  

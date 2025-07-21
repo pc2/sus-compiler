@@ -133,7 +133,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 let md = &linker.modules[md_id];
 
                 let mut result = String::new();
-                md.make_interface_info_fmt(interface, &file_data.file_text, &mut result);
+                md.make_interface_info_fmt(interface, &file_data.file_text, true, &mut result);
 
                 hover.sus_code(result);
             }
@@ -235,6 +235,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     md.make_interface_info_fmt(
                         interface_decl,
                         &linker.files[md.link_info.file].file_text,
+                        true,
                         &mut result,
                     );
                     hover.sus_code(result);
