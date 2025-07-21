@@ -1,17 +1,3 @@
-Warning: The result of this expression is not used. Only function calls can return nothing. 
-    ╭─[ core.sus:46:5 ]
-    │
- 46 │     assert #(C: SIZE == sizeof #(T: type T2))
-    │     ────────────────────┬────────────────────  
-    │                         ╰────────────────────── The result of this expression is not used. Only function calls can return nothing. 
-────╯
-Warning: The result of this expression is not used. Only function calls can return nothing. 
-     ╭─[ util.sus:210:4 ]
-     │
- 210 │          assert#(C: false)
-     │          ────────┬────────  
-     │                  ╰────────── The result of this expression is not used. Only function calls can return nothing. 
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -11292,47 +11278,12 @@ Error: For executing compile-time constants, all arguments must be fully specifi
       │                            ──────────────┬──────────────  
       │                                          ╰──────────────── For executing compile-time constants, all arguments must be fully specified. The arguments 'T' were not valid
 ──────╯
-Warning: The result of this expression is not used. Only function calls can return nothing. 
-      ╭─[ test.sus:1079:2 ]
-      │
- 1079 │     assert #(C: INT_ARR_SIZE == 3200)
-      │     ────────────────┬────────────────  
-      │                     ╰────────────────── The result of this expression is not used. Only function calls can return nothing. 
-──────╯
-Warning: The result of this expression is not used. Only function calls can return nothing. 
-      ╭─[ test.sus:1081:2 ]
-      │
- 1081 │     assert #(C: clog2 #(V: 15) == 4)
-      │     ────────────────┬───────────────  
-      │                     ╰───────────────── The result of this expression is not used. Only function calls can return nothing. 
-──────╯
-Warning: The result of this expression is not used. Only function calls can return nothing. 
-      ╭─[ test.sus:1082:2 ]
-      │
- 1082 │     assert #(C: clog2 #(V: 16) == 4)
-      │     ────────────────┬───────────────  
-      │                     ╰───────────────── The result of this expression is not used. Only function calls can return nothing. 
-──────╯
-Warning: The result of this expression is not used. Only function calls can return nothing. 
-      ╭─[ test.sus:1083:2 ]
-      │
- 1083 │     assert #(C: clog2 #(V: 17) == 5)
-      │     ────────────────┬───────────────  
-      │                     ╰───────────────── The result of this expression is not used. Only function calls can return nothing. 
-──────╯
 Error: Assertion failed
       ╭─[ test.sus:1087:2 ]
       │
  1087 │     assert #(C: 15 + 3 == 19)
       │     ────────────┬────────────  
       │                 ╰────────────── Assertion failed
-──────╯
-Warning: The result of this expression is not used. Only function calls can return nothing. 
-      ╭─[ test.sus:1087:2 ]
-      │
- 1087 │     assert #(C: 15 + 3 == 19)
-      │     ────────────┬────────────  
-      │                 ╰────────────── The result of this expression is not used. Only function calls can return nothing. 
 ──────╯
 Warning: Used 'when' in a generative context, use 'if' instead
       ╭─[ test.sus:1098:2 ]

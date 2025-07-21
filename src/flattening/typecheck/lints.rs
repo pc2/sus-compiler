@@ -261,17 +261,26 @@ impl LintContext<'_> {
             }
         }
 
-        // All asserts are also terminals
-        for (assert_instr_id, instr) in &self.working_on.instructions {
-            if let Instruction::Expression(expr) = instr {
-                if let ExpressionSource::WireRef(wr) = &expr.source {
-                    if let WireReferenceRoot::NamedConstant(cst) = &wr.root {
-                        if cst.id == get_builtin_const!("assert") {
-                            is_instance_used_map[assert_instr_id] = true;
-                            wire_to_explore_queue.push(assert_instr_id);
+        // All asserts and declarations starting with '_' are also terminals
+        for (instr_id, instr) in &self.working_on.instructions {
+            match instr {
+                Instruction::Expression(expr) => {
+                    if let ExpressionSource::WireRef(wr) = &expr.source {
+                        if let WireReferenceRoot::NamedConstant(cst) = &wr.root {
+                            if cst.id == get_builtin_const!("assert") {
+                                is_instance_used_map[instr_id] = true;
+                                wire_to_explore_queue.push(instr_id);
+                            }
                         }
                     }
                 }
+                Instruction::Declaration(decl) => {
+                    if decl.name.starts_with('_') {
+                        is_instance_used_map[instr_id] = true;
+                        wire_to_explore_queue.push(instr_id);
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -347,6 +356,9 @@ impl LintContext<'_> {
                     }
                 }
                 Instruction::Interface(stm) => {
+                    if let Some(lat_spec) = stm.latency_specifier {
+                        instruction_fanins[instr_id].push(lat_spec);
+                    }
                     for id in FlatIDRange::new(stm.then_block.0, stm.else_block.1) {
                         if let Instruction::Expression(Expression {
                             output: ExpressionOutput::MultiWrite(writes),

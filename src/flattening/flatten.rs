@@ -7,7 +7,7 @@ use crate::linker::passes::{GlobalResolver, LinkerPass};
 use crate::prelude::*;
 
 use ibig::IBig;
-use sus_proc_macro::{field, kind, kw};
+use sus_proc_macro::{field, get_builtin_const, kind, kw};
 
 use crate::linker::{FileData, GlobalObj, GlobalUUID};
 use crate::value::Value;
@@ -817,6 +817,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         let output = match (&source, writes.is_empty()) {
             (ExpressionSource::FuncCall(_), _) | (_, false) => ExpressionOutput::MultiWrite(writes),
+            (
+                ExpressionSource::WireRef(WireReference {
+                    root:
+                        WireReferenceRoot::NamedConstant(GlobalReference {
+                            id: get_builtin_const!("assert"), // Make an exception for assert
+                            ..
+                        }),
+                    ..
+                }),
+                true,
+            ) => ExpressionOutput::MultiWrite(Vec::new()),
             (_, true) => {
                 self.errors.warn(span, "The result of this expression is not used. Only function calls can return nothing. ");
                 ExpressionOutput::SubExpression(TyCell::new())
