@@ -304,20 +304,23 @@ impl<'l> TypeCheckingContext<'l> {
         for arg in &global_ref.template_args {
             match &arg.kind {
                 Some(TemplateKind::Type(t)) => {
+                    // even if we're wrongly operating on a value, we might as well check the user's written type is correctly typed.
                     self.typecheck_written_type(t);
                 }
                 Some(TemplateKind::Value(from_expr)) => {
                     if let Some(template_id) = arg.refers_to.get() {
-                        let remote_decl_instr = target_link_info.template_parameters[*template_id]
-                            .kind
-                            .unwrap_value()
-                            .declaration_instruction;
+                        let TemplateKind::Value(remote_parameter) =
+                            &target_link_info.template_parameters[*template_id].kind
+                        else {
+                            // Error handled by [GlobalReference::resolve_template_args]
+                            continue;
+                        };
 
                         let template_types: &FlatAlloc<_, _> = &global_ref.template_arg_types;
 
                         let target_decl = RemoteDeclaration::new(
                             target_link_info,
-                            remote_decl_instr,
+                            remote_parameter.declaration_instruction,
                             Some(template_types),
                         );
 

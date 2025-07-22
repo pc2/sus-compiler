@@ -803,7 +803,7 @@ impl<ID: Copy> GlobalReference<ID> {
                 let param = &target.template_parameters[refer_to];
 
                 match (&param.kind, &arg.kind) {
-                    (TemplateKind::Type(_), Some(TemplateKind::Value(_))) => {
+                    (TemplateKind::Value(_), Some(TemplateKind::Type(_))) => {
                         errors
                             .error(
                                 arg.name_span,
@@ -813,7 +813,7 @@ impl<ID: Copy> GlobalReference<ID> {
                             )
                             .info((param.name_span, target.file), "Declared here");
                     }
-                    (TemplateKind::Value(_), Some(TemplateKind::Type(_))) => {
+                    (TemplateKind::Type(_), Some(TemplateKind::Value(_))) => {
                         errors
                             .error(arg.name_span, format!("'{name}' is not a type. To use template type arguments use the `type` keyword like `T: type int[123]`"))
                             .info((param.name_span, target.file), "Declared here");
