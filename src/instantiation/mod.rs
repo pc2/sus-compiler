@@ -436,12 +436,6 @@ fn perform_instantiation(
 
     let name = global_ref.display(linker, false).to_string();
 
-    let _panic_guard = SpanDebugger::new(
-        "instantiating",
-        name.clone(),
-        &linker.files[md.link_info.file],
-    );
-
     // Don't instantiate modules that already errored. Otherwise instantiator may crash
     if md.link_info.errors.did_error {
         println!("Not Instantiating {name} due to flattening errors");
@@ -460,6 +454,9 @@ fn perform_instantiation(
         };
     }
 
+    let _panic_guard =
+        SpanDebugger::new("executing", name.clone(), &linker.files[md.link_info.file]);
+
     println!("Instantiating {name}");
     let exec = execute::execute(&md.link_info, linker, &global_ref.template_args);
 
@@ -474,6 +471,12 @@ fn perform_instantiation(
         typed.print_instantiated_module();
     }
 
+    let _panic_guard = SpanDebugger::new(
+        "concrete-typing",
+        name.clone(),
+        &linker.files[md.link_info.file],
+    );
+
     println!("Concrete Typechecking {name}");
     typed.typecheck(type_var_alloc);
 
@@ -485,6 +488,12 @@ fn perform_instantiation(
     if typed.errors.did_error() {
         return typed.into_instantiated_module(name);
     }
+
+    let _panic_guard = SpanDebugger::new(
+        "bounds-checking",
+        name.clone(),
+        &linker.files[md.link_info.file],
+    );
 
     println!("Checking array accesses {name}");
     typed.check_subtypes();

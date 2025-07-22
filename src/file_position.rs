@@ -28,7 +28,6 @@ impl Span {
     pub const MAX_POSSIBLE_SPAN: Span = Span(0, usize::MAX);
 
     pub fn as_range(&self) -> Range<usize> {
-        self.debug();
         self.0..self.1
     }
     #[track_caller]

@@ -41,6 +41,7 @@
                 "--debug-whitelist", "TEST",
                 "--debug", "TEST", // Temporary to add in code when debugging
                 "tinyTestFile.sus",
+                "--standalone", "TEST",
             ],
             "cwd": "${workspaceFolder}"
         },
@@ -139,6 +140,33 @@
 				"type": "npm",
 				"script": "watch"
 			}
-		}
-    ]
+		},
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug panic dump (select dump)",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=sus_compiler",
+                    "--package=sus_compiler"
+                ],
+                "filter": {
+                    "name": "sus_compiler",
+                    "kind": "bin"
+                }
+            },
+            "sourceLanguages": ["rust"],
+            "args": [
+                // By default it'll grab all .sus files in this directory. Doesn't use ./reproduce.sh though...
+            ],
+            "cwd": "${input:pickDumpFile}",
+        }
+    ],
+    "inputs": [
+        {
+            "id": "pickDumpFile",
+            "type": "command",
+            "command": "extension.commandvariable.file.pickFile",
+            "args": {
 }

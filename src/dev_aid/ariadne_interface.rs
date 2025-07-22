@@ -98,7 +98,7 @@ pub fn compile_all(file_paths: Vec<PathBuf>) -> (Linker, FileSourcesManager) {
         );
     }
 
-    linker.recompile_all();
+    linker.recompile_all_report_panics();
 
     (linker, file_source_manager)
 }

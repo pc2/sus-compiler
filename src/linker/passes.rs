@@ -35,7 +35,7 @@ impl Linker {
         println!("{pass_name} {}", &working_on_mut.name);
         let _panic_guard = SpanDebugger::new(
             pass_name,
-            working_on_mut.name.to_string(),
+            working_on_mut.name.clone(),
             &self.files[working_on_mut.file],
         );
 

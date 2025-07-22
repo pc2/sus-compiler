@@ -13,8 +13,11 @@ use circular_buffer::CircularBuffer;
 use colored::Colorize;
 
 use crate::{
-    config::config, linker::FileData, prelude::Span, pretty_print_span,
-    pretty_print_spans_in_reverse_order,
+    compiler_top::{get_core_dumps_dir, get_std_dir},
+    config::config,
+    linker::{FileData, Linker},
+    prelude::Span,
+    pretty_print_span, pretty_print_spans_in_reverse_order,
 };
 
 /// Many duplicates will be produced, and filtering them out in the code itself is inefficient. Therefore just keep a big buffer and deduplicate as needed
@@ -39,11 +42,7 @@ thread_local! {
     static MOST_RECENT_FILE_DATA: std::sync::atomic::AtomicPtr<FileData> = const {AtomicPtr::new(std::ptr::null_mut())}
 }
 
-/// Register a [crate::file_position::Span] for potential printing by [PanicGuardSpanPrinter] on panic.
-///
-/// Would like to use [crate::file_position::Span], but cannot copy the span because that would create infinite loop.
-///
-/// So use [Range] instead.
+/// Register a [crate::file_position::Span] for printing by [SpanDebugger] on panic.
 pub fn add_debug_span(sp: Span) {
     // Convert to range so we don't invoke any of Span's triggers
     DEBUG_STACK.with_borrow_mut(|history| {
@@ -55,7 +54,7 @@ pub fn add_debug_span(sp: Span) {
     });
 }
 
-fn print_most_recent_spans(file_data: &FileData, history: SpanDebuggerStackElement) {
+fn print_most_recent_spans(file_data: &FileData, history: &SpanDebuggerStackElement) {
     let mut spans_to_print: Vec<Range<usize>> = Vec::with_capacity(NUM_SPANS_TO_PRINT);
 
     for sp in history.span_history.iter().rev() {
@@ -171,19 +170,20 @@ impl Drop for SpanDebugger<'_> {
             humantime::format_duration(time_taken)
         ));
 
-        let last_stack_elem = DEBUG_STACK
-            .with_borrow_mut(|stack| stack.debug_stack.pop())
-            .unwrap();
-
+        DEBUG_STACK.with_borrow_mut(|stack| {
+            if std::thread::panicking() {
+                let last_stack_elem = stack.debug_stack.last().unwrap();
+                eprintln!(
+                    "Panic happened in Span-guarded context {} in {}",
+                    last_stack_elem.stage.red(),
+                    last_stack_elem.global_obj_name.red()
+                );
+                print_most_recent_spans(self.file_data, last_stack_elem)
+            } else {
+                let _ = stack.debug_stack.pop().unwrap();
+            }
+        });
         print_stack_top("");
-        if std::thread::panicking() {
-            eprintln!(
-                "Panic happened in Span-guarded context {} in {}",
-                last_stack_elem.stage.red(),
-                last_stack_elem.global_obj_name.red()
-            );
-            print_most_recent_spans(self.file_data, last_stack_elem)
-        }
     }
 }
 
@@ -235,6 +235,64 @@ pub fn setup_panic_handler() {
             }
         })
     }));
+}
+
+pub fn create_dump_on_panic(linker: &mut Linker, f: impl FnOnce(&mut Linker)) {
+    use std::fs;
+    use std::io::Write;
+    use std::time::SystemTime;
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(linker)));
+
+    if let Err(panic_info) = result {
+        // Get ~/.sus/core_dumps/{timestamp}
+        let cur_time = humantime::format_rfc3339(SystemTime::now());
+
+        let failure_name = DEBUG_STACK.with_borrow(|history| {
+            if let Some(SpanDebuggerStackElement {
+                stage,
+                global_obj_name,
+                ..
+            }) = history.debug_stack.last()
+            {
+                format!("{stage} {global_obj_name} {cur_time}")
+            } else {
+                format!("no module {cur_time}")
+            }
+        });
+
+        let std_dir = get_std_dir();
+        let dump_dir = get_core_dumps_dir().join(failure_name);
+        if let Err(err) = fs::create_dir_all(&dump_dir) {
+            eprintln!("Could not create {}: {err}", dump_dir.to_string_lossy());
+            std::panic::resume_unwind(panic_info);
+        }
+
+        // Write reproduce.sh with compiler args
+        let args: Vec<String> = std::env::args().collect();
+        let reproduce_path = dump_dir.join("reproduce.sh");
+        if let Ok(mut f) = fs::File::create(&reproduce_path) {
+            let cmd = format!("#!/bin/sh\n{}\n", args.join(" "));
+            let _ = f.write_all(cmd.as_bytes());
+        }
+
+        for (_id, file_data) in &linker.files {
+            // Exclude files from the standard library directory
+            if file_data
+                .file_identifier
+                .contains(std_dir.to_str().unwrap())
+            {
+                continue;
+            }
+            let filename = file_data.file_identifier.replace("/", "_");
+            let path = dump_dir.join(&filename);
+            if let Ok(mut f) = fs::File::create(&path) {
+                let _ = f.write_all(file_data.file_text.file_text.as_bytes());
+            }
+        }
+        eprintln!("Internal compiler error! All files dumped to {dump_dir:?}");
+        std::panic::resume_unwind(panic_info);
+    }
 }
 
 struct TimerEntry {

@@ -83,7 +83,7 @@ impl Linker {
     fn update_text(&mut self, uri: &Url, new_file_text: String, manager: &mut LSPFileManager) {
         self.add_or_update_file(uri.as_str(), new_file_text, manager);
 
-        self.recompile_all();
+        self.recompile_all_report_panics();
     }
     fn ensure_contains_file(&mut self, uri: &Url, manager: &mut LSPFileManager) -> FileUUID {
         if let Some(found) = self.find_uri(uri) {
@@ -92,7 +92,7 @@ impl Linker {
             let file_text = std::fs::read_to_string(uri.to_file_path().unwrap()).unwrap();
 
             let file_uuid = self.add_file_text(uri.to_string(), file_text, manager);
-            self.recompile_all();
+            self.recompile_all_report_panics();
             file_uuid
         }
     }
@@ -217,7 +217,7 @@ fn initialize_all_files(init_params: &InitializeParams) -> (Linker, LSPFileManag
         }
     }
 
-    linker.recompile_all();
+    linker.recompile_all_report_panics();
     (linker, manager)
 }
 

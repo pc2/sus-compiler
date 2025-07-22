@@ -439,8 +439,7 @@ impl<'a> Display for ConcreteGlobalReferenceDisplay<'a> {
         let object_full_name = self.target_link_info.get_full_name();
         f.write_str(&object_full_name)?;
         if self.template_args.is_empty() {
-            //return f.write_str(" #()");
-            return Ok(());
+            return f.write_str(" #()");
         } else {
             f.write_str(" #(")?;
         }

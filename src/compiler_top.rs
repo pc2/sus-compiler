@@ -1,8 +1,8 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 use crate::config::EarlyExitUpTo;
+use crate::debug::create_dump_on_panic;
 use crate::flattening::typecheck::{perform_lints, typecheck};
 use crate::linker::checkpoint::{
     AFTER_FLATTEN_CP, AFTER_INITIAL_PARSE_CP, AFTER_LINTS_CP, AFTER_TYPE_CHECK_CP,
@@ -21,7 +21,13 @@ use crate::{
 
 use crate::flattening::{flatten_all_globals, gather_initial_file_data};
 
-const STD_LIB_PATH: &str = env!("SUS_COMPILER_STD_LIB_PATH");
+pub const SUS_HOME: &str = env!("SUS_HOME");
+pub fn get_std_dir() -> PathBuf {
+    Path::new(SUS_HOME).join("std")
+}
+pub fn get_core_dumps_dir() -> PathBuf {
+    Path::new(SUS_HOME).join("core_dumps")
+}
 
 /// Any extra operations that should happen when files are added or removed from the linker. Such as caching line offsets.
 pub trait LinkerExtraFileInfoManager {
@@ -44,12 +50,14 @@ impl Linker {
         assert!(self.modules.is_empty());
         assert!(self.types.is_empty());
         assert!(self.constants.is_empty());
+        let std_lib_path = get_std_dir();
         if !config().ci {
-            println!("Standard Library Directory: {STD_LIB_PATH}");
+            println!(
+                "Standard Library Directory: {}",
+                std_lib_path.to_string_lossy()
+            );
         }
-        let std_path = PathBuf::from_str(STD_LIB_PATH)
-            .expect("Standard library directory is not a valid path?");
-        self.add_all_files_in_directory(&std_path, info_mngr);
+        self.add_all_files_in_directory(&std_lib_path, info_mngr);
 
         // Sanity check for the names the compiler knows internally.
         // They are defined in std/core.sus
@@ -197,6 +205,10 @@ impl Linker {
     pub fn find_file(&self, file_identifier: &str) -> Option<FileUUID> {
         self.files
             .find(|_id, f| f.file_identifier == file_identifier)
+    }
+
+    pub fn recompile_all_report_panics(&mut self) {
+        create_dump_on_panic(self, |slf| slf.recompile_all())
     }
 
     pub fn recompile_all(&mut self) {
