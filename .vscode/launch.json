@@ -39,9 +39,13 @@
             "sourceLanguages": ["rust"],
             "args": [
                 "--debug-whitelist", "TEST",
-                "--debug", "TEST", // Temporary to add in code when debugging
                 "tinyTestFile.sus",
                 "--standalone", "TEST",
+                "--debug", "TEST", // Temporary to add in code when debugging
+                "--debug", "print-flattened-pre-typecheck",
+                "--debug", "print-flattened",
+                "--debug", "print-instantiated-modules-pre-concrete-typecheck",
+                "--debug", "print-instantiated-modules",
             ],
             "cwd": "${workspaceFolder}"
         },
