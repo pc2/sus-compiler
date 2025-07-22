@@ -120,7 +120,9 @@ impl<'inst> ValueUnifier<'inst> {
 
                         // Values used in subtyping relations are always resolved in a forward direction (so a value b that depends on value a only gets resolved after a is resolved)
                         // That's why we can safely assert
-                        assert!(unifier.set(var_sources.target, Value::Integer(common_subtype)));
+                        unifier
+                            .set(var_sources.target, Value::Integer(common_subtype))
+                            .unwrap();
                     });
                 }
             }
@@ -322,7 +324,7 @@ impl ConcreteType {
         let_unwrap!(ConcreteType::Named(typ), &self);
         assert_eq!(typ.id, expected);
         crate::util::zip_eq(typ.template_args.iter(), args)
-            .all(|((_, to_unify), arg)| unifier.set(to_unify.unwrap_value(), arg.into()))
+            .all(|((_, to_unify), arg)| unifier.set(to_unify.unwrap_value(), arg.into()).is_ok())
     }
     pub fn new_named_with_args<const N: usize>(
         id: TypeUUID,

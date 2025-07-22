@@ -289,9 +289,10 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
     }
 
     /// Returns `false` if unification failed (IE already contained a value that wasn't `v`)
-    pub fn set<'u>(&mut self, a: &'u Unifyable<T, IDMarker>, v: T) -> Result<(), (&'u T, T)> {
+    pub fn set<'u>(&'u mut self, a: &'u Unifyable<T, IDMarker>, v: T) -> Result<(), (&'u T, T)> {
         match a {
-            Unifyable::Set(k) => k == &v,
+            Unifyable::Set(k) if k == &v => Ok(()),
+            Unifyable::Set(k) => Err((k, v)),
             Unifyable::Unknown(var) => {
                 let k = &mut self.store.known_values[self.store.ptrs[*var]];
                 match k {
@@ -308,7 +309,8 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
                         );
                         Ok(())
                     }
-                    KnownValue::Known(k) => k == &v,
+                    KnownValue::Known(k) if k == &v => Ok(()),
+                    KnownValue::Known(k) => Err((k, v)),
                 }
             }
         }

@@ -358,10 +358,12 @@ impl ModuleTypingContext<'_> {
                 let (submod_id, arg_id) = var.back_reference;
 
                 // The value wasn't known before, now it is
-                assert!(unifier.set(
-                    self.submodules[submod_id].refers_to.template_args[arg_id].unwrap_value(),
-                    Value::Integer(IBig::from(inferred_value)),
-                ));
+                unifier
+                    .set(
+                        self.submodules[submod_id].refers_to.template_args[arg_id].unwrap_value(),
+                        Value::Integer(IBig::from(inferred_value)),
+                    )
+                    .unwrap();
             }
         }
     }

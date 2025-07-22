@@ -429,7 +429,9 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 }));
 
                 // The output's size cannot have already been unified, this is the first time we see it
-                assert!(unifier.set(array_size, Value::Integer(IBig::from(array_wires.len()))));
+                unifier
+                    .set(array_size, Value::Integer(IBig::from(array_wires.len())))
+                    .unwrap();
             }
             // type is already set when the wire was created
             RealWireDataSource::Constant { value: _ } => {}
