@@ -289,7 +289,7 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
     }
 
     /// Returns `false` if unification failed (IE already contained a value that wasn't `v`)
-    pub fn set(&mut self, a: &Unifyable<T, IDMarker>, v: T) -> bool {
+    pub fn set<'u>(&mut self, a: &'u Unifyable<T, IDMarker>, v: T) -> Result<(), (&'u T, T)> {
         match a {
             Unifyable::Set(k) => k == &v,
             Unifyable::Unknown(var) => {
@@ -306,7 +306,7 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
                             &mut self.constraints_ready_for_unification,
                             used_in,
                         );
-                        true
+                        Ok(())
                     }
                     KnownValue::Known(k) => k == &v,
                 }

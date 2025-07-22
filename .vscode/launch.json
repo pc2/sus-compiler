@@ -169,4 +169,14 @@
             "type": "command",
             "command": "extension.commandvariable.file.pickFile",
             "args": {
+                "description": "Pick a core dump file",
+                "fromFolder": {
+                    "predefined": [
+                        "${userHome}/.sus/0.3.0-devel/core_dumps/",
+                    ]
+                },
+                "showDirs": true,
+            } 
+        } 
+    ] 
 }
