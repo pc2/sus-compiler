@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::ops::Deref;
+use std::rc::Rc;
 
 use ibig::IBig;
 use sus_proc_macro::get_builtin_type;
@@ -22,6 +23,35 @@ use crate::{typing::concrete_type::ConcreteType, value::Value};
 
 use super::shared::*;
 use std::fmt::{Display, Write};
+
+struct VariableAlloc {
+    pub var_names: Vec<Rc<str>>,
+    currently_used: usize,
+    prefix: &'static str,
+}
+impl VariableAlloc {
+    pub fn new(prefix: &'static str) -> Self {
+        Self {
+            var_names: Vec::new(),
+            currently_used: 0,
+            prefix,
+        }
+    }
+    fn alloc(&mut self) -> Rc<str> {
+        let claimed_id = self.currently_used;
+        self.currently_used += 1;
+        if claimed_id >= self.var_names.len() {
+            assert_eq!(claimed_id, self.var_names.len(), "Skipping a var?");
+            let prefix = self.prefix;
+            self.var_names.push(format!("{prefix}{claimed_id}").into());
+        }
+        self.var_names[claimed_id].clone()
+    }
+    /// Does not empty the
+    fn reuse(&mut self) {
+        self.currently_used = 0;
+    }
+}
 
 #[derive(Debug)]
 pub struct VerilogCodegenBackend;
@@ -97,7 +127,8 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
 struct CodeGenerationContext<'g> {
     /// Generate code to this variable
     program_text: String,
-    required_genvars: Vec<String>,
+    for_vars: VariableAlloc,
+    genvars: VariableAlloc,
 
     md: &'g Module,
     instance: &'g InstantiatedModule,
@@ -109,7 +140,7 @@ struct CodeGenerationContext<'g> {
 }
 
 enum ForEachPathElement<'g> {
-    Array { var: String, arr_size: &'g IBig },
+    Array { var: Rc<str>, arr_size: &'g IBig },
 }
 
 struct ForEachPath<'g, 'p> {
@@ -347,23 +378,14 @@ impl<'g> CodeGenerationContext<'g> {
 
     fn write_generative_decls_for(&mut self, f: impl FnOnce(&mut Self)) {
         let store_program_text_temporary = std::mem::take(&mut self.program_text);
-        self.required_genvars = Vec::new();
         f(self);
         let added_text = std::mem::replace(&mut self.program_text, store_program_text_temporary);
 
-        for var in &self.required_genvars {
+        for var in &self.genvars.var_names {
             writeln!(self.program_text, "genvar {var};").unwrap()
         }
         self.program_text.write_str(&added_text).unwrap();
     }
-    fn get_genvar_for(&mut self, idx: usize) -> &str {
-        if idx >= self.required_genvars.len() {
-            assert_eq!(idx, self.required_genvars.len(), "Skipping a var?");
-            self.required_genvars.push(format!("_g{idx}"));
-        }
-        &self.required_genvars[idx]
-    }
-
     fn write_verilog_code(&mut self) {
         self.comment_out(|new_self| {
             let name = &self.instance.name;
@@ -449,7 +471,6 @@ impl<'g> CodeGenerationContext<'g> {
             typ: &'g ConcreteType,
             in_always: bool,
             mut path: Vec<ForEachPathElement<'g>>,
-            var_idx: usize,
             operation: &mut impl FnMut(ForEachPath<'g, '_>, u64) -> String,
         ) -> String {
             let for_should_declare_var = if in_always { "int " } else { "" };
@@ -462,9 +483,9 @@ impl<'g> CodeGenerationContext<'g> {
                 };
 
                 let var = if in_always {
-                    format!("_v{var_idx}")
+                    slf.for_vars.alloc()
                 } else {
-                    slf.get_genvar_for(var_idx).to_owned()
+                    slf.genvars.alloc()
                 };
                 let (new_typ, sz) = arr_box.deref();
                 path.push(ForEachPathElement::Array {
@@ -472,14 +493,8 @@ impl<'g> CodeGenerationContext<'g> {
                     arr_size: sz.unwrap_integer(),
                 });
                 let sz = sz.unwrap_integer();
-                let content_str = walk_type_to_generate_foreach_recurse(
-                    slf,
-                    new_typ,
-                    in_always,
-                    path,
-                    var_idx + 1,
-                    operation,
-                );
+                let content_str =
+                    walk_type_to_generate_foreach_recurse(slf, new_typ, in_always, path, operation);
 
                 format!(
                     "for({for_should_declare_var}{var} = 0; {var} < {sz}; {var} = {var} + 1) begin\n{content_str}end\n"
@@ -487,14 +502,8 @@ impl<'g> CodeGenerationContext<'g> {
             }
         }
 
-        let content = walk_type_to_generate_foreach_recurse(
-            self,
-            typ,
-            in_always,
-            Vec::new(),
-            0,
-            &mut operation,
-        );
+        let content =
+            walk_type_to_generate_foreach_recurse(self, typ, in_always, Vec::new(), &mut operation);
 
         if in_always | typ.can_be_represented_as_packed_bits().is_some() {
             self.program_text.write_str(&content).unwrap();
@@ -606,6 +615,8 @@ impl<'g> CodeGenerationContext<'g> {
                 }
             }
             self.add_latency_registers(wire_id, w).unwrap();
+            self.for_vars.reuse(); // Reset list of genvars to reuse the names
+            self.genvars.reuse(); // Reset list of genvars to reuse the names
         }
     }
 
@@ -700,6 +711,8 @@ impl<'g> CodeGenerationContext<'g> {
         self.walk_typ_to_generate_foreach(&from_wire.typ, true, |path, _| {
             format!("{to_path}{path} {arrow_str} {from_name}{path};\n")
         });
+        self.for_vars.reuse(); // Reset list of genvars to reuse the names
+        self.genvars.reuse(); // Reset list of genvars to reuse the names
     }
 
     fn write_multiplexers(&mut self) {
@@ -893,7 +906,8 @@ fn gen_verilog_code(
         instance,
         linker,
         program_text: String::new(),
-        required_genvars: Vec::new(),
+        genvars: VariableAlloc::new("_g"),
+        for_vars: VariableAlloc::new("_v"),
         use_latency,
         needed_untils: instance.compute_needed_untils(),
     };
