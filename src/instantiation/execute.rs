@@ -917,16 +917,29 @@ impl<'l> ExecutionContext<'l> {
                     direction,
                     ..
                 } => {
-                    let from_wire = self.get_wire_or_constant_as_wire(*from, domain)?;
+                    let width = self.generation_state.get_generation_integer(*width)?;
+                    let span = *bracket_span;
 
-                    let width = self.generation_state[*width].unwrap_generation_value();
-
-                    path.push(RealWirePathElem::PartSelect {
-                        span: *bracket_span,
-                        from_wire,
-                        width: width.unwrap_integer().clone(),
-                        direction: *direction,
-                    });
+                    match &self.generation_state[*from] {
+                        SubModuleOrWire::SubModule(_) => unreachable!(),
+                        SubModuleOrWire::Unassigned => unreachable!(),
+                        &SubModuleOrWire::Wire(from_wire) => {
+                            path.push(RealWirePathElem::PartSelect {
+                                span,
+                                from_wire,
+                                width: width.clone(),
+                                direction: *direction,
+                            });
+                        }
+                        SubModuleOrWire::CompileTimeValue(from) => {
+                            let from = from.unwrap_integer().clone();
+                            let to = &from + width;
+                            path.push(RealWirePathElem::Slice {
+                                span,
+                                bounds: PartialBound::Known(from, to),
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -1116,6 +1129,8 @@ impl<'l> ExecutionContext<'l> {
             is_port: None,
         })
     }
+
+    /// Converts constants to wires implicitly.
     fn get_wire_or_constant_as_wire(
         &mut self,
         original_instruction: FlatID,
