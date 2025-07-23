@@ -519,3 +519,20 @@ pub fn join_string_iter<T>(
         }
     }
 }
+
+pub fn trim_known_prefix<'a>(in_str: &'a str, prefix: &str) -> &'a str {
+    assert_eq!(&in_str[..prefix.len()], prefix);
+    &in_str[prefix.len()..]
+}
+
+struct FmtWrapper<F: Fn(&mut Formatter<'_>) -> std::fmt::Result>(F);
+
+impl<F: Fn(&mut Formatter<'_>) -> std::fmt::Result> Display for FmtWrapper<F> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        (self.0)(f)
+    }
+}
+
+pub fn with_fmt(f: impl Fn(&mut Formatter<'_>) -> std::fmt::Result) -> impl Display {
+    FmtWrapper(f)
+}

@@ -180,10 +180,10 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Get rid of semicolons
 - [x] Access module inputs / outputs through field names
 - [ ] Operator and Module Overloads
-- [ ] Array Slices
-- [ ] Sized Integers
+- [x] Array Slices
+- [x] Sized Integers
 - [ ] Structs
-- [ ] Conditional Bindings
+- [x] Conditional Bindings
 - [x] Generative variables and assignments
 - [x] Generative Conditions
 - [x] Generative For Loops
@@ -211,7 +211,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 
 ### Safety
 - [x] Basic Type Checking (bools, ints, arrays, etc)
-- [ ] Integer and Array Bounds Checking
+- [x] Integer and Array Bounds Checking
 - [ ] Conflicting assignments (such as calling the same module twice in a single cycle, multiple assignments to a single variable)
 
 ### Typing & Inference

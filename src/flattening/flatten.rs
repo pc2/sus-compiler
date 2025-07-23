@@ -118,35 +118,6 @@ impl core::fmt::Display for BinaryOperator {
     }
 }
 
-impl core::fmt::Display for PartSelectDirection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            PartSelectDirection::Up => "+:",
-            PartSelectDirection::Down => "-:",
-        })
-    }
-}
-
-impl SliceType {
-    pub fn from_kind_id(kind_id: u16) -> Self {
-        match kind_id {
-            kw!(":") => SliceType::Normal,
-            kw!("+:") => SliceType::PartSelect(PartSelectDirection::Up),
-            kw!("-:") => SliceType::PartSelect(PartSelectDirection::Down),
-            _ => unreachable!(),
-        }
-    }
-}
-impl core::fmt::Display for SliceType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            SliceType::Normal => ":",
-            SliceType::PartSelect(PartSelectDirection::Up) => "+:",
-            SliceType::PartSelect(PartSelectDirection::Down) => "-:",
-        })
-    }
-}
-
 #[derive(Debug)]
 enum ModuleOrWrittenType {
     WrittenType(WrittenType),

@@ -87,7 +87,9 @@
                 }
             },
             "sourceLanguages": ["rust"],
-            "args": [],
+            "args": [
+                "--codegen"
+            ],
             "cwd": "${workspaceFolder}"
         },
         {

@@ -16,6 +16,7 @@ use std::fmt::Display;
 use crate::latency::port_latency_inference::PortLatencyInferenceInfo;
 pub use flatten::flatten_all_globals;
 pub use initialization::gather_initial_file_data;
+use sus_proc_macro::kw;
 
 use crate::linker::{Documentation, LinkInfo};
 use crate::value::Value;
@@ -504,10 +505,38 @@ pub enum PartSelectDirection {
     Up,
     Down,
 }
+impl core::fmt::Display for PartSelectDirection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            PartSelectDirection::Up => "+:",
+            PartSelectDirection::Down => "-:",
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SliceType {
     Normal,
     PartSelect(PartSelectDirection),
+}
+impl SliceType {
+    pub fn from_kind_id(kind_id: u16) -> Self {
+        match kind_id {
+            kw!(":") => SliceType::Normal,
+            kw!("+:") => SliceType::PartSelect(PartSelectDirection::Up),
+            kw!("-:") => SliceType::PartSelect(PartSelectDirection::Down),
+            _ => unreachable!(),
+        }
+    }
+}
+impl core::fmt::Display for SliceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            SliceType::Normal => ":",
+            SliceType::PartSelect(PartSelectDirection::Up) => "+:",
+            SliceType::PartSelect(PartSelectDirection::Down) => "-:",
+        })
+    }
 }
 
 /// See [Expression]

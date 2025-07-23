@@ -1486,7 +1486,19 @@ module negative_slice {
 }
 
 module multi_slice {
-	interface multi_slice : bool[20][30] matrix, int#(MIN: 0, MAX: 27) a, int#(MIN: 0, MAX: 18) b -> bool[2][3] result
+	interface multi_slice : bool[20][30] matrix, int#(MIN: 0, MAX: 27) a, int#(MIN: 2, MAX: 19) b -> bool[20][9] slice, bool[2][27] slice2, bool[5][9] gen_partselect, bool[2][3] partselect
 
-	result = matrix[a +: 3][b +: 2]
+	slice = matrix[:9][:]
+	slice2 = matrix[3:][4:6]
+	gen_partselect = matrix[3 +: 9][7 -: 5]
+	partselect = matrix[a +: 3][b -: 2]
+}
+
+module multi_slice_reverse {
+	interface multi_slice_reverse : int#(MIN: 0, MAX: 27) a, int#(MIN: 2, MAX: 19) b, bool[20][9] slice, bool[2][27] slice2, bool[5][9] gen_partselect, bool[2][3] partselect -> bool[20][30] matrix
+
+	matrix[:9][:] = slice
+	matrix[3:][4:6] = slice2
+	matrix[3 +: 9][7 -: 5] = gen_partselect
+	matrix[a +: 3][b -: 2] = partselect
 }
