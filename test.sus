@@ -1484,3 +1484,9 @@ module negative_slice {
 
 	int#(MIN:0, MAX: 6)[0] negative_slice = INTS[5][4:3]
 }
+
+module multi_slice {
+	interface multi_slice : bool[20][30] matrix, int#(MIN: 0, MAX: 27) a, int#(MIN: 0, MAX: 18) b -> bool[2][3] result
+
+	result = matrix[a +: 3][b +: 2]
+}

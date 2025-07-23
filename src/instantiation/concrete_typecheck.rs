@@ -44,7 +44,7 @@ pub fn co_walk_path<'inst>(
 ) -> (&'inst ConcreteType, &'inst ConcreteType) {
     for p in path {
         match p {
-            RealWirePathElem::Index { .. } => {
+            RealWirePathElem::Index { .. } | RealWirePathElem::ConstIndex { .. } => {
                 a = &a.unwrap_array().0;
             }
             RealWirePathElem::PartSelect { width, .. } => {
@@ -603,7 +603,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
     fn finalize_partial_bounds(path: &mut [RealWirePathElem], mut typ: &ConcreteType) {
         for pe in path {
             match pe {
-                RealWirePathElem::Index { .. } => {
+                RealWirePathElem::Index { .. } | RealWirePathElem::ConstIndex { .. } => {
                     typ = &typ.unwrap_array().0;
                 }
                 RealWirePathElem::PartSelect { .. } => {

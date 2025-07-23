@@ -21,7 +21,7 @@ use crate::typing::template::{TVec, TemplateKind};
 use crate::{typing::concrete_type::ConcreteType, value::Value};
 
 use super::shared::*;
-use std::fmt::Write;
+use std::fmt::{Display, Write};
 
 #[derive(Debug)]
 pub struct VerilogCodegenBackend;
@@ -97,6 +97,7 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
 struct CodeGenerationContext<'g> {
     /// Generate code to this variable
     program_text: String,
+    required_genvars: Vec<String>,
 
     md: &'g Module,
     instance: &'g InstantiatedModule,
@@ -107,27 +108,42 @@ struct CodeGenerationContext<'g> {
     needed_untils: FlatAlloc<i64, WireIDMarker>,
 }
 
-enum ForEachPathElement {
-    Array { var: String, arr_size: IBig },
+enum ForEachPathElement<'g> {
+    Array { var: String, arr_size: &'g IBig },
 }
 
-impl ForEachPathElement {
-    /// [_v0][_v1][...]
-    fn to_string(path: &[Self]) -> String {
-        let mut result = String::new();
-        for p in path {
+struct ForEachPath<'g, 'p> {
+    path: &'p [ForEachPathElement<'g>],
+}
+
+impl<'g, 'p> Deref for ForEachPath<'g, 'p> {
+    type Target = [ForEachPathElement<'g>];
+
+    fn deref(&self) -> &[ForEachPathElement<'g>] {
+        self.path
+    }
+}
+
+impl<'g, 'p> Display for ForEachPath<'g, 'p> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for p in self.path {
             match p {
                 ForEachPathElement::Array { var, arr_size: _ } => {
-                    write!(result, "[{var}]").unwrap();
+                    write!(f, "[{var}]")?;
                 }
             }
         }
-        result
+        Ok(())
     }
-    fn to_bit_index_formula(path: &[Self]) -> String {
-        let mut path_iter = path.iter();
+}
+
+impl<'g, 'p> ForEachPath<'g, 'p> {}
+
+impl ForEachPath<'_, '_> {
+    fn to_bit_index_formula(&self) -> String {
+        let mut path_iter = self.path.iter();
         let mut result = match path_iter.next().unwrap() {
-            ForEachPathElement::Array { var, arr_size: _ } => var.clone(),
+            ForEachPathElement::Array { var, arr_size: _ } => var.to_string(),
         };
         for p in path_iter {
             match p {
@@ -324,9 +340,28 @@ impl<'g> CodeGenerationContext<'g> {
         writeln!(
             self.program_text,
             "// {}",
-            added_text.replace("\n", "\n// ")
+            added_text.trim_end().replace("\n", "\n// ")
         )
         .unwrap();
+    }
+
+    fn write_generative_decls_for(&mut self, f: impl FnOnce(&mut Self)) {
+        let store_program_text_temporary = std::mem::take(&mut self.program_text);
+        self.required_genvars = Vec::new();
+        f(self);
+        let added_text = std::mem::replace(&mut self.program_text, store_program_text_temporary);
+
+        for var in &self.required_genvars {
+            writeln!(self.program_text, "genvar {var};").unwrap()
+        }
+        self.program_text.write_str(&added_text).unwrap();
+    }
+    fn get_genvar_for(&mut self, idx: usize) -> &str {
+        if idx >= self.required_genvars.len() {
+            assert_eq!(idx, self.required_genvars.len(), "Skipping a var?");
+            self.required_genvars.push(format!("_g{idx}"));
+        }
+        &self.required_genvars[idx]
     }
 
     fn write_verilog_code(&mut self) {
@@ -337,10 +372,11 @@ impl<'g> CodeGenerationContext<'g> {
         match self.md.link_info.is_extern {
             IsExtern::Normal => {
                 self.write_module_signature();
-                self.write_generative_declarations();
-                self.write_wire_declarations();
-                self.write_submodules();
-                self.write_multiplexers();
+                self.write_generative_decls_for(|new_self| {
+                    new_self.write_wire_declarations();
+                    new_self.write_submodules();
+                    new_self.write_multiplexers();
+                });
                 self.write_endmodule();
             }
             IsExtern::Extern => {
@@ -352,8 +388,9 @@ impl<'g> CodeGenerationContext<'g> {
             }
             IsExtern::Builtin => {
                 self.write_module_signature();
-                self.write_generative_declarations();
-                self.write_builtins();
+                self.write_generative_decls_for(|new_self| {
+                    new_self.write_builtins();
+                });
                 self.write_endmodule();
             }
         }
@@ -403,21 +440,22 @@ impl<'g> CodeGenerationContext<'g> {
     /// ```
     fn walk_typ_to_generate_foreach(
         &mut self,
-        typ: &ConcreteType,
+        typ: &'g ConcreteType,
         in_always: bool,
-        mut operation: impl FnMut(&[ForEachPathElement], u64) -> String,
+        mut operation: impl FnMut(ForEachPath<'g, '_>, u64) -> String,
     ) {
-        fn walk_type_to_generate_foreach_recurse(
-            typ: &ConcreteType,
+        fn walk_type_to_generate_foreach_recurse<'g>(
+            slf: &mut CodeGenerationContext<'g>,
+            typ: &'g ConcreteType,
             in_always: bool,
-            mut path: Vec<ForEachPathElement>,
+            mut path: Vec<ForEachPathElement<'g>>,
             var_idx: usize,
-            operation: &mut impl FnMut(&[ForEachPathElement], u64) -> String,
+            operation: &mut impl FnMut(ForEachPath<'g, '_>, u64) -> String,
         ) -> String {
             let for_should_declare_var = if in_always { "int " } else { "" };
 
             if let Some(fundamental_size) = typ.can_be_represented_as_packed_bits() {
-                operation(&path, fundamental_size)
+                operation(ForEachPath { path: &path }, fundamental_size)
             } else {
                 let ConcreteType::Array(arr_box) = typ else {
                     todo!("Structs");
@@ -426,15 +464,16 @@ impl<'g> CodeGenerationContext<'g> {
                 let var = if in_always {
                     format!("_v{var_idx}")
                 } else {
-                    format!("_g{var_idx}")
+                    slf.get_genvar_for(var_idx).to_owned()
                 };
                 let (new_typ, sz) = arr_box.deref();
                 path.push(ForEachPathElement::Array {
                     var: var.clone(),
-                    arr_size: sz.unwrap_integer().clone(),
+                    arr_size: sz.unwrap_integer(),
                 });
                 let sz = sz.unwrap_integer();
                 let content_str = walk_type_to_generate_foreach_recurse(
+                    slf,
                     new_typ,
                     in_always,
                     path,
@@ -448,8 +487,14 @@ impl<'g> CodeGenerationContext<'g> {
             }
         }
 
-        let content =
-            walk_type_to_generate_foreach_recurse(typ, in_always, Vec::new(), 0, &mut operation);
+        let content = walk_type_to_generate_foreach_recurse(
+            self,
+            typ,
+            in_always,
+            Vec::new(),
+            0,
+            &mut operation,
+        );
 
         if in_always | typ.can_be_represented_as_packed_bits().is_some() {
             self.program_text.write_str(&content).unwrap();
@@ -458,24 +503,6 @@ impl<'g> CodeGenerationContext<'g> {
         }
     }
 
-    fn write_generative_declarations(&mut self) {
-        let mut deepest_array = 0;
-        for (_, w) in &self.instance.wires {
-            let mut this_array_depth = 0;
-            let mut typ = &w.typ;
-
-            while let ConcreteType::Array(a) = typ {
-                this_array_depth += 1;
-                typ = &a.0;
-            }
-
-            deepest_array = usize::max(deepest_array, this_array_depth);
-        }
-
-        for var in 0..deepest_array {
-            writeln!(self.program_text, "genvar _g{var};").unwrap()
-        }
-    }
     fn write_wire_declarations(&mut self) {
         for (wire_id, w) in &self.instance.wires {
             // For better readability of output Verilog
@@ -502,7 +529,6 @@ impl<'g> CodeGenerationContext<'g> {
                         writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
 
                         self.walk_typ_to_generate_foreach(&w.typ, false, |path, _| {
-                            let path = ForEachPathElement::to_string(path);
                             format!("assign {}{path} = {from_string}{path};\n", &w.name)
                         });
                     } else {
@@ -521,7 +547,6 @@ impl<'g> CodeGenerationContext<'g> {
                     let op = op.op_text();
                     let right_name = self.wire_name(right_wire, w.absolute_latency);
                     self.walk_typ_to_generate_foreach(&w.typ, false, |path, _| {
-                        let path = ForEachPathElement::to_string(path);
                         format!("assign {wire_name}{path} = {op}{right_name}{path};\n")
                     });
                 }
@@ -540,7 +565,6 @@ impl<'g> CodeGenerationContext<'g> {
                     let left_name = self.wire_name(left_wire, w.absolute_latency);
                     let right_name = self.wire_name(right_wire, w.absolute_latency);
                     self.walk_typ_to_generate_foreach(&w.typ, false, |path, _| {
-                        let path = ForEachPathElement::to_string(path);
                         format!(
                             "assign {wire_name}{path} = {left_name}{path} {op} {right_name}{path};\n"
                         )
@@ -560,7 +584,6 @@ impl<'g> CodeGenerationContext<'g> {
                         let element_wire_name = self.wire_name(element_wire, w.absolute_latency);
 
                         self.walk_typ_to_generate_foreach(&element_wire.typ, false, |path, _| {
-                            let path = ForEachPathElement::to_string(path);
                             format!(
                                 "assign {wire_name}[{arr_idx}]{path} = {element_wire_name}{path};\n"
                             )
@@ -675,7 +698,6 @@ impl<'g> CodeGenerationContext<'g> {
         }
         let to_path = format!("{if_stack}{output_name}{path}");
         self.walk_typ_to_generate_foreach(&from_wire.typ, true, |path, _| {
-            let path = ForEachPathElement::to_string(path);
             format!("{to_path}{path} {arrow_str} {from_name}{path};\n")
         });
     }
@@ -794,12 +816,11 @@ impl<'g> CodeGenerationContext<'g> {
                         .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "bits");
 
                 self.walk_typ_to_generate_foreach(typ, false, |path, num_bits| {
-                    let path_str = ForEachPathElement::to_string(path);
                     if path.is_empty() {
-                        format!("assign bits = value{path_str};\n")
+                        format!("assign bits = value{path};\n")
                     } else {
-                        let path_formula = ForEachPathElement::to_bit_index_formula(path);
-                        format!("assign bits[({path_formula}) * {num_bits} +: {num_bits}] = value{path_str};\n")
+                        let path_formula = path.to_bit_index_formula();
+                        format!("assign bits[({path_formula}) * {num_bits} +: {num_bits}] = value{path};\n")
                     }
                 });
             }
@@ -815,12 +836,11 @@ impl<'g> CodeGenerationContext<'g> {
                         .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "value");
 
                 self.walk_typ_to_generate_foreach(typ, false, |path, num_bits| {
-                    let path_str = ForEachPathElement::to_string(path);
                     if path.is_empty() {
-                        format!("assign value{path_str} = bits;\n")
+                        format!("assign value{path} = bits;\n")
                     } else {
-                        let path_formula = ForEachPathElement::to_bit_index_formula(path);
-                        format!("assign value{path_str} = bits[({path_formula}) * {num_bits} +: {num_bits}];\n")
+                        let path_formula = path.to_bit_index_formula();
+                        format!("assign value{path} = bits[({path_formula}) * {num_bits} +: {num_bits}];\n")
                     }
                 });
             }
@@ -873,6 +893,7 @@ fn gen_verilog_code(
         instance,
         linker,
         program_text: String::new(),
+        required_genvars: Vec::new(),
         use_latency,
         needed_untils: instance.compute_needed_untils(),
     };
