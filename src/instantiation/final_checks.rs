@@ -24,7 +24,7 @@ fn make_output_typ<'c>(typ: &'c ConcreteType, path: &[RealWirePathElem]) -> Cow<
     };
 
     match fst {
-        RealWirePathElem::Index { .. } => {
+        RealWirePathElem::Index { .. } | RealWirePathElem::ConstIndex { .. } => {
             let (content, _) = typ.unwrap_array();
             make_output_typ(content, rest_of_path)
         }
@@ -73,6 +73,14 @@ impl<'l> ModuleTypingContext<'l> {
             );
         }
     }
+    fn check_array_idx_in_bound(&self, idx: &IBig, sz: &IBig, span: Span, ctx: &str) {
+        if idx < &IBig::from(0) || idx >= sz {
+            self.errors.error(
+                span,
+                format!("Out of bounds! The array is of size {sz}, but the {ctx} is {idx}"),
+            );
+        }
+    }
 
     fn check_wire_ref_bounds(&self, mut typ: &ConcreteType, path: &[RealWirePathElem]) {
         for p in path {
@@ -85,6 +93,13 @@ impl<'l> ModuleTypingContext<'l> {
                     let wire = &self.wires[*idx_wire];
                     let (min, max) = wire.typ.unwrap_integer_bounds();
                     self.check_array_bound_min_max(min, max, arr_sz, span, "index");
+                }
+                RealWirePathElem::ConstIndex { span, idx } => {
+                    let (content, arr_sz) = typ.unwrap_array_known_size();
+                    typ = content;
+
+                    let span = span.inner_span();
+                    self.check_array_idx_in_bound(idx, arr_sz, span, "index");
                 }
                 RealWirePathElem::Slice { span, bounds, .. } => {
                     let (from, to) = bounds.unwrap_valid();

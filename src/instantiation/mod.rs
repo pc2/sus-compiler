@@ -57,6 +57,10 @@ pub enum RealWirePathElem {
         span: BracketSpan,
         idx_wire: WireID,
     },
+    ConstIndex {
+        span: BracketSpan,
+        idx: IBig,
+    },
     PartSelect {
         span: BracketSpan,
         from_wire: WireID,
@@ -292,7 +296,7 @@ impl ForEachContainedWire for RealWirePathElem {
             RealWirePathElem::PartSelect { from_wire, .. } => {
                 f(*from_wire);
             }
-            RealWirePathElem::Slice { .. } => {}
+            RealWirePathElem::Slice { .. } | RealWirePathElem::ConstIndex { .. } => {}
         }
     }
 }
@@ -510,6 +514,9 @@ impl ModuleTypingContext<'_> {
             match p {
                 RealWirePathElem::Index { idx_wire, .. } => {
                     print!("[{}]", self.name(*idx_wire));
+                }
+                RealWirePathElem::ConstIndex { idx, .. } => {
+                    print!("[{idx}]");
                 }
                 RealWirePathElem::Slice { bounds, .. } => match bounds {
                     PartialBound::Known(from, to) => print!("[{from}:{to}]"),

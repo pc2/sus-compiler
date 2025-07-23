@@ -154,6 +154,11 @@ fn make_array_bounds<'v>(
     }
 }
 
+pub enum WireOrInt<'i> {
+    Wire(WireID),
+    Int(&'i IBig),
+}
+
 pub type ExecutionResult<T> = Result<T, (Span, String)>;
 
 /// Every [crate::flattening::Instruction] has an associated value (See [SubModuleOrWire]).
@@ -342,6 +347,23 @@ impl GenerationState<'_> {
             Err((self.span_of(v), "This variable is unset!".to_owned()))
         } else {
             Ok(vv)
+        }
+    }
+    fn get_wire_or_int(&self, v: FlatID) -> ExecutionResult<WireOrInt<'_>> {
+        match &self.generation_state[v] {
+            SubModuleOrWire::SubModule(_) => unreachable!(),
+            SubModuleOrWire::Unassigned => unreachable!(),
+            SubModuleOrWire::Wire(wire_id) => Ok(WireOrInt::Wire(*wire_id)),
+            SubModuleOrWire::CompileTimeValue(value) => {
+                if let Value::Unset = value {
+                    Err((
+                        self.span_of(v),
+                        "This variable is unset, expected int!".to_owned(),
+                    ))
+                } else {
+                    Ok(WireOrInt::Int(value.unwrap_integer()))
+                }
+            }
         }
     }
     fn get_generation_integer(&self, idx: FlatID) -> ExecutionResult<&IBig> {
@@ -861,7 +883,6 @@ impl<'l> ExecutionContext<'l> {
     fn execute_wire_ref_path(
         &mut self,
         wire_ref: &'l WireReference,
-        domain: DomainID,
     ) -> ExecutionResult<(InterfaceID, Span, Vec<RealWirePathElem>)> {
         let mut interface_found = (InterfaceID::MAIN_INTERFACE, wire_ref.root_span);
         let mut path = Vec::new();
@@ -870,11 +891,16 @@ impl<'l> ExecutionContext<'l> {
                 WireReferencePathElement::ArrayAccess {
                     idx, bracket_span, ..
                 } => {
-                    let idx_wire = self.get_wire_or_constant_as_wire(*idx, domain)?;
-                    path.push(RealWirePathElem::Index {
-                        span: *bracket_span,
-                        idx_wire,
-                    });
+                    let span = *bracket_span;
+                    match self.generation_state.get_wire_or_int(*idx)? {
+                        WireOrInt::Wire(idx_wire) => {
+                            path.push(RealWirePathElem::Index { span, idx_wire });
+                        }
+                        WireOrInt::Int(idx) => {
+                            let idx = idx.clone();
+                            path.push(RealWirePathElem::ConstIndex { span, idx });
+                        }
+                    }
                 }
                 WireReferencePathElement::FieldAccess {
                     name_span,
@@ -920,10 +946,8 @@ impl<'l> ExecutionContext<'l> {
                     let width = self.generation_state.get_generation_integer(*width)?;
                     let span = *bracket_span;
 
-                    match &self.generation_state[*from] {
-                        SubModuleOrWire::SubModule(_) => unreachable!(),
-                        SubModuleOrWire::Unassigned => unreachable!(),
-                        &SubModuleOrWire::Wire(from_wire) => {
+                    match self.generation_state.get_wire_or_int(*from)? {
+                        WireOrInt::Wire(from_wire) => {
                             path.push(RealWirePathElem::PartSelect {
                                 span,
                                 from_wire,
@@ -931,12 +955,11 @@ impl<'l> ExecutionContext<'l> {
                                 direction: *direction,
                             });
                         }
-                        SubModuleOrWire::CompileTimeValue(from) => {
-                            let from = from.unwrap_integer().clone();
-                            let to = &from + width;
+                        WireOrInt::Int(from) => {
+                            let to = from + width;
                             path.push(RealWirePathElem::Slice {
                                 span,
-                                bounds: PartialBound::Known(from, to),
+                                bounds: PartialBound::Known(from.clone(), to),
                             });
                         }
                     }
@@ -955,7 +978,7 @@ impl<'l> ExecutionContext<'l> {
         self.link_info.instructions[original_instruction]
             .get_span()
             .debug();
-        let (port_interface, port_span, path) = self.execute_wire_ref_path(wire_ref, domain)?;
+        let (port_interface, port_span, path) = self.execute_wire_ref_path(wire_ref)?;
         let wire_id = match &wire_ref.root {
             &WireReferenceRoot::LocalDecl(decl_id) => {
                 let _ = self.link_info.instructions[decl_id].unwrap_declaration();
@@ -1298,8 +1321,7 @@ impl<'l> ExecutionContext<'l> {
             WireReferenceRoot::LocalSubmodule(submod_decl_id) => {
                 let submod_id = self.generation_state[*submod_decl_id].unwrap_submodule_instance();
 
-                let (interface, name_span, path) =
-                    self.execute_wire_ref_path(interface_ref, domain)?;
+                let (interface, name_span, path) = self.execute_wire_ref_path(interface_ref)?;
 
                 Ok(self.get_submodule_interface(submod_id, interface, name_span, domain))
             }

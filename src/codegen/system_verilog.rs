@@ -267,6 +267,9 @@ impl<'g> CodeGenerationContext<'g> {
                     let idx_wire_name = self.wire_name(wire, absolute_latency);
                     write!(result, "[{idx_wire_name}]").unwrap();
                 }
+                RealWirePathElem::ConstIndex { span: _, idx } => {
+                    write!(result, "[{idx}]").unwrap();
+                }
                 RealWirePathElem::Slice { bounds, .. } => {
                     let (from, to) = bounds.unwrap_valid();
 
