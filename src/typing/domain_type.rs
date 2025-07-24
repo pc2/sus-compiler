@@ -30,10 +30,9 @@ pub enum DomainType {
 impl DomainType {
     pub const PLACEHOLDER: DomainType = DomainType::Unknown(UUID::PLACEHOLDER);
 
+    #[track_caller]
     pub fn unwrap_physical(&self) -> DomainID {
-        let Self::Physical(w) = self else {
-            unreachable!()
-        };
+        let_unwrap!(Self::Physical(w), self);
         *w
     }
 }

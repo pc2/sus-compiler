@@ -532,7 +532,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     span,
                     format!(
                         "Could not finalize this type, some parameters were still unknown: {}",
-                        w.typ.display(self.linker, true)
+                        w.typ.display(self.linker)
                     ),
                 );
             } else if !w.typ.is_valid() {
@@ -540,7 +540,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     w.get_span(self.link_info),
                     format!(
                         "The type of this wire is invalid! {}",
-                        w.typ.display(self.linker, true)
+                        w.typ.display(self.linker)
                     ),
                 );
             }
@@ -574,7 +574,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         for (_, sm) in &mut self.submodules {
             if !sm.refers_to.template_args.fully_substitute(substitutor) {
                 self.errors.error(sm.get_span(self.link_info), format!("Could not infer the parameters of this submodule, some parameters were still unknown: {}", 
-                    sm.refers_to.display(self.linker, true)
+                    sm.refers_to.display(self.linker)
                 ));
             } else if let Err(reason) = sm.refers_to.report_if_errors(
                 self.linker,
