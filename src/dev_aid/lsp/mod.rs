@@ -4,6 +4,7 @@ mod tree_walk;
 
 use crate::{
     alloc::zip_eq, compiler_top::LinkerExtraFileInfoManager, linker::GlobalUUID, prelude::*,
+    util::contains_duplicates,
 };
 
 use hover_info::hover;
@@ -335,6 +336,10 @@ fn gather_all_references_across_all_files(
             }
         }
     }
+    for r in &ref_locations {
+        assert!(!contains_duplicates(&r.1), "List: {:?}", &r.1);
+    }
+
     ref_locations
 }
 

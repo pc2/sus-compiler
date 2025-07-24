@@ -243,41 +243,47 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
     ) {
         match &wire_ref.root {
             WireReferenceRoot::LocalDecl(decl_id) => {
-                self.visit(
-                    wire_ref.root_span,
-                    LocationInfo::InGlobal(
-                        obj_id,
-                        link_info,
-                        *decl_id,
-                        InGlobal::NamedLocal(link_info.instructions[*decl_id].unwrap_declaration()),
-                    ),
-                );
+                // Deduplicate references to implicit wire refs from decl: `int myDecl = 123`, `myDecl` occurs in both `int myDecl`, and `myDecl = 123`
+                let decl = link_info.instructions[*decl_id].unwrap_declaration();
+                if decl.name_span != wire_ref.root_span {
+                    self.visit(
+                        wire_ref.root_span,
+                        LocationInfo::InGlobal(
+                            obj_id,
+                            link_info,
+                            *decl_id,
+                            InGlobal::NamedLocal(decl),
+                        ),
+                    );
+                }
             }
             WireReferenceRoot::LocalSubmodule(submod_decl) => {
-                self.visit(
-                    wire_ref.root_span,
-                    LocationInfo::InGlobal(
-                        obj_id,
-                        link_info,
-                        *submod_decl,
-                        InGlobal::NamedSubmodule(
-                            link_info.instructions[*submod_decl].unwrap_submodule(),
+                let submod = link_info.instructions[*submod_decl].unwrap_submodule();
+                if submod.name_span != wire_ref.root_span {
+                    self.visit(
+                        wire_ref.root_span,
+                        LocationInfo::InGlobal(
+                            obj_id,
+                            link_info,
+                            *submod_decl,
+                            InGlobal::NamedSubmodule(submod),
                         ),
-                    ),
-                );
+                    );
+                }
             }
             WireReferenceRoot::LocalInterface(interface_decl) => {
-                self.visit(
-                    wire_ref.root_span,
-                    LocationInfo::InGlobal(
-                        obj_id,
-                        link_info,
-                        *interface_decl,
-                        InGlobal::LocalInterface(
-                            link_info.instructions[*interface_decl].unwrap_interface(),
+                let interface = link_info.instructions[*interface_decl].unwrap_interface();
+                if interface.name_span != wire_ref.root_span {
+                    self.visit(
+                        wire_ref.root_span,
+                        LocationInfo::InGlobal(
+                            obj_id,
+                            link_info,
+                            *interface_decl,
+                            InGlobal::LocalInterface(interface),
                         ),
-                    ),
-                );
+                    );
+                }
             }
             WireReferenceRoot::NamedConstant(cst) => {
                 self.walk_global_reference(obj_id, link_info, cst);

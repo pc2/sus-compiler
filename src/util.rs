@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt::Debug;
 
 /*pub fn all_equal_in_iter<T: Eq + Debug>(iter: impl IntoIterator<Item = T>) -> Option<T> {
@@ -43,6 +44,16 @@ pub fn merge_vec_into<T>(a: &mut Vec<T>, mut b: Vec<T>) {
         std::mem::swap(a, &mut b);
     }
     a.append(&mut b);
+}
+
+pub fn contains_duplicates<T: Eq + std::hash::Hash>(iter: impl IntoIterator<Item = T>) -> bool {
+    let mut seen = HashSet::new();
+    for item in iter {
+        if !seen.insert(item) {
+            return true;
+        }
+    }
+    false
 }
 
 #[derive(Debug)]
