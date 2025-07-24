@@ -438,7 +438,7 @@ fn perform_instantiation(
 ) -> InstantiatedModule {
     let md = &linker.modules[global_ref.id];
 
-    let name = global_ref.display(linker, false).to_string();
+    let name = global_ref.display(linker).to_string();
 
     // Don't instantiate modules that already errored. Otherwise instantiator may crash
     if md.link_info.errors.did_error {
@@ -563,7 +563,7 @@ impl ModuleTypingContext<'_> {
             } else {
                 "".purple()
             };
-            let typ_str = typ.display(&self.linker.globals, false).to_string().red();
+            let typ_str = typ.display(&self.linker.globals).to_string().red();
             let domain_name = domain.display(&self.md.domains);
             let absolute_latency = if *absolute_latency == CALCULATE_LATENCY_LATER {
                 String::from("?")
@@ -653,7 +653,7 @@ impl ModuleTypingContext<'_> {
         ) in &self.submodules
         {
             let instance_md = &self.linker.globals[refers_to.id];
-            let refers_to = refers_to.display(&self.linker.globals, false);
+            let refers_to = refers_to.display(&self.linker.globals);
             let instantiate_success = if instance.get().is_some() {
                 "Instantiation Successful!".yellow()
             } else {
@@ -671,7 +671,7 @@ impl ModuleTypingContext<'_> {
                 print!("    {direction} .{remote_name}({local_name})");
                 if let Some(instance) = instance.get() {
                     let typ_str = if let Some(port) = &instance.interface_ports[port_id] {
-                        port.typ.display(&self.linker.globals, false).to_string()
+                        port.typ.display(&self.linker.globals).to_string()
                     } else {
                         "/".into()
                     }

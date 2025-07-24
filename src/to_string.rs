@@ -132,19 +132,15 @@ impl<ID: Into<GlobalUUID> + Copy> AbstractGlobalReference<ID> {
 }
 
 impl ConcreteType {
-    pub fn display<'a>(
-        &'a self,
-        globals: &'a LinkerGlobals,
-        use_newlines: bool,
-    ) -> impl Display + 'a {
+    pub fn display<'a>(&'a self, globals: &'a LinkerGlobals) -> impl Display + 'a {
         FmtWrapper(move |f| match self {
             ConcreteType::Named(global_ref) => {
                 // Avoid ambiguity: call display() directly on ConcreteGlobalReference
-                ConcreteGlobalReference::display(global_ref, globals, use_newlines).fmt(f)
+                ConcreteGlobalReference::display(global_ref, globals).fmt(f)
             }
             ConcreteType::Array(arr_box) => {
                 let (elem_typ, arr_size) = arr_box.deref();
-                write!(f, "{}[", elem_typ.display(globals, use_newlines))?;
+                write!(f, "{}[", elem_typ.display(globals))?;
                 // arr_size is Unifyable<Value, ...>, which implements Display for Unifyable, not Value
                 match arr_size {
                     Unifyable::Set(val) => {
@@ -162,14 +158,9 @@ impl ConcreteType {
 }
 
 impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
-    pub fn display<'v>(
-        &'v self,
-        globals: &'v LinkerGlobals,
-        use_newlines: bool,
-    ) -> impl Display + 'v {
+    pub fn display<'v>(&'v self, globals: &'v LinkerGlobals) -> impl Display + 'v {
         let target_link_info = &globals[self.id.into()];
         FmtWrapper(move |f| {
-            let nl = if use_newlines { "\n    " } else { "" };
             assert!(self.template_args.len() == target_link_info.template_parameters.len());
             let object_full_name = target_link_info.get_full_name();
             f.write_str(&object_full_name)?;
@@ -186,22 +177,16 @@ impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
                     f.write_str(", ")?;
                 }
                 is_first = false;
-                f.write_fmt(format_args!("{nl}{}: ", arg_in_target.name))?;
+                f.write_fmt(format_args!("{}: ", arg_in_target.name))?;
                 match arg {
                     TemplateKind::Type(typ_arg) => {
-                        f.write_fmt(format_args!(
-                            "type {}",
-                            typ_arg.display(globals, use_newlines)
-                        ))?;
+                        f.write_fmt(format_args!("type {}", typ_arg.display(globals)))?;
                     }
                     TemplateKind::Value(v) => match v {
                         Unifyable::Set(value) => write!(f, "{value}")?,
-                        Unifyable::Unknown(_) => f.write_str("/* Could not infer */")?,
+                        Unifyable::Unknown(_) => f.write_char('?')?,
                     },
                 }
-            }
-            if use_newlines {
-                f.write_str("\n")?;
             }
             f.write_char(')')
         })

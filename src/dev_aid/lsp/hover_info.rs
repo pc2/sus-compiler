@@ -60,7 +60,7 @@ impl HoverCollector<'_> {
                         if wire.original_instruction != id {
                             continue;
                         }
-                        let typ_str = wire.typ.display(self.linker, true);
+                        let typ_str = wire.typ.display(self.linker);
                         let name_str = &wire.name;
                         let latency_str = if wire.absolute_latency != CALCULATE_LATENCY_LATER {
                             wire.absolute_latency.to_string()
@@ -78,7 +78,7 @@ impl HoverCollector<'_> {
         for (_template_args, inst) in self.linker.instantiator.borrow().iter_for_module(md_id) {
             for (_id, sm) in &inst.submodules {
                 if sm.original_instruction == submodule_instr {
-                    self.sus_code(sm.refers_to.display(self.linker, true).to_string());
+                    self.sus_code(sm.refers_to.display(self.linker).to_string());
                 }
             }
         }

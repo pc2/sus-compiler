@@ -58,8 +58,8 @@ impl<'l> ModuleTypingContext<'l> {
             self.errors.subtype_error(
                 context,
                 wire.get_span(self.link_info),
-                wire.typ.display(&self.linker.globals, true),
-                expected.display(&self.linker.globals, true),
+                wire.typ.display(&self.linker.globals),
+                expected.display(&self.linker.globals),
             )
         })
     }
@@ -161,15 +161,15 @@ impl<'l> ModuleTypingContext<'l> {
                             .type_error(
                                 "select",
                                 w.get_span(self.link_info),
-                                found_output_typ.display(self.linker, true),
-                                w.typ.display(self.linker, true),
+                                found_output_typ.display(self.linker),
+                                w.typ.display(self.linker),
                             )
                             .info_same_file(
                                 root_wire.get_span(self.link_info),
                                 format!(
                                     "{} declared here of type {}",
                                     &root_wire.name,
-                                    root_wire.typ.display(self.linker, true),
+                                    root_wire.typ.display(self.linker),
                                 ),
                             );
                     }
@@ -195,7 +195,7 @@ impl<'l> ModuleTypingContext<'l> {
                                 s.write_span,
                                 format!(
                                     "Writing to this, which has type {}",
-                                    w.typ.display(self.linker, true)
+                                    w.typ.display(self.linker)
                                 ),
                             );
                         }
