@@ -261,7 +261,6 @@ pub fn create_dump_on_panic(linker: &mut Linker, f: impl FnOnce(&mut Linker)) {
             }
         });
 
-        let std_dir = get_std_dir();
         let dump_dir = get_core_dumps_dir().join(failure_name);
         if let Err(err) = fs::create_dir_all(&dump_dir) {
             eprintln!("Could not create {}: {err}", dump_dir.to_string_lossy());
@@ -278,10 +277,7 @@ pub fn create_dump_on_panic(linker: &mut Linker, f: impl FnOnce(&mut Linker)) {
 
         for (_id, file_data) in &linker.files {
             // Exclude files from the standard library directory
-            if file_data
-                .file_identifier
-                .contains(std_dir.to_str().unwrap())
-            {
+            if file_data.is_std {
                 continue;
             }
             let filename = file_data.file_identifier.replace("/", "_");

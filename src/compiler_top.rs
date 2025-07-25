@@ -58,6 +58,9 @@ impl Linker {
             );
         }
         self.add_all_files_in_directory(&std_lib_path, info_mngr);
+        for (_, f) in &mut self.files {
+            f.is_std = true; // Mark standard library files
+        }
 
         // Sanity check for the names the compiler knows internally.
         // They are defined in std/core.sus
@@ -148,6 +151,7 @@ impl Linker {
             tree,
             associated_values: Vec::new(),
             parsing_errors: ErrorStore::new(),
+            is_std: false,
         });
 
         self.with_file_builder(file_id, |builder| {

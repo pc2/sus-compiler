@@ -151,6 +151,7 @@ pub struct FileData {
     /// In source file order
     pub associated_values: Vec<GlobalUUID>,
     pub tree: tree_sitter::Tree,
+    pub is_std: bool,
 }
 
 /// Globally references any [Module], [StructType], or [NamedConstant] in [Linker]

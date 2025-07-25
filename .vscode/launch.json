@@ -150,7 +150,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug panic dump (select dump)",
+            "name": "Debug core dump",
             "cargo": {
                 "args": [
                     "build",
@@ -179,6 +179,7 @@
                 "fromFolder": {
                     "predefined": [
                         "${userHome}/.sus/0.3.0-devel/core_dumps/",
+                        "${workspaceFolder}/core_dumps/",
                     ]
                 },
                 "showDirs": true,
