@@ -7295,33 +7295,6 @@ interface make_infinite_type_help:
       │                     ┬  
       │                     ╰── No such field 'b' on make_infinite_type_help #(T: ?[...]). Available fields are 'make_infinite_type_help'
 ──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1036:8 ]
-      │
- 1036 │        bool do_write'0,
-      │             ────┬───  
-      │                 ╰───── Unused Variable: This variable does not affect the output ports of this module
-──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1038:13 ]
-      │
- 1038 │        bool[500] data'0 ->
-      │                  ──┬─  
-      │                    ╰─── Unused Variable: This variable does not affect the output ports of this module
-──────╯
-Error: 'TO' is not a valid template argument of DualPortMem
-      ╭─[ test.sus:1041:16 ]
-      │
- 1041 │     DualPortMem #(TO: 128, T: type bool[500]) mem
-      │                   ─┬  
-      │                    ╰── 'TO' is not a valid template argument of DualPortMem
-      │
-      ├─[ util.sus:2:8 ]
-      │
-    2 │ module DualPortMem #(T, int SIZE) {
-      │        ─────┬─────  
-      │             ╰─────── 'DualPortMem' defined here
-──────╯
 Error: Typing Error: function argument expects 'int' but was given 'bool'
       ╭─[ test.sus:1043:12 ]
       │
@@ -7367,13 +7340,6 @@ Error: Could not infer the parameters of this submodule, some parameters were st
  1049 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │                                                   ┬  
       │                                                   ╰── Could not infer the parameters of this submodule, some parameters were still unknown: FIFO #(T: type int #(FROM: ?, TO: ?), DEPTH: 3, READY_SLACK: 5)
-──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1053:35 ]
-      │
- 1053 │     interface start_iteration : bool do_start
-      │                                      ────┬───  
-      │                                          ╰───── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Typing Error: function argument expects 'int' but was given 'bool'
       ╭─[ test.sus:1060:20 ]

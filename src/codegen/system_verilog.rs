@@ -622,7 +622,7 @@ impl<'g> CodeGenerationContext<'g> {
                         write!(self.program_text, "{wire_or_reg}{wire_decl}{content}").unwrap();
                     }
                 }
-                RealWireDataSource::UnaryOp { op, rank, right } => {
+                RealWireDataSource::UnaryOp { op, right, .. } => {
                     writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
 
                     let op = op.op_text();
@@ -634,10 +634,7 @@ impl<'g> CodeGenerationContext<'g> {
                     })
                 }
                 RealWireDataSource::BinaryOp {
-                    op,
-                    rank,
-                    left,
-                    right,
+                    op, left, right, ..
                 } => {
                     writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
 

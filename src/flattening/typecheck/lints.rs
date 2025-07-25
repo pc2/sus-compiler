@@ -326,6 +326,25 @@ impl LintContext<'_> {
                     expr.source.for_each_dependency(&mut |id| {
                         instruction_fanins[instr_id].push(id);
                     });
+                    // Function arguments feed into the submodule of the function
+                    if let ExpressionSource::FuncCall(fc) = &expr.source {
+                        let wr_expr =
+                            self.working_on.instructions[fc.func_wire_ref].unwrap_expression();
+                        if let ExpressionSource::WireRef(fc_wr) = &wr_expr.source {
+                            match &fc_wr.root {
+                                WireReferenceRoot::LocalSubmodule(fc_target)
+                                | WireReferenceRoot::LocalInterface(fc_target) => {
+                                    for arg in &fc.arguments {
+                                        instruction_fanins[*fc_target].push(*arg);
+                                    }
+                                }
+                                WireReferenceRoot::LocalDecl(_)
+                                | WireReferenceRoot::NamedConstant(_)
+                                | WireReferenceRoot::NamedModule(_)
+                                | WireReferenceRoot::Error => {}
+                            }
+                        }
+                    }
                     match &expr.output {
                         ExpressionOutput::MultiWrite(writes) => {
                             for wr in writes {

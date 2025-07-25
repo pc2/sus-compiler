@@ -61,10 +61,6 @@ impl WireReference {
             WireReferenceRoot::Error => {}
         }
     }
-    pub fn for_each_generative_input(&self, collect: &mut impl FnMut(FlatID)) {
-        self.for_each_generative_input_in_root(collect);
-        self.for_each_input_wire_in_path(collect);
-    }
     pub fn for_each_input_wire_in_path(&self, collect: &mut impl FnMut(FlatID)) {
         for p in &self.path {
             match p {

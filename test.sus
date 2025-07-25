@@ -1038,7 +1038,7 @@ module UseDualPortMem {
 		bool[500] data'0 ->
 		bool[500] read_data'0
 		
-	DualPortMem #(TO: 128, T: type bool[500]) mem
+	DualPortMem #(SIZE: 128, T: type bool[500]) mem
 
 	mem.write(do_write, addr, data)
 

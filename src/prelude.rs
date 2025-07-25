@@ -65,8 +65,6 @@ impl UUIDMarker for PortIDMarker {
 }
 pub type PortID = UUID<PortIDMarker>;
 
-pub type PortIDRange = UUIDRange<PortIDMarker>;
-
 pub struct InterfaceIDMarker;
 impl UUIDMarker for InterfaceIDMarker {
     const DISPLAY_NAME: &'static str = "interface_";
