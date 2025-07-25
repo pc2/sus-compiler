@@ -137,8 +137,8 @@ impl Value {
         match self {
             Value::Bool(_) => typ.unwrap_named().id == get_builtin_type!("bool"),
             Value::Integer(v) => {
-                let (min, max) = typ.unwrap_integer_bounds();
-                min <= v && max >= v
+                let bounds = typ.unwrap_int_bounds();
+                v >= bounds.from && v < bounds.to
             }
             Value::Array(values) => {
                 let (content, sz) = typ.unwrap_array_known_size();

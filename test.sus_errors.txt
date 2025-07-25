@@ -26,62 +26,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
     │              ─┬  
     │               ╰── Unused Variable: This variable does not affect the output ports of this module
 ────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-    ╭─[ test.sus:81:75 ]
-    │
- 81 │     interface Accumulator : int#(FROM: 0, TO: 100) term, bool done -> int total
-    │                                                                           ──┬──  
-    │                                                                             ╰──── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-    ╭─[ test.sus:82:15 ]
-    │
- 82 │     state int tot
-    │               ─┬─  
-    │                ╰─── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-    ╭─[ test.sus:85:9 ]
-    │
- 85 │     int new_tot = (tot + term) % 100
-    │         ───┬───  
-    │            ╰───── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-    ╭─[ test.sus:85:19 ]
-    │
- 85 │     int new_tot = (tot + term) % 100
-    │                   ─────────┬────────  
-    │                            ╰────────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-    ╭─[ test.sus:85:20 ]
-    │
- 85 │     int new_tot = (tot + term) % 100
-    │                    ─┬─  
-    │                     ╰─── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-    ╭─[ test.sus:85:20 ]
-    │
- 85 │     int new_tot = (tot + term) % 100
-    │                    ─────┬────  
-    │                         ╰────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-    ╭─[ test.sus:87:21 ]
-    │
- 87 │         reg total = new_tot
-    │                     ───┬───  
-    │                        ╰───── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-    ╭─[ test.sus:90:15 ]
-    │
- 90 │         tot = new_tot
-    │               ───┬───  
-    │                  ╰───── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:115:10 ]
      │
@@ -7385,11 +7329,11 @@ Error: Typing Error: function argument expects 'int' but was given 'bool'
       │               ────┬───  
       │                   ╰───── Typing Error: function argument expects 'int' but was given 'bool'
       │
-      ├─[ util.sus:8:47 ]
+      ├─[ util.sus:8:43 ]
       │
-    8 │     action write'0 : int#(FROM: 0, TO: SIZE - 1) addr'0, T data'0 {
-      │                                                  ──┬─  
-      │                                                    ╰─── 'addr' declared here
+    8 │     action write'0 : int#(FROM: 0, TO: SIZE) addr'0, T data'0 {
+      │                                              ──┬─  
+      │                                                ╰─── 'addr' declared here
 ──────╯
 Error: Typing Error: function argument expects 'bool[]' but was given 'int'
       ╭─[ test.sus:1043:22 ]
@@ -7398,11 +7342,11 @@ Error: Typing Error: function argument expects 'bool[]' but was given 'int'
       │                         ──┬─  
       │                           ╰─── Typing Error: function argument expects 'bool[]' but was given 'int'
       │
-      ├─[ util.sus:8:57 ]
+      ├─[ util.sus:8:53 ]
       │
-    8 │     action write'0 : int#(FROM: 0, TO: SIZE - 1) addr'0, T data'0 {
-      │                                                            ──┬─  
-      │                                                              ╰─── 'data' declared here
+    8 │     action write'0 : int#(FROM: 0, TO: SIZE) addr'0, T data'0 {
+      │                                                        ──┬─  
+      │                                                          ╰─── 'data' declared here
 ──────╯
 Error: Excess argument. Function takes 2 args, but 3 were passed.
       ╭─[ test.sus:1043:28 ]
@@ -7413,7 +7357,7 @@ Error: Excess argument. Function takes 2 args, but 3 were passed.
       │
       ├─[ util.sus:8:9 ]
       │
-    8 │     action write'0 : int#(FROM: 0, TO: SIZE - 1) addr'0, T data'0 {
+    8 │     action write'0 : int#(FROM: 0, TO: SIZE) addr'0, T data'0 {
       │            ──┬──  
       │              ╰──── Interface 'write' defined here
 ──────╯
@@ -8663,14 +8607,14 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1402:10 ]
       │
- 1402 │     gen int SZ = sizeof #(T: type int#(FROM: 0, TO: 256*256-1))
+ 1402 │     gen int SZ = sizeof #(T: type int#(FROM: 0, TO: 256*256))
       │             ─┬  
       │              ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1404:6 ]
       │
- 1404 │     int b = transmute #(T2: type int#(FROM: 0, TO: 256*256-1)) (a)
+ 1404 │     int b = transmute #(T2: type int#(FROM: 0, TO: 256*256)) (a)
       │         ┬  
       │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯

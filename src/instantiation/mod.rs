@@ -26,7 +26,7 @@ use crate::flattening::{
 };
 use crate::{errors::ErrorStore, value::Value};
 
-use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
+use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType, IntBounds};
 
 /// In valid programs, this becomes [PartialBound::Known] after concrete typecheck
 #[derive(Debug, Clone)]
@@ -38,9 +38,9 @@ pub enum PartialBound {
 }
 
 impl PartialBound {
-    pub fn unwrap_valid(&self) -> (&IBig, &IBig) {
+    pub fn unwrap_valid(&self) -> IntBounds<&IBig> {
         let_unwrap!(Self::Known(from, to), self);
-        (from, to)
+        IntBounds { from, to }
     }
     pub fn unwrap_width(&self) -> IBig {
         let_unwrap!(Self::Known(from, to), self);

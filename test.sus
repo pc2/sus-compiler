@@ -1399,9 +1399,9 @@ module InstantiateTransmutes {
 module StraightTransmute {
 	int#(FROM: 0, TO: 255)[2] a
 
-	gen int SZ = sizeof #(T: type int#(FROM: 0, TO: 256*256-1))
+	gen int SZ = sizeof #(T: type int#(FROM: 0, TO: 256*256))
 
-	int b = transmute #(T2: type int#(FROM: 0, TO: 256*256-1)) (a)
+	int b = transmute #(T2: type int#(FROM: 0, TO: 256*256)) (a)
 
 	int #(FROM: 5, TO: 3) v
 }

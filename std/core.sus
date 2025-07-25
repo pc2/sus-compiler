@@ -15,19 +15,19 @@ __builtin__ module CrossDomain #(T) {
 }
 
 __builtin__ module IntToBits #(int NUM_BITS) {
-    interface IntToBits : int #(FROM: -pow2 #(E: NUM_BITS - 1), TO: pow2 #(E: NUM_BITS - 1) - 1) value'0 -> bool[NUM_BITS] bits'0
+    interface IntToBits : int #(FROM: -pow2 #(E: NUM_BITS - 1), TO: pow2 #(E: NUM_BITS - 1)) value'0 -> bool[NUM_BITS] bits'0
 }
 
 __builtin__ module BitsToInt #(int NUM_BITS) {
-    interface BitsToInt : bool[NUM_BITS] bits'0 -> int #(FROM: -pow2 #(E: NUM_BITS - 1), TO: pow2 #(E: NUM_BITS - 1) - 1) value'0
+    interface BitsToInt : bool[NUM_BITS] bits'0 -> int #(FROM: -pow2 #(E: NUM_BITS - 1), TO: pow2 #(E: NUM_BITS - 1)) value'0
 }
 
 __builtin__ module UIntToBits #(int NUM_BITS) {
-    interface UIntToBits : int #(FROM: 0, TO: pow2 #(E: NUM_BITS) - 1) value'0 -> bool[NUM_BITS] bits'0
+    interface UIntToBits : int #(FROM: 0, TO: pow2 #(E: NUM_BITS)) value'0 -> bool[NUM_BITS] bits'0
 }
 
 __builtin__ module BitsToUInt #(int NUM_BITS) {
-    interface BitsToUInt : bool[NUM_BITS] bits'0 -> int #(FROM: 0, TO: pow2 #(E: NUM_BITS) - 1) value'0
+    interface BitsToUInt : bool[NUM_BITS] bits'0 -> int #(FROM: 0, TO: pow2 #(E: NUM_BITS)) value'0
 }
 
 __builtin__ module transmute_to_bits #(T) {

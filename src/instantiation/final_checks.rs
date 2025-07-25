@@ -9,7 +9,10 @@ use ibig::IBig;
 use crate::{
     errors::ErrorReference,
     instantiation::PartSelectDirection,
-    typing::{concrete_type::ConcreteType, value_unifier::UnifyableValue},
+    typing::{
+        concrete_type::{ConcreteType, IntBounds},
+        value_unifier::UnifyableValue,
+    },
     value::Value,
 };
 
@@ -63,18 +66,18 @@ impl<'l> ModuleTypingContext<'l> {
             )
         })
     }
-    fn check_array_bound_min_max(&self, min: &IBig, max: &IBig, sz: &IBig, span: Span, ctx: &str) {
-        if min < &IBig::from(0) || max >= sz {
+    fn boundscheck_array(&self, idx_bounds: IntBounds<&IBig>, sz: &IBig, span: Span, ctx: &str) {
+        if !IntBounds::new_from_zero(sz).contains_bounds(idx_bounds) {
             self.errors.error(
                 span,
                 format!(
-                    "Out of bounds! The array is of size {sz}, but the {ctx} has bounds {min}:{max}"
+                    "Out of bounds! The array is of size {sz}, but the {ctx} has bounds {idx_bounds}"
                 ),
             );
         }
     }
-    fn check_array_idx_in_bound(&self, idx: &IBig, sz: &IBig, span: Span, ctx: &str) {
-        if idx < &IBig::from(0) || idx >= sz {
+    fn boundscheck_idx(&self, idx: &IBig, sz: &IBig, span: Span, ctx: &str) {
+        if !IntBounds::new_from_zero(sz).contains(idx) {
             self.errors.error(
                 span,
                 format!("Out of bounds! The array is of size {sz}, but the {ctx} is {idx}"),
@@ -91,28 +94,22 @@ impl<'l> ModuleTypingContext<'l> {
 
                     let span = span.inner_span();
                     let wire = &self.wires[*idx_wire];
-                    let (min, max) = wire.typ.unwrap_integer_bounds();
-                    self.check_array_bound_min_max(min, max, arr_sz, span, "index");
+                    let idx_bounds = wire.typ.unwrap_int_bounds();
+                    self.boundscheck_array(idx_bounds, arr_sz, span, "index");
                 }
                 RealWirePathElem::ConstIndex { span, idx } => {
                     let (content, arr_sz) = typ.unwrap_array_known_size();
                     typ = content;
 
                     let span = span.inner_span();
-                    self.check_array_idx_in_bound(idx, arr_sz, span, "index");
+                    self.boundscheck_idx(idx, arr_sz, span, "index");
                 }
                 RealWirePathElem::Slice { span, bounds, .. } => {
-                    let (from, to) = bounds.unwrap_valid();
+                    let idx_bounds = bounds.unwrap_valid();
                     let (content, arr_sz) = typ.unwrap_array_known_size();
                     typ = content;
 
-                    self.check_array_bound_min_max(
-                        from,
-                        &(to - 1),
-                        arr_sz,
-                        span.inner_span(),
-                        "slice bound",
-                    );
+                    self.boundscheck_array(idx_bounds, arr_sz, span.inner_span(), "slice bound");
                 }
                 RealWirePathElem::PartSelect {
                     span,
@@ -125,20 +122,27 @@ impl<'l> ModuleTypingContext<'l> {
 
                     let from_wire = &self.wires[*from_wire];
 
-                    let (min_a, max_a) = from_wire.typ.unwrap_integer_bounds();
+                    let from_bounds = from_wire.typ.unwrap_int_bounds();
 
-                    let (lower, upper) = match direction {
-                        PartSelectDirection::Up => (min_a.clone(), max_a + width - 1),
-                        PartSelectDirection::Down => (min_a - width + 1, max_a.clone()),
+                    let tmp: IBig; // For fixing the lifetime for access_bounds
+                    let access_bounds = match direction {
+                        PartSelectDirection::Up => {
+                            tmp = from_bounds.to + width - 1;
+                            IntBounds {
+                                from: from_bounds.from,
+                                to: &tmp,
+                            }
+                        }
+                        PartSelectDirection::Down => {
+                            tmp = from_bounds.from - width + 1;
+                            IntBounds {
+                                from: &tmp,
+                                to: from_bounds.to,
+                            }
+                        }
                     };
-
-                    self.check_array_bound_min_max(
-                        &lower,
-                        &upper,
-                        arr_sz,
-                        span.inner_span(),
-                        "indexed part-select",
-                    );
+                    let span = span.inner_span();
+                    self.boundscheck_array(access_bounds, arr_sz, span, "indexed part-select");
                 }
             }
         }

@@ -15,9 +15,7 @@ use crate::instantiation::{
     InstantiatedModule, MultiplexerSource, RealWire, RealWireDataSource, RealWirePathElem,
 };
 use crate::to_string::{join_string_iter, trim_known_prefix};
-use crate::typing::concrete_type::{
-    get_int_bitwidth, ConcreteGlobalReference, ConcreteTemplateArg,
-};
+use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg, IntBounds};
 use crate::typing::template::{TVec, TemplateKind};
 use crate::{typing::concrete_type::ConcreteType, value::Value};
 
@@ -84,29 +82,20 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
 
     loop {
         match typ {
-            ConcreteType::Named(ConcreteGlobalReference {
-                id: get_builtin_type!("int"),
-                template_args,
-            }) => {
-                let [min, max] = template_args.cast_to_int_array();
-                let bitwidth = get_int_bitwidth(min, max) - 1;
-                if min < &IBig::from(0) {
-                    return format!(" signed[{bitwidth}:0] {var_name}{array_string}");
-                } else {
-                    return format!("[{bitwidth}:0] {var_name}{array_string}");
+            ConcreteType::Named(content_typ) => match content_typ.id {
+                get_builtin_type!("int") => {
+                    let bounds = content_typ.unwrap_int_bounds();
+                    let bitwidth = bounds.bitwidth() - 1;
+                    if bounds.from < &IBig::from(0) {
+                        return format!(" signed[{bitwidth}:0] {var_name}{array_string}");
+                    } else {
+                        return format!("[{bitwidth}:0] {var_name}{array_string}");
+                    }
                 }
-            }
-            ConcreteType::Named(ConcreteGlobalReference {
-                id: get_builtin_type!("bool"),
-                ..
-            }) => return format!(" {var_name}{array_string}"),
-            ConcreteType::Named(ConcreteGlobalReference {
-                id: get_builtin_type!("float"),
-                ..
-            }) => return format!("[31:0] {var_name}{array_string}"),
-            ConcreteType::Named(ConcreteGlobalReference { id: _, .. }) => {
-                todo!("Structs")
-            }
+                get_builtin_type!("bool") => return format!(" {var_name}{array_string}"),
+                get_builtin_type!("float") => return format!("[31:0] {var_name}{array_string}"),
+                _ => todo!("Structs"),
+            },
             ConcreteType::Array(arr) => {
                 let (content_typ, size) = arr.deref();
                 let sz = size.unwrap_integer() - 1;
@@ -201,16 +190,16 @@ impl<'g> CodeGenerationContext<'g> {
                     result.write_str(b).unwrap();
                 }
                 get_builtin_type!("int") => {
-                    let [min, max] = global_ref.template_args.cast_to_int_array();
+                    let bounds = global_ref.unwrap_int_bounds();
 
-                    let bitwidth = get_int_bitwidth(min, max);
+                    let bitwidth = bounds.bitwidth();
 
                     let cst_str = match cst {
                         Value::Integer(ibig) => ibig.to_string(),
                         Value::Unset => "x".to_string(),
                         _ => unreachable!(),
                     };
-                    if min < &IBig::from(0) {
+                    if bounds.from < &IBig::from(0) {
                         result
                             .write_fmt(format_args!("{bitwidth}'sd{cst_str}"))
                             .unwrap()
@@ -563,7 +552,7 @@ impl<'g> CodeGenerationContext<'g> {
                 RealWirePathElem::Slice { bounds, .. } => {
                     typ = &typ.unwrap_array().0;
 
-                    let (from, to) = bounds.unwrap_valid();
+                    let IntBounds { from, to } = bounds.unwrap_valid();
 
                     let (for_stm, var) = self.mk_for(&(to - from), in_always);
 

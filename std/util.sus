@@ -5,12 +5,12 @@ module DualPortMem #(T, int SIZE) {
 	cross_mem.in = mem
 
 	domain write_clk
-	action write'0 : int#(FROM: 0, TO: SIZE - 1) addr'0, T data'0 {
+	action write'0 : int#(FROM: 0, TO: SIZE) addr'0, T data'0 {
 		mem[addr] = data
 	}
 
 	domain read_clk
-	action read'0: int#(FROM: 0, TO: SIZE - 1)  read_addr'0 -> T read_data'0 {
+	action read'0: int#(FROM: 0, TO: SIZE)  read_addr'0 -> T read_data'0 {
 		read_data = cross_mem.out[read_addr]
 	}
 }
@@ -22,8 +22,8 @@ module FIFO #(
 	int READY_SLACK
 ) {
 	state T[DEPTH] mem
-	state int#(FROM: 0, TO: DEPTH - 1) read_addr
-	state int#(FROM: 0, TO: DEPTH - 1) write_addr
+	state int#(FROM: 0, TO: DEPTH) read_addr
+	state int#(FROM: 0, TO: DEPTH) write_addr
 
 	initial read_addr = 0
 	initial write_addr = 0

@@ -2,11 +2,11 @@
 
 extern module RawROM #(int WIDTH, int DEPTH) {
     domain clk
-    interface RawROM : int #(FROM: 0, TO: DEPTH-1) index'0 -> bool[WIDTH] output_bits'2
+    interface RawROM : int #(FROM: 0, TO: DEPTH) index'0 -> bool[WIDTH] output_bits'2
 }
 
 module ROM #(T, int DEPTH) {
-    interface ROM : int #(FROM: 0, TO: DEPTH-1) index -> T output_data
+    interface ROM : int #(FROM: 0, TO: DEPTH) index -> T output_data
     RawROM#(WIDTH: sizeof #(T), DEPTH) rom
     bool[sizeof #(T)] out_bits = rom(index)
 
@@ -16,8 +16,8 @@ module ROM #(T, int DEPTH) {
 extern module RawRAM #(int WIDTH, int DEPTH) {
     domain clk
 
-    action write'0 : int#(FROM: 0, TO: DEPTH - 1) addra'0, bool[WIDTH] dina'0 {}
-    action read'0 : int#(FROM: 0, TO: DEPTH - 1) addrb'0 -> bool[WIDTH] doutb'2 {}
+    action write'0 : int#(FROM: 0, TO: DEPTH) addra'0, bool[WIDTH] dina'0 {}
+    action read'0 : int#(FROM: 0, TO: DEPTH) addrb'0 -> bool[WIDTH] doutb'2 {}
 }
 
 module RAM #(T, int DEPTH) {
@@ -27,11 +27,11 @@ module RAM #(T, int DEPTH) {
 
     RawRAM#(WIDTH, DEPTH) ram
 
-    action write : int#(FROM: 0, TO: DEPTH - 1) addra, T dina {
+    action write : int#(FROM: 0, TO: DEPTH) addra, T dina {
         bool[WIDTH] din = transmute_to_bits(dina)
         ram.write(addra, din)
     }
-    action read : int#(FROM: 0, TO: DEPTH - 1) addrb -> T doutb {
+    action read : int#(FROM: 0, TO: DEPTH) addrb -> T doutb {
         bool[WIDTH] dout = ram.read(addrb)
         doutb = transmute_from_bits(dout)
     }

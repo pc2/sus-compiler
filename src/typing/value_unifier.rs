@@ -9,7 +9,11 @@ use sus_proc_macro::get_builtin_type;
 use crate::{
     let_unwrap,
     prelude::*,
-    typing::{abstract_type::AbstractInnerType, concrete_type::SubtypeRelation, template::TVec},
+    typing::{
+        abstract_type::{AbstractGlobalReference, AbstractInnerType},
+        concrete_type::SubtypeRelation,
+        template::TVec,
+    },
     value::Value,
 };
 
@@ -136,28 +140,6 @@ pub struct CommonSubtypeRelation<'t> {
     pub sources: Vec<&'t UnifyableValue>,
 }
 
-impl ValueUnifierAlloc {
-    pub fn make_array_of(&mut self, content_typ: ConcreteType) -> ConcreteType {
-        ConcreteType::Array(Box::new((content_typ, self.alloc_unknown())))
-    }
-    fn mk_int_maybe(&mut self, v: Option<IBig>) -> TemplateKind<ConcreteType, UnifyableValue> {
-        TemplateKind::Value(match v {
-            Some(v) => Value::Integer(v).into(),
-            None => self.alloc_unknown(),
-        })
-    }
-    /// Creates a new `int #(int MIN, int MAX)`. The resulting int can have a value from `MIN` to `MAX-1`
-    pub fn new_int_type(&mut self, min: Option<IBig>, max: Option<IBig>) -> ConcreteType {
-        let template_args =
-            FlatAlloc::from_vec(vec![self.mk_int_maybe(min), self.mk_int_maybe(max)]);
-
-        ConcreteType::Named(ConcreteGlobalReference {
-            id: get_builtin_type!("int"),
-            template_args,
-        })
-    }
-}
-
 impl Value {
     /// Traverses the Value, to create a [ConcreteType] for it, guided by the abstract type given.
     /// So '1' becomes `ConcreteType::Named(ConcreteGlobalReference{id: get_builtin_type!("int"), ...}})`,
@@ -166,7 +148,7 @@ impl Value {
     /// Panics when arrays contain mutually incompatible types
     pub fn concretize_type(
         &self,
-        linker: &Linker,
+        _linker: &Linker,
         abs_typ: &AbstractRankedType,
         template_args: &TVec<ConcreteTemplateArg>,
         value_alloc: &mut ValueUnifierAlloc,
@@ -179,30 +161,52 @@ impl Value {
                 self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |_| Ok(()))?;
                 template_args[*template_id].unwrap_type().clone()
             }
-            AbstractInnerType::Named(content_typ) => {
-                let mut result_args: Option<TVec<ConcreteTemplateArg>> = None;
+            AbstractInnerType::Named(AbstractGlobalReference {
+                id: get_builtin_type!("bool"),
+                ..
+            }) => {
+                self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |v| {
+                    match v {
+                        Value::Bool(_) => {}
+                        Value::Integer(_) => {
+                            unreachable!("Caught by abstract typecheck");
+                        }
+                        Value::Array(_) => {
+                            unreachable!("All arrays handled by get_tensor_size_recursive");
+                        }
+                        Value::Unset => {
+                            return Err("This compile-time constant contains Unset".into());
+                        }
+                    }
+                    Ok(())
+                })?;
+                ConcreteType::Named(ConcreteGlobalReference {
+                    id: get_builtin_type!("bool"),
+                    template_args: FlatAlloc::new(),
+                })
+            }
+            AbstractInnerType::Named(AbstractGlobalReference {
+                id: get_builtin_type!("int"),
+                ..
+            }) => {
+                let mut min_max: Option<(&IBig, &IBig)> = None;
 
                 self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |v| {
                     match v {
-                        Value::Bool(_) => {
-                            assert_eq!(content_typ.id, get_builtin_type!("bool"));
-                        }
                         Value::Integer(v) => {
-                            assert_eq!(content_typ.id, get_builtin_type!("int"));
-                            if let Some(args) = &mut result_args {
-                                let [min, max] = args.cast_to_int_array_mut();
+                            if let Some((min, max)) = &mut min_max {
                                 if v < min {
-                                    *min = v.clone();
+                                    *min = v;
                                 }
                                 if v > max {
-                                    *max = v.clone();
+                                    *max = v;
                                 }
                             } else {
-                                result_args = Some(TVec::from_vec(vec![
-                                    TemplateKind::Value(Value::Integer(v.clone()).into()),
-                                    TemplateKind::Value(Value::Integer(v.clone()).into()),
-                                ]))
+                                min_max = Some((v, v))
                             }
+                        }
+                        Value::Bool(_) => {
+                            unreachable!("Caught by abstract typecheck");
                         }
                         Value::Array(_) => {
                             unreachable!("All arrays handled by get_tensor_size_recursive")
@@ -214,16 +218,25 @@ impl Value {
                     Ok(())
                 })?;
 
+                let template_args: TVec<ConcreteTemplateArg> =
+                    FlatAlloc::from_vec(if let Some((min, max)) = min_max {
+                        vec![
+                            TemplateKind::Value(Value::Integer(min.clone()).into()),
+                            TemplateKind::Value(Value::Integer(max + 1).into()),
+                        ]
+                    } else {
+                        vec![
+                            TemplateKind::Value(value_alloc.alloc_unknown()),
+                            TemplateKind::Value(value_alloc.alloc_unknown()),
+                        ]
+                    });
                 ConcreteType::Named(ConcreteGlobalReference {
-                    id: content_typ.id,
-                    template_args: match result_args {
-                        Some(args) => args,
-                        None => linker.types[content_typ.id].link_info.template_parameters.map(|(_, param)| match &param.kind {
-                            TemplateKind::Type(_) => todo!("Should extract type info from AbstractRankedType with specified args instead!"),
-                            TemplateKind::Value(_) => TemplateKind::Value(value_alloc.alloc_unknown())
-                        }),
-                    },
+                    id: get_builtin_type!("int"),
+                    template_args,
                 })
+            }
+            AbstractInnerType::Named(AbstractGlobalReference { .. }) => {
+                todo!("Structs")
             }
             AbstractInnerType::Unknown(_) => unreachable!("Caught by typecheck"),
             AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => {
@@ -235,12 +248,12 @@ impl Value {
 
         Ok(content_typ.stack_arrays_usize(&tensor_sizes))
     }
-    fn get_tensor_size_recursive(
-        &self,
+    fn get_tensor_size_recursive<'v>(
+        &'v self,
         depth: usize,
         max_depth: usize,
         tensor_sizes: &mut Vec<usize>,
-        elem_fn: &mut impl FnMut(&Value) -> Result<(), String>,
+        elem_fn: &mut impl FnMut(&'v Value) -> Result<(), String>,
     ) -> Result<(), String> {
         if depth == max_depth {
             elem_fn(self)
@@ -315,27 +328,6 @@ impl ConcreteType {
             .cast_to_array::<N>()
             .map(|v| v.unwrap_value())
     }
-    pub fn set_named_template_args<const N: usize>(
-        &self,
-        expected: TypeUUID,
-        unifier: &mut ValueUnifier<'_>,
-        args: [impl Into<Value>; N],
-    ) -> bool {
-        let_unwrap!(ConcreteType::Named(typ), &self);
-        assert_eq!(typ.id, expected);
-        crate::util::zip_eq(typ.template_args.iter(), args)
-            .all(|((_, to_unify), arg)| unifier.set(to_unify.unwrap_value(), arg.into()).is_ok())
-    }
-    pub fn new_named_with_args<const N: usize>(
-        id: TypeUUID,
-        args: [impl Into<ConcreteTemplateArg>; N],
-    ) -> Self {
-        ConcreteType::Named(ConcreteGlobalReference {
-            id,
-            template_args: FlatAlloc::from_vec(args.map(|a| a.into()).to_vec()),
-        })
-    }
-
     pub fn display_substitute(&self, linker: &Linker, substitutor: &ValueUnifierStore) -> String {
         let mut typ_copy = self.clone();
         typ_copy.fully_substitute(substitutor);
