@@ -69,42 +69,6 @@ module JoinDomains #(T1, T2, int OFFSET) {
 	o2 = i2
 }
 
-module Iterator #(int TO) {
-	state int #(FROM: 0, TO) current_limit
-
-	// trigger
-	interface iter : -> bool valid, state int #(FROM: 0, TO) value
-	
-	valid = value != current_limit
-
-	// action
-	action start : int #(FROM: 0, TO) up_to {
-		current_limit = up_to
-		value = 0
-	} else when valid {
-		value = (value + 1) % TO
-	}
-}
-
-module FixedSizeIterator #(int TO) {
-	interface iter : -> bool valid, state int#(FROM: 0, TO) value
-
-	output bool last
-
-	initial value = 0
-
-	action start {
-		value = 0
-	} else {
-		when valid {
-			value = value + 1
-		}
-	}
-
-	last = value == TO - 1
-	valid = value != TO
-}
-
 module SlowClockGenerator #(int PERIOD) {
 	interface SlowClockGenerator : -> state int cur_value
 	
@@ -117,33 +81,13 @@ module SlowClockGenerator #(int PERIOD) {
 	}
 }
 
-module SplitAt #(T, int SIZE, int SPLIT_POINT) {
-	interface SplitAt : T[SIZE] i -> T[SPLIT_POINT] left, T[SIZE - SPLIT_POINT] right
-
-	for int I in 0..SPLIT_POINT {
-		left[I] = i[I]
-	}
-	for int I in 0..SIZE - SPLIT_POINT {
-		right[I] = i[I+SPLIT_POINT]
-	}
-}
-
 module Abs #(int TO) {
-	interface Abs : int #(FROM: -TO, TO) a -> int #(FROM: 0, TO) o
+	interface Abs : int #(FROM: -TO+1, TO) a -> int #(FROM: 0, TO) o
 
 	when a < 0 {
-		o = -a
+		o = unsafe_int_cast#(FROM: 0, TO)(-a)
 	} else {
-		o = a
-	}
-}
-
-/// Temporary, to be replaced with slice syntax : result = vals[FROM +: OUT_SIZE]
-module Slice #(T, int SIZE, int OUT_SIZE, int FROM) {
-	interface Slice : T[SIZE] vals -> T[OUT_SIZE] result
-
-	for int I in 0..OUT_SIZE {
-		result[I] = vals[I + FROM]
+		o = unsafe_int_cast#(FROM: 0, TO)(a)
 	}
 }
 
@@ -151,12 +95,8 @@ module Slice #(T, int SIZE, int OUT_SIZE, int FROM) {
 module Concat #(T, int SIZE_A, int SIZE_B) {
 	interface Concat : T[SIZE_A] a, T[SIZE_B] b -> T[SIZE_A + SIZE_B] result
 
-	for int I in 0..SIZE_A {
-		result[I] = a[I]
-	}
-	for int I in 0..SIZE_B {
-		result[I + SIZE_A] = b[I]
-	}
+	result[:SIZE_A] = a
+	result[SIZE_A:] = b
 }
 
 /// Concatenate two arrays, such that the elements of b come after the elements of a
@@ -169,7 +109,7 @@ module Repeat #(T, int SIZE) {
 }
 
 module BitSelect #(int SIZE) {
-	interface BitSelect : int selection -> bool[SIZE] bits
+	interface BitSelect : int#(FROM: 0, TO: SIZE - 1) selection -> bool[SIZE] bits
 
 	for int I in 0..SIZE {
 		bits[I] = false
@@ -182,7 +122,7 @@ module PopCount #(int WIDTH) {
 	// Should be chosen based on what's most efficient for the target architecture
 	gen int BASE_CASE_SIZE = 5
 
-	interface PopCount : bool[WIDTH] bits'0 -> int#(FROM: 0, TO: WIDTH) popcount
+	interface PopCount : bool[WIDTH] bits'0 -> int#(FROM: 0, TO: WIDTH+1) popcount
 
 	if WIDTH == 0 {
 		int zero'0 = 0
@@ -210,19 +150,14 @@ module PopCount #(int WIDTH) {
 			assert#(C: false)
 		}
 	} else {
-		gen int LEFT_WIDTH = WIDTH / 2
-		gen int RIGHT_WIDTH = WIDTH - LEFT_WIDTH
-
-		bool[LEFT_WIDTH] left_part, bool[RIGHT_WIDTH] right_part = SplitAt #(SIZE: WIDTH, SPLIT_POINT: LEFT_WIDTH, T: type bool)(bits)
-
-		reg reg popcount = PopCount #(WIDTH: LEFT_WIDTH)(left_part) + PopCount #(WIDTH: RIGHT_WIDTH)(right_part)
+		reg reg popcount = PopCount(bits[:WIDTH / 2]) + PopCount(bits[WIDTH / 2:])
 	}
 }
 
 
 // Recursive Tree Add module recurses smaller copies of itself. 
 module TreeAdd #(int WIDTH, int FROM, int TO) {
-	interface TreeAdd : int#(FROM, TO)[WIDTH] values'0 -> int#(FROM: FROM*WIDTH, TO: TO*WIDTH) total
+	interface TreeAdd : int#(FROM, TO)[WIDTH] values'0 -> int#(FROM: FROM*WIDTH, TO: (TO - 1)*WIDTH + 1) total
 
 	if WIDTH == 0 {
 		// Have to explicitly give zero a latency count. 
@@ -232,16 +167,9 @@ module TreeAdd #(int WIDTH, int FROM, int TO) {
 	} else if WIDTH == 1 {
 		total = values[0]
 	} else {
-		gen int L_SZ = WIDTH / 2
-		gen int R_SZ = WIDTH - L_SZ
-
-		// Can declare modules and use them later. 
-		SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
-		int[L_SZ] left_part, int[R_SZ] right_part = split(values)
-
 		// Or instantiate submodules inline
-		int left_total = TreeAdd #(WIDTH: L_SZ)(left_part)
-		int right_total = TreeAdd #(WIDTH: R_SZ)(right_part)
+		int left_total = TreeAdd(values[:WIDTH / 2])
+		int right_total = TreeAdd(values[WIDTH / 2:])
 		
 		// Can add pipelining registers here too. 
 		// Latency Counting will figure it out.

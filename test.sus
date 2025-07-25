@@ -1018,7 +1018,8 @@ module conflicting_domain_with_port_name {
 }
 
 module make_infinite_type_help #(T) {
-	interface make_infinite_type_help: T[3] a -> T b
+	input T[3] a
+	output T b
 
 	b = a[0]
 }
@@ -1065,13 +1066,6 @@ module use_Iterator {
 		outVal = myArr[value]
 	}
 }
-
-module UseSlice {
-	int[20] arr
-
-	int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
-}
-
 
 module UseBuiltinConstants {
 	gen int INT_ARR_SIZE = sizeof #(T: type int[10][10])

@@ -1,54 +1,4 @@
 
-/// Unsafe builtin to circumvent the Latency Counting System. Connects `out` to `in` without adding the requisite latency
-/// Or: used for negative latencies, for instance to implement Almost-Full FIFOs, stateful for loops, etc. 
-__builtin__ module LatencyOffset #(T, int OFFSET) {
-    interface LatencyOffset : T in'0 -> T out'OFFSET
-}
-
-/// Unsafe builtin to connect wires from different domains. 
-/// Important: Does not perform any kind of Clock Domain Crossing!
-__builtin__ module CrossDomain #(T) {
-    domain in_clk
-    input T in'0
-    domain out_clk
-    output T out'0
-}
-
-__builtin__ module IntToBits #(int NUM_BITS) {
-    interface IntToBits : int #(FROM: -pow2 #(E: NUM_BITS - 1), TO: pow2 #(E: NUM_BITS - 1)) value'0 -> bool[NUM_BITS] bits'0
-}
-
-__builtin__ module BitsToInt #(int NUM_BITS) {
-    interface BitsToInt : bool[NUM_BITS] bits'0 -> int #(FROM: -pow2 #(E: NUM_BITS - 1), TO: pow2 #(E: NUM_BITS - 1)) value'0
-}
-
-__builtin__ module UIntToBits #(int NUM_BITS) {
-    interface UIntToBits : int #(FROM: 0, TO: pow2 #(E: NUM_BITS)) value'0 -> bool[NUM_BITS] bits'0
-}
-
-__builtin__ module BitsToUInt #(int NUM_BITS) {
-    interface BitsToUInt : bool[NUM_BITS] bits'0 -> int #(FROM: 0, TO: pow2 #(E: NUM_BITS)) value'0
-}
-
-__builtin__ module transmute_to_bits #(T) {
-    interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
-}
-
-__builtin__ module transmute_from_bits #(T) {
-    interface transmute_from_bits : bool[sizeof #(T)] bits'0 -> T value'0
-}
-
-module transmute #(T1, T2) {
-    interface transmute : T1 a'0 -> T2 b'0
-
-    gen int SIZE = sizeof #(T: type T1)
-    
-    assert #(C: SIZE == sizeof #(T: type T2))
-
-    bool[SIZE] as_bits = transmute_to_bits #(T: type T1)(a)
-    b = transmute_from_bits #(T: type T2)(as_bits)
-}
-
 // For now these builtin declarations must be in this order, because they're constants in the code. 
 // We'll get a better system for this at some point
 
@@ -104,3 +54,57 @@ __builtin__ const int falling_factorial #(int N, int K) {}
 
 /// Computes `N! / (K! * (N - K)!)`. for `0 <= K <= N`
 __builtin__ const int comb #(int N, int K) {}
+
+/// Unsafe builtin to circumvent the Latency Counting System. Connects `out` to `in` without adding the requisite latency
+/// Or: used for negative latencies, for instance to implement Almost-Full FIFOs, stateful for loops, etc. 
+__builtin__ module LatencyOffset #(T, int OFFSET) {
+    interface LatencyOffset : T in'0 -> T out'OFFSET
+}
+
+/// Unsafe builtin to connect wires from different domains. 
+/// Important: Does not perform any kind of Clock Domain Crossing!
+__builtin__ module CrossDomain #(T) {
+    domain in_clk
+    input T in'0
+    domain out_clk
+    output T out'0
+}
+
+__builtin__ module IntToBits #(int NUM_BITS) {
+    interface IntToBits : int #(FROM: -pow2 #(E: NUM_BITS - 1), TO: pow2 #(E: NUM_BITS - 1)) value'0 -> bool[NUM_BITS] bits'0
+}
+
+__builtin__ module BitsToInt #(int NUM_BITS) {
+    interface BitsToInt : bool[NUM_BITS] bits'0 -> int #(FROM: -pow2 #(E: NUM_BITS - 1), TO: pow2 #(E: NUM_BITS - 1)) value'0
+}
+
+__builtin__ module UIntToBits #(int NUM_BITS) {
+    interface UIntToBits : int #(FROM: 0, TO: pow2 #(E: NUM_BITS)) value'0 -> bool[NUM_BITS] bits'0
+}
+
+__builtin__ module BitsToUInt #(int NUM_BITS) {
+    interface BitsToUInt : bool[NUM_BITS] bits'0 -> int #(FROM: 0, TO: pow2 #(E: NUM_BITS)) value'0
+}
+
+__builtin__ module transmute_to_bits #(T) {
+    interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+}
+
+__builtin__ module transmute_from_bits #(T) {
+    interface transmute_from_bits : bool[sizeof #(T)] bits'0 -> T value'0
+}
+
+module transmute #(T1, T2) {
+    interface transmute : T1 a'0 -> T2 b'0
+
+    gen int SIZE = sizeof #(T: type T1)
+    
+    assert #(C: SIZE == sizeof #(T: type T2))
+
+    bool[SIZE] as_bits = transmute_to_bits #(T: type T1)(a)
+    b = transmute_from_bits #(T: type T2)(as_bits)
+}
+
+__builtin__ module unsafe_int_cast #(int FROM_I, int TO_I, int FROM, int TO) {
+    interface unsafe_int_cast : int#(FROM: FROM_I, TO: TO_I) i -> int#(FROM, TO) o
+}

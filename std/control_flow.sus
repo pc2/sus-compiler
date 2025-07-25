@@ -1,0 +1,51 @@
+
+module Iterator #(int MAX) {
+	state int #(FROM: 0, TO: MAX + 2) current_limit
+	state int #(FROM: 0, TO: MAX + 1) value_state
+	output state bool may_next
+	initial current_limit = 0
+	initial value_state = 0
+	initial may_next = false
+
+	/// Requires `!may_next`
+	action start : int #(FROM: 0, TO: MAX + 2) up_to {
+		current_limit = up_to
+		value_state = 0
+		may_next = true
+	}
+
+	/// Requires `may_next`
+	action next : -> int #(FROM: 0, TO: MAX + 1) value, bool last {
+		last = value_state == current_limit
+		value = value_state
+		when !last {
+			value_state = unsafe_int_cast#(FROM_O: 0, TO_O: MAX + 1)(value_state + 1)
+		} else {
+			may_next = false
+		}
+	}
+}
+
+module FixedSizeIterator #(int TO) {
+	state int #(FROM: 0, TO) value_state
+	output state bool may_next
+	initial value_state = 0
+	initial may_next = false
+
+	/// Requires `!may_next`
+	action start {
+		value_state = 0
+		may_next = true
+	}
+
+	/// Requires `may_next`
+	action next : -> int #(FROM: 0, TO) value, bool last {
+		last = value_state == TO - 1
+		value = value_state
+		when !last {
+			value_state = unsafe_int_cast#(FROM_O: 0, TO_O: TO)(value_state + 1)
+		} else {
+			may_next = false
+		}
+	}
+}
