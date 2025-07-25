@@ -1,12 +1,5 @@
-Flattening LatencyOffset
-Flattening CrossDomain
-Flattening IntToBits
-Flattening BitsToInt
-Flattening UIntToBits
-Flattening BitsToUInt
-Flattening transmute_to_bits
-Flattening transmute_from_bits
-Flattening transmute
+Flattening Iterator
+Flattening FixedSizeIterator
 Flattening bool
 Flattening int
 Flattening float
@@ -21,15 +14,21 @@ Flattening pow
 Flattening factorial
 Flattening falling_factorial
 Flattening comb
+Flattening LatencyOffset
+Flattening CrossDomain
+Flattening IntToBits
+Flattening BitsToInt
+Flattening UIntToBits
+Flattening BitsToUInt
+Flattening transmute_to_bits
+Flattening transmute_from_bits
+Flattening transmute
+Flattening unsafe_int_cast
 Flattening DualPortMem
 Flattening FIFO
 Flattening JoinDomains
-Flattening Iterator
-Flattening FixedSizeIterator
 Flattening SlowClockGenerator
-Flattening SplitAt
 Flattening Abs
-Flattening Slice
 Flattening Concat
 Flattening Repeat
 Flattening BitSelect
@@ -131,7 +130,6 @@ Flattening make_infinite_type
 Flattening UseDualPortMem
 Flattening example_FIFO
 Flattening use_Iterator
-Flattening UseSlice
 Flattening UseBuiltinConstants
 Flattening FailingAssert
 Flattening IfTesting
@@ -175,6 +173,8 @@ Flattening wrong_slice_length
 Flattening negative_slice
 Flattening multi_slice
 Flattening multi_slice_reverse
+Typechecking Iterator
+Typechecking FixedSizeIterator
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -184,15 +184,12 @@ Typechecking BitsToUInt
 Typechecking transmute_to_bits
 Typechecking transmute_from_bits
 Typechecking transmute
+Typechecking unsafe_int_cast
 Typechecking DualPortMem
 Typechecking FIFO
 Typechecking JoinDomains
-Typechecking Iterator
-Typechecking FixedSizeIterator
 Typechecking SlowClockGenerator
-Typechecking SplitAt
 Typechecking Abs
-Typechecking Slice
 Typechecking Concat
 Typechecking Repeat
 Typechecking BitSelect
@@ -292,7 +289,6 @@ Typechecking make_infinite_type
 Typechecking UseDualPortMem
 Typechecking example_FIFO
 Typechecking use_Iterator
-Typechecking UseSlice
 Typechecking UseBuiltinConstants
 Typechecking FailingAssert
 Typechecking IfTesting
@@ -352,6 +348,8 @@ Typechecking falling_factorial
 Typechecking comb
 Typechecking SUM_UP
 Typechecking dont_care
+Lints Iterator
+Lints FixedSizeIterator
 Lints LatencyOffset
 Lints CrossDomain
 Lints IntToBits
@@ -361,15 +359,12 @@ Lints BitsToUInt
 Lints transmute_to_bits
 Lints transmute_from_bits
 Lints transmute
+Lints unsafe_int_cast
 Lints DualPortMem
 Lints FIFO
 Lints JoinDomains
-Lints Iterator
-Lints FixedSizeIterator
 Lints SlowClockGenerator
-Lints SplitAt
 Lints Abs
-Lints Slice
 Lints Concat
 Lints Repeat
 Lints BitSelect
@@ -469,7 +464,6 @@ Lints make_infinite_type
 Lints UseDualPortMem
 Lints example_FIFO
 Lints use_Iterator
-Lints UseSlice
 Lints UseBuiltinConstants
 Lints FailingAssert
 Lints IfTesting
@@ -739,23 +733,14 @@ Instantiating numbersToAddUp #()
 Concrete Typechecking numbersToAddUp #()
 Instantiating TreeAdd #(WIDTH: 5, FROM: 3, TO: 4)
 Concrete Typechecking TreeAdd #(WIDTH: 5, FROM: 3, TO: 4)
-Instantiating SplitAt #(T: type int #(FROM: 3, TO: 4), SIZE: 5, SPLIT_POINT: 2)
-Concrete Typechecking SplitAt #(T: type int #(FROM: 3, TO: 4), SIZE: 5, SPLIT_POINT: 2)
-Checking array accesses SplitAt #(T: type int #(FROM: 3, TO: 4), SIZE: 5, SPLIT_POINT: 2)
-Instantiating TreeAdd #(WIDTH: 3, FROM: 3, TO: 4)
-Concrete Typechecking TreeAdd #(WIDTH: 3, FROM: 3, TO: 4)
-Instantiating SplitAt #(T: type int #(FROM: 3, TO: 4), SIZE: 3, SPLIT_POINT: 1)
-Concrete Typechecking SplitAt #(T: type int #(FROM: 3, TO: 4), SIZE: 3, SPLIT_POINT: 1)
-Checking array accesses SplitAt #(T: type int #(FROM: 3, TO: 4), SIZE: 3, SPLIT_POINT: 1)
 Instantiating TreeAdd #(WIDTH: 2, FROM: 3, TO: 4)
 Concrete Typechecking TreeAdd #(WIDTH: 2, FROM: 3, TO: 4)
-Instantiating SplitAt #(T: type int #(FROM: 3, TO: 4), SIZE: 2, SPLIT_POINT: 1)
-Concrete Typechecking SplitAt #(T: type int #(FROM: 3, TO: 4), SIZE: 2, SPLIT_POINT: 1)
-Checking array accesses SplitAt #(T: type int #(FROM: 3, TO: 4), SIZE: 2, SPLIT_POINT: 1)
 Instantiating TreeAdd #(WIDTH: 1, FROM: 3, TO: 4)
 Concrete Typechecking TreeAdd #(WIDTH: 1, FROM: 3, TO: 4)
 Checking array accesses TreeAdd #(WIDTH: 1, FROM: 3, TO: 4)
 Checking array accesses TreeAdd #(WIDTH: 2, FROM: 3, TO: 4)
+Instantiating TreeAdd #(WIDTH: 3, FROM: 3, TO: 4)
+Concrete Typechecking TreeAdd #(WIDTH: 3, FROM: 3, TO: 4)
 Checking array accesses TreeAdd #(WIDTH: 3, FROM: 3, TO: 4)
 Checking array accesses TreeAdd #(WIDTH: 5, FROM: 3, TO: 4)
 Checking array accesses numbersToAddUp #()
@@ -772,8 +757,6 @@ Not Instantiating UseDualPortMem #() due to flattening errors
 Instantiating example_FIFO #()
 Concrete Typechecking example_FIFO #()
 Not Instantiating use_Iterator #() due to flattening errors
-Instantiating UseSlice #()
-Concrete Typechecking UseSlice #()
 Instantiating UseBuiltinConstants #()
 Instantiating FailingAssert #()
 Instantiating latency_counting_disjoint_blocks #()

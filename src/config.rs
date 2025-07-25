@@ -58,6 +58,7 @@ pub struct ConfigStruct {
     pub ci: bool,
     pub target_language: TargetLanguage,
     pub files: Vec<PathBuf>,
+    pub sus_home_override: Option<PathBuf>,
 }
 
 pub const VERSION_INFO: &str = concat!(
@@ -161,6 +162,20 @@ fn command_builder() -> Command {
                     Ok(file_path)
                 }
             }))
+        .arg(Arg::new("sus-home")
+            .long("sus-home")
+            .help("Override the SUS_HOME directory (for std/core.sus, core_dumps, etc)")
+            .value_parser(|dir: &str| {
+                let path = PathBuf::from(dir);
+                if !path.exists() {
+                    Err("Directory does not exist")
+                } else if !path.is_dir() {
+                    Err("Path is not a directory")
+                } else {
+                    Ok(path)
+                }
+            })
+        )
 }
 
 fn parse_args<I, T>(itr: I) -> Result<ConfigStruct, clap::Error>
@@ -208,6 +223,8 @@ where
                     }),
             });
 
+    let sus_home_override = matches.get_one::<PathBuf>("sus-home").cloned();
+
     Ok(ConfigStruct {
         use_lsp: matches.get_flag("lsp"),
         lsp_debug_mode: matches.get_flag("lsp-debug"),
@@ -224,6 +241,7 @@ where
         ci: matches.get_flag("ci"),
         target_language: *matches.get_one("target").unwrap(),
         files,
+        sus_home_override,
     })
 }
 
@@ -239,4 +257,13 @@ pub fn initialize_config_from_cli_args() {
 /// Access the singleton [ConfigStruct] representing the CLI arguments passed to `sus_compiler`
 pub fn config() -> &'static ConfigStruct {
     CONFIG.get().unwrap()
+}
+
+/// Returns the SUS_HOME directory, using the override if set, otherwise the env variable
+pub fn get_sus_home() -> PathBuf {
+    if let Some(ref override_path) = config().sus_home_override {
+        override_path.clone()
+    } else {
+        PathBuf::from(env!("SUS_HOME"))
+    }
 }

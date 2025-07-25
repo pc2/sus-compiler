@@ -4,6 +4,7 @@
   // "sus_lsp.executable_path": "${workspaceFolder}/target/release/sus_compiler",
   "sus_lsp.tcp_port": 25000,
   "sus_lsp.args": [
+    "--sus-home", ".",
     "--lsp",
     // Tracking down slow compilations
     "--kill-timeout", "2000ms",

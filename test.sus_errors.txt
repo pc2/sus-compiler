@@ -2560,9 +2560,9 @@ Error: 'beep' is not a valid template argument of int
      │                              ──┬─  
      │                                ╰─── 'beep' is not a valid template argument of int
      │
-     ├─[ core.sus:58:20 ]
+     ├─[ core.sus:8:20 ]
      │
-  58 │ __builtin__ struct int #(int FROM, int TO) {}
+   8 │ __builtin__ struct int #(int FROM, int TO) {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -2573,9 +2573,9 @@ Error: 'BEEP' is not a valid template argument of int
      │                                            ──┬─  
      │                                              ╰─── 'BEEP' is not a valid template argument of int
      │
-     ├─[ core.sus:58:20 ]
+     ├─[ core.sus:8:20 ]
      │
-  58 │ __builtin__ struct int #(int FROM, int TO) {}
+   8 │ __builtin__ struct int #(int FROM, int TO) {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -2586,9 +2586,9 @@ Error: int is not a named wire: local or constant, it is a Struct instead!
      │                                                  ─┬─  
      │                                                   ╰─── int is not a named wire: local or constant, it is a Struct instead!
      │
-     ├─[ core.sus:58:20 ]
+     ├─[ core.sus:8:20 ]
      │
-  58 │ __builtin__ struct int #(int FROM, int TO) {}
+   8 │ __builtin__ struct int #(int FROM, int TO) {}
      │                    ─┬─  
      │                     ╰─── Defined here
 ─────╯
@@ -7120,9 +7120,9 @@ Error: 'ABC' is not a valid template argument of int
      │           ─┬─  
      │            ╰─── 'ABC' is not a valid template argument of int
      │
-     ├─[ core.sus:58:20 ]
+     ├─[ core.sus:8:20 ]
      │
-  58 │ __builtin__ struct int #(int FROM, int TO) {}
+   8 │ __builtin__ struct int #(int FROM, int TO) {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -7263,42 +7263,17 @@ Error: This declaration conflicts with a previous declaration in the same scope
       │            ────┬────  
       │                ╰────── This declaration conflicts with a previous declaration in the same scope
 ──────╯
-Error: No such field 'a' on make_infinite_type_help #(T: ?[...]). Available fields are 'make_infinite_type_help'
-      ╭─[ test.sus:1029:8 ]
+Error: Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects '?[][...]' but was given '?[...]'
+      ╭─[ test.sus:1030:2 ]
       │
- 1020 │ module make_infinite_type_help #(T) {
-      │        ───────────┬───────────  
-      │                   ╰───────────── Module 'make_infinite_type_help' defined here. module make_infinite_type_help #(T):
-domain clk:
-interface make_infinite_type_help:
-	input T[3] a
-	->
-	output T b
-      │ 
- 1029 │     mtinf.a = mtinf.b
-      │           ┬  
-      │           ╰── No such field 'a' on make_infinite_type_help #(T: ?[...]). Available fields are 'make_infinite_type_help'
-──────╯
-Error: No such field 'b' on make_infinite_type_help #(T: ?[...]). Available fields are 'make_infinite_type_help'
-      ╭─[ test.sus:1029:18 ]
-      │
- 1020 │ module make_infinite_type_help #(T) {
-      │        ───────────┬───────────  
-      │                   ╰───────────── Module 'make_infinite_type_help' defined here. module make_infinite_type_help #(T):
-domain clk:
-interface make_infinite_type_help:
-	input T[3] a
-	->
-	output T b
-      │ 
- 1029 │     mtinf.a = mtinf.b
-      │                     ┬  
-      │                     ╰── No such field 'b' on make_infinite_type_help #(T: ?[...]). Available fields are 'make_infinite_type_help'
+ 1030 │     mtinf.a = mtinf.b
+      │     ───┬───  
+      │        ╰───── Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects '?[][...]' but was given '?[...]'
 ──────╯
 Error: Typing Error: function argument expects 'int' but was given 'bool'
-      ╭─[ test.sus:1043:12 ]
+      ╭─[ test.sus:1044:12 ]
       │
- 1043 │     mem.write(do_write, addr, data)
+ 1044 │     mem.write(do_write, addr, data)
       │               ────┬───  
       │                   ╰───── Typing Error: function argument expects 'int' but was given 'bool'
       │
@@ -7309,9 +7284,9 @@ Error: Typing Error: function argument expects 'int' but was given 'bool'
       │                                                ╰─── 'addr' declared here
 ──────╯
 Error: Typing Error: function argument expects 'bool[]' but was given 'int'
-      ╭─[ test.sus:1043:22 ]
+      ╭─[ test.sus:1044:22 ]
       │
- 1043 │     mem.write(do_write, addr, data)
+ 1044 │     mem.write(do_write, addr, data)
       │                         ──┬─  
       │                           ╰─── Typing Error: function argument expects 'bool[]' but was given 'int'
       │
@@ -7322,9 +7297,9 @@ Error: Typing Error: function argument expects 'bool[]' but was given 'int'
       │                                                          ╰─── 'data' declared here
 ──────╯
 Error: Excess argument. Function takes 2 args, but 3 were passed.
-      ╭─[ test.sus:1043:28 ]
+      ╭─[ test.sus:1044:28 ]
       │
- 1043 │     mem.write(do_write, addr, data)
+ 1044 │     mem.write(do_write, addr, data)
       │                               ──┬─  
       │                                 ╰─── Excess argument. Function takes 2 args, but 3 were passed.
       │
@@ -7335,140 +7310,112 @@ Error: Excess argument. Function takes 2 args, but 3 were passed.
       │              ╰──── Interface 'write' defined here
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: FIFO #(T: type int #(FROM: ?, TO: ?), DEPTH: 3, READY_SLACK: 5)
-      ╭─[ test.sus:1049:48 ]
+      ╭─[ test.sus:1050:48 ]
       │
- 1049 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 1050 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │                                                   ┬  
       │                                                   ╰── Could not infer the parameters of this submodule, some parameters were still unknown: FIFO #(T: type int #(FROM: ?, TO: ?), DEPTH: 3, READY_SLACK: 5)
 ──────╯
 Error: Typing Error: function argument expects 'int' but was given 'bool'
-      ╭─[ test.sus:1060:20 ]
+      ╭─[ test.sus:1061:20 ]
       │
- 1060 │     arrayStream.start(do_start, 10)
+ 1061 │     arrayStream.start(do_start, 10)
       │                       ────┬───  
       │                           ╰───── Typing Error: function argument expects 'int' but was given 'bool'
       │
-      ├─[ util.sus:81:36 ]
+      ├─[ control_flow.sus:11:45 ]
       │
-   81 │     action start : int #(FROM: 0, TO) up_to {
-      │                                       ──┬──  
-      │                                         ╰──── 'up_to' declared here
+   11 │     action start : int #(FROM: 0, TO: MAX + 2) up_to {
+      │                                                ──┬──  
+      │                                                  ╰──── 'up_to' declared here
 ──────╯
 Error: Excess argument. Function takes 1 args, but 2 were passed.
-      ╭─[ test.sus:1060:30 ]
+      ╭─[ test.sus:1061:30 ]
       │
- 1060 │     arrayStream.start(do_start, 10)
+ 1061 │     arrayStream.start(do_start, 10)
       │                                 ─┬  
       │                                  ╰── Excess argument. Function takes 1 args, but 2 were passed.
       │
-      ├─[ util.sus:81:9 ]
+      ├─[ control_flow.sus:11:9 ]
       │
-   81 │     action start : int #(FROM: 0, TO) up_to {
+   11 │     action start : int #(FROM: 0, TO: MAX + 2) up_to {
       │            ──┬──  
       │              ╰──── Interface 'start' defined here
 ──────╯
-Error: Used 'if' in a non generative context, use 'when' instead
-      ╭─[ test.sus:1064:2 ]
+Error: A function call expects this to be an interface, but found a regular wire
+      ╭─[ test.sus:1064:31 ]
       │
- 1064 │     if iter_valid {
+ 1064 │     bool iter_valid, int value = arrayStream.iter()
+      │                                  ────────┬───────  
+      │                                          ╰───────── A function call expects this to be an interface, but found a regular wire
+──────╯
+Error: No such field 'iter' on Iterator. Available fields are 'Iterator', 'may_next', 'start', 'next'
+      ╭─[ test.sus:1064:43 ]
+      │
+ 1064 │     bool iter_valid, int value = arrayStream.iter()
+      │                                              ──┬─  
+      │                                                ╰─── No such field 'iter' on Iterator. Available fields are 'Iterator', 'may_next', 'start', 'next'
+      │
+      ├─[ control_flow.sus:2:8 ]
+      │
+    2 │ module Iterator #(int MAX) {
+      │        ────┬───  
+      │            ╰───── Module 'Iterator' defined here. module Iterator #(int MAX):
+domain clk:
+output state bool may_next
+action start:
+	input int #(FROM: 0, TO: MAX + 2) up_to
+action next:
+	->
+	output int #(FROM: 0, TO: MAX + 1) value
+	output bool last
+──────╯
+Error: Used 'if' in a non generative context, use 'when' instead
+      ╭─[ test.sus:1065:2 ]
+      │
+ 1065 │     if iter_valid {
       │     ─┬  
       │      ╰── Used 'if' in a non generative context, use 'when' instead
 ──────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[20]
-      ╭─[ test.sus:1070:10 ]
-      │
- 1070 │     int[20] arr
-      │             ─┬─  
-      │              ╰─── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[20]
-──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1070:10 ]
-      │
- 1070 │     int[20] arr
-      │             ─┬─  
-      │              ╰─── Unused Variable: This variable does not affect the output ports of this module
-──────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[5]
-      ╭─[ test.sus:1072:9 ]
-      │
- 1072 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
-      │            ───┬──  
-      │               ╰──── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[5]
-──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1072:9 ]
-      │
- 1072 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
-      │            ───┬──  
-      │               ╰──── Unused Variable: This variable does not affect the output ports of this module
-──────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[20]
-      ╭─[ test.sus:1072:18 ]
-      │
- 1072 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
-      │                     ────────────────────────────┬────────────────────────────  
-      │                                                 ╰────────────────────────────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[20]
-──────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[5]
-      ╭─[ test.sus:1072:18 ]
-      │
- 1072 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
-      │                     ────────────────────────────┬────────────────────────────  
-      │                                                 ╰────────────────────────────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[5]
-──────╯
-Error: Could not infer the parameters of this submodule, some parameters were still unknown: Slice #(T: type int #(FROM: ?, TO: ?), SIZE: 20, OUT_SIZE: 5, FROM: 3)
-      ╭─[ test.sus:1072:18 ]
-      │
- 1072 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
-      │                     ──────────────────────────┬─────────────────────────  
-      │                                               ╰─────────────────────────── Could not infer the parameters of this submodule, some parameters were still unknown: Slice #(T: type int #(FROM: ?, TO: ?), SIZE: 20, OUT_SIZE: 5, FROM: 3)
-──────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[20]
-      ╭─[ test.sus:1072:71 ]
-      │
- 1072 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
-      │                                                                          ─┬─  
-      │                                                                           ╰─── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[20]
-──────╯
 Error: For executing compile-time constants, all arguments must be fully specified. The arguments 'T' were not valid
-      ╭─[ test.sus:1077:25 ]
+      ╭─[ test.sus:1071:25 ]
       │
- 1077 │     gen int INT_ARR_SIZE = sizeof #(T: type int[10][10])
+ 1071 │     gen int INT_ARR_SIZE = sizeof #(T: type int[10][10])
       │                            ──────────────┬──────────────  
       │                                          ╰──────────────── For executing compile-time constants, all arguments must be fully specified. The arguments 'T' were not valid
 ──────╯
 Error: Assertion failed
-      ╭─[ test.sus:1087:2 ]
+      ╭─[ test.sus:1081:2 ]
       │
- 1087 │     assert #(C: 15 + 3 == 19)
+ 1081 │     assert #(C: 15 + 3 == 19)
       │     ────────────┬────────────  
       │                 ╰────────────── Assertion failed
 ──────╯
 Warning: Used 'when' in a generative context, use 'if' instead
-      ╭─[ test.sus:1098:2 ]
+      ╭─[ test.sus:1092:2 ]
       │
- 1098 │     when WIDTH <= BASE_CASE_SIZE {
+ 1092 │     when WIDTH <= BASE_CASE_SIZE {
       │     ──┬─  
       │       ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
 Error: Used 'if' in a non generative context, use 'when' instead
-      ╭─[ test.sus:1101:4 ]
+      ╭─[ test.sus:1095:4 ]
       │
- 1101 │          if bits[I] {
+ 1095 │          if bits[I] {
       │          ─┬  
       │           ╰── Used 'if' in a non generative context, use 'when' instead
 ──────╯
 Error: Used 'if' in a non generative context, use 'when' instead
-      ╭─[ test.sus:1103:11 ]
+      ╭─[ test.sus:1097:11 ]
       │
- 1103 │          } else if !bits[I] {
+ 1097 │          } else if !bits[I] {
       │                 ─┬  
       │                  ╰── Used 'if' in a non generative context, use 'when' instead
 ──────╯
 Warning: Used 'when' in a generative context, use 'if' instead
-      ╭─[ test.sus:1108:9 ]
+      ╭─[ test.sus:1102:9 ]
       │
- 1108 │     } else when WIDTH > BASE_CASE_SIZE {
+ 1102 │     } else when WIDTH > BASE_CASE_SIZE {
       │            ──┬─  
       │              ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
@@ -7476,14 +7423,14 @@ Error: This port is not strongly connected to the strongly connected port cluste
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-      ╭─[ test.sus:1114:21 ]
+      ╭─[ test.sus:1108:21 ]
       │
- 1113 │     interface x : bool a -> bool b
+ 1107 │     interface x : bool a -> bool b
       │                        ┬         ┬  
       │                        ╰──────────── 'a' declared here
       │                                  │  
       │                                  ╰── 'b' declared here
- 1114 │     interface y : bool c -> bool d
+ 1108 │     interface y : bool c -> bool d
       │                        ┬  
       │                        ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
@@ -7494,14 +7441,14 @@ Error: This port is not strongly connected to the strongly connected port cluste
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-      ╭─[ test.sus:1114:31 ]
+      ╭─[ test.sus:1108:31 ]
       │
- 1113 │     interface x : bool a -> bool b
+ 1107 │     interface x : bool a -> bool b
       │                        ┬         ┬  
       │                        ╰──────────── 'a' declared here
       │                                  │  
       │                                  ╰── 'b' declared here
- 1114 │     interface y : bool c -> bool d
+ 1108 │     interface y : bool c -> bool d
       │                                  ┬  
       │                                  ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
@@ -7512,14 +7459,14 @@ Error: This port is not strongly connected to the strongly connected port cluste
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-      ╭─[ test.sus:1124:21 ]
+      ╭─[ test.sus:1118:21 ]
       │
- 1123 │     interface x : bool a -> bool b
+ 1117 │     interface x : bool a -> bool b
       │                        ┬         ┬  
       │                        ╰──────────── 'a' declared here
       │                                  │  
       │                                  ╰── 'b' declared here
- 1124 │     interface y : bool c -> bool d
+ 1118 │     interface y : bool c -> bool d
       │                        ┬  
       │                        ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
@@ -7530,14 +7477,14 @@ Error: This port is not strongly connected to the strongly connected port cluste
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-      ╭─[ test.sus:1124:31 ]
+      ╭─[ test.sus:1118:31 ]
       │
- 1123 │     interface x : bool a -> bool b
+ 1117 │     interface x : bool a -> bool b
       │                        ┬         ┬  
       │                        ╰──────────── 'a' declared here
       │                                  │  
       │                                  ╰── 'b' declared here
- 1124 │     interface y : bool c -> bool d
+ 1118 │     interface y : bool c -> bool d
       │                                  ┬  
       │                                  ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
@@ -7545,41 +7492,41 @@ Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1128:11 ]
+      ╭─[ test.sus:1122:11 ]
       │
- 1128 │     reg bool a_delayed = a
+ 1122 │     reg bool a_delayed = a
       │              ────┬────  
       │                  ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1130:7 ]
+      ╭─[ test.sus:1124:7 ]
       │
- 1130 │     bool out_shared = a_delayed ^ c
+ 1124 │     bool out_shared = a_delayed ^ c
       │          ─────┬────  
       │               ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Excess argument. Function takes 1 args, but 2 were passed.
-      ╭─[ test.sus:1140:47 ]
+      ╭─[ test.sus:1134:47 ]
       │
- 1140 │     out_val = infer_me(in_val | (in_val_2 == 0), in_val_2)
+ 1134 │     out_val = infer_me(in_val | (in_val_2 == 0), in_val_2)
       │                                                  ────┬───  
       │                                                      ╰───── Excess argument. Function takes 1 args, but 2 were passed.
       │ 
- 1145 │     interface infer_me : bool x'0 -> bool y'A
+ 1139 │     interface infer_me : bool x'0 -> bool y'A
       │               ────┬───  
       │                   ╰───── Interface 'infer_me' defined here
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1159:51 ]
+      ╭─[ test.sus:1153:51 ]
       │
- 1159 │     trigger request_data'0 : -> int#(FROM: 0, TO: 6) data_received'3
+ 1153 │     trigger request_data'0 : -> int#(FROM: 0, TO: 6) data_received'3
       │                                                      ──────┬──────  
       │                                                            ╰──────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused port 'data_out'
-      ╭─[ test.sus:1161:20 ]
+      ╭─[ test.sus:1155:20 ]
       │
- 1161 │     FIFO #(DEPTH: 30) fifo
+ 1155 │     FIFO #(DEPTH: 30) fifo
       │                       ──┬─  
       │                         ╰─── Unused port 'data_out'
       │                         │   
@@ -7592,9 +7539,9 @@ Warning: Unused port 'data_out'
       │                                           ╰───── Port 'data_out' declared here
 ──────╯
 Warning: Unused port 'data_valid'
-      ╭─[ test.sus:1161:20 ]
+      ╭─[ test.sus:1155:20 ]
       │
- 1161 │     FIFO #(DEPTH: 30) fifo
+ 1155 │     FIFO #(DEPTH: 30) fifo
       │                       ──┬─  
       │                         ╰─── Unused port 'data_valid'
       │                         │   
@@ -7607,9 +7554,9 @@ Warning: Unused port 'data_valid'
       │                              ╰────── Port 'data_valid' declared here
 ──────╯
 Warning: Unused port 'pop'
-      ╭─[ test.sus:1161:20 ]
+      ╭─[ test.sus:1155:20 ]
       │
- 1161 │     FIFO #(DEPTH: 30) fifo
+ 1155 │     FIFO #(DEPTH: 30) fifo
       │                       ──┬─  
       │                         ╰─── Unused port 'pop'
       │                         │   
@@ -7622,582 +7569,582 @@ Warning: Unused port 'pop'
       │             ╰─── Port 'pop' declared here
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1164:27 ]
+      ╭─[ test.sus:1158:27 ]
       │
- 1164 │        reg reg reg reg reg int heavy_computation = request_data()
+ 1158 │        reg reg reg reg reg int heavy_computation = request_data()
       │                                ────────┬────────  
       │                                        ╰────────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
-      ╭─[ test.sus:1187:11 ]
+      ╭─[ test.sus:1181:11 ]
       │
- 1187 │     infer_me x
+ 1181 │     infer_me x
       │              ┬  
       │              ╰── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
-      ╭─[ test.sus:1188:11 ]
+      ╭─[ test.sus:1182:11 ]
       │
- 1188 │     infer_me y
+ 1182 │     infer_me y
       │              ┬  
       │              ╰── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1199:7 ]
+      ╭─[ test.sus:1193:7 ]
       │
- 1199 │     bool in_spec'0 = in_port
+ 1193 │     bool in_spec'0 = in_port
       │          ───┬───  
       │             ╰───── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[10][6][2]
-      ╭─[ test.sus:1206:43 ]
+      ╭─[ test.sus:1200:43 ]
       │
- 1206 │     interface testArrayWrite : int[10][6][2] in_arr -> int[10][6] out_arr
+ 1200 │     interface testArrayWrite : int[10][6][2] in_arr -> int[10][6] out_arr
       │                                              ───┬──  
       │                                                 ╰──── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[10][6][2]
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[10][6]
-      ╭─[ test.sus:1206:64 ]
+      ╭─[ test.sus:1200:64 ]
       │
- 1206 │     interface testArrayWrite : int[10][6][2] in_arr -> int[10][6] out_arr
+ 1200 │     interface testArrayWrite : int[10][6][2] in_arr -> int[10][6] out_arr
       │                                                                   ───┬───  
       │                                                                      ╰───── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[10][6]
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[10][6]
-      ╭─[ test.sus:1208:12 ]
+      ╭─[ test.sus:1202:12 ]
       │
- 1208 │     out_arr = in_arr[0]
+ 1202 │     out_arr = in_arr[0]
       │               ────┬────  
       │                   ╰────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[10][6]
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1210:18 ]
+      ╭─[ test.sus:1204:18 ]
       │
- 1210 │     out_arr[5][9] = in_arr[0][5][9]
+ 1204 │     out_arr[5][9] = in_arr[0][5][9]
       │                     ───────┬───────  
       │                            ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1214:20 ]
+      ╭─[ test.sus:1208:20 ]
       │
- 1214 │          out_arr[j][i] = in_arr[0][j][i]
+ 1208 │          out_arr[j][i] = in_arr[0][j][i]
       │                          ───────┬───────  
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_poison_output #(N: ?)
-      ╭─[ test.sus:1229:19 ]
+      ╭─[ test.sus:1223:19 ]
       │
- 1229 │     bool x, bool y = infer_me_with_poison_output(i)
+ 1223 │     bool x, bool y = infer_me_with_poison_output(i)
       │                      ─────────────┬─────────────  
       │                                   ╰─────────────── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_poison_output #(N: ?)
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1234:34 ]
+      ╭─[ test.sus:1228:34 ]
       │
- 1234 │     interface __add__ : int#(TO: A) a'0, int #(TO:B) b'0 -> int #(TO: A+B) o'clog2 #(V: 5)
+ 1228 │     interface __add__ : int#(TO: A) a'0, int #(TO:B) b'0 -> int #(TO: A+B) o'clog2 #(V: 5)
       │                                     ┬  
       │                                     ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1234:51 ]
+      ╭─[ test.sus:1228:51 ]
       │
- 1234 │     interface __add__ : int#(TO: A) a'0, int #(TO:B) b'0 -> int #(TO: A+B) o'clog2 #(V: 5)
+ 1228 │     interface __add__ : int#(TO: A) a'0, int #(TO:B) b'0 -> int #(TO: A+B) o'clog2 #(V: 5)
       │                                                      ┬  
       │                                                      ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1245:32 ]
+      ╭─[ test.sus:1239:32 ]
       │
- 1245 │ module MultiStateLoop #(T, int II) {
+ 1239 │ module MultiStateLoop #(T, int II) {
       │                                ─┬  
       │                                 ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: An action requires a block
-      ╭─[ test.sus:1247:3 ]
+      ╭─[ test.sus:1241:3 ]
       │
- 1247 │        action next_state'II : T next_state_value
+ 1241 │        action next_state'II : T next_state_value
       │        ───┬──  
       │           ╰──── An action requires a block
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1247:28 ]
+      ╭─[ test.sus:1241:28 ]
       │
- 1247 │        action next_state'II : T next_state_value
+ 1241 │        action next_state'II : T next_state_value
       │                                 ────────┬───────  
       │                                         ╰───────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: An action requires a block
-      ╭─[ test.sus:1250:2 ]
+      ╭─[ test.sus:1244:2 ]
       │
- 1250 │     action request_output : -> trigger output_valid : T result
+ 1244 │     action request_output : -> trigger output_valid : T result
       │     ───┬──  
       │        ╰──── An action requires a block
 ──────╯
 Error: While parsing 'interface_statement', parser found a syntax error in a node of type 'ERROR'
-      ╭─[ test.sus:1250:24 ]
+      ╭─[ test.sus:1244:24 ]
       │
- 1250 │     action request_output : -> trigger output_valid : T result
+ 1244 │     action request_output : -> trigger output_valid : T result
       │     ─────────────────────────────┬────┬───────────────────────  
       │                                  ╰────────────────────────────── Parent node 'interface_statement'
       │                                       │                         
       │                                       ╰───────────────────────── While parsing 'interface_statement', parser found a syntax error in a node of type 'ERROR'
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1250:54 ]
+      ╭─[ test.sus:1244:54 ]
       │
- 1250 │     action request_output : -> trigger output_valid : T result
+ 1244 │     action request_output : -> trigger output_valid : T result
       │                                                         ───┬──  
       │                                                            ╰──── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: An action requires a block
-      ╭─[ test.sus:1257:3 ]
+      ╭─[ test.sus:1251:3 ]
       │
- 1257 │        action input_valid : float new_input
+ 1251 │        action input_valid : float new_input
       │        ───┬──  
       │           ╰──── An action requires a block
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1257:30 ]
+      ╭─[ test.sus:1251:30 ]
       │
- 1257 │        action input_valid : float new_input
+ 1251 │        action input_valid : float new_input
       │                                   ────┬────  
       │                                       ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: No Global of the name 'trigger' was found. Did you forget to import it?
-      ╭─[ test.sus:1259:29 ]
+      ╭─[ test.sus:1253:29 ]
       │
- 1259 │     action request_result : -> trigger result_valid : {
+ 1253 │     action request_result : -> trigger result_valid : {
       │                                ───┬───  
       │                                   ╰───── No Global of the name 'trigger' was found. Did you forget to import it?
 ──────╯
 Error: While parsing 'interface_statement', parser found a syntax error in a node of type 'ERROR'
-      ╭─[ test.sus:1259:50 ]
+      ╭─[ test.sus:1253:50 ]
       │
- 1259 │ ╭─▶     action request_result : -> trigger result_valid : {
+ 1253 │ ╭─▶     action request_result : -> trigger result_valid : {
       │ │                                                       ┬  
       │ │                                                       ╰── While parsing 'interface_statement', parser found a syntax error in a node of type 'ERROR'
       ┆ ┆   
- 1261 │ ├─▶     }
+ 1255 │ ├─▶     }
       │ │           
       │ ╰─────────── Parent node 'interface_statement'
 ──────╯
 Error: No such field 'process' on MultiStateLoop #(T: ?[...], II: _). Available fields are 'MultiStateLoop', 'may_process', 'next_state', 'request_output'
-      ╭─[ test.sus:1263:12 ]
+      ╭─[ test.sus:1257:12 ]
       │
- 1245 │ module MultiStateLoop #(T, int II) {
+ 1239 │ module MultiStateLoop #(T, int II) {
       │        ───────┬──────  
       │               ╰──────── Module 'MultiStateLoop' defined here. module MultiStateLoop #(T, int II):
 domain clk:
@@ -8208,263 +8155,263 @@ action next_state'II:
 action request_output:
 	input T result
       │ 
- 1263 │     when loop.process : float cur_state {
+ 1257 │     when loop.process : float cur_state {
       │               ───┬───  
       │                  ╰───── No such field 'process' on MultiStateLoop #(T: ?[...], II: _). Available fields are 'MultiStateLoop', 'may_process', 'next_state', 'request_output'
 ──────╯
 Error: Cannot use conditional bingings because the condition isn't an action or a trigger
-      ╭─[ test.sus:1263:20 ]
+      ╭─[ test.sus:1257:20 ]
       │
- 1263 │     when loop.process : float cur_state {
+ 1257 │     when loop.process : float cur_state {
       │                       ────────┬────────  
       │                               ╰────────── Cannot use conditional bingings because the condition isn't an action or a trigger
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1263:28 ]
+      ╭─[ test.sus:1257:28 ]
       │
- 1263 │     when loop.process : float cur_state {
+ 1257 │     when loop.process : float cur_state {
       │                               ────┬────  
       │                                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Typing Error: writing the output of this expression expects 'float' but was given 'int'
-      ╭─[ test.sus:1264:3 ]
+      ╭─[ test.sus:1258:3 ]
       │
- 1264 │        float next_state = cur_state * cur_state
+ 1258 │        float next_state = cur_state * cur_state
       │        ────────┬───────  
       │                ╰───────── Typing Error: writing the output of this expression expects 'float' but was given 'int'
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1264:9 ]
+      ╭─[ test.sus:1258:9 ]
       │
- 1264 │        float next_state = cur_state * cur_state
+ 1258 │        float next_state = cur_state * cur_state
       │              ─────┬────  
       │                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Typing Error: binop left side expects 'int' but was given 'float'
-      ╭─[ test.sus:1264:22 ]
+      ╭─[ test.sus:1258:22 ]
       │
- 1264 │        float next_state = cur_state * cur_state
+ 1258 │        float next_state = cur_state * cur_state
       │                           ────┬────  
       │                               ╰────── Typing Error: binop left side expects 'int' but was given 'float'
 ──────╯
 Error: Typing Error: binop right side expects 'int' but was given 'float'
-      ╭─[ test.sus:1264:34 ]
+      ╭─[ test.sus:1258:34 ]
       │
- 1264 │        float next_state = cur_state * cur_state
+ 1258 │        float next_state = cur_state * cur_state
       │                                       ────┬────  
       │                                           ╰────── Typing Error: binop right side expects 'int' but was given 'float'
 ──────╯
 Error: Typing Error: binop left side expects 'int' but was given 'float'
-      ╭─[ test.sus:1265:8 ]
+      ╭─[ test.sus:1259:8 ]
       │
- 1265 │        when cur_state >= 2.0 {
+ 1259 │        when cur_state >= 2.0 {
       │             ────┬────  
       │                 ╰────── Typing Error: binop left side expects 'int' but was given 'float'
 ──────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-      ╭─[ test.sus:1265:22 ]
+      ╭─[ test.sus:1259:22 ]
       │
- 1265 │ ╭─▶        when cur_state >= 2.0 {
+ 1259 │ ╭─▶        when cur_state >= 2.0 {
       │ │                             ─┬  
       │ │                              ╰── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
       ┆ ┆   
- 1267 │ ├─▶        }
+ 1261 │ ├─▶        }
       │ │              
       │ ╰────────────── Parent node 'if_statement'
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1272:6 ]
+      ╭─[ test.sus:1266:6 ]
       │
- 1272 │     int a = 3
+ 1266 │     int a = 3
       │         ┬  
       │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1273:6 ]
+      ╭─[ test.sus:1267:6 ]
       │
- 1273 │     int b = 4
+ 1267 │     int b = 4
       │         ┬  
       │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[4]
-      ╭─[ test.sus:1275:9 ]
+      ╭─[ test.sus:1269:9 ]
       │
- 1275 │     int[4] result = []
+ 1269 │     int[4] result = []
       │            ───┬──  
       │               ╰──── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[4]
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1275:9 ]
+      ╭─[ test.sus:1269:9 ]
       │
- 1275 │     int[4] result = []
+ 1269 │     int[4] result = []
       │            ───┬──  
       │               ╰──── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[0]
-      ╭─[ test.sus:1275:18 ]
+      ╭─[ test.sus:1269:18 ]
       │
- 1275 │     int[4] result = []
+ 1269 │     int[4] result = []
       │                     ─┬  
       │                      ╰── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[0]
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1278:29 ]
+      ╭─[ test.sus:1272:29 ]
       │
- 1278 │ module unknownLatency #(int V) {
+ 1272 │ module unknownLatency #(int V) {
       │                             ┬  
       │                             ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: unknownLatency #(V: ?)
-      ╭─[ test.sus:1288:17 ]
+      ╭─[ test.sus:1282:17 ]
       │
- 1288 │     unknownLatency ulat
+ 1282 │     unknownLatency ulat
       │                    ──┬─  
       │                      ╰─── Could not infer the parameters of this submodule, some parameters were still unknown: unknownLatency #(V: ?)
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1294:20 ]
+      ╭─[ test.sus:1288:20 ]
       │
- 1294 │     interface a: bool x'0 -> bool y'V
+ 1288 │     interface a: bool x'0 -> bool y'V
       │                       ┬  
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1296:20 ]
+      ╭─[ test.sus:1290:20 ]
       │
- 1296 │     interface b: bool p'0 -> bool q'-V
+ 1290 │     interface b: bool p'0 -> bool q'-V
       │                       ┬  
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_conflicting_directions #(V: ?)
-      ╭─[ test.sus:1302:34 ]
+      ╭─[ test.sus:1296:34 ]
       │
- 1302 │     infer_me_conflicting_directions inf
+ 1296 │     infer_me_conflicting_directions inf
       │                                     ─┬─  
       │                                      ╰─── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_conflicting_directions #(V: ?)
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1309:20 ]
+      ╭─[ test.sus:1303:20 ]
       │
- 1309 │     interface a: bool x'0 -> bool y'V
+ 1303 │     interface a: bool x'0 -> bool y'V
       │                       ┬  
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1311:20 ]
+      ╭─[ test.sus:1305:20 ]
       │
- 1311 │     interface b: bool p'0 -> bool q'V+30
+ 1305 │     interface b: bool p'0 -> bool q'V+30
       │                       ┬  
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1324:20 ]
+      ╭─[ test.sus:1318:20 ]
       │
- 1324 │     interface a: bool x'0 -> bool y'-V
+ 1318 │     interface a: bool x'0 -> bool y'-V
       │                       ┬  
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1326:20 ]
+      ╭─[ test.sus:1320:20 ]
       │
- 1326 │     interface b: bool p'0 -> bool q'-V+30
+ 1320 │     interface b: bool p'0 -> bool q'-V+30
       │                       ┬  
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1338:35 ]
+      ╭─[ test.sus:1332:35 ]
       │
- 1338 │ module infer_me_inputs_only #(int V) {
+ 1332 │ module infer_me_inputs_only #(int V) {
       │                                   ┬  
       │                                   ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1339:40 ]
+      ╭─[ test.sus:1333:40 ]
       │
- 1339 │     interface infer_me_inputs_only : bool a'0, bool b'V
+ 1333 │     interface infer_me_inputs_only : bool a'0, bool b'V
       │                                           ┬  
       │                                           ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1339:50 ]
+      ╭─[ test.sus:1333:50 ]
       │
- 1339 │     interface infer_me_inputs_only : bool a'0, bool b'V
+ 1333 │     interface infer_me_inputs_only : bool a'0, bool b'V
       │                                                     ┬  
       │                                                     ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1343:44 ]
+      ╭─[ test.sus:1337:44 ]
       │
- 1343 │     interface use_infer_me_inputs_only : bool x'0
+ 1337 │     interface use_infer_me_inputs_only : bool x'0
       │                                               ┬  
       │                                               ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1346:19 ]
+      ╭─[ test.sus:1340:19 ]
       │
- 1346 │     reg reg reg bool y = x
+ 1340 │     reg reg reg bool y = x
       │                      ┬  
       │                      ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_inputs_only #(V: ?)
-      ╭─[ test.sus:1348:2 ]
+      ╭─[ test.sus:1342:2 ]
       │
- 1348 │     infer_me_inputs_only(x, y)
+ 1342 │     infer_me_inputs_only(x, y)
       │     ──────────┬─────────  
       │               ╰─────────── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_inputs_only #(V: ?)
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1353:14 ]
+      ╭─[ test.sus:1347:14 ]
       │
- 1353 │     gen int[15] v = [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5]
+ 1347 │     gen int[15] v = [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5]
       │                 ┬  
       │                 ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1355:14 ]
+      ╭─[ test.sus:1349:14 ]
       │
- 1355 │     gen int[15] vv = v + v
+ 1349 │     gen int[15] vv = v + v
       │                 ─┬  
       │                  ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1357:14 ]
+      ╭─[ test.sus:1351:14 ]
       │
- 1357 │     gen int[16] vvv = [1, 2, 4, 8, 1, 2, 4, 8, 1, 2, 4, 8, 1, 2, 4, 6]
+ 1351 │     gen int[16] vvv = [1, 2, 4, 8, 1, 2, 4, 8, 1, 2, 4, 8, 1, 2, 4, 6]
       │                 ─┬─  
       │                  ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1359:13 ]
+      ╭─[ test.sus:1353:13 ]
       │
- 1359 │     gen int[3] qzd = vv + vvv
+ 1353 │     gen int[3] qzd = vv + vvv
       │                ─┬─  
       │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Higher Rank array operation's arrays don't match in size: 15, 16
-      ╭─[ test.sus:1359:19 ]
+      ╭─[ test.sus:1353:19 ]
       │
- 1359 │     gen int[3] qzd = vv + vvv
+ 1353 │     gen int[3] qzd = vv + vvv
       │                      ────┬───  
       │                          ╰───── Higher Rank array operation's arrays don't match in size: 15, 16
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1361:16 ]
+      ╭─[ test.sus:1355:16 ]
       │
- 1361 │     state int[15] wire_v
+ 1355 │     state int[15] wire_v
       │                   ───┬──  
       │                      ╰──── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1369:9 ]
+      ╭─[ test.sus:1363:9 ]
       │
- 1369 │     int[5] vs = [1, 2, 3, 4, 5]
+ 1363 │     int[5] vs = [1, 2, 3, 4, 5]
       │            ─┬  
       │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Excess argument. Function takes 1 args, but 2 were passed.
-      ╭─[ test.sus:1376:18 ]
+      ╭─[ test.sus:1370:18 ]
       │
- 1376 │     f.push(true, 3)
+ 1370 │     f.push(true, 3)
       │                  ┬  
       │                  ╰── Excess argument. Function takes 1 args, but 2 were passed.
       │
@@ -8475,280 +8422,280 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │              ╰─── Interface 'push' defined here
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1380:11 ]
+      ╭─[ test.sus:1374:11 ]
       │
- 1380 │     gen bool a
+ 1374 │     gen bool a
       │              ┬  
       │              ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1382:7 ]
+      ╭─[ test.sus:1376:7 ]
       │
- 1382 │     bool b
+ 1376 │     bool b
       │          ┬  
       │          ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Cannot write to compiletime variable through runtime 'when' blocks
-      ╭─[ test.sus:1385:3 ]
+      ╭─[ test.sus:1379:3 ]
       │
- 1380 │     gen bool a
+ 1374 │     gen bool a
       │              ┬  
       │              ╰── 'a' declared here
       │ 
- 1384 │     when b {
+ 1378 │     when b {
       │     ──┬─  
       │       ╰─── Assignment passes through this 'when'
- 1385 │        a = true
+ 1379 │        a = true
       │        ┬  
       │        ╰── Cannot write to compiletime variable through runtime 'when' blocks
 ──────╯
 Error: This declaration conflicts with a previous declaration in the same scope
-      ╭─[ test.sus:1390:13 ]
+      ╭─[ test.sus:1384:13 ]
       │
- 1389 │ module SameNameAsType #(NUM_INPUTS) {
+ 1383 │ module SameNameAsType #(NUM_INPUTS) {
       │                         ─────┬────  
       │                              ╰────── Parameter 'NUM_INPUTS' declared here
- 1390 │     gen int NUM_INPUTS = 500
+ 1384 │     gen int NUM_INPUTS = 500
       │             ─────┬────  
       │                  ╰────── This declaration conflicts with a previous declaration in the same scope
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1390:13 ]
+      ╭─[ test.sus:1384:13 ]
       │
- 1390 │     gen int NUM_INPUTS = 500
+ 1384 │     gen int NUM_INPUTS = 500
       │             ─────┬────  
       │                  ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: transmute_from_bits #(T: type int #(FROM: ?, TO: ?)[30])
-      ╭─[ test.sus:1394:41 ]
+      ╭─[ test.sus:1388:41 ]
       │
- 1394 │     transmute_from_bits #(T: type int[30]) a
+ 1388 │     transmute_from_bits #(T: type int[30]) a
       │                                            ┬  
       │                                            ╰── Could not infer the parameters of this submodule, some parameters were still unknown: transmute_from_bits #(T: type int #(FROM: ?, TO: ?)[30])
 ──────╯
 Warning: Unused port 'bits'
-      ╭─[ test.sus:1395:40 ]
+      ╭─[ test.sus:1389:40 ]
       │
- 1395 │     transmute_to_bits #(T: type bool[60]) b
+ 1389 │     transmute_to_bits #(T: type bool[60]) b
       │                                           ┬  
       │                                           ╰── Unused port 'bits'
       │                                           │  
       │                                           ╰── b declared here
       │
-      ├─[ core.sus:34:66 ]
+      ├─[ core.sus:90:66 ]
       │
-   34 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+   90 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                                                  ──┬─  
       │                                                                    ╰─── Port 'bits' declared here
 ──────╯
 Warning: Unused port 'value'
-      ╭─[ test.sus:1395:40 ]
+      ╭─[ test.sus:1389:40 ]
       │
- 1395 │     transmute_to_bits #(T: type bool[60]) b
+ 1389 │     transmute_to_bits #(T: type bool[60]) b
       │                                           ┬  
       │                                           ╰── Unused port 'value'
       │                                           │  
       │                                           ╰── b declared here
       │
-      ├─[ core.sus:34:37 ]
+      ├─[ core.sus:90:37 ]
       │
-   34 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+   90 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                     ──┬──  
       │                                       ╰──── Port 'value' declared here
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: transmute_to_bits #(T: type int #(FROM: ?, TO: ?)[3][3][5])
-      ╭─[ test.sus:1396:44 ]
+      ╭─[ test.sus:1390:44 ]
       │
- 1396 │     transmute_to_bits #(T: type int[3][3][5]) c
+ 1390 │     transmute_to_bits #(T: type int[3][3][5]) c
       │                                               ┬  
       │                                               ╰── Could not infer the parameters of this submodule, some parameters were still unknown: transmute_to_bits #(T: type int #(FROM: ?, TO: ?)[3][3][5])
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1400:28 ]
+      ╭─[ test.sus:1394:28 ]
       │
- 1400 │     int#(FROM: 0, TO: 255)[2] a
+ 1394 │     int#(FROM: 0, TO: 255)[2] a
       │                               ┬  
       │                               ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1402:10 ]
+      ╭─[ test.sus:1396:10 ]
       │
- 1402 │     gen int SZ = sizeof #(T: type int#(FROM: 0, TO: 256*256))
+ 1396 │     gen int SZ = sizeof #(T: type int#(FROM: 0, TO: 256*256))
       │             ─┬  
       │              ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1404:6 ]
+      ╭─[ test.sus:1398:6 ]
       │
- 1404 │     int b = transmute #(T2: type int#(FROM: 0, TO: 256*256)) (a)
+ 1398 │     int b = transmute #(T2: type int#(FROM: 0, TO: 256*256)) (a)
       │         ┬  
       │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: The type of this wire is invalid! int #(FROM: 5, TO: 3)
-      ╭─[ test.sus:1406:24 ]
+      ╭─[ test.sus:1400:24 ]
       │
- 1406 │     int #(FROM: 5, TO: 3) v
+ 1400 │     int #(FROM: 5, TO: 3) v
       │                           ┬  
       │                           ╰── The type of this wire is invalid! int #(FROM: 5, TO: 3)
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1406:24 ]
+      ╭─[ test.sus:1400:24 ]
       │
- 1406 │     int #(FROM: 5, TO: 3) v
+ 1400 │     int #(FROM: 5, TO: 3) v
       │                           ┬  
       │                           ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1421:7 ]
+      ╭─[ test.sus:1415:7 ]
       │
- 1421 │     bool b
+ 1415 │     bool b
       │          ┬  
       │          ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1429:25 ]
+      ╭─[ test.sus:1423:25 ]
       │
- 1429 │     when submod.beep : int x {
+ 1423 │     when submod.beep : int x {
       │                            ┬  
       │                            ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1430:7 ]
+      ╭─[ test.sus:1424:7 ]
       │
- 1430 │        int y = x
+ 1424 │        int y = x
       │            ┬  
       │            ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1439:18 ]
+      ╭─[ test.sus:1433:18 ]
       │
- 1439 │     gen int[10][20] INTS
+ 1433 │     gen int[10][20] INTS
       │                     ──┬─  
       │                       ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1441:10 ]
+      ╭─[ test.sus:1435:10 ]
       │
- 1441 │     for int i in 0..10 {
+ 1435 │     for int i in 0..10 {
       │             ┬  
       │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1442:11 ]
+      ╭─[ test.sus:1436:11 ]
       │
- 1442 │        for int j in 0..20 {
+ 1436 │        for int j in 0..20 {
       │                ┬  
       │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1449:17 ]
+      ╭─[ test.sus:1443:17 ]
       │
- 1449 │     gen int[5][30] SUBSLICE = INTS[11:14][2:5]
+ 1443 │     gen int[5][30] SUBSLICE = INTS[11:14][2:5]
       │                    ────┬───  
       │                        ╰───── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1451:6 ]
+      ╭─[ test.sus:1445:6 ]
       │
- 1451 │     int x = 3
+ 1445 │     int x = 3
       │         ┬  
       │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1453:6 ]
+      ╭─[ test.sus:1447:6 ]
       │
- 1453 │     int y = 1
+ 1447 │     int y = 1
       │         ┬  
       │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1455:6 ]
+      ╭─[ test.sus:1449:6 ]
       │
- 1455 │     int z = INTS[x][y]
+ 1449 │     int z = INTS[x][y]
       │         ┬  
       │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1457:12 ]
+      ╭─[ test.sus:1451:12 ]
       │
- 1457 │     int[3][4] w = INTS[x+:4][y-:3]
+ 1451 │     int[3][4] w = INTS[x+:4][y-:3]
       │               ┬  
       │               ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1459:25 ]
+      ╭─[ test.sus:1453:25 ]
       │
- 1459 │     int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4:4]
+ 1453 │     int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4:4]
       │                            ─────┬────  
       │                                 ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[0]
-      ╭─[ test.sus:1459:38 ]
+      ╭─[ test.sus:1453:38 ]
       │
- 1459 │     int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4:4]
+ 1453 │     int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4:4]
       │                                         ──────┬─────  
       │                                               ╰─────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[0]
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1464:18 ]
+      ╭─[ test.sus:1458:18 ]
       │
- 1464 │     gen int[10][20] INTS
+ 1458 │     gen int[10][20] INTS
       │                     ──┬─  
       │                       ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1466:10 ]
+      ╭─[ test.sus:1460:10 ]
       │
- 1466 │     for int i in 0..10 {
+ 1460 │     for int i in 0..10 {
       │             ┬  
       │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1467:11 ]
+      ╭─[ test.sus:1461:11 ]
       │
- 1467 │        for int j in 0..20 {
+ 1461 │        for int j in 0..20 {
       │                ┬  
       │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Attempting to write to this slice 11:14 (length 3) with an array of length 0.
-      ╭─[ test.sus:1472:7 ]
+      ╭─[ test.sus:1466:7 ]
       │
- 1472 │     INTS[11:14][2:5] = []
+ 1466 │     INTS[11:14][2:5] = []
       │          ──┬──  
       │            ╰──── Attempting to write to this slice 11:14 (length 3) with an array of length 0.
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1477:18 ]
+      ╭─[ test.sus:1471:18 ]
       │
- 1477 │     gen int[10][20] INTS
+ 1471 │     gen int[10][20] INTS
       │                     ──┬─  
       │                       ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1479:10 ]
+      ╭─[ test.sus:1473:10 ]
       │
- 1479 │     for int i in 0..10 {
+ 1473 │     for int i in 0..10 {
       │             ┬  
       │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1480:11 ]
+      ╭─[ test.sus:1474:11 ]
       │
- 1480 │        for int j in 0..20 {
+ 1474 │        for int j in 0..20 {
       │                ┬  
       │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1485:25 ]
+      ╭─[ test.sus:1479:25 ]
       │
- 1485 │     int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4:3]
+ 1479 │     int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4:3]
       │                            ───────┬──────  
       │                                   ╰──────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Slice 4:3 has a negative length.
-      ╭─[ test.sus:1485:50 ]
+      ╭─[ test.sus:1479:50 ]
       │
- 1485 │     int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4:3]
+ 1479 │     int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4:3]
       │                                                     ─┬─  
       │                                                      ╰─── Slice 4:3 has a negative length.
 ──────╯

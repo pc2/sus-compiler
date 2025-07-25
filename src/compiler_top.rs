@@ -19,14 +19,14 @@ use crate::{
     linker::FileData,
 };
 
+use crate::config::get_sus_home;
 use crate::flattening::{flatten_all_globals, gather_initial_file_data};
 
-pub const SUS_HOME: &str = env!("SUS_HOME");
 pub fn get_std_dir() -> PathBuf {
-    Path::new(SUS_HOME).join("std")
+    get_sus_home().join("std")
 }
 pub fn get_core_dumps_dir() -> PathBuf {
-    Path::new(SUS_HOME).join("core_dumps")
+    get_sus_home().join("core_dumps")
 }
 
 /// Any extra operations that should happen when files are added or removed from the linker. Such as caching line offsets.
