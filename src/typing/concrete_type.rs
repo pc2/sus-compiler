@@ -480,16 +480,16 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn test_bound_to_bits() {
-        assert_eq!(IntBounds{from: &IBig::from(-1), to: &IBig::from(0)}.bitwidth(), 1);
-        assert_eq!(IntBounds{from: &IBig::from(-2), to: &IBig::from(0)}.bitwidth(), 2);
-        assert_eq!(IntBounds{from: &IBig::from(-1), to: &IBig::from(1)}.bitwidth(), 2);
-        assert_eq!(IntBounds{from: &IBig::from(-2), to: &IBig::from(2)}.bitwidth(), 3);
-        assert_eq!(IntBounds{from: &IBig::from(2), to: &IBig::from(8)}.bitwidth(), 4);
-        assert_eq!(IntBounds{from: &IBig::from(-1000), to: &IBig::from(0)}.bitwidth(), 11);
-        assert_eq!(IntBounds{from: &IBig::from(-2000), to: &IBig::from(-1000)}.bitwidth(), 12);
-        assert_eq!(IntBounds{from: &IBig::from(-256), to: &IBig::from(255)}.bitwidth(), 9);
-        assert_eq!(IntBounds{from: &IBig::from(0), to: &IBig::from(255)}.bitwidth(), 8);
-        assert_eq!(IntBounds{from: &IBig::from(20), to: &IBig::from(256)}.bitwidth(), 9);
-        assert_eq!(IntBounds{from: &IBig::from(0), to: &IBig::from(0)}.bitwidth(), 1); // Temporary fix, such that we never generate Length 0 wires (#86)
+        assert_eq!(IntBounds{from: &IBig::from(-1), to: &IBig::from(1)}.bitwidth(), 1);
+        assert_eq!(IntBounds{from: &IBig::from(-2), to: &IBig::from(1)}.bitwidth(), 2);
+        assert_eq!(IntBounds{from: &IBig::from(-1), to: &IBig::from(2)}.bitwidth(), 2);
+        assert_eq!(IntBounds{from: &IBig::from(-2), to: &IBig::from(3)}.bitwidth(), 3);
+        assert_eq!(IntBounds{from: &IBig::from(2), to: &IBig::from(9)}.bitwidth(), 4);
+        assert_eq!(IntBounds{from: &IBig::from(-1000), to: &IBig::from(1)}.bitwidth(), 11);
+        assert_eq!(IntBounds{from: &IBig::from(-2000), to: &IBig::from(-999)}.bitwidth(), 12);
+        assert_eq!(IntBounds{from: &IBig::from(-256), to: &IBig::from(256)}.bitwidth(), 9);
+        assert_eq!(IntBounds{from: &IBig::from(0), to: &IBig::from(256)}.bitwidth(), 8);
+        assert_eq!(IntBounds{from: &IBig::from(20), to: &IBig::from(257)}.bitwidth(), 9);
+        assert_eq!(IntBounds{from: &IBig::from(0), to: &IBig::from(1)}.bitwidth(), 1); // Temporary fix, such that we never generate Length 0 wires (#86)
     }
 }
