@@ -633,7 +633,6 @@ pub enum DeclarationKind {
         is_state: bool,
         port_id: PortID,
         parent_interface: InterfaceID,
-        domain: DomainID,
     },
     ConditionalBinding {
         when_id: FlatID,

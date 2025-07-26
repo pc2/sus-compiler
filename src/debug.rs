@@ -13,7 +13,7 @@ use circular_buffer::CircularBuffer;
 use colored::Colorize;
 
 use crate::{
-    compiler_top::{get_core_dumps_dir, get_std_dir},
+    compiler_top::get_core_dumps_dir,
     config::config,
     linker::{FileData, Linker},
     prelude::Span,

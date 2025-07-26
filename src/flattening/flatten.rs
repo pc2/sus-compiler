@@ -546,7 +546,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             is_state,
                             port_id,
                             parent_interface,
-                            domain: self.current_domain,
                         }
                     } else {
                         let is_state = state_kw.is_some();
@@ -595,7 +594,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 }
                 DeclarationKind::Port {
                     direction,
-                    domain,
                     parent_interface,
                     ..
                 } => {
@@ -625,7 +623,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         name_span,
                         decl_span,
                         direction,
-                        domain,
+                        domain: self.current_domain,
                         declaration_instruction,
                         latency_specifier,
                     });
@@ -634,7 +632,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         is_state,
                         port_id,
                         parent_interface,
-                        domain,
                     }
                 }
                 d @ DeclarationKind::RegularGenerative { .. } => {
@@ -659,6 +656,11 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 }
             };
 
+            let domain = if let DeclarationKind::Port { .. } = decl_kind {
+                Cell::new(DomainType::Physical(self.current_domain))
+            } else {
+                Cell::new(DomainType::PLACEHOLDER)
+            };
             assert_eq!(
                 declaration_instruction,
                 self.instructions
@@ -666,7 +668,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         parent_condition: self.current_parent_condition,
                         typ_expr,
                         typ: TyCell::new(),
-                        domain: Cell::new(DomainType::PLACEHOLDER),
+                        domain,
                         declaration_itself_is_not_written_to,
                         decl_kind,
                         name: name.to_owned(),
@@ -1570,7 +1572,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     is_state: false,
                     parent_interface,
                     port_id: UUID::PLACEHOLDER,
-                    domain: self.current_domain,
                 },
                 cursor,
             );
@@ -1582,7 +1583,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     is_state: false,
                     parent_interface,
                     port_id: UUID::PLACEHOLDER,
-                    domain: self.current_domain,
                 },
                 cursor,
             );

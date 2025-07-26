@@ -51,16 +51,18 @@ impl<'l> TypeCheckingContext<'l> {
             }
             Instruction::Declaration(declaration) => {
                 self.written_type_must_be_generative(&declaration.typ_expr);
-                declaration.domain.set(match declaration.decl_kind {
-                    DeclarationKind::Port { domain, .. } => DomainType::Physical(domain),
+                match declaration.decl_kind {
+                    DeclarationKind::Port { .. } => {} // Domain is already set by flatten
                     DeclarationKind::StructField(..)
                     | DeclarationKind::RegularWire { .. }
                     | DeclarationKind::ConditionalBinding { .. } => {
-                        self.domain_checker.alloc_unknown()
+                        declaration.domain.set(self.domain_checker.alloc_unknown())
                     }
                     DeclarationKind::RegularGenerative { .. }
-                    | DeclarationKind::TemplateParameter { .. } => DomainType::Generative,
-                });
+                    | DeclarationKind::TemplateParameter { .. } => {
+                        declaration.domain.set(DomainType::Generative)
+                    }
+                }
                 if let Some(latency_spec) = declaration.latency_specifier {
                     self.must_be_generative(latency_spec, "Latency Specifier");
                 }
