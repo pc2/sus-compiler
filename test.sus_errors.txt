@@ -2145,20 +2145,6 @@ interface out:
      │                       ┬  
      │                       ╰── No such field 'o' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
 ─────╯
-Error: No Global of the name 'FIFO' was found. Did you forget to import it?
-     ╭─[ test.sus:649:2 ]
-     │
- 649 │     FIFO fiii
-     │     ──┬─  
-     │       ╰─── No Global of the name 'FIFO' was found. Did you forget to import it?
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:649:7 ]
-     │
- 649 │     FIFO fiii
-     │          ──┬─  
-     │            ╰─── Unused Variable: This variable does not affect the output ports of this module
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:651:11 ]
      │
@@ -2173,6 +2159,19 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │          ──┬──  
      │            ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: Excess output targets. Function returns 1 results, but 2 targets were given.
+     ╭─[ test.sus:653:14 ]
+     │
+ 653 │     bool valid, bool[20] data2 = fiii.pop(true)
+     │                 ───────┬──────  
+     │                        ╰──────── Excess output targets. Function returns 1 results, but 2 targets were given.
+     │
+     ├─[ xpm.sus:70:12 ]
+     │
+  70 │     action pop : -> T pop_data {
+     │            ─┬─  
+     │             ╰─── Interface 'pop' defined here
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:653:23 ]
      │
@@ -2180,12 +2179,18 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                          ──┬──  
      │                            ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: A function call expects this to be an interface, but found a regular wire
-     ╭─[ test.sus:653:31 ]
+Error: Excess argument. Function takes 0 args, but 1 were passed.
+     ╭─[ test.sus:653:40 ]
      │
  653 │     bool valid, bool[20] data2 = fiii.pop(true)
-     │                                  ────┬───  
-     │                                      ╰───── A function call expects this to be an interface, but found a regular wire
+     │                                           ──┬─  
+     │                                             ╰─── Excess argument. Function takes 0 args, but 1 were passed.
+     │
+     ├─[ xpm.sus:70:12 ]
+     │
+  70 │     action pop : -> T pop_data {
+     │            ─┬─  
+     │             ╰─── Interface 'pop' defined here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:659:44 ]
@@ -2636,19 +2641,18 @@ Error: 'beep' is read-only
      │     ──┬─  
      │       ╰─── 'beep' is read-only
 ─────╯
-Error: No Global of the name 'FIFO' was found. Did you forget to import it?
-     ╭─[ test.sus:775:2 ]
+Error: 'BITWIDTH' is not a valid template argument of FIFO
+     ╭─[ test.sus:775:9 ]
      │
  775 │     FIFO #(BITWIDTH: 4) badoop
-     │     ──┬─  
-     │       ╰─── No Global of the name 'FIFO' was found. Did you forget to import it?
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:775:22 ]
+     │            ────┬───  
+     │                ╰───── 'BITWIDTH' is not a valid template argument of FIFO
      │
- 775 │     FIFO #(BITWIDTH: 4) badoop
-     │                         ───┬──  
-     │                            ╰──── Unused Variable: This variable does not affect the output ports of this module
+     ├─[ xpm.sus:54:8 ]
+     │
+  54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+     │        ──┬─  
+     │          ╰─── 'FIFO' defined here
 ─────╯
 Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:779:2 ]
@@ -7314,19 +7318,18 @@ Error: A function call expects this to be an interface, but found a regular wire
       │                 ────┬───  
       │                     ╰───── A function call expects this to be an interface, but found a regular wire
 ──────╯
-Error: No Global of the name 'FIFO' was found. Did you forget to import it?
-      ╭─[ test.sus:1050:2 ]
+Error: 'READY_SLACK' is not a valid template argument of FIFO
+      ╭─[ test.sus:1050:19 ]
       │
  1050 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-      │     ──┬─  
-      │       ╰─── No Global of the name 'FIFO' was found. Did you forget to import it?
-──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1050:48 ]
+      │                      ─────┬─────  
+      │                           ╰─────── 'READY_SLACK' is not a valid template argument of FIFO
       │
- 1050 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-      │                                                   ┬  
-      │                                                   ╰── Unused Variable: This variable does not affect the output ports of this module
+      ├─[ xpm.sus:54:8 ]
+      │
+   54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+      │        ──┬─  
+      │          ╰─── 'FIFO' defined here
 ──────╯
 Error: Typing Error: function argument expects 'int' but was given 'bool'
       ╭─[ test.sus:1061:20 ]
@@ -7535,19 +7538,36 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                                                      ──────┬──────  
       │                                                            ╰──────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: No Global of the name 'FIFO' was found. Did you forget to import it?
-      ╭─[ test.sus:1155:2 ]
+Warning: Used 'when' in a generative context, use 'if' instead
+      ╭─[ test.sus:1157:2 ]
       │
- 1155 │     FIFO #(DEPTH: 30) fifo
+ 1157 │     when fifo.ready {
       │     ──┬─  
-      │       ╰─── No Global of the name 'FIFO' was found. Did you forget to import it?
+      │       ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1155:20 ]
+Error: No such field 'ready' on FIFO #(T: ?[...], DEPTH: _, MAY_PUSH_LATENCY: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
+      ╭─[ test.sus:1157:12 ]
       │
- 1155 │     FIFO #(DEPTH: 30) fifo
-      │                       ──┬─  
-      │                         ╰─── Unused Variable: This variable does not affect the output ports of this module
+ 1157 │     when fifo.ready {
+      │               ──┬──  
+      │                 ╰──── No such field 'ready' on FIFO #(T: ?[...], DEPTH: _, MAY_PUSH_LATENCY: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
+      │
+      ├─[ xpm.sus:54:8 ]
+      │
+   54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+      │        ──┬─  
+      │          ╰─── Module 'FIFO' defined here. module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY):
+domain clk:
+action rst:
+domain write:
+output bool may_push'-MAY_PUSH_LATENCY
+action push:
+	input T push_data
+domain read:
+output bool may_pop
+action pop:
+	->
+	output T pop_data
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1158:27 ]
@@ -7555,13 +7575,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1158 │        reg reg reg reg reg int heavy_computation = request_data()
       │                                ────────┬────────  
       │                                        ╰────────── Unused Variable: This variable does not affect the output ports of this module
-──────╯
-Error: A function call expects this to be an interface, but found a regular wire
-      ╭─[ test.sus:1160:3 ]
-      │
- 1160 │        fifo.push(heavy_computation)
-      │        ────┬────  
-      │            ╰────── A function call expects this to be an interface, but found a regular wire
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
       ╭─[ test.sus:1181:11 ]
@@ -8396,26 +8409,31 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │            ─┬  
       │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: No Global of the name 'FIFO' was found. Did you forget to import it?
-      ╭─[ test.sus:1368:5 ]
+Error: 'READY_SLACK' is not a valid template argument of FIFO
+      ╭─[ test.sus:1368:23 ]
       │
  1368 │     FIFO #(DEPTH: 53, READY_SLACK: 3) f
-      │     ──┬─  
-      │       ╰─── No Global of the name 'FIFO' was found. Did you forget to import it?
-──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1368:39 ]
+      │                       ─────┬─────  
+      │                            ╰─────── 'READY_SLACK' is not a valid template argument of FIFO
       │
- 1368 │     FIFO #(DEPTH: 53, READY_SLACK: 3) f
-      │                                       ┬  
-      │                                       ╰── Unused Variable: This variable does not affect the output ports of this module
+      ├─[ xpm.sus:54:8 ]
+      │
+   54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+      │        ──┬─  
+      │          ╰─── 'FIFO' defined here
 ──────╯
-Error: A function call expects this to be an interface, but found a regular wire
-      ╭─[ test.sus:1370:5 ]
+Error: Excess argument. Function takes 1 args, but 2 were passed.
+      ╭─[ test.sus:1370:18 ]
       │
  1370 │     f.push(true, 3)
-      │     ───┬──  
-      │        ╰──── A function call expects this to be an interface, but found a regular wire
+      │                  ┬  
+      │                  ╰── Excess argument. Function takes 1 args, but 2 were passed.
+      │
+      ├─[ xpm.sus:63:12 ]
+      │
+   63 │     action push : T push_data {
+      │            ──┬─  
+      │              ╰─── Interface 'push' defined here
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1374:11 ]
@@ -8695,3 +8713,10 @@ Error: Slice 4:3 has a negative length.
       │                                                     ─┬─  
       │                                                      ╰─── Slice 4:3 has a negative length.
 ──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+    ╭─[ xpm.sus:54:22 ]
+    │
+ 54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+    │                      ──┬──  
+    │                        ╰──── Unused Variable: This variable does not affect the output ports of this module
+────╯
