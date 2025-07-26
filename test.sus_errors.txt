@@ -2145,6 +2145,20 @@ interface out:
      │                       ┬  
      │                       ╰── No such field 'o' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
 ─────╯
+Error: No Global of the name 'FIFO' was found. Did you forget to import it?
+     ╭─[ test.sus:649:2 ]
+     │
+ 649 │     FIFO fiii
+     │     ──┬─  
+     │       ╰─── No Global of the name 'FIFO' was found. Did you forget to import it?
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:649:7 ]
+     │
+ 649 │     FIFO fiii
+     │          ──┬─  
+     │            ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:651:11 ]
      │
@@ -2166,18 +2180,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                          ──┬──  
      │                            ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Excess argument. Function takes 0 args, but 1 were passed.
-     ╭─[ test.sus:653:40 ]
+Error: A function call expects this to be an interface, but found a regular wire
+     ╭─[ test.sus:653:31 ]
      │
  653 │     bool valid, bool[20] data2 = fiii.pop(true)
-     │                                           ──┬─  
-     │                                             ╰─── Excess argument. Function takes 0 args, but 1 were passed.
-     │
-     ├─[ util.sus:48:9 ]
-     │
-  48 │     action pop: -> bool data_valid, T data_out {
-     │            ─┬─  
-     │             ╰─── Interface 'pop' defined here
+     │                                  ────┬───  
+     │                                      ╰───── A function call expects this to be an interface, but found a regular wire
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:659:44 ]
@@ -2628,18 +2636,19 @@ Error: 'beep' is read-only
      │     ──┬─  
      │       ╰─── 'beep' is read-only
 ─────╯
-Error: 'BITWIDTH' is not a valid template argument of FIFO
-     ╭─[ test.sus:775:9 ]
+Error: No Global of the name 'FIFO' was found. Did you forget to import it?
+     ╭─[ test.sus:775:2 ]
      │
  775 │     FIFO #(BITWIDTH: 4) badoop
-     │            ────┬───  
-     │                ╰───── 'BITWIDTH' is not a valid template argument of FIFO
+     │     ──┬─  
+     │       ╰─── No Global of the name 'FIFO' was found. Did you forget to import it?
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:775:22 ]
      │
-     ├─[ util.sus:18:8 ]
-     │
-  18 │ module FIFO #(
-     │        ──┬─  
-     │          ╰─── 'FIFO' defined here
+ 775 │     FIFO #(BITWIDTH: 4) badoop
+     │                         ───┬──  
+     │                            ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:779:2 ]
@@ -7270,51 +7279,54 @@ Error: Typing Error: writing the output of this expression: Creating Infinite Ty
       │     ───┬───  
       │        ╰───── Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects '?[][...]' but was given '?[...]'
 ──────╯
-Error: Typing Error: function argument expects 'int' but was given 'bool'
-      ╭─[ test.sus:1044:12 ]
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1037:8 ]
+      │
+ 1037 │        bool do_write'0,
+      │             ────┬───  
+      │                 ╰───── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1039:13 ]
+      │
+ 1039 │        bool[500] data'0 ->
+      │                  ──┬─  
+      │                    ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: No Global of the name 'DualPortMem' was found. Did you forget to import it?
+      ╭─[ test.sus:1042:2 ]
+      │
+ 1042 │     DualPortMem #(SIZE: 128, T: type bool[500]) mem
+      │     ─────┬─────  
+      │          ╰─────── No Global of the name 'DualPortMem' was found. Did you forget to import it?
+──────╯
+Error: A function call expects this to be an interface, but found a regular wire
+      ╭─[ test.sus:1044:2 ]
       │
  1044 │     mem.write(do_write, addr, data)
-      │               ────┬───  
-      │                   ╰───── Typing Error: function argument expects 'int' but was given 'bool'
-      │
-      ├─[ util.sus:8:43 ]
-      │
-    8 │     action write'0 : int#(FROM: 0, TO: SIZE) addr'0, T data'0 {
-      │                                              ──┬─  
-      │                                                ╰─── 'addr' declared here
+      │     ────┬────  
+      │         ╰────── A function call expects this to be an interface, but found a regular wire
 ──────╯
-Error: Typing Error: function argument expects 'bool[]' but was given 'int'
-      ╭─[ test.sus:1044:22 ]
+Error: A function call expects this to be an interface, but found a regular wire
+      ╭─[ test.sus:1046:14 ]
       │
- 1044 │     mem.write(do_write, addr, data)
-      │                         ──┬─  
-      │                           ╰─── Typing Error: function argument expects 'bool[]' but was given 'int'
-      │
-      ├─[ util.sus:8:53 ]
-      │
-    8 │     action write'0 : int#(FROM: 0, TO: SIZE) addr'0, T data'0 {
-      │                                                        ──┬─  
-      │                                                          ╰─── 'data' declared here
+ 1046 │     read_data = mem.read(addr)
+      │                 ────┬───  
+      │                     ╰───── A function call expects this to be an interface, but found a regular wire
 ──────╯
-Error: Excess argument. Function takes 2 args, but 3 were passed.
-      ╭─[ test.sus:1044:28 ]
+Error: No Global of the name 'FIFO' was found. Did you forget to import it?
+      ╭─[ test.sus:1050:2 ]
       │
- 1044 │     mem.write(do_write, addr, data)
-      │                               ──┬─  
-      │                                 ╰─── Excess argument. Function takes 2 args, but 3 were passed.
-      │
-      ├─[ util.sus:8:9 ]
-      │
-    8 │     action write'0 : int#(FROM: 0, TO: SIZE) addr'0, T data'0 {
-      │            ──┬──  
-      │              ╰──── Interface 'write' defined here
+ 1050 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+      │     ──┬─  
+      │       ╰─── No Global of the name 'FIFO' was found. Did you forget to import it?
 ──────╯
-Error: Could not infer the parameters of this submodule, some parameters were still unknown: FIFO #(T: type int #(FROM: ?, TO: ?), DEPTH: 3, READY_SLACK: 5)
+Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1050:48 ]
       │
  1050 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │                                                   ┬  
-      │                                                   ╰── Could not infer the parameters of this submodule, some parameters were still unknown: FIFO #(T: type int #(FROM: ?, TO: ?), DEPTH: 3, READY_SLACK: 5)
+      │                                                   ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Typing Error: function argument expects 'int' but was given 'bool'
       ╭─[ test.sus:1061:20 ]
@@ -7523,50 +7535,19 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                                                      ──────┬──────  
       │                                                            ╰──────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Warning: Unused port 'data_out'
-      ╭─[ test.sus:1155:20 ]
+Error: No Global of the name 'FIFO' was found. Did you forget to import it?
+      ╭─[ test.sus:1155:2 ]
       │
  1155 │     FIFO #(DEPTH: 30) fifo
-      │                       ──┬─  
-      │                         ╰─── Unused port 'data_out'
-      │                         │   
-      │                         ╰─── fifo declared here
-      │
-      ├─[ util.sus:48:36 ]
-      │
-   48 │     action pop: -> bool data_valid, T data_out {
-      │                                       ────┬───  
-      │                                           ╰───── Port 'data_out' declared here
+      │     ──┬─  
+      │       ╰─── No Global of the name 'FIFO' was found. Did you forget to import it?
 ──────╯
-Warning: Unused port 'data_valid'
+Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1155:20 ]
       │
  1155 │     FIFO #(DEPTH: 30) fifo
       │                       ──┬─  
-      │                         ╰─── Unused port 'data_valid'
-      │                         │   
-      │                         ╰─── fifo declared here
-      │
-      ├─[ util.sus:48:22 ]
-      │
-   48 │     action pop: -> bool data_valid, T data_out {
-      │                         ─────┬────  
-      │                              ╰────── Port 'data_valid' declared here
-──────╯
-Warning: Unused port 'pop'
-      ╭─[ test.sus:1155:20 ]
-      │
- 1155 │     FIFO #(DEPTH: 30) fifo
-      │                       ──┬─  
-      │                         ╰─── Unused port 'pop'
-      │                         │   
-      │                         ╰─── fifo declared here
-      │
-      ├─[ util.sus:48:9 ]
-      │
-   48 │     action pop: -> bool data_valid, T data_out {
-      │            ─┬─  
-      │             ╰─── Port 'pop' declared here
+      │                         ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1158:27 ]
@@ -7574,6 +7555,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1158 │        reg reg reg reg reg int heavy_computation = request_data()
       │                                ────────┬────────  
       │                                        ╰────────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: A function call expects this to be an interface, but found a regular wire
+      ╭─[ test.sus:1160:3 ]
+      │
+ 1160 │        fifo.push(heavy_computation)
+      │        ────┬────  
+      │            ╰────── A function call expects this to be an interface, but found a regular wire
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
       ╭─[ test.sus:1181:11 ]
@@ -8408,18 +8396,26 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │            ─┬  
       │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Excess argument. Function takes 1 args, but 2 were passed.
-      ╭─[ test.sus:1370:18 ]
+Error: No Global of the name 'FIFO' was found. Did you forget to import it?
+      ╭─[ test.sus:1368:5 ]
+      │
+ 1368 │     FIFO #(DEPTH: 53, READY_SLACK: 3) f
+      │     ──┬─  
+      │       ╰─── No Global of the name 'FIFO' was found. Did you forget to import it?
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1368:39 ]
+      │
+ 1368 │     FIFO #(DEPTH: 53, READY_SLACK: 3) f
+      │                                       ┬  
+      │                                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: A function call expects this to be an interface, but found a regular wire
+      ╭─[ test.sus:1370:5 ]
       │
  1370 │     f.push(true, 3)
-      │                  ┬  
-      │                  ╰── Excess argument. Function takes 1 args, but 2 were passed.
-      │
-      ├─[ util.sus:42:9 ]
-      │
-   42 │     action push'READY_SLACK: T data_in'READY_SLACK {
-      │            ──┬─  
-      │              ╰─── Interface 'push' defined here
+      │     ───┬──  
+      │        ╰──── A function call expects this to be an interface, but found a regular wire
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1374:11 ]
@@ -8482,9 +8478,9 @@ Warning: Unused port 'bits'
       │                                           │  
       │                                           ╰── b declared here
       │
-      ├─[ core.sus:90:66 ]
+      ├─[ core.sus:126:66 ]
       │
-   90 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+  126 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                                                  ──┬─  
       │                                                                    ╰─── Port 'bits' declared here
 ──────╯
@@ -8497,9 +8493,9 @@ Warning: Unused port 'value'
       │                                           │  
       │                                           ╰── b declared here
       │
-      ├─[ core.sus:90:37 ]
+      ├─[ core.sus:126:37 ]
       │
-   90 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+  126 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                     ──┬──  
       │                                       ╰──── Port 'value' declared here
 ──────╯

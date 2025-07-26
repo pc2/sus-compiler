@@ -69,6 +69,42 @@ __builtin__ module CrossDomain #(T) {
     domain out_clk
     output T out'0
 }
+/// Unsafe builtin to connect wires from different domains. 
+/// Important: Does not perform any kind of Clock Domain Crossing!
+module CrossAction #(T) {
+    CrossDomain #(T: type bool) cross_valid
+    CrossDomain #(T) cross_data
+    domain in_clk
+    action in'0 : T data_in'0 {
+        cross_valid.in = true
+        cross_data.in = data_in
+    } else {
+        cross_valid.in = false
+    }
+    domain out_clk
+    trigger out'0 : T data_out'0
+
+    when cross_valid.out {
+        out(cross_data.out)
+    }
+}
+/// Unsafe builtin to connect wires from different domains. 
+/// Important: Does not perform any kind of Clock Domain Crossing!
+module CrossActionNoData {
+    CrossDomain #(T: type bool) cross_valid
+    domain in_clk
+    action in'0 {
+        cross_valid.in = true
+    } else {
+        cross_valid.in = false
+    }
+    domain out_clk
+    trigger out'0
+
+    when cross_valid.out {
+        out()
+    }
+}
 
 __builtin__ module IntToBits #(int NUM_BITS) {
     interface IntToBits : int #(FROM: -pow2 #(E: NUM_BITS - 1), TO: pow2 #(E: NUM_BITS - 1)) value'0 -> bool[NUM_BITS] bits'0
@@ -106,5 +142,5 @@ module transmute #(T1, T2) {
 }
 
 __builtin__ module unsafe_int_cast #(int FROM_I, int TO_I, int FROM, int TO) {
-    interface unsafe_int_cast : int#(FROM: FROM_I, TO: TO_I) i -> int#(FROM, TO) o
+    interface unsafe_int_cast : int#(FROM: FROM_I, TO: TO_I) in -> int#(FROM, TO) out
 }

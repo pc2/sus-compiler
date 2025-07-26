@@ -824,85 +824,74 @@ impl<'g> CodeGenerationContext<'g> {
         }
     }
 
+    fn check_ports<const N: usize>(&self, ports: &[(Direction, &'static str)]) -> [&Port; N] {
+        let actual_ports: [&Port; N] = self.md.ports.cast_to_array();
+
+        for ((direction, name), port) in crate::util::zip_eq(ports, actual_ports) {
+            assert_eq!(&port.name, *name);
+            assert_eq!(port.direction, *direction);
+        }
+
+        actual_ports
+    }
+
     /// TODO probably best to have some smarter system for this in the future.
     fn write_builtins(&mut self) {
+        let args = &self.instance.global_ref.template_args;
         match self.md.link_info.name.as_str() {
             "LatencyOffset" => {
-                let _in_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "in");
-                let _out_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "out");
+                let [_in_port, _out_port] =
+                    self.check_ports(&[(Direction::Input, "in"), (Direction::Output, "out")]);
+
                 self.program_text.write_str("\tassign out = in;\n").unwrap();
             }
             "CrossDomain" => {
-                let _in_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "in");
-                let _out_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "out");
+                let [_in_port, _out_port] =
+                    self.check_ports(&[(Direction::Input, "in"), (Direction::Output, "out")]);
+
                 self.program_text.write_str("\tassign out = in;\n").unwrap();
             }
             "IntToBits" => {
-                let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
-                let _num_bits: usize = num_bits.try_into().unwrap();
+                let [_num_bits] = args.cast_to_int_array();
+                let [_value_port, _bits_port] =
+                    self.check_ports(&[(Direction::Input, "value"), (Direction::Output, "bits")]);
 
-                let _value_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "value");
-                let _bits_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "bits");
                 writeln!(self.program_text, "\tassign bits = value;").unwrap();
             }
             "BitsToInt" => {
-                let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
-                let _num_bits: usize = num_bits.try_into().unwrap();
+                let [_num_bits] = args.cast_to_int_array();
+                let [_bits_port, _value_port] =
+                    self.check_ports(&[(Direction::Input, "bits"), (Direction::Output, "value")]);
 
-                let _bits_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "bits");
-                let _value_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "value");
                 writeln!(self.program_text, "\tassign value = bits;").unwrap();
             }
             "UIntToBits" => {
-                let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
-                let _num_bits: usize = num_bits.try_into().unwrap();
+                let [_num_bits] = args.cast_to_int_array();
+                let [_value_port, _bits_port] =
+                    self.check_ports(&[(Direction::Input, "value"), (Direction::Output, "bits")]);
 
-                let _value_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "value");
-                let _bits_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "bits");
                 writeln!(self.program_text, "\tassign bits = value;").unwrap();
             }
             "BitsToUInt" => {
-                let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
-                let _num_bits: usize = num_bits.try_into().unwrap();
+                let [_num_bits] = args.cast_to_int_array();
+                let [_bits_port, _value_port] =
+                    self.check_ports(&[(Direction::Input, "bits"), (Direction::Output, "value")]);
 
-                let _bits_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "bits");
-                let _value_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "value");
                 writeln!(self.program_text, "\tassign value = bits;").unwrap();
             }
+            "unsafe_int_cast" => {
+                let [_from_i, _to_i, _from, _to] = args.cast_to_int_array();
+                let [_bits_port, _value_port] =
+                    self.check_ports(&[(Direction::Input, "in"), (Direction::Output, "out")]);
+
+                writeln!(self.program_text, "\tassign out = in;").unwrap();
+            }
             "transmute_to_bits" => {
-                let [typ] = self.instance.global_ref.template_args.cast_to_array();
+                let [typ] = args.cast_to_array();
                 let typ = typ.unwrap_type();
 
-                let _value_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "value");
-                let _bits_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "bits");
+                let [_value_port, _bits_port] =
+                    self.check_ports(&[(Direction::Input, "value"), (Direction::Output, "bits")]);
 
                 self.in_generate(|slf| {
                     slf.foreach_for_copy_unpacked(typ, false, |path, num_bits| {
@@ -916,15 +905,11 @@ impl<'g> CodeGenerationContext<'g> {
                 });
             }
             "transmute_from_bits" => {
-                let [typ] = self.instance.global_ref.template_args.cast_to_array();
+                let [typ] = args.cast_to_array();
                 let typ = typ.unwrap_type();
 
-                let _bits_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(0), Direction::Input, "bits");
-                let _value_port =
-                    self.md
-                        .unwrap_port(PortID::from_hidden_value(1), Direction::Output, "value");
+                let [_bits_port, _value_port] =
+                    self.check_ports(&[(Direction::Input, "bits"), (Direction::Output, "value")]);
 
                 self.in_generate(|slf| {
                     slf.foreach_for_copy_unpacked(typ, false, |path, num_bits| {
@@ -945,17 +930,6 @@ impl<'g> CodeGenerationContext<'g> {
 
     fn write_endmodule(&mut self) {
         writeln!(self.program_text, "endmodule\n").unwrap();
-    }
-}
-
-impl Module {
-    fn unwrap_port(&self, port_id: PortID, direction: Direction, name: &str) -> &Port {
-        let result = &self.ports[port_id];
-
-        assert_eq!(result.name, name);
-        assert_eq!(result.direction, direction);
-
-        result
     }
 }
 

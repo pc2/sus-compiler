@@ -2,15 +2,16 @@
 
 extern module RawROM #(int WIDTH, int DEPTH) {
     domain clk
-    interface RawROM : int #(FROM: 0, TO: DEPTH) index'0 -> bool[WIDTH] output_bits'2
+    action read : int #(FROM: 0, TO: DEPTH) index'0 -> bool[WIDTH] output_bits'2 {}
 }
 
 module ROM #(T, int DEPTH) {
-    interface ROM : int #(FROM: 0, TO: DEPTH) index -> T output_data
     RawROM#(WIDTH: sizeof #(T), DEPTH) rom
-    bool[sizeof #(T)] out_bits = rom(index)
+    action ROM : int #(FROM: 0, TO: DEPTH) index -> T output_data {
+        bool[sizeof #(T)] out_bits = rom.read(index)
 
-    output_data = transmute_from_bits #(T) (out_bits)
+        output_data = transmute_from_bits #(T) (out_bits)
+    }
 }
 
 extern module RawRAM #(int WIDTH, int DEPTH) {
@@ -34,5 +35,40 @@ module RAM #(T, int DEPTH) {
     action read : int#(FROM: 0, TO: DEPTH) addrb -> T doutb {
         bool[WIDTH] dout = ram.read(addrb)
         doutb = transmute_from_bits(dout)
+    }
+}
+
+extern module RawFIFO #(int WIDTH, int DEPTH, int MAY_PUSH_LATENCY) {
+    domain clk
+    action rst'0 {}
+
+    domain write
+    output bool may_push'-MAY_PUSH_LATENCY
+    action push'0 : bool[WIDTH] push_data'0 {}
+    
+    domain read
+    output bool may_pop'0
+    action pop'0 : -> bool[WIDTH] pop_data'2 {}
+}
+
+module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+    RawFIFO fifo
+    domain clk
+    action rst {
+        fifo.rst()
+    }
+
+    domain write
+    output bool may_push'-MAY_PUSH_LATENCY = fifo.may_push
+    action push : T push_data {
+        bool[sizeof#(T)] as_bits = transmute_to_bits(push_data)
+        fifo.push(as_bits)
+    }
+    
+    domain read
+    output bool may_pop = fifo.may_pop
+    action pop : -> T pop_data {
+        bool[sizeof#(T)] pop_data_as_bits = fifo.pop()
+        pop_data = transmute_from_bits(pop_data_as_bits)
     }
 }

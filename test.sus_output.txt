@@ -16,6 +16,8 @@ Flattening falling_factorial
 Flattening comb
 Flattening LatencyOffset
 Flattening CrossDomain
+Flattening CrossAction
+Flattening CrossActionNoData
 Flattening IntToBits
 Flattening BitsToInt
 Flattening UIntToBits
@@ -24,8 +26,6 @@ Flattening transmute_to_bits
 Flattening transmute_from_bits
 Flattening transmute
 Flattening unsafe_int_cast
-Flattening DualPortMem
-Flattening FIFO
 Flattening JoinDomains
 Flattening SlowClockGenerator
 Flattening Abs
@@ -177,6 +177,8 @@ Typechecking Iterator
 Typechecking FixedSizeIterator
 Typechecking LatencyOffset
 Typechecking CrossDomain
+Typechecking CrossAction
+Typechecking CrossActionNoData
 Typechecking IntToBits
 Typechecking BitsToInt
 Typechecking UIntToBits
@@ -185,8 +187,6 @@ Typechecking transmute_to_bits
 Typechecking transmute_from_bits
 Typechecking transmute
 Typechecking unsafe_int_cast
-Typechecking DualPortMem
-Typechecking FIFO
 Typechecking JoinDomains
 Typechecking SlowClockGenerator
 Typechecking Abs
@@ -352,6 +352,8 @@ Lints Iterator
 Lints FixedSizeIterator
 Lints LatencyOffset
 Lints CrossDomain
+Lints CrossAction
+Lints CrossActionNoData
 Lints IntToBits
 Lints BitsToInt
 Lints UIntToBits
@@ -360,8 +362,6 @@ Lints transmute_to_bits
 Lints transmute_from_bits
 Lints transmute
 Lints unsafe_int_cast
-Lints DualPortMem
-Lints FIFO
 Lints JoinDomains
 Lints SlowClockGenerator
 Lints Abs
@@ -523,6 +523,12 @@ Lints falling_factorial
 Lints comb
 Lints SUM_UP
 Lints dont_care
+Instantiating CrossActionNoData #()
+Concrete Typechecking CrossActionNoData #()
+Instantiating CrossDomain #(T: type bool #())
+Concrete Typechecking CrossDomain #(T: type bool #())
+Checking array accesses CrossDomain #(T: type bool #())
+Checking array accesses CrossActionNoData #()
 Instantiating example_md #()
 Concrete Typechecking example_md #()
 Checking array accesses example_md #()
@@ -754,8 +760,7 @@ Not Instantiating implicit_domain_forbidden #() due to flattening errors
 Not Instantiating conflicting_domain_with_port_name #() due to flattening errors
 Not Instantiating make_infinite_type #() due to flattening errors
 Not Instantiating UseDualPortMem #() due to flattening errors
-Instantiating example_FIFO #()
-Concrete Typechecking example_FIFO #()
+Not Instantiating example_FIFO #() due to flattening errors
 Not Instantiating use_Iterator #() due to flattening errors
 Instantiating UseBuiltinConstants #()
 Instantiating FailingAssert #()
@@ -770,21 +775,7 @@ Instantiating infer_me #(A: 5)
 Concrete Typechecking infer_me #(A: 5)
 Checking array accesses infer_me #(A: 5)
 Checking array accesses infer_from_local_context #()
-Instantiating instantiate_fifo #()
-Concrete Typechecking instantiate_fifo #()
-Instantiating FIFO #(T: type int #(FROM: 0, TO: 6), DEPTH: 30, READY_SLACK: 8)
-Concrete Typechecking FIFO #(T: type int #(FROM: 0, TO: 6), DEPTH: 30, READY_SLACK: 8)
-Instantiating CrossDomain #(T: type int #(FROM: 0, TO: 30))
-Concrete Typechecking CrossDomain #(T: type int #(FROM: 0, TO: 30))
-Checking array accesses CrossDomain #(T: type int #(FROM: 0, TO: 30))
-Instantiating CrossDomain #(T: type int #(FROM: 0, TO: 6)[30])
-Concrete Typechecking CrossDomain #(T: type int #(FROM: 0, TO: 6)[30])
-Checking array accesses CrossDomain #(T: type int #(FROM: 0, TO: 6)[30])
-Instantiating LatencyOffset #(T: type bool #(), OFFSET: -9)
-Concrete Typechecking LatencyOffset #(T: type bool #(), OFFSET: -9)
-Checking array accesses LatencyOffset #(T: type bool #(), OFFSET: -9)
-Checking array accesses FIFO #(T: type int #(FROM: 0, TO: 6), DEPTH: 30, READY_SLACK: 8)
-Checking array accesses instantiate_fifo #()
+Not Instantiating instantiate_fifo #() due to flattening errors
 Instantiating inference_edge_case #()
 Concrete Typechecking inference_edge_case #()
 Instantiating specified_latencies_not_ports_edge_case #()
