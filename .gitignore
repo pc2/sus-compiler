@@ -7,5 +7,5 @@
 **/*.fst
 **/*.dot
 sus-lsp/
-core_dumps/
+crash_dumps/
 tinyTestFile.sus

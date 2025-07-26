@@ -25,8 +25,8 @@ use crate::flattening::{flatten_all_globals, gather_initial_file_data};
 pub fn get_std_dir() -> PathBuf {
     get_sus_home().join("std")
 }
-pub fn get_core_dumps_dir() -> PathBuf {
-    get_sus_home().join("core_dumps")
+pub fn get_crash_dumps_dir() -> PathBuf {
+    get_sus_home().join("crash_dumps")
 }
 
 /// Any extra operations that should happen when files are added or removed from the linker. Such as caching line offsets.

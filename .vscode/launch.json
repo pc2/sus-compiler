@@ -150,7 +150,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug core dump",
+            "name": "Debug crash dump",
             "cargo": {
                 "args": [
                     "build",
@@ -164,6 +164,7 @@
             },
             "sourceLanguages": ["rust"],
             "args": [
+                "--no-redump"
                 // By default it'll grab all .sus files in this directory. Doesn't use ./reproduce.sh though...
             ],
             "cwd": "${input:pickDumpFile}",
@@ -175,11 +176,11 @@
             "type": "command",
             "command": "extension.commandvariable.file.pickFile",
             "args": {
-                "description": "Pick a core dump file",
+                "description": "Pick a crash dump folder",
                 "fromFolder": {
                     "predefined": [
-                        "${userHome}/.sus/0.3.0-devel/core_dumps/",
-                        "${workspaceFolder}/core_dumps/",
+                        "${userHome}/.sus/0.3.0-devel/crash_dumps/",
+                        "${workspaceFolder}/crash_dumps/",
                     ]
                 },
                 "showDirs": true,

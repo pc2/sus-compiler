@@ -59,6 +59,7 @@ pub struct ConfigStruct {
     pub target_language: TargetLanguage,
     pub files: Vec<PathBuf>,
     pub sus_home_override: Option<PathBuf>,
+    pub no_redump: bool,
 }
 
 pub const VERSION_INFO: &str = concat!(
@@ -164,7 +165,8 @@ fn command_builder() -> Command {
             }))
         .arg(Arg::new("sus-home")
             .long("sus-home")
-            .help("Override the SUS_HOME directory (for std/core.sus, core_dumps, etc)")
+            .hide(true)
+            .help("Override the SUS_HOME directory (for std/core.sus, crash_dumps, etc)")
             .value_parser(|dir: &str| {
                 let path = PathBuf::from(dir);
                 if !path.exists() {
@@ -176,6 +178,11 @@ fn command_builder() -> Command {
                 }
             })
         )
+        .arg(Arg::new("no-redump")
+            .long("no-redump")
+            .hide(true)
+            .help("Disable creation of new crash dump on panic")
+            .action(clap::ArgAction::SetTrue))
 }
 
 fn parse_args<I, T>(itr: I) -> Result<ConfigStruct, clap::Error>
@@ -242,6 +249,7 @@ where
         target_language: *matches.get_one("target").unwrap(),
         files,
         sus_home_override,
+        no_redump: matches.get_flag("no-redump"),
     })
 }
 

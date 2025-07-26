@@ -13,7 +13,7 @@ use circular_buffer::CircularBuffer;
 use colored::Colorize;
 
 use crate::{
-    compiler_top::get_core_dumps_dir,
+    compiler_top::get_crash_dumps_dir,
     config::config,
     linker::{FileData, Linker},
     prelude::Span,
@@ -238,6 +238,12 @@ pub fn setup_panic_handler() {
 }
 
 pub fn create_dump_on_panic(linker: &mut Linker, f: impl FnOnce(&mut Linker)) {
+    if crate::config::config().no_redump {
+        // Run without protection, don't create a dump on panic
+        f(linker);
+        return;
+    }
+
     use std::fs;
     use std::io::Write;
     use std::time::SystemTime;
@@ -245,7 +251,7 @@ pub fn create_dump_on_panic(linker: &mut Linker, f: impl FnOnce(&mut Linker)) {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(linker)));
 
     if let Err(panic_info) = result {
-        // Get ~/.sus/core_dumps/{timestamp}
+        // Get ~/.sus/crash_dumps/{timestamp}
         let cur_time = humantime::format_rfc3339(SystemTime::now());
 
         let failure_name = DEBUG_STACK.with_borrow(|history| {
@@ -261,7 +267,7 @@ pub fn create_dump_on_panic(linker: &mut Linker, f: impl FnOnce(&mut Linker)) {
             }
         });
 
-        let dump_dir = get_core_dumps_dir().join(failure_name);
+        let dump_dir = get_crash_dumps_dir().join(failure_name);
         if let Err(err) = fs::create_dir_all(&dump_dir) {
             eprintln!("Could not create {}: {err}", dump_dir.to_string_lossy());
             std::panic::resume_unwind(panic_info);
@@ -271,7 +277,11 @@ pub fn create_dump_on_panic(linker: &mut Linker, f: impl FnOnce(&mut Linker)) {
         let args: Vec<String> = std::env::args().collect();
         let reproduce_path = dump_dir.join("reproduce.sh");
         if let Ok(mut f) = fs::File::create(&reproduce_path) {
-            let cmd = format!("#!/bin/sh\n{}\n", args.join(" "));
+            use crate::config::VERSION_INFO;
+            let cmd = format!(
+                "#!/bin/sh\n#SUS Compiler Version: {VERSION_INFO}\n{}\n",
+                args.join(" ")
+            );
             let _ = f.write_all(cmd.as_bytes());
         }
 
