@@ -2,19 +2,21 @@
 
 use std::borrow::Cow;
 
-use crate::instantiation::RealWire;
+use crate::{instantiation::RealWire, latency::AbsLat};
 
 pub fn wire_name_with_latency(
     wire: &RealWire,
-    absolute_latency: i64,
+    target_abs_lat: AbsLat,
     use_latency: bool,
 ) -> Cow<'_, str> {
-    assert!(wire.absolute_latency <= absolute_latency);
-    if use_latency && (wire.absolute_latency != absolute_latency) {
-        if absolute_latency < 0 {
-            Cow::Owned(format!("_{}_N{}", wire.name, -absolute_latency))
+    let wire_abs_lat = wire.absolute_latency.unwrap();
+    let target_abs_lat = target_abs_lat.unwrap();
+    assert!(wire_abs_lat <= target_abs_lat);
+    if use_latency && (wire_abs_lat != target_abs_lat) {
+        if target_abs_lat < 0 {
+            Cow::Owned(format!("_{}_N{}", wire.name, -target_abs_lat))
         } else {
-            Cow::Owned(format!("_{}_D{}", wire.name, absolute_latency))
+            Cow::Owned(format!("_{}_D{}", wire.name, target_abs_lat))
         }
     } else {
         Cow::Borrowed(&wire.name)

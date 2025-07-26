@@ -3,6 +3,7 @@ mod list_of_lists;
 
 pub mod port_latency_inference;
 
+use std::fmt::{Debug, Display, Write};
 use std::{cmp::max, iter::zip};
 
 use crate::dev_aid::dot_graphs::display_latency_count_graph;
@@ -25,7 +26,51 @@ use self::list_of_lists::ListOfLists;
 use crate::instantiation::*;
 
 // Temporary value before proper latency is given
-pub const CALCULATE_LATENCY_LATER: i64 = i64::MIN;
+const CALCULATE_LATENCY_LATER: i64 = i64::MIN;
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AbsLat(i64);
+
+impl AbsLat {
+    pub const UNKNOWN: Self = Self(CALCULATE_LATENCY_LATER);
+    pub fn new(v: i64) -> Self {
+        assert!(v != CALCULATE_LATENCY_LATER);
+        Self(v)
+    }
+    pub fn get(self) -> Option<i64> {
+        if self.0 == CALCULATE_LATENCY_LATER {
+            None
+        } else {
+            Some(self.0)
+        }
+    }
+    #[track_caller]
+    pub fn unwrap(self) -> i64 {
+        assert!(self.0 != CALCULATE_LATENCY_LATER);
+        self.0
+    }
+}
+impl Display for AbsLat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.get() {
+            Some(lat) => write!(f, "{lat}"),
+            None => f.write_char('?'),
+        }
+    }
+}
+impl Debug for AbsLat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.get() {
+            Some(lat) => write!(f, "AbsLat({lat})"),
+            None => f.write_str("AbsLat(?)"),
+        }
+    }
+}
+impl Default for AbsLat {
+    fn default() -> Self {
+        Self::UNKNOWN
+    }
+}
 
 struct PathMuxSource<'s> {
     to_wire: &'s RealWire,
@@ -105,11 +150,8 @@ impl LatencyCountingProblem {
             map_latency_node_to_wire.push(w_id);
 
             // Add specifieds
-            if w.specified_latency != CALCULATE_LATENCY_LATER {
-                specified_latencies.push(SpecifiedLatency {
-                    node,
-                    latency: w.specified_latency,
-                });
+            if let Some(latency) = w.specified_latency.get() {
+                specified_latencies.push(SpecifiedLatency { node, latency });
             }
 
             node
@@ -254,7 +296,7 @@ impl InstantiatedModule {
     ///
     /// If needed only the same cycle it is generated, then this is equal to [RealWire::absolute_latency].
     pub fn compute_needed_untils(&self) -> FlatAlloc<i64, WireIDMarker> {
-        let mut result = self.wires.map(|(_id, w)| w.absolute_latency);
+        let mut result = self.wires.map(|(_id, w)| w.absolute_latency.unwrap());
 
         for (_id, w) in &self.wires {
             w.source.iter_sources_with_min_latency(|other, _| {
@@ -265,7 +307,7 @@ impl InstantiatedModule {
                 };
                 let nu = &mut result[other];
 
-                *nu = max(*nu, w.absolute_latency);
+                *nu = max(*nu, w.absolute_latency.unwrap());
             });
         }
 
@@ -306,7 +348,7 @@ impl ModuleTypingContext<'_> {
                 for (node, lat) in zip(problem.map_latency_node_to_wire.iter(), latencies.iter()) {
                     let wire = &mut self.wires[*node];
                     if is_valid(*lat) {
-                        wire.absolute_latency = *lat;
+                        wire.absolute_latency = AbsLat::new(*lat);
                     } else {
                         let source_location = self
                             .md
@@ -316,7 +358,7 @@ impl ModuleTypingContext<'_> {
                             source_location,
                             "Latency Counting couldn't reach this node".to_string(),
                         );
-                        wire.absolute_latency = CALCULATE_LATENCY_LATER;
+                        wire.absolute_latency = AbsLat::UNKNOWN;
                     }
                 }
             }
@@ -531,13 +573,13 @@ impl ModuleTypingContext<'_> {
                     self.gather_all_mux_inputs(latency_node_meanings, &conflict_path);
                 let path_message = make_path_info_string(
                     &writes_involved,
-                    start_wire.specified_latency,
+                    start_wire.specified_latency.unwrap(),
                     &start_wire.name,
                 );
                 //assert!(!writes_involved.is_empty());
 
                 let end_name = &end_wire.name;
-                let specified_end_latency = end_wire.specified_latency;
+                let specified_end_latency = end_wire.specified_latency.unwrap();
                 error(end_latency_decl.span, format!("Conflicting specified latency\n\n{path_message}\nBut this was specified as {end_name}'{specified_end_latency}"))
                     .info_obj_same_file(start_decl);
             }

@@ -7,7 +7,6 @@
 use std::borrow::Cow;
 use std::ops::{Deref, Index, IndexMut, Range};
 
-use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::let_unwrap;
 use crate::linker::IsExtern;
 use crate::linker::{GlobalUUID, LinkInfo};
@@ -1128,8 +1127,8 @@ impl<'l> ExecutionContext<'l> {
             original_instruction,
             domain,
             name: self.unique_name_producer.get_unique_name(""),
-            specified_latency: CALCULATE_LATENCY_LATER,
-            absolute_latency: CALCULATE_LATENCY_LATER,
+            specified_latency: AbsLat::UNKNOWN,
+            absolute_latency: AbsLat::UNKNOWN,
             is_port: None,
         }))
     }
@@ -1142,8 +1141,8 @@ impl<'l> ExecutionContext<'l> {
             original_instruction,
             domain,
             name: self.unique_name_producer.get_unique_name(""),
-            specified_latency: CALCULATE_LATENCY_LATER,
-            absolute_latency: CALCULATE_LATENCY_LATER,
+            specified_latency: AbsLat::UNKNOWN,
+            absolute_latency: AbsLat::UNKNOWN,
             is_port: None,
         })
     }
@@ -1217,8 +1216,8 @@ impl<'l> ExecutionContext<'l> {
                 name: self
                     .unique_name_producer
                     .get_unique_name(format!("_{}_{}", submod_instance.name, port_data.name)),
-                specified_latency: CALCULATE_LATENCY_LATER,
-                absolute_latency: CALCULATE_LATENCY_LATER,
+                specified_latency: AbsLat::UNKNOWN,
+                absolute_latency: AbsLat::UNKNOWN,
                 is_port: None,
             });
 
@@ -1458,17 +1457,17 @@ impl<'l> ExecutionContext<'l> {
             original_instruction,
             domain,
             source,
-            specified_latency: CALCULATE_LATENCY_LATER,
-            absolute_latency: CALCULATE_LATENCY_LATER,
+            specified_latency: AbsLat::UNKNOWN,
+            absolute_latency: AbsLat::UNKNOWN,
             is_port: None,
         })])
     }
 
-    fn get_specified_latency(&mut self, spec_lat: Option<FlatID>) -> ExecutionResult<i64> {
+    fn get_specified_latency(&mut self, spec_lat: Option<FlatID>) -> ExecutionResult<AbsLat> {
         Ok(if let Some(spec) = &spec_lat {
-            self.generation_state.get_generation_small_int(*spec)?
+            AbsLat::new(self.generation_state.get_generation_small_int(*spec)?)
         } else {
-            CALCULATE_LATENCY_LATER
+            AbsLat::UNKNOWN
         })
     }
 
@@ -1522,7 +1521,7 @@ impl<'l> ExecutionContext<'l> {
                 domain: wire_decl.domain.get().unwrap_physical(),
                 source,
                 specified_latency,
-                absolute_latency: CALCULATE_LATENCY_LATER,
+                absolute_latency: AbsLat::UNKNOWN,
                 is_port,
             });
             SubModuleOrWire::Wire(wire_id)
@@ -1855,7 +1854,7 @@ impl<'l> ExecutionContext<'l> {
                             domain: interface.domain.unwrap_physical(),
                             source,
                             specified_latency,
-                            absolute_latency: CALCULATE_LATENCY_LATER,
+                            absolute_latency: AbsLat::UNKNOWN,
                             is_port,
                         });
 

@@ -6,7 +6,7 @@ use ibig::IBig;
 use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::zip_eq;
-use crate::latency::CALCULATE_LATENCY_LATER;
+use crate::latency::AbsLat;
 use crate::linker::{IsExtern, LinkInfo};
 use crate::prelude::*;
 
@@ -278,7 +278,7 @@ impl<'g> CodeGenerationContext<'g> {
         }
     }
 
-    fn wire_name(&self, wire: WireID, requested_latency: i64) -> Cow<'g, str> {
+    fn wire_name(&self, wire: WireID, requested_latency: AbsLat) -> Cow<'g, str> {
         let wire = &self.instance.wires[wire];
         match &wire.source {
             RealWireDataSource::Constant { value } => {
@@ -302,11 +302,9 @@ impl<'g> CodeGenerationContext<'g> {
     ) -> Result<(), std::fmt::Error> {
         if self.use_latency {
             // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it's only needed this cycle
-            assert!(w.absolute_latency != CALCULATE_LATENCY_LATER);
-            assert!(self.needed_untils[wire_id] != CALCULATE_LATENCY_LATER);
-            for i in w.absolute_latency..self.needed_untils[wire_id] {
-                let from = wire_name_with_latency(w, i, self.use_latency);
-                let to = wire_name_with_latency(w, i + 1, self.use_latency);
+            for i in w.absolute_latency.unwrap()..self.needed_untils[wire_id] {
+                let from = wire_name_with_latency(w, AbsLat::new(i), self.use_latency);
+                let to = wire_name_with_latency(w, AbsLat::new(i + 1), self.use_latency);
 
                 let var_decl = typ_to_declaration(&w.typ, &to);
 
@@ -495,7 +493,7 @@ impl<'g> CodeGenerationContext<'g> {
         &mut self,
         mut typ: &'g ConcreteType,
         path: &'g [RealWirePathElem],
-        requested_latency: i64,
+        requested_latency: AbsLat,
         in_always: bool,
         operation: impl FnOnce(
             &mut CodeGenerationContext<'g>,

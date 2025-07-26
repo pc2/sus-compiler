@@ -10,7 +10,7 @@ use unique_names::UniqueNames;
 
 use crate::alloc::zip_eq;
 use crate::debug::SpanDebugger;
-use crate::latency::CALCULATE_LATENCY_LATER;
+use crate::latency::AbsLat;
 use crate::linker::LinkInfo;
 use crate::prelude::*;
 use crate::to_string::join_string_iter;
@@ -132,9 +132,9 @@ pub struct RealWire {
     pub name: String,
     pub domain: DomainID,
     /// non i64::MIN values specify specified latency
-    pub specified_latency: i64,
+    pub specified_latency: AbsLat,
     /// The computed latencies after latency counting
-    pub absolute_latency: i64,
+    pub absolute_latency: AbsLat,
     pub is_port: Option<Direction>,
 }
 impl RealWire {
@@ -190,7 +190,7 @@ impl SubModule {
 pub struct InstantiatedPort {
     pub wire: WireID,
     pub direction: Direction,
-    pub absolute_latency: i64,
+    pub absolute_latency: AbsLat,
     pub typ: ConcreteType,
     pub domain: DomainID,
 }
@@ -358,7 +358,7 @@ impl Executed {
             Some(InstantiatedPort {
                 wire: *wire_id,
                 direction: port.direction,
-                absolute_latency: CALCULATE_LATENCY_LATER,
+                absolute_latency: AbsLat::UNKNOWN,
                 typ: wire.typ.clone(),
                 domain: wire.domain,
             })
@@ -565,11 +565,6 @@ impl ModuleTypingContext<'_> {
             };
             let typ_str = typ.display(&self.linker.globals).to_string().red();
             let domain_name = domain.display(&self.md.domains);
-            let absolute_latency = if *absolute_latency == CALCULATE_LATENCY_LATER {
-                String::from("?")
-            } else {
-                absolute_latency.to_string()
-            };
             let name = name.green();
             print!("{name}: {is_port_str}{typ_str}'{absolute_latency} {domain_name} [{original_instruction:?}]");
             match source {

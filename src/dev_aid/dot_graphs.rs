@@ -59,11 +59,8 @@ impl<'inst> Labeller<'inst, NodeType, EdgeType> for InstantiatedModule {
                     RealWireDataSource::ConstructArray { .. } => "[...]".into(),
                     RealWireDataSource::Constant { value } => value.to_string().into(),
                 };
-                if wire.absolute_latency == i64::MIN {
-                    format!("{id:?}: {name}'?")
-                } else {
-                    format!("{id:?}: {name}'{}", wire.absolute_latency)
-                }
+                let abs_lat = wire.absolute_latency;
+                format!("{id:?}: {name}'{abs_lat}")
             }
             NodeType::SubModule(id) => {
                 let sm = &self.submodules[id];

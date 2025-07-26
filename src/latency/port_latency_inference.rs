@@ -383,7 +383,9 @@ impl SubModule {
                 sm_md.domains.map(|_| Vec::new());
 
             for (p_id, port) in instance.interface_ports.iter_valids() {
-                specified_per_domain[port.domain].push((p_id, port.absolute_latency));
+                if let Some(port_abs_lat) = port.absolute_latency.get() {
+                    specified_per_domain[port.domain].push((p_id, port_abs_lat));
+                }
             }
 
             let mut total_size = 0;

@@ -1,4 +1,3 @@
-use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::prelude::*;
 use crate::typing::domain_type::DomainType;
 use crate::typing::template::TemplateKind;
@@ -61,13 +60,9 @@ impl HoverCollector<'_> {
                             continue;
                         }
                         let typ_str = wire.typ.display(self.linker);
-                        let name_str = &wire.name;
-                        let latency_str = if wire.absolute_latency != CALCULATE_LATENCY_LATER {
-                            wire.absolute_latency.to_string()
-                        } else {
-                            "?".to_owned()
-                        };
-                        self.sus_code(format!("{typ_str} {name_str}'{latency_str}"));
+                        let name = &wire.name;
+                        let absolute_latency = &wire.absolute_latency;
+                        self.sus_code(format!("{typ_str} {name}'{absolute_latency}"));
                     }
                 }
             }
