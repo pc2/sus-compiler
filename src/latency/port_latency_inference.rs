@@ -283,11 +283,8 @@ impl PortLatencyInferenceInfo {
 
         // Inference Edges
         for (from_id, from) in &updated_port_linearities {
-            if from.direction == Direction::Output {
-                continue;
-            }
             for (to_id, to) in &updated_port_linearities {
-                if to.domain != from.domain || to.direction == Direction::Input {
+                if to.domain != from.domain {
                     continue; // ports on different domains cannot be related in latency counting
                 }
 
@@ -306,6 +303,12 @@ impl PortLatencyInferenceInfo {
                                 multiply_var_by: multiplier,
                                 offset,
                             } => {
+                                if from.direction == Direction::Output
+                                    || to.direction == Direction::Input
+                                {
+                                    continue; // No inference is possible between Input/Input or Output/Output
+                                }
+
                                 assert!(multiplier != 0);
                                 let linearity_is_positive = multiplier >= 0;
                                 let target_to_infer = *local_variables[target_to_infer]
@@ -326,10 +329,22 @@ impl PortLatencyInferenceInfo {
                                     offset,
                                 }
                             }
+                            EdgeInfo::Poison => {
+                                if from.direction == Direction::Output
+                                    || to.direction == Direction::Input
+                                {
+                                    continue; // No inference is possible between Input/Input or Output/Output
+                                }
+
+                                EdgeInfo::Poison
+                            }
                             EdgeInfo::ConstantOffset(cst) => EdgeInfo::ConstantOffset(cst),
-                            EdgeInfo::Poison => EdgeInfo::Poison,
                         }
                     } else {
+                        if from.direction == Direction::Output || to.direction == Direction::Input {
+                            continue; // No inference is possible between Input/Input or Output/Output
+                        }
+
                         EdgeInfo::Poison
                     },
                 ));

@@ -142,5 +142,5 @@ module transmute #(T1, T2) {
 }
 
 __builtin__ module unsafe_int_cast #(int FROM_I, int TO_I, int FROM, int TO) {
-    interface unsafe_int_cast : int#(FROM: FROM_I, TO: TO_I) in -> int#(FROM, TO) out
+    interface unsafe_int_cast : int#(FROM: FROM_I, TO: TO_I) in'0 -> int#(FROM, TO) out'0
 }
