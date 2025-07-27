@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::{collections::HashMap, rc::Rc};
 
+use crate::debug::SpanDebugger;
 use crate::errors::CompileError;
 use crate::instantiation::perform_instantiation;
 use crate::typing::concrete_type::ConcreteGlobalReference;
@@ -93,18 +94,21 @@ impl Instantiator {
         } else {
             std::mem::drop(cache_borrow);
 
-            let object_id = Rc::new(object_id);
-            let result = perform_instantiation(linker, object_id.clone());
+            let global_ref = Rc::new(object_id);
 
-            if crate::debug::is_enabled("dot-concrete-module") {
-                crate::dev_aid::dot_graphs::display_generated_hardware_structure(&result);
-            }
+            let name = global_ref.display(linker).to_string();
+
+            let md = &linker.modules[global_ref.id];
+            let file = &linker.files[md.link_info.file];
+            let _panic_guard = SpanDebugger::new("instantiating", name, file);
+
+            let result = perform_instantiation(linker, global_ref.clone());
 
             let result_ref = Rc::new(result);
             let mut cache_borrow = self.cache.borrow_mut();
             assert!(cache_borrow
                 .cache
-                .insert(object_id, result_ref.clone())
+                .insert(global_ref, result_ref.clone())
                 .is_none());
             result_ref
         };

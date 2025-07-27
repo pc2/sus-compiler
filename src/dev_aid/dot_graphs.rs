@@ -6,15 +6,15 @@ use crate::{
     alloc::FlatAlloc,
     flattening::Direction,
     instantiation::{
-        ForEachContainedWire, InstantiatedModule, RealWire, RealWireDataSource, SubModule,
+        ForEachContainedWire, ModuleTypingContext, RealWire, RealWireDataSource, SubModule,
     },
     latency::LatencyCountingProblem,
     linker::Linker,
     prelude::{SubModuleID, SubModuleIDMarker, WireID, WireIDMarker},
 };
 
-pub fn display_generated_hardware_structure(md_instance: &InstantiatedModule) {
-    let mut file = std::fs::File::create("hardware_structure.dot").unwrap();
+pub fn display_generated_hardware_structure(md_instance: &ModuleTypingContext<'_>) {
+    let mut file = std::fs::File::create(format!("{}.dot", md_instance.name)).unwrap();
     render(md_instance, &mut file).unwrap();
 }
 
@@ -24,9 +24,18 @@ enum NodeType {
     SubModule(SubModuleID),
 }
 
+impl Direction {
+    fn node_color(&self) -> &'static str {
+        match self {
+            Direction::Input => "red",
+            Direction::Output => "blue",
+        }
+    }
+}
+
 type EdgeType = (NodeType, NodeType);
 
-impl<'inst> Labeller<'inst, NodeType, EdgeType> for InstantiatedModule {
+impl<'inst> Labeller<'inst, NodeType, EdgeType> for ModuleTypingContext<'_> {
     fn graph_id(&'inst self) -> Id<'inst> {
         Id::new(&self.mangled_name).unwrap()
     }
@@ -46,38 +55,42 @@ impl<'inst> Labeller<'inst, NodeType, EdgeType> for InstantiatedModule {
     }
 
     fn node_label(&'inst self, n: &NodeType) -> LabelText<'inst> {
-        LabelText::LabelStr(Cow::Owned(match *n {
+        LabelText::LabelStr(match *n {
             NodeType::Wire(id) => {
                 let wire = &self.wires[id];
-                let name: Cow<'_, str> = match &wire.source {
-                    RealWireDataSource::ReadOnly | RealWireDataSource::Multiplexer { .. } => {
-                        wire.name.as_str().into()
-                    }
-                    RealWireDataSource::UnaryOp { op, .. } => op.op_text().into(),
-                    RealWireDataSource::BinaryOp { op, .. } => op.op_text().into(),
-                    RealWireDataSource::Select { .. } => "xyz[][][]".into(),
-                    RealWireDataSource::ConstructArray { .. } => "[...]".into(),
-                    RealWireDataSource::Constant { value } => value.to_string().into(),
-                };
+                let name = &wire.name;
                 let abs_lat = wire.absolute_latency;
-                format!("{id:?}: {name}'{abs_lat}")
+                Cow::Owned(format!("{name}'{abs_lat}"))
             }
             NodeType::SubModule(id) => {
                 let sm = &self.submodules[id];
-                format!("{id:?}: {}", &sm.name)
+                Cow::Borrowed(&sm.name)
             }
-        }))
+        })
     }
 
     fn node_style(&'inst self, n: &NodeType) -> Style {
         match n {
-            NodeType::Wire(_) => Style::None,
+            NodeType::Wire(w_id) => match self.wires[*w_id].is_port {
+                Some(Direction::Input) => Style::Bold,
+                Some(Direction::Output) => Style::Bold,
+                None => Style::None,
+            },
             NodeType::SubModule(_) => Style::Filled,
+        }
+    }
+
+    fn node_color<'a>(&'a self, n: &NodeType) -> Option<LabelText<'a>> {
+        match n {
+            NodeType::Wire(w_id) => self.wires[*w_id]
+                .is_port
+                .map(|d| LabelText::LabelStr(Cow::Borrowed(d.node_color()))),
+            NodeType::SubModule(_) => None,
         }
     }
 }
 
-impl<'inst> GraphWalk<'inst, NodeType, EdgeType> for InstantiatedModule {
+impl<'inst> GraphWalk<'inst, NodeType, EdgeType> for ModuleTypingContext<'_> {
     fn nodes(&'inst self) -> Nodes<'inst, NodeType> {
         self.wires
             .iter()
@@ -95,10 +108,10 @@ impl<'inst> GraphWalk<'inst, NodeType, EdgeType> for InstantiatedModule {
         }
 
         for (submod_id, s) in &self.submodules {
-            for (_, port) in s.port_map.iter_valids() {
+            let s_md = &self.linker.modules[s.refers_to.id];
+            for (port_id, port) in s.port_map.iter_valids() {
                 let w_id = port.maps_to_wire;
-                let w = &self.wires[w_id];
-                match w.is_port.unwrap() {
+                match s_md.ports[port_id].direction {
                     Direction::Input => {
                         edges.push((NodeType::Wire(w_id), NodeType::SubModule(submod_id)));
                     }
@@ -227,15 +240,9 @@ impl<'a> Labeller<'a, usize, LatencyEdge<'a>> for Problem<'a> {
     }
 
     fn node_color(&'a self, node: &usize) -> Option<LabelText<'a>> {
-        self.extra_node_info[*node].0.map(|direction| {
-            LabelText::LabelStr(
-                match direction {
-                    Direction::Input => "red",
-                    Direction::Output => "blue",
-                }
-                .into(),
-            )
-        })
+        self.extra_node_info[*node]
+            .0
+            .map(|direction| LabelText::LabelStr(direction.node_color().into()))
     }
 }
 

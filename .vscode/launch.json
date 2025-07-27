@@ -42,10 +42,10 @@
                 "tinyTestFile.sus",
                 "--standalone", "TEST",
                 "--debug", "TEST", // Temporary to add in code when debugging
-                "--debug", "print-flattened-pre-typecheck",
-                "--debug", "print-flattened",
-                "--debug", "print-instantiated-modules-pre-concrete-typecheck",
-                "--debug", "print-instantiated-modules",
+                "--debug", "print-abstract-pre-typecheck",
+                "--debug", "print-abstract",
+                "--debug", "print-concrete-pre-typecheck",
+                "--debug", "print-concrete",
             ],
             "cwd": "${workspaceFolder}"
         },
@@ -66,8 +66,33 @@
             },
             "sourceLanguages": ["rust"],
             "args": [
-                "--module-and-dependencies",
+                "--standalone",
                 "BitSerialMatrixMultiply",
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug Mandelbrot in 'sus_compiler'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=sus_compiler",
+                    "--package=sus_compiler"
+                ],
+                "filter": {
+                    "name": "sus_compiler",
+                    "kind": "bin"
+                }
+            },
+            "sourceLanguages": ["rust"],
+            "args": [
+                "/home/lennart/Desktop/Projects/mandelbrotFPGA/mandelbrot.sus",
+                "/home/lennart/Desktop/Projects/mandelbrotFPGA/float.sus",
+                "--debug-whitelist", "SlowIteratorState",
+                "--debug", "print-concrete",
+                "--debug", "dot-dependency-graph"
             ],
             "cwd": "${workspaceFolder}"
         },

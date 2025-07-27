@@ -9,7 +9,6 @@ use ibig::IBig;
 use unique_names::UniqueNames;
 
 use crate::alloc::zip_eq;
-use crate::debug::SpanDebugger;
 use crate::latency::AbsLat;
 use crate::linker::LinkInfo;
 use crate::prelude::*;
@@ -370,6 +369,7 @@ impl Executed {
         linker: &'l Linker,
         md: &'l Module,
         global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
+        name: String,
     ) -> (ModuleTypingContext<'l>, ValueUnifierAlloc) {
         let interface_ports = self.make_interface(md);
         let errors = ErrorCollector::new_empty(md.link_info.file, &linker.files);
@@ -377,6 +377,8 @@ impl Executed {
             errors.error(position, reason);
         }
         let ctx = ModuleTypingContext {
+            mangled_name: mangle_name(&name),
+            name,
             global_ref,
             wires: self.wires,
             submodules: self.submodules,
@@ -392,6 +394,8 @@ impl Executed {
 }
 
 pub struct ModuleTypingContext<'l> {
+    pub name: String,
+    pub mangled_name: String,
     pub global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
     pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
@@ -405,12 +409,15 @@ pub struct ModuleTypingContext<'l> {
 }
 
 impl<'l> ModuleTypingContext<'l> {
-    fn into_instantiated_module(self, name: String) -> InstantiatedModule {
-        let mangled_name = mangle_name(&name);
+    fn into_instantiated_module(self) -> InstantiatedModule {
+        if crate::debug::is_enabled("dot-dependency-graph") {
+            crate::dev_aid::dot_graphs::display_generated_hardware_structure(&self);
+        }
+
         InstantiatedModule {
             global_ref: self.global_ref,
-            name,
-            mangled_name,
+            name: self.name,
+            mangled_name: self.mangled_name,
             errors: self.errors.into_storage(),
             interface_ports: self.interface_ports,
             wires: self.wires,
@@ -458,51 +465,37 @@ fn perform_instantiation(
         };
     }
 
-    let _panic_guard =
-        SpanDebugger::new("executing", name.clone(), &linker.files[md.link_info.file]);
-
     println!("Instantiating {name}");
     let exec = execute::execute(&md.link_info, linker, &global_ref.template_args);
 
-    let (mut typed, type_var_alloc) = exec.into_module_typing_context(linker, md, global_ref);
+    let (mut typed, type_var_alloc) =
+        exec.into_module_typing_context(linker, md, global_ref, name.clone());
 
     if typed.errors.did_error() {
-        return typed.into_instantiated_module(name);
+        return typed.into_instantiated_module();
     }
 
-    if crate::debug::is_enabled("print-instantiated-modules-pre-concrete-typecheck") {
+    if crate::debug::is_enabled("print-concrete-pre-typecheck") {
         println!("[[Executed {name}]]");
         typed.print_instantiated_module();
     }
 
-    let _panic_guard = SpanDebugger::new(
-        "concrete-typing",
-        name.clone(),
-        &linker.files[md.link_info.file],
-    );
-
     println!("Concrete Typechecking {name}");
     typed.typecheck(type_var_alloc);
 
-    if crate::debug::is_enabled("print-instantiated-modules") {
+    if crate::debug::is_enabled("print-concrete") {
         println!("[[Instantiated {name}]]");
         typed.print_instantiated_module();
     }
 
     if typed.errors.did_error() {
-        return typed.into_instantiated_module(name);
+        return typed.into_instantiated_module();
     }
-
-    let _panic_guard = SpanDebugger::new(
-        "bounds-checking",
-        name.clone(),
-        &linker.files[md.link_info.file],
-    );
 
     println!("Checking array accesses {name}");
     typed.check_subtypes();
 
-    typed.into_instantiated_module(name)
+    typed.into_instantiated_module()
 }
 
 impl ModuleTypingContext<'_> {
@@ -675,6 +668,16 @@ impl ModuleTypingContext<'_> {
                 }
                 println!();
             }
+        }
+        println!("\nPorts: ");
+        for (port_id, p) in &self.interface_ports {
+            let direction = self.md.ports[port_id].direction.to_string().purple();
+            let name = if let Some(p) = p {
+                self.name(p.wire).to_string()
+            } else {
+                "N/C".to_owned()
+            };
+            println!("{port_id:?}: {direction} {name}")
         }
         println!();
         println!();

@@ -236,7 +236,7 @@ impl Linker {
 
         for global_id in &global_ids {
             if let GlobalObj::Module(md) = &mut self.globals.get_mut(*global_id) {
-                if crate::debug::is_enabled("print-flattened-pre-typecheck") {
+                if crate::debug::is_enabled("print-abstract-pre-typecheck") {
                     md.print_flattened_module(&self.files[md.link_info.file]);
                 }
             }
@@ -251,7 +251,7 @@ impl Linker {
             self.pass("Typechecking", *global_id, |pass, errors, files| {
                 typecheck(pass, errors);
 
-                if crate::debug::is_enabled("print-flattened") {
+                if crate::debug::is_enabled("print-abstract") {
                     let md = pass.get_mut();
                     if let GlobalObj::Module(md) = md {
                         md.print_flattened_module(&files[md.link_info.file]);
