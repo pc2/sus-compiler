@@ -34,7 +34,10 @@ pub struct AbsLat(i64);
 impl AbsLat {
     pub const UNKNOWN: Self = Self(CALCULATE_LATENCY_LATER);
     pub fn new(v: i64) -> Self {
-        assert!(v != CALCULATE_LATENCY_LATER);
+        assert!(
+            v < i64::MAX - 100000000 && v > i64::MIN + 100000000,
+            "Trying to create an AbsLat with a v too close to CALCULATE_LATENCY_LATER ({CALCULATE_LATENCY_LATER}): {v}"
+        );
         Self(v)
     }
     pub fn get(self) -> Option<i64> {
@@ -397,6 +400,7 @@ impl ModuleTypingContext<'_> {
 
         for (_, var) in problem.inference_variables.into_iter() {
             if let Some(inferred_value) = var.get() {
+                let _ = AbsLat::new(inferred_value); // Trigger the AbsLat too close to AbsLat::UNKNOWN assert
                 let (submod_id, arg_id) = var.back_reference;
 
                 // The value wasn't known before, now it is

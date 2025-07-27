@@ -19,6 +19,7 @@ use std::collections::VecDeque;
 use crate::{
     alloc::FlatAlloc,
     flattening::Direction,
+    latency::AbsLat,
     prelude::{InferenceVarIDMarker, LatencyCountInferenceVarID},
 };
 
@@ -841,9 +842,10 @@ impl<ID> ValueToInfer<ID> {
     }
     pub fn get(&self) -> Option<i64> {
         self.inferred_value
-            .and_then(|v| (v != i64::MAX).then_some(v))
+            .and_then(|v| (v != i64::MAX && v != i64::MIN).then_some(v))
     }
     fn apply_candidate(&mut self, candidate_value: i64) {
+        let _ = AbsLat::new(candidate_value); // Trigger the "too close to AbsLat::UNKNOWN" assert
         if let Some(v) = &mut self.inferred_value {
             *v = if self.linear_factor_is_positive {
                 i64::min(*v, candidate_value)
