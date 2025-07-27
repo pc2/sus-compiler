@@ -5,9 +5,7 @@ use dot::{render, Edges, GraphWalk, Id, LabelText, Labeller, Nodes, Style};
 use crate::{
     alloc::FlatAlloc,
     flattening::Direction,
-    instantiation::{
-        ForEachContainedWire, ModuleTypingContext, RealWire, RealWireDataSource, SubModule,
-    },
+    instantiation::{ForEachContainedWire, ModuleTypingContext, RealWire, SubModule},
     latency::LatencyCountingProblem,
     linker::Linker,
     prelude::{SubModuleID, SubModuleIDMarker, WireID, WireIDMarker},

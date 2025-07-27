@@ -6,7 +6,7 @@ pub mod dot_graphs;
 #[cfg(not(feature = "dot"))]
 pub mod dot_graphs {
     pub fn display_generated_hardware_structure(
-        _md_instance: &crate::instantiation::InstantiatedModule,
+        _md_instance: &crate::instantiation::ModuleTypingContext<'_>,
     ) {
         panic!("sus_compiler was not compiled with the 'dot' feature!");
     }

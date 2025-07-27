@@ -1288,7 +1288,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let is_local = cursor.optional_field(field!("local"));
         cursor.field(field!("interface_kind"));
         let (interface_kw, interface_kw_span) = cursor.kind_span();
-        let (left_direction, interface_kind) = match interface_kw {
+        let (left_direction, mut interface_kind) = match interface_kw {
             kw!("interface") => (Direction::Input, InterfaceKind::RegularInterface),
             kw!("action") => (Direction::Input, InterfaceKind::Action(UUID::PLACEHOLDER)),
             kw!("trigger") => (Direction::Output, InterfaceKind::Trigger(UUID::PLACEHOLDER)),
@@ -1306,6 +1306,33 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         };
 
         let documentation = cursor.extract_gathered_comments();
+
+        let declaration_instruction = self.instructions.get_next_alloc_id();
+        match &mut interface_kind {
+            InterfaceKind::RegularInterface => {}
+            InterfaceKind::Action(port_id) => {
+                *port_id = self.ports.alloc(Port {
+                    name: name.to_owned(),
+                    name_span,
+                    decl_span: interface_decl_span,
+                    direction: Direction::Input,
+                    domain: self.current_domain,
+                    declaration_instruction,
+                    latency_specifier,
+                });
+            }
+            InterfaceKind::Trigger(port_id) => {
+                *port_id = self.ports.alloc(Port {
+                    name: name.to_owned(),
+                    name_span,
+                    decl_span: interface_decl_span,
+                    direction: Direction::Output,
+                    domain: self.current_domain,
+                    declaration_instruction,
+                    latency_specifier,
+                });
+            }
+        }
 
         let decl_instr = self
             .instructions
@@ -1326,6 +1353,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 then_block: FlatIDRange::PLACEHOLDER,
                 else_block: FlatIDRange::PLACEHOLDER,
             }));
+        assert_eq!(decl_instr, declaration_instruction);
 
         let then_block_starts_at = self.instructions.get_next_alloc_id();
 
@@ -1363,31 +1391,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             &mut self.instructions[decl_instr]
         );
 
-        match &mut interface.interface_kind {
-            InterfaceKind::RegularInterface => {}
-            InterfaceKind::Action(port_id) => {
-                *port_id = self.ports.alloc(Port {
-                    name: name.to_owned(),
-                    name_span,
-                    decl_span: interface_decl_span,
-                    direction: Direction::Input,
-                    domain: self.current_domain,
-                    declaration_instruction: decl_instr,
-                    latency_specifier,
-                });
-            }
-            InterfaceKind::Trigger(port_id) => {
-                *port_id = self.ports.alloc(Port {
-                    name: name.to_owned(),
-                    name_span,
-                    decl_span: interface_decl_span,
-                    direction: Direction::Output,
-                    domain: self.current_domain,
-                    declaration_instruction: decl_instr,
-                    latency_specifier,
-                });
-            }
-        }
         interface.interface_id = interface_id;
         interface.inputs = inputs;
         interface.outputs = outputs;
