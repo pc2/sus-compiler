@@ -91,7 +91,11 @@ pub trait CodeGenBackend {
         let mut out_file = self.make_output_file(path);
         let mut to_process_queue: Vec<Rc<InstantiatedModule>> = Vec::new();
         for (_template_args, inst) in linker.instantiator.borrow().iter_for_module(md_id) {
-            to_process_queue.push(inst.clone());
+            if inst.errors.did_error {
+                eprintln!("Cannot codegen {}, due to errors!", inst.name);
+            } else {
+                to_process_queue.push(inst.clone());
+            }
         }
 
         let mut to_process_queue: Vec<&InstantiatedModule> =
