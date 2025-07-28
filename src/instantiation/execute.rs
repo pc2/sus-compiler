@@ -1847,16 +1847,28 @@ impl<'l> ExecutionContext<'l> {
                                 sources: Vec::new(),
                             },
                         };
+                        let domain = interface.domain.unwrap_physical();
                         let condition_wire = self.wires.alloc(RealWire {
                             name: self.unique_name_producer.get_unique_name(&interface.name),
                             typ: ConcreteType::BOOL,
                             original_instruction,
-                            domain: interface.domain.unwrap_physical(),
+                            domain,
                             source,
                             specified_latency,
                             absolute_latency: AbsLat::UNKNOWN,
                             is_port,
                         });
+
+                        if let InterfaceKind::Trigger(_) = interface.interface_kind {
+                            let false_wire = self.alloc_bool(false, original_instruction, domain);
+                            self.instantiate_write_to_wire(
+                                condition_wire,
+                                Vec::new(),
+                                false_wire,
+                                0,
+                                interface.name_span,
+                            );
+                        }
 
                         self.condition_stack.push(ConditionStackElem {
                             condition_wire,
