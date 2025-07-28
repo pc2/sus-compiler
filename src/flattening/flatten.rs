@@ -1073,11 +1073,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     }
 
     /// Makes sure to reset [Self::current_parent_condition] appropriately
-    fn with_parent_condition<R>(
-        &mut self,
-        new_parent: Option<FlatID>,
-        f: impl FnOnce(&mut Self) -> R,
-    ) -> R {
+    fn with_parent_condition(&mut self, new_parent: Option<FlatID>, f: impl FnOnce(&mut Self)) {
         let old_parent_condition = self.current_parent_condition;
         if let Some(parent_when) = new_parent {
             self.current_parent_condition = Some(ParentCondition {
@@ -1086,54 +1082,50 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             });
         }
 
-        let result = f(self);
+        f(self);
 
         self.current_parent_condition = old_parent_condition;
-
-        result
     }
 
     fn flatten_then_else_blocks(
         &mut self,
         cursor: &mut Cursor<'c>,
-        parent_when: Option<FlatID>,
+        may_invert_parent_when: bool,
     ) -> (FlatIDRange, FlatIDRange, Option<Span>, Option<Span>) {
-        self.with_parent_condition(parent_when, |slf| {
-            let start_at = slf.instructions.get_next_alloc_id();
-            if !cursor.optional_field(field!("then_block")) {
-                let empty = UUIDRange(start_at, start_at);
-                return (empty, empty, None, None);
-            }
-            let then_block_span = cursor.span();
-            let then_block = slf.flatten_code(cursor);
+        let start_at = self.instructions.get_next_alloc_id();
+        if !cursor.optional_field(field!("then_block")) {
+            let empty = UUIDRange(start_at, start_at);
+            return (empty, empty, None, None);
+        }
+        let then_block_span = cursor.span();
+        let then_block = self.flatten_code(cursor);
 
-            if parent_when.is_some() {
-                slf.current_parent_condition
-                    .as_mut()
-                    .unwrap()
-                    .is_else_branch = true;
-            }
+        if may_invert_parent_when {
+            self.current_parent_condition
+                .as_mut()
+                .unwrap()
+                .is_else_branch = true;
+        }
 
-            let else_start = slf.instructions.get_next_alloc_id();
-            let else_span = if cursor.optional_field(field!("else_block")) {
-                cursor.go_down(kind!("else_block"), |cursor| {
-                    cursor.field(field!("content"));
-                    if cursor.kind() == kind!("if_statement") {
-                        slf.flatten_if_statement(cursor); // Chained if statements
-                    } else {
-                        slf.flatten_code(cursor);
-                    }
-                });
-                Some(cursor.span())
-            } else {
-                None
-            };
+        let else_start = self.instructions.get_next_alloc_id();
+        let else_span = if cursor.optional_field(field!("else_block")) {
+            cursor.go_down(kind!("else_block"), |cursor| {
+                cursor.field(field!("content"));
+                if cursor.kind() == kind!("if_statement") {
+                    self.flatten_if_statement(cursor); // Chained if statements
+                } else {
+                    self.flatten_code(cursor);
+                }
+            });
+            Some(cursor.span())
+        } else {
+            None
+        };
 
-            let else_end = slf.instructions.get_next_alloc_id();
-            let else_block = FlatIDRange::new(else_start, else_end);
+        let else_end = self.instructions.get_next_alloc_id();
+        let else_block = FlatIDRange::new(else_start, else_end);
 
-            (then_block, else_block, Some(then_block_span), else_span)
-        })
+        (then_block, else_block, Some(then_block_span), else_span)
     }
 
     fn flatten_if_statement(&mut self, cursor: &mut Cursor<'c>) {
@@ -1158,6 +1150,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     is_generative: expects_generative,
                     then_block: FlatIDRange::PLACEHOLDER,
                     else_block: FlatIDRange::PLACEHOLDER,
+                    then_span: Span::MAX_POSSIBLE_SPAN,
+                    else_span: Some(Span::MAX_POSSIBLE_SPAN),
                     bindings_read_only: Vec::new(),
                     bindings_writable: Vec::new(),
                     conditional_bindings_span: None,
@@ -1165,35 +1159,41 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
             let bindings_start_at = self.instructions.get_next_alloc_id();
 
-            let ((bindings_inputs, bindings_outputs), conditional_binding_span) =
-                if cursor.optional_field(field!("conditional_bindings")) {
-                    let conditional_bindings_span = cursor.span();
-                    cursor.go_down(kind!("interface_ports"), |cursor| {
-                        (
-                            self.flatten_conditional_bindings(if_id, cursor),
-                            Some(conditional_bindings_span),
-                        )
-                    })
-                } else {
-                    ((Vec::new(), Vec::new()), None)
-                };
+            let bindings_ctx_frame = self.local_variable_context.new_frame();
 
-            let (then_block, else_block, then_block_span, _else_span) =
-                self.flatten_then_else_blocks(cursor, (!expects_generative).then_some(if_id));
+            self.with_parent_condition((!expects_generative).then_some(if_id), |slf| {
+                let ((bindings_inputs, bindings_outputs), conditional_binding_span) =
+                    if cursor.optional_field(field!("conditional_bindings")) {
+                        let conditional_bindings_span = cursor.span();
+                        cursor.go_down(kind!("interface_ports"), |cursor| {
+                            (
+                                slf.flatten_conditional_bindings(if_id, cursor),
+                                Some(conditional_bindings_span),
+                            )
+                        })
+                    } else {
+                        ((Vec::new(), Vec::new()), None)
+                    };
 
-            let then_block = UUIDRange(bindings_start_at, then_block.1);
+                let (then_block, else_block, then_span, else_span) =
+                    slf.flatten_then_else_blocks(cursor, !expects_generative);
 
-            assert!(then_block_span.is_some());
+                let then_block = UUIDRange(bindings_start_at, then_block.1);
 
-            let_unwrap!(
-                Instruction::IfStatement(if_stmt),
-                &mut self.instructions[if_id]
-            );
-            if_stmt.then_block = then_block;
-            if_stmt.else_block = else_block;
-            if_stmt.bindings_read_only = bindings_inputs;
-            if_stmt.bindings_writable = bindings_outputs;
-            if_stmt.conditional_bindings_span = conditional_binding_span;
+                let_unwrap!(
+                    Instruction::IfStatement(if_stmt),
+                    &mut slf.instructions[if_id]
+                );
+                if_stmt.then_block = then_block;
+                if_stmt.else_block = else_block;
+                if_stmt.then_span = then_span.unwrap();
+                if_stmt.else_span = else_span;
+                if_stmt.bindings_read_only = bindings_inputs;
+                if_stmt.bindings_writable = bindings_outputs;
+                if_stmt.conditional_bindings_span = conditional_binding_span;
+            });
+
+            self.local_variable_context.pop_frame(bindings_ctx_frame);
         })
     }
 
@@ -1372,6 +1372,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 domain: DomainType::Physical(self.current_domain),
                 then_block: FlatIDRange::PLACEHOLDER,
                 else_block: FlatIDRange::PLACEHOLDER,
+                then_span: Some(Span::MAX_POSSIBLE_SPAN),
+                else_span: Some(Span::MAX_POSSIBLE_SPAN),
             }),
         );
 
@@ -1403,47 +1405,54 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             }
         };
 
-        let (inputs, outputs) = self.flatten_interface_ports(left_direction, interface_id, cursor);
+        let is_action_or_trigger = interface_kind.is_conditional();
 
-        let (then_block, else_block, then_block_span, else_span) = self.flatten_then_else_blocks(
-            cursor,
-            interface_kind
-                .is_conditional()
-                .then_some(declaration_instruction),
+        self.with_parent_condition(
+            is_action_or_trigger.then_some(declaration_instruction),
+            |slf| {
+                let (inputs, outputs) =
+                    slf.flatten_interface_ports(left_direction, interface_id, cursor);
+
+                let (then_block, else_block, then_span, else_span) =
+                    slf.flatten_then_else_blocks(cursor, is_action_or_trigger);
+
+                let then_block = UUIDRange(then_block_starts_at, then_block.1);
+                let_unwrap!(
+                    Instruction::Interface(interface),
+                    &mut slf.instructions[declaration_instruction]
+                );
+
+                interface.interface_id = interface_id;
+                interface.inputs = inputs;
+                interface.outputs = outputs;
+                interface.then_block = then_block;
+                interface.else_block = else_block;
+                interface.then_span = then_span;
+                interface.else_span = else_span;
+
+                match interface_kind {
+                    InterfaceKind::RegularInterface => {
+                        if let Some((_, lat_spec_span)) = parsed_latency_specifier {
+                            slf.errors.error(
+                                lat_spec_span,
+                                "Can only add latency specifiers to actions or triggers",
+                            );
+                        }
+                        if let Some(else_span) = else_span {
+                            slf.errors
+                                .error(else_span, "Regular interfaces cannot take else blocks");
+                        }
+                    }
+                    InterfaceKind::Action(_) => {
+                        if then_span.is_none() {
+                            slf.errors
+                                .error(interface_kw_span, "An action requires a block");
+                        }
+                    }
+                    InterfaceKind::Trigger(_) => {}
+                }
+            },
         );
-        let then_block = UUIDRange(then_block_starts_at, then_block.1);
-        let_unwrap!(
-            Instruction::Interface(interface),
-            &mut self.instructions[declaration_instruction]
-        );
-
-        interface.interface_id = interface_id;
-        interface.inputs = inputs;
-        interface.outputs = outputs;
-        interface.then_block = then_block;
-        interface.else_block = else_block;
-
-        match interface_kind {
-            InterfaceKind::RegularInterface => {
-                if let Some((_, lat_spec_span)) = parsed_latency_specifier {
-                    self.errors.error(
-                        lat_spec_span,
-                        "Can only add latency specifiers to actions or triggers",
-                    );
-                }
-                if let Some(else_span) = else_span {
-                    self.errors
-                        .error(else_span, "Regular interfaces cannot take else blocks");
-                }
-            }
-            InterfaceKind::Action(_) => {
-                if then_block_span.is_none() {
-                    self.errors
-                        .error(interface_kw_span, "An action requires a block");
-                }
-            }
-            InterfaceKind::Trigger(_) => {}
-        }
 
         if let Some(variable_ctx_frame) = variable_ctx_frame {
             self.local_variable_context.pop_frame(variable_ctx_frame);
