@@ -7576,19 +7576,30 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                                ────────┬────────  
       │                                        ╰────────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
-      ╭─[ test.sus:1181:11 ]
+Error: Conflicting specified latency
+
+a'0
+-> _x_x'0 (+0)
+-> loose_inbetween'2 (+2)
+-> _y_x'2 (+0)
+-> b'4 (+2)
+
+But this was specified as b'3
+      ╭─[ test.sus:1176:52 ]
       │
- 1181 │     infer_me x
-      │              ┬  
-      │              ╰── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
-──────╯
-Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
-      ╭─[ test.sus:1182:11 ]
-      │
- 1182 │     infer_me y
-      │              ┬  
-      │              ╰── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
+ 1176 │     interface inference_edge_case: bool a'0 -> bool b'3
+      │                                         ┬             ┬  
+      │                                         ╰──────────────── 'a' declared here
+      │                                                       │  
+      │                                                       ╰── Conflicting specified latency
+
+a'0
+-> _x_x'0 (+0)
+-> loose_inbetween'2 (+2)
+-> _y_x'2 (+0)
+-> b'4 (+2)
+
+But this was specified as b'3
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1193:7 ]

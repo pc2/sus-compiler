@@ -287,6 +287,9 @@ impl PortLatencyInferenceInfo {
                 if to.domain != from.domain {
                     continue; // ports on different domains cannot be related in latency counting
                 }
+                if from_id == to_id {
+                    continue; // No edges from a node to itself
+                }
 
                 edges.push((
                     from_id,
@@ -697,8 +700,7 @@ mod tests {
             &specified_latencies,
             &inference_edges,
             &mut values_to_infer,
-        )
-        .unwrap();
+        );
 
         assert_eq!(
             values_to_infer.map(|v| v.1.get()).into_vec(),
