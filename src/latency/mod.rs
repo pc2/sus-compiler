@@ -390,7 +390,7 @@ impl ModuleTypingContext<'_> {
         );
 
         // We don't need to report the error, they'll bubble up later anyway during [solve_latencies]
-        let _result = infer_unknown_latency_edges(
+        infer_unknown_latency_edges(
             fanins,
             &problem.ports,
             &problem.specified_latencies,

@@ -30,6 +30,7 @@ struct PerThreadDebugInfo {
     recent_debug_options: CircularBuffer<RECENT_DEBUG_FLAG_SIZE, (Option<String>, &'static str)>,
 }
 
+#[derive(Debug)]
 struct SpanDebuggerStackElement {
     stage: &'static str,
     global_obj_name: String,

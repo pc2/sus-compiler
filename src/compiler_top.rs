@@ -234,14 +234,6 @@ impl Linker {
 
         flatten_all_globals(self);
 
-        for global_id in &global_ids {
-            if let GlobalObj::Module(md) = &mut self.globals.get_mut(*global_id) {
-                if crate::debug::is_enabled("print-abstract-pre-typecheck") {
-                    md.print_flattened_module(&self.files[md.link_info.file]);
-                }
-            }
-        }
-
         self.checkpoint(&global_ids, AFTER_FLATTEN_CP);
         if config.early_exit == EarlyExitUpTo::Flatten {
             return;

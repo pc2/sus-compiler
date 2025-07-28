@@ -1831,4 +1831,10 @@ fn flatten_global(pass: &mut LinkerPass, errors: &ErrorCollector, cursor: &mut C
             assert_ne!(parent_when.parent_when, id);
         }
     }
+
+    if let GlobalObj::Module(md) = pass.get_with_context().0 {
+        if crate::debug::is_enabled("print-abstract-pre-typecheck") {
+            md.print_flattened_module(cursor.file_data);
+        }
+    }
 }
