@@ -18,6 +18,8 @@ pub use crate::let_unwrap;
 pub use crate::unwrap_variant;
 #[allow(unused_imports)]
 pub use sus_proc_macro::__debug_breakpoint;
+#[allow(unused_imports)]
+pub use sus_proc_macro::__debug_breakpoint_if;
 
 // private imports, for the IDs
 

@@ -127,7 +127,7 @@ pub fn get_builtin_const(token_stream: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn __debug_breakpoint(_input: TokenStream) -> TokenStream {
-    let expanded = quote! {
+    quote! {
         if crate::debug::debugging_enabled() {
             #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
             unsafe {
@@ -149,6 +149,35 @@ pub fn __debug_breakpoint(_input: TokenStream) -> TokenStream {
                 core::arch::asm!("brk #0");
             }
         }
-    };
-    TokenStream::from(expanded)
+    }
+    .into()
+}
+
+#[proc_macro]
+pub fn __debug_breakpoint_if(input: TokenStream) -> TokenStream {
+    let expr: syn::Expr = syn::parse_macro_input!(input as syn::Expr);
+    quote! {
+        if crate::debug::debugging_enabled() && (#expr) {
+            #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+            unsafe {
+                core::arch::asm!("int3");
+            }
+
+            #[cfg(all(target_arch = "x86_64", target_os = "windows"))]
+            unsafe {
+                core::arch::asm!("int3");
+            }
+
+            #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+            unsafe {
+                core::arch::asm!("brk #0");
+            }
+
+            #[cfg(all(target_arch = "aarch64", target_os = "windows"))]
+            unsafe {
+                core::arch::asm!("brk #0");
+            }
+        }
+    }
+    .into()
 }
