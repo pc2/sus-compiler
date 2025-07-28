@@ -93,13 +93,6 @@ impl<IndexMarker> UUIDAllocator<IndexMarker> {
         self.cur.0 += 1;
         allocated_id
     }
-    pub fn to_flat_alloc<T: Default>(&self) -> FlatAlloc<T, IndexMarker> {
-        let mut result = FlatAlloc::with_capacity(self.cur.0);
-        for _ in 0..self.cur.0 {
-            result.alloc(T::default());
-        }
-        result
-    }
     pub fn as_range(&self) -> UUIDRange<IndexMarker> {
         UUIDRange(UUID::from_hidden_value(0), self.cur)
     }
@@ -647,6 +640,14 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
         let uuid = self.data.len();
         self.data.push(value);
         UUID(uuid, PhantomData)
+    }
+    #[track_caller]
+    pub fn alloc_next_alloc_id(&mut self, id: UUID<IndexMarker>, value: T)
+    where
+        IndexMarker: UUIDMarker,
+    {
+        let found_id = self.alloc(value);
+        assert_eq!(id, found_id, "There was an element inserted between a call to [FlatAlloc::get_next_alloc_id] and [FlatAlloc::alloc_next_alloc_id]")
     }
     pub fn len(&self) -> usize {
         self.data.len()
