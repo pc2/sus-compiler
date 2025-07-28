@@ -354,7 +354,7 @@ impl DomainType {
         domains: &'d FlatAlloc<DomainInfo, DomainIDMarker>,
     ) -> impl Display + 'd {
         FmtWrapper(move |f| match self {
-            DomainType::Generative => f.write_str("{gen}"),
+            DomainType::Generative => f.write_str("gen"),
             DomainType::Physical(physical_id) => write!(f, "{}", physical_id.display(domains)),
             DomainType::Unknown(unknown_id) => write!(f, "{{{unknown_id:?}}}"),
         })

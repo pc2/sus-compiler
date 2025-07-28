@@ -3,7 +3,7 @@ mod lints;
 mod type_check;
 
 use crate::{
-    alloc::UUIDAllocator,
+    alloc::{UUIDAllocator, UUID},
     linker::{
         passes::{GlobalResolver, LinkerPass},
         GlobalObj,
