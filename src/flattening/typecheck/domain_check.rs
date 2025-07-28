@@ -93,23 +93,25 @@ impl<'l> TypeCheckingContext<'l> {
                     }
                 });
 
-                expression.domain.set(total_domain.0);
-
                 // Function call "writes" also require the condition domain
                 if let ExpressionSource::FuncCall(fc) = &expression.source {
                     let call_expr = self.instructions[fc.func_wire_ref].unwrap_subexpression();
-                    assert!(call_expr.domain != DomainType::Generative); // TODO generative function calls
-
-                    if let Some(condition_domain) =
-                        self.get_condition_domain(expression.parent_condition)
-                    {
-                        self.unify_physicals(
-                            total_domain,
-                            condition_domain,
-                            "the runtime condition for function calls",
-                        );
+                    if call_expr.domain != DomainType::Generative {
+                        if let Some(condition_domain) =
+                            self.get_condition_domain(expression.parent_condition)
+                        {
+                            self.unify_physicals(
+                                total_domain,
+                                condition_domain,
+                                "the runtime condition for function calls",
+                            );
+                        }
+                    } else {
+                        // TODO generative function calls
                     }
                 }
+
+                expression.domain.set(total_domain.0);
 
                 // Regular "writes"
                 if let ExpressionOutput::MultiWrite(writes) = &expression.output {
