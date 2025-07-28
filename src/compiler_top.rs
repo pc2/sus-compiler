@@ -244,9 +244,9 @@ impl Linker {
                 typecheck(pass, errors);
 
                 if crate::debug::is_enabled("print-abstract") {
-                    let md = pass.get_mut();
+                    let (md, globals) = pass.get_with_context();
                     if let GlobalObj::Module(md) = md {
-                        md.print_flattened_module(&files[md.link_info.file]);
+                        md.print_flattened_module(&files[md.link_info.file], globals.globals);
                     }
                 }
             });

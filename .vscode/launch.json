@@ -90,9 +90,11 @@
             "args": [
                 "/home/lennart/Desktop/Projects/mandelbrotFPGA/mandelbrot.sus",
                 "/home/lennart/Desktop/Projects/mandelbrotFPGA/float.sus",
-                "--debug-whitelist", "SlowIteratorState",
+                "--debug-whitelist", "SlowIterator2",
+                "--debug", "print-abstract-pre-typecheck",
+                "--debug", "print-abstract",
                 "--debug", "print-concrete",
-                "--debug", "dot-dependency-graph"
+                "--standalone", "MandelbrotSlowIter2"
             ],
             "cwd": "${workspaceFolder}"
         },

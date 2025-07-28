@@ -1,3 +1,6 @@
+use colored::Colorize;
+use sus_proc_macro::kw;
+
 use crate::alloc::zip_eq;
 use crate::prelude::*;
 
@@ -10,8 +13,12 @@ use crate::value::Value;
 use crate::{file_position::FileText, pretty_print_many_spans};
 
 use crate::flattening::{
-    Declaration, DeclarationKind, DomainInfo, InterfaceDeclKind, InterfaceDeclaration,
-    InterfaceToDomainMap, Module, WrittenType,
+    Declaration, DeclarationKind, Direction, DomainInfo, Expression, ExpressionOutput,
+    ExpressionSource, ForStatement, FuncCall, GlobalReference, IfStatement, Instruction,
+    InterfaceDeclKind, InterfaceDeclaration, InterfaceKind, InterfaceToDomainMap, Module,
+    PartSelectDirection, PathElemRefersTo, SliceType, SubModuleInstance, WireReference,
+    WireReferencePathElement, WireReferenceRoot, WriteModifiers, WriteTo, WrittenTemplateArg,
+    WrittenType,
 };
 use crate::linker::{FileData, GlobalUUID, LinkInfo, LinkerGlobals};
 use crate::typing::{abstract_type::AbstractRankedType, concrete_type::ConcreteType};
@@ -118,15 +125,120 @@ impl<ID: Into<GlobalUUID> + Copy> AbstractGlobalReference<ID> {
                 &self.template_arg_types,
                 &target_link_info.template_parameters,
             );
-            join_string_iter_formatter(", ", f, args_iter, |(_, typ, param), f| match typ {
-                TemplateKind::Type(typ) => f.write_fmt(format_args!(
-                    "{}: {}",
-                    param.name,
-                    typ.display(globals, link_info)
-                )),
-                TemplateKind::Value(()) => f.write_fmt(format_args!("{}: _", param.name)),
+            join_string_iter_formatter(", ", f, args_iter, |(_, typ, param), f| {
+                write!(f, "{}: ", &param.name)?;
+                match typ {
+                    TemplateKind::Type(typ) => {
+                        f.write_fmt(format_args!("type {}", typ.display(globals, link_info)))
+                    }
+                    TemplateKind::Value(()) => f.write_char('_'),
+                }
             })?;
             f.write_str(")")
+        })
+    }
+}
+
+impl<ID: Into<GlobalUUID> + Copy> GlobalReference<ID> {
+    pub fn display<'a>(
+        &'a self,
+        globals: &'a LinkerGlobals,
+        link_info: &'a LinkInfo,
+    ) -> impl Display + 'a {
+        FmtWrapper(move |f| {
+            let target_link_info: &LinkInfo = &globals[self.id.into()];
+            f.write_str(&target_link_info.name)?;
+            f.write_str(" #(")?;
+            join_string_iter_formatter(
+                ", ",
+                f,
+                &self.template_args,
+                |WrittenTemplateArg {
+                     name,
+                     refers_to,
+                     kind,
+                     ..
+                 },
+                 f| {
+                    write!(f, "{name} -> ")?;
+                    if let Some(found) = refers_to.get() {
+                        write!(
+                            f,
+                            "{}: ",
+                            &target_link_info.template_parameters[*found].name
+                        )?;
+                    } else {
+                        f.write_str("?: ")?;
+                    }
+                    match kind {
+                        Some(TemplateKind::Type(wr_typ)) => write!(
+                            f,
+                            "type {}",
+                            wr_typ.display(globals, &link_info.template_parameters)
+                        ),
+                        Some(TemplateKind::Value(v_id)) => write!(f, "{v_id:?}"),
+                        None => f.write_str("INVALID"),
+                    }
+                },
+            )?;
+            f.write_str(")")
+        })
+    }
+}
+
+impl WireReference {
+    pub fn display<'s>(
+        &'s self,
+        globals: &'s LinkerGlobals,
+        link_info: &'s LinkInfo,
+    ) -> impl Display + 's {
+        FmtWrapper(|f| {
+            match &self.root {
+                WireReferenceRoot::LocalDecl(decl_id)
+                | WireReferenceRoot::LocalSubmodule(decl_id)
+                | WireReferenceRoot::LocalInterface(decl_id) => {
+                    let decl_name = link_info.debug_name(*decl_id);
+                    write!(f, "{decl_name}")?
+                }
+                WireReferenceRoot::NamedConstant(global_reference) => {
+                    write!(f, "{}", global_reference.display(globals, link_info))?;
+                }
+                WireReferenceRoot::NamedModule(global_reference) => {
+                    write!(f, "{}", global_reference.display(globals, link_info))?;
+                }
+                WireReferenceRoot::Error => write!(f, "{{error}}")?,
+            }
+            for p in &self.path {
+                match p {
+                    WireReferencePathElement::FieldAccess {
+                        name, refers_to, ..
+                    } => {
+                        write!(f, ".{name}")?;
+                        match refers_to.get() {
+                            Some(PathElemRefersTo::Interface(_)) => {}
+                            None => write!(f, "?")?,
+                        }
+                    }
+                    WireReferencePathElement::ArrayAccess { idx, .. } => {
+                        write!(f, "[{idx:?}]")?;
+                    }
+                    WireReferencePathElement::ArraySlice { from, to, .. } => match (from, to) {
+                        (None, None) => write!(f, "[:]")?,
+                        (None, Some(to)) => write!(f, "[:{to:?}]")?,
+                        (Some(from), None) => write!(f, "[{from:?}:]")?,
+                        (Some(from), Some(to)) => write!(f, "[{from:?}:{to:?}]")?,
+                    },
+                    WireReferencePathElement::ArrayPartSelect {
+                        from,
+                        width,
+                        direction,
+                        ..
+                    } => {
+                        write!(f, "[{from:?}{direction}{width:?}]")?;
+                    }
+                }
+            }
+            Ok(())
         })
     }
 }
@@ -237,6 +349,308 @@ impl DomainType {
             DomainType::Unknown(_) => unreachable!(),
         })
     }
+    pub fn debug<'d>(
+        &'d self,
+        domains: &'d FlatAlloc<DomainInfo, DomainIDMarker>,
+    ) -> impl Display + 'd {
+        FmtWrapper(move |f| match self {
+            DomainType::Generative => f.write_str("{gen}"),
+            DomainType::Physical(physical_id) => write!(f, "{}", physical_id.display(domains)),
+            DomainType::Unknown(unknown_id) => write!(f, "{{{unknown_id:?}}}"),
+        })
+    }
+}
+
+impl Display for WriteModifiers {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WriteModifiers::Connection { num_regs, .. } => {
+                for _ in 0..*num_regs {
+                    f.write_str("reg ")?;
+                }
+                Ok(())
+            }
+            WriteModifiers::Initial { .. } => f.write_str("initial"),
+        }
+    }
+}
+
+impl core::fmt::Debug for DeclarationKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeclarationKind::RegularWire {
+                is_state,
+                read_only,
+            } => {
+                if *is_state {
+                    f.write_str("state ")?;
+                }
+                if *read_only {
+                    f.write_str("read_only ")?;
+                }
+                f.write_str("wire")
+            }
+            DeclarationKind::StructField(field_id) => write!(f, "field({field_id:?})"),
+            DeclarationKind::Port {
+                direction,
+                is_state,
+                port_id,
+                parent_interface,
+            } => {
+                if *is_state {
+                    f.write_str("state")?;
+                }
+                write!(f, "{direction}({port_id:?}@{parent_interface:?})")
+            }
+            DeclarationKind::ConditionalBinding {
+                when_id,
+                direction,
+                is_state,
+            } => {
+                if *is_state {
+                    f.write_str("state")?;
+                }
+                write!(f, "{direction} binding(in when {when_id:?})")
+            }
+            DeclarationKind::RegularGenerative { read_only } => {
+                if *read_only {
+                    f.write_str("read_only ")?;
+                }
+                write!(f, "gen")
+            }
+            DeclarationKind::TemplateParameter(template_id) => {
+                write!(f, "gen param({template_id:?})")
+            }
+        }
+    }
+}
+impl core::fmt::Debug for InterfaceKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RegularInterface => write!(f, "interface"),
+            Self::Action(port) => write!(f, "action({port:?})"),
+            Self::Trigger(port) => write!(f, "trigger({port:?})"),
+        }
+    }
+}
+impl Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Direction::Input => "input",
+            Direction::Output => "output",
+        })
+    }
+}
+impl Display for PartSelectDirection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            PartSelectDirection::Up => "+:",
+            PartSelectDirection::Down => "-:",
+        })
+    }
+}
+impl SliceType {
+    pub fn from_kind_id(kind_id: u16) -> Self {
+        match kind_id {
+            kw!(":") => SliceType::Normal,
+            kw!("+:") => SliceType::PartSelect(PartSelectDirection::Up),
+            kw!("-:") => SliceType::PartSelect(PartSelectDirection::Down),
+            _ => unreachable!(),
+        }
+    }
+}
+impl Display for SliceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            SliceType::Normal => ":",
+            SliceType::PartSelect(PartSelectDirection::Up) => "+:",
+            SliceType::PartSelect(PartSelectDirection::Down) => "-:",
+        })
+    }
+}
+
+impl LinkInfo {
+    fn debug_name(&self, instr_id: FlatID) -> impl Display + '_ {
+        let name = self.get_instruction_name(instr_id).unwrap();
+        FmtWrapper(move |f| write!(f, "{instr_id:?}={name}"))
+    }
+    fn display_domain_of<'s>(
+        &'s self,
+        instr_id: FlatID,
+        domains: &'s FlatAlloc<DomainInfo, DomainIDMarker>,
+    ) -> impl Display + 's {
+        let domain = self.get_instruction_domain(instr_id);
+        FmtWrapper(move |f| {
+            if let Some(domain) = domain {
+                write!(f, "{}", domain.debug(domains))
+            } else {
+                Ok(())
+            }
+        })
+    }
+    pub fn print_instructions(
+        &self,
+        domains: &FlatAlloc<DomainInfo, DomainIDMarker>,
+        file_data: &FileData,
+        globals: &LinkerGlobals,
+    ) {
+        let mut spans_print = Vec::new();
+        for (id, instr) in &self.instructions {
+            let parent = FmtWrapper(|f| {
+                if let Some(p) = instr.get_parent_condition() {
+                    let p_when = p.parent_when;
+                    if p.is_else_branch {
+                        write!(f, "parent: !{p_when:?}")
+                    } else {
+                        write!(f, "parent: {p_when:?}")
+                    }
+                } else {
+                    f.write_str("no parent when")
+                }
+            });
+            let domain = self.display_domain_of(id, domains);
+            print!("{id:?}: {parent} {domain} ");
+            match instr {
+                Instruction::SubModule(SubModuleInstance {
+                    module_ref,
+                    name,
+                    local_domain_map,
+                    typ,
+                    ..
+                }) => {
+                    let name = name.green();
+                    print!("{} {name}", module_ref.display(globals, self));
+                }
+                Instruction::Declaration(Declaration {
+                    typ_expr,
+                    typ,
+                    name,
+                    decl_kind,
+                    latency_specifier,
+                    ..
+                }) => {
+                    let typ_expr = typ_expr.display(globals, &self.template_parameters);
+                    let name = name.green();
+                    print!("{decl_kind:?} {typ_expr} {name}");
+                    if let Some(lat_spec) = latency_specifier {
+                        print!("'{lat_spec:?}");
+                    }
+                }
+                Instruction::Expression(Expression { source, output, .. }) => {
+                    match output {
+                        ExpressionOutput::SubExpression(_typ) => {}
+                        ExpressionOutput::MultiWrite(write_tos) => {
+                            print!("(");
+                            join_string_iter_print(
+                                ", ",
+                                write_tos,
+                                |WriteTo {
+                                     to,
+                                     write_modifiers,
+                                     target_domain,
+                                     ..
+                                 }| {
+                                    let target_domain = target_domain.get();
+                                    let target_domain = target_domain.debug(domains);
+                                    let to = to.display(globals, self);
+                                    print!("{target_domain} {write_modifiers} {to}")
+                                },
+                            );
+                            print!(") = ");
+                        }
+                    }
+                    match source {
+                        ExpressionSource::WireRef(wire_reference) => {
+                            print!("{}", wire_reference.display(globals, self));
+                        }
+                        ExpressionSource::FuncCall(FuncCall {
+                            func_wire_ref,
+                            arguments,
+                            ..
+                        }) => {
+                            print!("{func_wire_ref:?}(");
+                            join_string_iter_print(", ", arguments, |arg| {
+                                print!("{arg:?}");
+                            });
+                            print!(")");
+                        }
+                        ExpressionSource::UnaryOp { op, right, rank: _ } => {
+                            print!("{op}{right:?}");
+                        }
+                        ExpressionSource::BinaryOp {
+                            op,
+                            left,
+                            right,
+                            rank: _,
+                        } => print!("{left:?} {op} {right:?}"),
+                        ExpressionSource::ArrayConstruct(elements) => {
+                            print!("[");
+                            join_string_iter_print(", ", elements, |elem| {
+                                print!("{elem:?}");
+                            });
+                            print!("]");
+                        }
+                        ExpressionSource::Literal(value) => {
+                            print!("literal {value}")
+                        }
+                    }
+                }
+                Instruction::Interface(InterfaceDeclaration {
+                    name,
+                    latency_specifier,
+                    is_local,
+                    interface_id,
+                    interface_kind,
+                    inputs,
+                    outputs,
+                    then_block,
+                    else_block,
+                    ..
+                }) => {
+                    let is_local = if *is_local { "local " } else { "" };
+                    let name = name.green();
+                    print!("{is_local} {interface_kind:?} {interface_id:?} {name}");
+                    if let Some(lat_spec) = latency_specifier {
+                        print!("'{lat_spec:?}");
+                    }
+                    if !inputs.is_empty() | !outputs.is_empty() {
+                        print!(": {inputs:?} -> {outputs:?}");
+                    }
+                    print!(" {{{then_block:?}}} else {{{else_block:?}}}");
+                }
+                Instruction::IfStatement(IfStatement {
+                    condition,
+                    is_generative,
+                    then_block,
+                    else_block,
+                    bindings_read_only,
+                    bindings_writable,
+                    ..
+                }) => {
+                    let kw = if *is_generative { "if" } else { "when" };
+                    print!("{kw} {condition:?} ");
+                    if !bindings_read_only.is_empty() | !bindings_writable.is_empty() {
+                        print!(": {bindings_read_only:?} -> {bindings_writable:?}");
+                    }
+                    print!(" {{{then_block:?}}} else {{{else_block:?}}}");
+                }
+                Instruction::ForStatement(ForStatement {
+                    loop_var_decl,
+                    start,
+                    end,
+                    loop_body,
+                    ..
+                }) => {
+                    let loop_var_decl_name = self.debug_name(*loop_var_decl);
+                    print!("for {loop_var_decl_name} in {start:?}..{end:?} {{{loop_body:?}}}")
+                }
+            }
+            println!();
+            let span = self.get_instruction_span(id);
+            spans_print.push((format!("{id:?} {domain}"), span.as_range()));
+        }
+        pretty_print_many_spans(file_data, &spans_print);
+    }
 }
 
 impl Module {
@@ -321,7 +735,7 @@ impl Module {
             if let Some(domain_map) = &local_domains_used_in_parent_module {
                 let submod_name = &self.link_info.name;
                 let name_in_parent =
-                    domain_map.local_domain_map[domain_id].display(domain_map.domains);
+                    domain_map.local_domain_map[domain_id].debug(domain_map.domains);
                 writeln!(result, "domain {submod_name}.{name} = {name_in_parent}").unwrap();
             } else {
                 writeln!(result, "domain {name}:").unwrap();
@@ -351,7 +765,7 @@ impl Module {
         result
     }
 
-    pub fn print_flattened_module(&self, file_data: &FileData) {
+    pub fn print_flattened_module(&self, file_data: &FileData, globals: &LinkerGlobals) {
         println!("[[{}]]:", self.link_info.name);
         println!("Interface:");
         println!(
@@ -359,22 +773,34 @@ impl Module {
             self.make_all_ports_info_string(&file_data.file_text, None)
         );
         println!("Instructions:");
-        let mut spans_print = Vec::new();
-        for (id, inst) in &self.link_info.instructions {
-            println!("    {id:?}: {inst:?}");
-            let span = self.link_info.get_instruction_span(id);
-            spans_print.push((format!("{id:?}"), span.as_range()));
+        self.link_info
+            .print_instructions(&self.domains, file_data, globals);
+    }
+}
+
+pub fn join_string_iter<T>(
+    result: &mut String,
+    sep: &'static str,
+    iter: impl IntoIterator<Item = T>,
+    mut f: impl FnMut(&mut String, T),
+) {
+    let mut iter = iter.into_iter();
+    if let Some(first) = iter.next() {
+        f(result, first);
+        for item in iter {
+            result.write_str(sep).unwrap();
+            f(result, item);
         }
-        pretty_print_many_spans(file_data, &spans_print);
     }
 }
 
 pub fn join_string_iter_formatter<'fmt, T>(
     sep: &str,
     f: &mut Formatter<'fmt>,
-    mut iter: impl Iterator<Item = T>,
+    iter: impl IntoIterator<Item = T>,
     mut func: impl FnMut(T, &mut Formatter<'fmt>) -> std::fmt::Result,
 ) -> std::fmt::Result {
+    let mut iter = iter.into_iter();
     if let Some(first) = iter.next() {
         func(first, f)?;
         for item in iter {
@@ -385,17 +811,17 @@ pub fn join_string_iter_formatter<'fmt, T>(
     Ok(())
 }
 
-pub fn join_string_iter<T>(
-    result: &mut String,
+pub fn join_string_iter_print<T>(
     sep: &'static str,
-    mut iter: impl Iterator<Item = T>,
-    mut f: impl FnMut(&mut String, T),
+    iter: impl IntoIterator<Item = T>,
+    mut f: impl FnMut(T),
 ) {
+    let mut iter = iter.into_iter();
     if let Some(first) = iter.next() {
-        f(result, first);
+        f(first);
         for item in iter {
-            result.write_str(sep).unwrap();
-            f(result, item);
+            print!("{sep}");
+            f(item);
         }
     }
 }

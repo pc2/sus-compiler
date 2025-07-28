@@ -1847,9 +1847,10 @@ fn flatten_global(pass: &mut LinkerPass, errors: &ErrorCollector, cursor: &mut C
         }
     }
 
-    if let GlobalObj::Module(md) = pass.get_with_context().0 {
+    let (md, globals) = pass.get_with_context();
+    if let GlobalObj::Module(md) = md {
         if crate::debug::is_enabled("print-abstract-pre-typecheck") {
-            md.print_flattened_module(cursor.file_data);
+            md.print_flattened_module(cursor.file_data, globals.globals);
         }
     }
 }

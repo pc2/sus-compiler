@@ -4,7 +4,10 @@ use crate::{
     instantiation::instantiation_cache::Instantiator,
     linker::passes::ResolvedGlobals,
     prelude::*,
-    typing::template::{GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind},
+    typing::{
+        domain_type::DomainType,
+        template::{GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind},
+    },
 };
 
 pub mod checkpoint;
@@ -133,10 +136,30 @@ impl LinkInfo {
             Instruction::Declaration(decl) => decl.decl_span,
             Instruction::Expression(w) => w.span,
             Instruction::IfStatement(if_stmt) => if_stmt.if_keyword_span,
-            Instruction::Interface(act_trig) => act_trig.name_span,
+            Instruction::Interface(interface) => interface.name_span,
             Instruction::ForStatement(for_stmt) => {
                 self.get_instruction_span(for_stmt.loop_var_decl)
             }
+        }
+    }
+    pub fn get_instruction_name(&self, instr_id: FlatID) -> Option<&str> {
+        match &self.instructions[instr_id] {
+            Instruction::SubModule(sm) => Some(&sm.name),
+            Instruction::Declaration(decl) => Some(&decl.name),
+            Instruction::Interface(interface) => Some(&interface.name),
+            Instruction::Expression(_)
+            | Instruction::IfStatement(_)
+            | Instruction::ForStatement(_) => None,
+        }
+    }
+    pub fn get_instruction_domain(&self, instr_id: FlatID) -> Option<DomainType> {
+        match &self.instructions[instr_id] {
+            Instruction::Declaration(decl) => Some(decl.domain.get()),
+            Instruction::Interface(interface) => Some(interface.domain),
+            Instruction::Expression(expr) => Some(expr.domain.get()),
+            Instruction::SubModule(_)
+            | Instruction::IfStatement(_)
+            | Instruction::ForStatement(_) => None,
         }
     }
 }

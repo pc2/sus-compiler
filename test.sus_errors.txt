@@ -7545,12 +7545,12 @@ Warning: Used 'when' in a generative context, use 'if' instead
       │     ──┬─  
       │       ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
-Error: No such field 'ready' on FIFO #(T: ?[...], DEPTH: _, MAY_PUSH_LATENCY: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
+Error: No such field 'ready' on FIFO #(T: type ?[...], DEPTH: _, MAY_PUSH_LATENCY: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
       ╭─[ test.sus:1157:12 ]
       │
  1157 │     when fifo.ready {
       │               ──┬──  
-      │                 ╰──── No such field 'ready' on FIFO #(T: ?[...], DEPTH: _, MAY_PUSH_LATENCY: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
+      │                 ╰──── No such field 'ready' on FIFO #(T: type ?[...], DEPTH: _, MAY_PUSH_LATENCY: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
       │
       ├─[ xpm.sus:54:8 ]
       │
@@ -8153,7 +8153,7 @@ Error: While parsing 'interface_statement', parser found a syntax error in a nod
       │ │           
       │ ╰─────────── Parent node 'interface_statement'
 ──────╯
-Error: No such field 'process' on MultiStateLoop #(T: ?[...], II: _). Available fields are 'MultiStateLoop', 'may_process', 'next_state', 'request_output'
+Error: No such field 'process' on MultiStateLoop #(T: type ?[...], II: _). Available fields are 'MultiStateLoop', 'may_process', 'next_state', 'request_output'
       ╭─[ test.sus:1257:12 ]
       │
  1239 │ module MultiStateLoop #(T, int II) {
@@ -8169,7 +8169,7 @@ action request_output:
       │ 
  1257 │     when loop.process : float cur_state {
       │               ───┬───  
-      │                  ╰───── No such field 'process' on MultiStateLoop #(T: ?[...], II: _). Available fields are 'MultiStateLoop', 'may_process', 'next_state', 'request_output'
+      │                  ╰───── No such field 'process' on MultiStateLoop #(T: type ?[...], II: _). Available fields are 'MultiStateLoop', 'may_process', 'next_state', 'request_output'
 ──────╯
 Error: Cannot use conditional bingings because the condition isn't an action or a trigger
       ╭─[ test.sus:1257:20 ]

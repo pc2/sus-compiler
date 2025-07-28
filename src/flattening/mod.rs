@@ -11,12 +11,10 @@ use crate::typing::abstract_type::{AbstractGlobalReference, AbstractRankedType, 
 use crate::typing::domain_type::DomainType;
 
 use std::cell::{Cell, OnceCell};
-use std::fmt::Display;
 
 use crate::latency::port_latency_inference::PortLatencyInferenceInfo;
 pub use flatten::flatten_all_globals;
 pub use initialization::gather_initial_file_data;
-use sus_proc_macro::kw;
 
 use crate::linker::{Documentation, LinkInfo};
 use crate::value::Value;
@@ -200,16 +198,8 @@ impl Direction {
         }
     }
 }
-impl Display for Direction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Direction::Input => "input",
-            Direction::Output => "output",
-        })
-    }
-}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum InterfaceKind {
     RegularInterface,
     Action(PortID),
@@ -505,38 +495,11 @@ pub enum PartSelectDirection {
     Up,
     Down,
 }
-impl core::fmt::Display for PartSelectDirection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            PartSelectDirection::Up => "+:",
-            PartSelectDirection::Down => "-:",
-        })
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SliceType {
     Normal,
     PartSelect(PartSelectDirection),
-}
-impl SliceType {
-    pub fn from_kind_id(kind_id: u16) -> Self {
-        match kind_id {
-            kw!(":") => SliceType::Normal,
-            kw!("+:") => SliceType::PartSelect(PartSelectDirection::Up),
-            kw!("-:") => SliceType::PartSelect(PartSelectDirection::Down),
-            _ => unreachable!(),
-        }
-    }
-}
-impl core::fmt::Display for SliceType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            SliceType::Normal => ":",
-            SliceType::PartSelect(PartSelectDirection::Up) => "+:",
-            SliceType::PartSelect(PartSelectDirection::Down) => "-:",
-        })
-    }
 }
 
 /// See [Expression]
@@ -621,7 +584,7 @@ impl Expression {
 
 /// Little helper struct that tells us what kind of declaration it is.
 /// Is it a Port, Template argument, A struct field, or just a regular temporary?
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum DeclarationKind {
     RegularWire {
         is_state: bool,
@@ -971,8 +934,8 @@ pub struct ForStatement {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ParentCondition {
-    parent_when: FlatID,
-    is_else_branch: bool,
+    pub parent_when: FlatID,
+    pub is_else_branch: bool,
 }
 
 #[derive(Debug)]
