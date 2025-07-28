@@ -8,7 +8,8 @@ impl FinalizationContext {
         for (_, instr) in instructions {
             match instr {
                 Instruction::SubModule(sm) => {
-                    for (_, d) in sm.local_domain_map.get_mut() {
+                    let local_domain_map = sm.local_domain_map.get_mut().unwrap();
+                    for (_, d) in local_domain_map {
                         assert!(d.fully_substitute(&self.domain_checker));
                     }
                 }
@@ -42,12 +43,15 @@ impl<'l> TypeCheckingContext<'l> {
     pub fn domain_check_instr(&mut self, instr: &Instruction) {
         match instr {
             Instruction::SubModule(sub_module_instance) => {
-                sub_module_instance.local_domain_map.set(
-                    self.globals
-                        .get_module(sub_module_instance.module_ref.id)
-                        .domains
-                        .map(|_| self.domain_checker.alloc_unknown()),
-                );
+                sub_module_instance
+                    .local_domain_map
+                    .set(
+                        self.globals
+                            .get_module(sub_module_instance.module_ref.id)
+                            .domains
+                            .map(|_| self.domain_checker.alloc_unknown()),
+                    )
+                    .unwrap();
             }
             Instruction::Declaration(declaration) => {
                 self.written_type_must_be_generative(&declaration.typ_expr);
@@ -221,8 +225,9 @@ impl<'l> TypeCheckingContext<'l> {
             WireReferenceRoot::LocalSubmodule(local_submod) => {
                 let submod = self.instructions[*local_submod].unwrap_submodule();
                 let submod_ref = self.globals.get_declared_submodule(submod);
-                if submod.local_domain_map.len() == 1 {
-                    let [singular_domain] = submod.local_domain_map.cast_to_array();
+                let local_domain_map = submod.local_domain_map.get().unwrap();
+                if local_domain_map.len() == 1 {
+                    let [singular_domain] = local_domain_map.cast_to_array();
                     return Some(*singular_domain);
                 }
 
@@ -230,10 +235,10 @@ impl<'l> TypeCheckingContext<'l> {
                     if let WireReferencePathElement::FieldAccess { refers_to, .. } = p {
                         match refers_to.get() {
                             Some(PathElemRefersTo::Interface(interface)) => {
-                                if let Some(local_domain) =
+                                if let Some(domain_in_submod) =
                                     submod_ref.md.interfaces[*interface].domain
                                 {
-                                    return Some(submod.local_domain_map[local_domain]);
+                                    return Some(local_domain_map[domain_in_submod]);
                                 }
                             }
                             None => {}

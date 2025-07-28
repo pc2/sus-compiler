@@ -520,6 +520,21 @@ impl LinkInfo {
                 }) => {
                     let name = name.green();
                     print!("{} {name}", module_ref.display(globals, self));
+                    let submod_domains = &globals[module_ref.id].domains;
+                    if let Some(local_domain_map) = local_domain_map.get() {
+                        print!("[");
+                        join_string_iter_print(
+                            ", ",
+                            local_domain_map,
+                            |(submod_domain, domain_here)| {
+                                let submod_domain = submod_domain.display(submod_domains);
+                                let domain_here = domain_here.unwrap_physical();
+                                let domain_here = domain_here.display(domains);
+                                print!(".{submod_domain} = {domain_here}");
+                            },
+                        );
+                        print!("]");
+                    }
                 }
                 Instruction::Declaration(Declaration {
                     typ_expr,

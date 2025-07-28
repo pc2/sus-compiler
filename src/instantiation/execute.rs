@@ -993,8 +993,8 @@ impl<'l> ExecutionContext<'l> {
                 );
                 let port_decl = submod_md.link_info.instructions[port_decl].unwrap_declaration();
                 let_unwrap!(DeclarationKind::Port { port_id, .. }, port_decl.decl_kind);
-                let domain =
-                    submod.local_domain_map[submod_interface.domain.unwrap()].unwrap_physical();
+                let local_domain_map = submod.local_domain_map.get().unwrap();
+                let domain = local_domain_map[submod_interface.domain.unwrap()].unwrap_physical();
                 let submod_id = self.generation_state[*submod_id].unwrap_submodule_instance();
                 self.get_submodule_port(submod_id, port_id, Some(port_span), domain)
             }

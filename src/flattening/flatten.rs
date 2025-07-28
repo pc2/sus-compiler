@@ -491,7 +491,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         name: name.to_owned(),
                         name_span,
                         module_ref,
-                        local_domain_map: TyCell::new(),
+                        local_domain_map: OnceCell::new(),
                         typ: TyCell::new(),
                         documentation,
                     };
@@ -1072,54 +1072,68 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         }
     }
 
-    fn flatten_then_else_blocks(
+    /// Makes sure to reset [Self::current_parent_condition] appropriately
+    fn with_parent_condition<R>(
         &mut self,
-        cursor: &mut Cursor<'c>,
-        parent_when: Option<FlatID>,
-    ) -> (FlatIDRange, FlatIDRange, Option<Span>, Option<Span>) {
-        let prev_parent_condition = self.current_parent_condition;
-        if let Some(parent_when) = parent_when {
+        new_parent: Option<FlatID>,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let old_parent_condition = self.current_parent_condition;
+        if let Some(parent_when) = new_parent {
             self.current_parent_condition = Some(ParentCondition {
                 parent_when,
                 is_else_branch: false,
             });
         }
 
-        let start_at = self.instructions.get_next_alloc_id();
-        if !cursor.optional_field(field!("then_block")) {
-            let empty = UUIDRange(start_at, start_at);
-            return (empty, empty, None, None);
-        }
-        let then_block_span = cursor.span();
-        let then_block = self.flatten_code(cursor);
+        let result = f(self);
 
-        if let Some(parent_when) = parent_when {
-            self.current_parent_condition = Some(ParentCondition {
-                parent_when,
-                is_else_branch: true,
-            });
-        }
+        self.current_parent_condition = old_parent_condition;
 
-        let else_start = self.instructions.get_next_alloc_id();
-        let else_span = if cursor.optional_field(field!("else_block")) {
-            cursor.go_down(kind!("else_block"), |cursor| {
-                cursor.field(field!("content"));
-                if cursor.kind() == kind!("if_statement") {
-                    self.flatten_if_statement(cursor); // Chained if statements
-                } else {
-                    self.flatten_code(cursor);
-                }
-            });
-            Some(cursor.span())
-        } else {
-            None
-        };
-        let else_end = self.instructions.get_next_alloc_id();
-        let else_block = FlatIDRange::new(else_start, else_end);
+        result
+    }
 
-        self.current_parent_condition = prev_parent_condition;
+    fn flatten_then_else_blocks(
+        &mut self,
+        cursor: &mut Cursor<'c>,
+        parent_when: Option<FlatID>,
+    ) -> (FlatIDRange, FlatIDRange, Option<Span>, Option<Span>) {
+        self.with_parent_condition(parent_when, |slf| {
+            let start_at = slf.instructions.get_next_alloc_id();
+            if !cursor.optional_field(field!("then_block")) {
+                let empty = UUIDRange(start_at, start_at);
+                return (empty, empty, None, None);
+            }
+            let then_block_span = cursor.span();
+            let then_block = slf.flatten_code(cursor);
 
-        (then_block, else_block, Some(then_block_span), else_span)
+            if parent_when.is_some() {
+                slf.current_parent_condition
+                    .as_mut()
+                    .unwrap()
+                    .is_else_branch = true;
+            }
+
+            let else_start = slf.instructions.get_next_alloc_id();
+            let else_span = if cursor.optional_field(field!("else_block")) {
+                cursor.go_down(kind!("else_block"), |cursor| {
+                    cursor.field(field!("content"));
+                    if cursor.kind() == kind!("if_statement") {
+                        slf.flatten_if_statement(cursor); // Chained if statements
+                    } else {
+                        slf.flatten_code(cursor);
+                    }
+                });
+                Some(cursor.span())
+            } else {
+                None
+            };
+
+            let else_end = slf.instructions.get_next_alloc_id();
+            let else_block = FlatIDRange::new(else_start, else_end);
+
+            (then_block, else_block, Some(then_block_span), else_span)
+        })
     }
 
     fn flatten_if_statement(&mut self, cursor: &mut Cursor<'c>) {

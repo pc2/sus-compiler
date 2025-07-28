@@ -687,8 +687,10 @@ pub struct SubModuleInstance {
     pub name_span: Span,
     /// Maps each of the module's local domains to the domain that it is used in.
     ///
+    /// `local_domain_map[submodule_domain] = parent_domain`
+    ///
     /// These are *always* [DomainType::Physical] (of course, start out as [DomainType::Unknown] before typing)
-    pub local_domain_map: TyCell<FlatAlloc<DomainType, DomainIDMarker>>,
+    pub local_domain_map: OnceCell<FlatAlloc<DomainType, DomainIDMarker>>,
     pub typ: TyCell<AbstractRankedType>,
     pub documentation: Documentation,
 }

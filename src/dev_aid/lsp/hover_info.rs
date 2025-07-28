@@ -152,7 +152,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.sus_code(submodule.make_all_ports_info_string(
                 &linker.files[submodule.link_info.file].file_text,
                 Some(InterfaceToDomainMap {
-                    local_domain_map: &submod.local_domain_map,
+                    local_domain_map: submod.local_domain_map.get().unwrap(),
                     domains: &md.domains,
                 }),
             ));
