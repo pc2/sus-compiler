@@ -942,7 +942,7 @@ impl RealWireDataSource {
                 is_state: None,
                 sources: _,
             } => "/*mux_wire*/ logic",
-            _ => "logic",
+            _ => "wire", // Has to be "wire", because `logic[5:0] v = other_wire;` would *initialize* v to other_wire, so we need to use `wire`
         }
     }
 }
