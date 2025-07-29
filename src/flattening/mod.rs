@@ -267,24 +267,20 @@ pub enum WireReferencePathElement {
         name: String,
         name_span: Span,
         refers_to: OnceCell<PathElemRefersTo>,
-        input_typ: TyCell<AbstractRankedType>,
     },
     ArrayAccess {
         idx: FlatID,
         bracket_span: BracketSpan,
-        input_typ: TyCell<AbstractRankedType>,
     },
     ArraySlice {
         from: Option<FlatID>,
         to: Option<FlatID>,
         bracket_span: BracketSpan,
-        input_typ: TyCell<AbstractRankedType>,
     },
     ArrayPartSelect {
         from: FlatID,
         width: FlatID,
         bracket_span: BracketSpan,
-        input_typ: TyCell<AbstractRankedType>,
         direction: PartSelectDirection,
     },
 }
@@ -380,18 +376,6 @@ pub struct WireReference {
 impl WireReference {
     pub fn is_error(&self) -> bool {
         matches!(&self.root, WireReferenceRoot::Error)
-    }
-    pub fn get_root_typ(&self) -> &AbstractRankedType {
-        if let Some(first) = self.path.first() {
-            match first {
-                WireReferencePathElement::ArrayAccess { input_typ, .. }
-                | WireReferencePathElement::FieldAccess { input_typ, .. }
-                | WireReferencePathElement::ArrayPartSelect { input_typ, .. }
-                | WireReferencePathElement::ArraySlice { input_typ, .. } => input_typ,
-            }
-        } else {
-            &self.output_typ
-        }
     }
     pub fn get_total_span(&self) -> Span {
         if let Some(last) = self.path.last() {

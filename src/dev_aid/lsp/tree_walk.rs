@@ -303,7 +303,6 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                     name: _,
                     name_span,
                     refers_to,
-                    input_typ: _,
                 } => {
                     let Some(refers_to) = refers_to.get() else {
                         continue;

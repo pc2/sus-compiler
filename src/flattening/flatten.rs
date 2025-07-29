@@ -713,13 +713,9 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let bracket_span = BracketSpan::from_outer(cursor.span());
         let path_elem = cursor.go_down(kind!("array_access_bracket_expression"), |cursor| {
             if cursor.optional_field(field!("index")) {
-                let expr = self.flatten_subexpr(cursor);
+                let idx = self.flatten_subexpr(cursor);
 
-                WireReferencePathElement::ArrayAccess {
-                    idx: expr,
-                    bracket_span,
-                    input_typ: TyCell::new(),
-                }
+                WireReferencePathElement::ArrayAccess { idx, bracket_span }
             } else {
                 cursor.field(field!("slice"));
                 cursor.go_down(kind!("slice"), |cursor| {
@@ -762,7 +758,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 from,
                                 width,
                                 bracket_span,
-                                input_typ: TyCell::new(),
                                 direction,
                             }
                         }
@@ -770,7 +765,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             from,
                             to,
                             bracket_span,
-                            input_typ: TyCell::new(),
                         },
                     }
                 })
@@ -1034,7 +1028,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     name,
                     name_span,
                     refers_to: OnceCell::new(),
-                    input_typ: TyCell::new(),
                 });
 
                 wire_ref

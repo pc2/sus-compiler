@@ -11,7 +11,9 @@ use crate::let_unwrap;
 use crate::linker::IsExtern;
 use crate::linker::{GlobalUUID, LinkInfo};
 use crate::prelude::*;
-use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType};
+use crate::typing::abstract_type::{
+    AbstractInnerType, AbstractRankedType, PeanoType, BOOL_SCALAR, INT_SCALAR,
+};
 use crate::typing::concrete_type::ConcreteTemplateArg;
 use crate::typing::domain_type::DomainType;
 use crate::typing::template::TVec;
@@ -766,15 +768,18 @@ impl<'l> ExecutionContext<'l> {
     fn evaluate_builtin_constant(
         &self,
         cst_ref: &ConcreteGlobalReference<ConstantUUID>,
-    ) -> Result<Value, String> {
+    ) -> Result<(Value, AbstractRankedType), String> {
         match cst_ref.id {
-            get_builtin_const!("true") => Ok(Value::Bool(true)),
-            get_builtin_const!("false") => Ok(Value::Bool(false)),
+            get_builtin_const!("true") => Ok((Value::Bool(true), BOOL_SCALAR)),
+            get_builtin_const!("false") => Ok((Value::Bool(false), BOOL_SCALAR)),
             get_builtin_const!("clog2") => {
                 let [val] = cst_ref.template_args.cast_to_int_array();
                 if val > &ibig::ibig!(0) {
                     let val = UBig::try_from(val - 1).unwrap();
-                    Ok(Value::Integer(IBig::from(val.bit_len())))
+                    Ok((
+                        Value::Integer(IBig::from(val.bit_len())),
+                        INT_SCALAR.clone(),
+                    ))
                 } else {
                     Err(format!(
                         "clog2 argument must be strictly positive! Found {val}"
@@ -786,7 +791,7 @@ impl<'l> ExecutionContext<'l> {
                 if let Ok(exp) = usize::try_from(exponent) {
                     let mut result = ibig::ubig!(0);
                     result.set_bit(exp);
-                    Ok(Value::Integer(result.into()))
+                    Ok((Value::Integer(result.into()), INT_SCALAR.clone()))
                 } else {
                     Err(format!("pow2 exponent must be >= 0, found {exponent}"))
                 }
@@ -794,7 +799,7 @@ impl<'l> ExecutionContext<'l> {
             get_builtin_const!("pow") => {
                 let [base, exponent] = cst_ref.template_args.cast_to_int_array();
                 if let Ok(exp) = usize::try_from(exponent) {
-                    Ok(Value::Integer(base.pow(exp)))
+                    Ok((Value::Integer(base.pow(exp)), INT_SCALAR.clone()))
                 } else {
                     Err(format!("pow exponent must be >= 0, found {exponent}"))
                 }
@@ -803,7 +808,7 @@ impl<'l> ExecutionContext<'l> {
                 let [n] = cst_ref.template_args.cast_to_int_array();
                 let n = must_be_positive(n, "factorial parameter")?;
 
-                Ok(Value::Integer(factorial(n).into()))
+                Ok((Value::Integer(factorial(n).into()), INT_SCALAR.clone()))
             }
             get_builtin_const!("falling_factorial") => {
                 let [n, k] = cst_ref.template_args.cast_to_int_array();
@@ -814,7 +819,10 @@ impl<'l> ExecutionContext<'l> {
                     return Err(format!("comb assertion failed: k <= n. Found n={n}, k={k}"));
                 }
 
-                Ok(Value::Integer(falling_factorial(n, &k).into()))
+                Ok((
+                    Value::Integer(falling_factorial(n, &k).into()),
+                    INT_SCALAR.clone(),
+                ))
             }
             get_builtin_const!("comb") => {
                 let [n, k] = cst_ref.template_args.cast_to_int_array();
@@ -825,15 +833,16 @@ impl<'l> ExecutionContext<'l> {
                     return Err(format!("comb assertion failed: k <= n. Found n={n}, k={k}"));
                 }
 
-                Ok(Value::Integer(
-                    (falling_factorial(n, &k) / factorial(k)).into(),
+                Ok((
+                    Value::Integer((falling_factorial(n, &k) / factorial(k)).into()),
+                    INT_SCALAR.clone(),
                 ))
             }
             get_builtin_const!("assert") => {
                 let [condition] = cst_ref.template_args.cast_to_array();
 
                 if condition.unwrap_value().unwrap_bool() {
-                    Ok(Value::Bool(true))
+                    Ok((Value::Bool(true), BOOL_SCALAR))
                 } else {
                     Err("Assertion failed".into())
                 }
@@ -842,7 +851,7 @@ impl<'l> ExecutionContext<'l> {
                 let [concrete_typ] = cst_ref.template_args.cast_to_array();
 
                 if let Some(typ_sz) = concrete_typ.unwrap_type().sizeof() {
-                    Ok(Value::Integer(typ_sz))
+                    Ok((Value::Integer(typ_sz), INT_SCALAR.clone()))
                 } else {
                     Err("This is an incomplete type".into())
                 }
@@ -859,7 +868,7 @@ impl<'l> ExecutionContext<'l> {
     fn get_named_constant_value(
         &mut self,
         cst_ref: &GlobalReference<ConstantUUID>,
-    ) -> ExecutionResult<Value> {
+    ) -> ExecutionResult<(Value, AbstractRankedType)> {
         let linker_cst = &self.linker.constants[cst_ref.id];
         let concrete_ref = self.execute_global_ref(cst_ref)?;
 
@@ -999,11 +1008,11 @@ impl<'l> ExecutionContext<'l> {
                 self.get_submodule_port(submod_id, port_id, Some(port_span), domain)
             }
             WireReferenceRoot::NamedConstant(cst) => {
-                let value = self.get_named_constant_value(cst)?;
+                let (value, typ) = self.get_named_constant_value(cst)?;
 
                 self.alloc_wire_for_const(
                     value,
-                    wire_ref.get_root_typ(),
+                    &typ,
                     original_instruction,
                     domain,
                     wire_ref.root_span,
@@ -1534,7 +1543,7 @@ impl<'l> ExecutionContext<'l> {
                 Cow::Borrowed(self.generation_state.get_generation_value(*decl_id)?)
             }
             WireReferenceRoot::NamedConstant(cst) => {
-                Cow::Owned(self.get_named_constant_value(cst)?)
+                Cow::Owned(self.get_named_constant_value(cst)?.0)
             }
             WireReferenceRoot::LocalSubmodule(_)
             | WireReferenceRoot::NamedModule(_)

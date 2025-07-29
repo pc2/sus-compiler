@@ -149,10 +149,8 @@ impl<'l> TypeCheckingContext<'l> {
                     name,
                     name_span,
                     refers_to,
-                    input_typ,
                 } => {
-                    input_typ.set(walking_typ);
-                    walking_typ = match &input_typ.inner {
+                    walking_typ = match &walking_typ.inner {
                         AbstractInnerType::Template(template_id) => {
                             let template_arg = &self.link_info.template_parameters[*template_id];
                             self.errors
@@ -233,27 +231,16 @@ impl<'l> TypeCheckingContext<'l> {
                         AbstractInnerType::Unknown(_) => self.type_checker.alloc_unknown(), // todo!("Structs")
                     }
                 }
-                WireReferencePathElement::ArrayAccess {
-                    idx,
-                    bracket_span,
-                    input_typ,
-                } => {
-                    input_typ.set(walking_typ);
+                WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
                     self.must_be_int(*idx);
 
                     walking_typ = self.type_checker.rank_down(
-                        input_typ,
+                        &walking_typ,
                         bracket_span.outer_span(),
                         "array access",
                     );
                 }
-                WireReferencePathElement::ArraySlice {
-                    from,
-                    to,
-                    input_typ,
-                    ..
-                } => {
-                    input_typ.set(walking_typ.clone());
+                WireReferencePathElement::ArraySlice { from, to, .. } => {
                     if let Some(from) = from {
                         self.must_be_int(*from);
                     }
@@ -265,13 +252,7 @@ impl<'l> TypeCheckingContext<'l> {
                     // TODO: This doesn't cover the case where there are more array accesses than arrays.
                     // walking_typ = walking_typ;
                 }
-                WireReferencePathElement::ArrayPartSelect {
-                    from,
-                    width,
-                    input_typ,
-                    ..
-                } => {
-                    input_typ.set(walking_typ.clone());
+                WireReferencePathElement::ArrayPartSelect { from, width, .. } => {
                     self.must_be_int(*from);
                     self.must_be_int(*width);
 
@@ -1078,34 +1059,6 @@ impl FinalizationContext {
                 self.finalize_global_ref(md);
             }
             _ => {}
-        }
-        for path_elem in &mut wire_ref.path {
-            match path_elem {
-                WireReferencePathElement::FieldAccess {
-                    input_typ,
-                    name_span,
-                    ..
-                } => {
-                    self.finalize_abstract_type(input_typ.get_mut(), *name_span);
-                }
-                WireReferencePathElement::ArrayAccess {
-                    input_typ,
-                    bracket_span,
-                    ..
-                }
-                | WireReferencePathElement::ArraySlice {
-                    input_typ,
-                    bracket_span,
-                    ..
-                }
-                | WireReferencePathElement::ArrayPartSelect {
-                    input_typ,
-                    bracket_span,
-                    ..
-                } => {
-                    self.finalize_abstract_type(input_typ.get_mut(), bracket_span.outer_span());
-                }
-            }
         }
         let total_span = wire_ref.get_total_span();
         self.finalize_abstract_type(wire_ref.output_typ.get_mut(), total_span);
