@@ -177,6 +177,10 @@ impl<T: std::fmt::Debug> TyCell<T> {
     fn set(&self, v: T) {
         self.0.set(v).unwrap();
     }
+
+    pub fn get_maybe(&self) -> Option<&T> {
+        self.0.get()
+    }
 }
 
 impl<T> Default for TyCell<T> {

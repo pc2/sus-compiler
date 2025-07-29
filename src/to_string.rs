@@ -2,6 +2,7 @@ use colored::Colorize;
 use sus_proc_macro::kw;
 
 use crate::alloc::zip_eq;
+use crate::flattening::typecheck::TyCell;
 use crate::prelude::*;
 
 use crate::typing::abstract_type::{AbstractGlobalReference, AbstractInnerType};
@@ -80,6 +81,21 @@ impl AbstractRankedType {
             res?;
             // Print PeanoType rank using its custom Display impl
             write!(f, "{}", PeanoTypeDisplay(&self.rank))
+        })
+    }
+}
+impl TyCell<AbstractRankedType> {
+    pub fn display<'a>(
+        &'a self,
+        globals: &'a LinkerGlobals,
+        link_info: &'a LinkInfo,
+    ) -> impl Display + 'a {
+        FmtWrapper(move |f| {
+            if let Some(slf) = self.get_maybe() {
+                slf.display(globals, link_info).fmt(f)
+            } else {
+                f.write_str("?")
+            }
         })
     }
 }
@@ -525,7 +541,7 @@ impl LinkInfo {
                     module_ref,
                     name,
                     local_domain_map,
-                    typ,
+                    typ: _,
                     ..
                 }) => {
                     let name = name.green();
@@ -556,14 +572,18 @@ impl LinkInfo {
                 }) => {
                     let typ_expr = typ_expr.display(globals, &self.template_parameters);
                     let name = name.green();
-                    print!("{decl_kind:?} {typ_expr} {name}");
+                    let typ = typ.display(globals, self);
+                    print!("{decl_kind:?} {typ_expr} ({typ}) {name}");
                     if let Some(lat_spec) = latency_specifier {
                         print!("'{lat_spec:?}");
                     }
                 }
                 Instruction::Expression(Expression { source, output, .. }) => {
                     match output {
-                        ExpressionOutput::SubExpression(_typ) => {}
+                        ExpressionOutput::SubExpression(typ) => {
+                            let typ = typ.display(globals, self);
+                            print!("({typ})")
+                        }
                         ExpressionOutput::MultiWrite(write_tos) => {
                             print!("(");
                             join_string_iter_print(
