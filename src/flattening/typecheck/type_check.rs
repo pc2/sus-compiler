@@ -184,15 +184,16 @@ impl<'l> TypeCheckingContext<'l> {
                         // TODO "subinterfaces"
                         AbstractInnerType::Interface(md_ref, _interface) => {
                             let md = self.globals.get_submodule(md_ref);
-                            let new_typ = if let Some(interface) = md
+
+                            let interface = md
                                 .md
                                 .interfaces
-                                .find(|_, interface| &interface.name == name)
-                            {
-                                refers_to
-                                    .set(PathElemRefersTo::Interface(interface))
-                                    .unwrap();
+                                .find(|_, interface| &interface.name == name);
+                            refers_to
+                                .set(PathElemRefersTo::Interface(md_ref.id, interface))
+                                .unwrap();
 
+                            let new_typ = if let Some(interface) = interface {
                                 if let Some(InterfaceDeclKind::SinglePort(port_decl)) =
                                     md.md.interfaces[interface].declaration_instruction
                                 {

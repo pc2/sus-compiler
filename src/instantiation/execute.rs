@@ -395,7 +395,7 @@ impl GenerationState<'_> {
             let new_elem = match p {
                 WireReferencePathElement::FieldAccess { refers_to, .. } => {
                     match refers_to.get().unwrap() {
-                        PathElemRefersTo::Interface(_) => {
+                        PathElemRefersTo::Interface(_, _) => {
                             unreachable!("Not possible in generative context!")
                         }
                     }
@@ -906,8 +906,8 @@ impl<'l> ExecutionContext<'l> {
                     refers_to,
                     ..
                 } => match refers_to.get().unwrap() {
-                    PathElemRefersTo::Interface(interface) => {
-                        interface_found = (*interface, *name_span);
+                    PathElemRefersTo::Interface(_, interface) => {
+                        interface_found = (interface.unwrap(), *name_span);
                     }
                 },
                 WireReferencePathElement::ArraySlice {

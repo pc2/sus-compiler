@@ -255,7 +255,7 @@ pub struct Interface {
 
 #[derive(Debug, Clone, Copy)]
 pub enum PathElemRefersTo {
-    Interface(InterfaceID),
+    Interface(ModuleUUID, Option<InterfaceID>),
 }
 
 /// An element in a [WireReference] path. Could be array accesses, slice accesses, field accesses, etc

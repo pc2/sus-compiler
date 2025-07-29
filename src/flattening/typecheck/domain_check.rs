@@ -253,14 +253,14 @@ impl<'l> TypeCheckingContext<'l> {
                 for p in &wire_ref.path {
                     if let WireReferencePathElement::FieldAccess { refers_to, .. } = p {
                         match refers_to.get() {
-                            Some(PathElemRefersTo::Interface(interface)) => {
+                            Some(PathElemRefersTo::Interface(_, Some(interface))) => {
                                 if let Some(domain_in_submod) =
                                     submod_ref.md.interfaces[*interface].domain
                                 {
                                     return Some(local_domain_map[domain_in_submod]);
                                 }
                             }
-                            None => {}
+                            Some(PathElemRefersTo::Interface(_, None)) | None => {}
                         };
                     }
                 }

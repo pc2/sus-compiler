@@ -53,29 +53,32 @@ impl LintContext<'_> {
                         ..
                     } = p
                     {
-                        if let Some(PathElemRefersTo::Interface(port)) = refers_to.get() {
-                            if let Some(InterfaceDeclKind::SinglePort(port_decl)) =
-                                submod.md.interfaces[*port].declaration_instruction
-                            {
-                                let module_port_decl = submod.get_decl(port_decl);
-                                let_unwrap!(
-                                    DeclarationKind::Port { direction, .. },
-                                    module_port_decl.remote_decl.decl_kind
-                                );
-                                match (is_writing_to, direction) {
-                                    (true, Direction::Input) | (false, Direction::Output) => {}
-                                    (true, Direction::Output) => {
-                                        self.errors
-                                            .error(*name_span, "Cannot write to an output port")
-                                            .info_obj(&module_port_decl);
-                                    }
-                                    (false, Direction::Input) => {
-                                        self.errors
-                                            .error(*name_span, "Cannot read from an input port")
-                                            .info_obj(&module_port_decl);
+                        match refers_to.get() {
+                            Some(PathElemRefersTo::Interface(_, Some(port))) => {
+                                if let Some(InterfaceDeclKind::SinglePort(port_decl)) =
+                                    submod.md.interfaces[*port].declaration_instruction
+                                {
+                                    let module_port_decl = submod.get_decl(port_decl);
+                                    let_unwrap!(
+                                        DeclarationKind::Port { direction, .. },
+                                        module_port_decl.remote_decl.decl_kind
+                                    );
+                                    match (is_writing_to, direction) {
+                                        (true, Direction::Input) | (false, Direction::Output) => {}
+                                        (true, Direction::Output) => {
+                                            self.errors
+                                                .error(*name_span, "Cannot write to an output port")
+                                                .info_obj(&module_port_decl);
+                                        }
+                                        (false, Direction::Input) => {
+                                            self.errors
+                                                .error(*name_span, "Cannot read from an input port")
+                                                .info_obj(&module_port_decl);
+                                        }
                                     }
                                 }
                             }
+                            Some(PathElemRefersTo::Interface(_, None)) | None => {}
                         }
                     }
                 }

@@ -5,7 +5,6 @@ use crate::prelude::*;
 
 use crate::linker::{FileData, GlobalUUID, LinkInfo};
 
-use crate::typing::abstract_type::AbstractInnerType;
 use crate::typing::template::{
     GenerativeParameterKind, Parameter, TemplateKind, TypeParameterKind,
 };
@@ -304,18 +303,20 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                     name: _,
                     name_span,
                     refers_to,
-                    input_typ,
+                    input_typ: _,
                 } => {
                     let Some(refers_to) = refers_to.get() else {
                         continue;
                     };
 
                     let target = match refers_to {
-                        PathElemRefersTo::Interface(interface) => {
-                            let_unwrap!(AbstractInnerType::Interface(md_ref, _), &input_typ.inner);
-                            let submodule = &self.linker.modules[md_ref.id];
+                        PathElemRefersTo::Interface(_, None) => {
+                            continue;
+                        }
+                        PathElemRefersTo::Interface(in_module, Some(interface)) => {
+                            let submodule = &self.linker.modules[*in_module];
                             LocationInfo::Interface(
-                                md_ref.id,
+                                *in_module,
                                 submodule,
                                 *interface,
                                 &submodule.interfaces[*interface],

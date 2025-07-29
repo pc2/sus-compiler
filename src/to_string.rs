@@ -215,7 +215,16 @@ impl WireReference {
                     } => {
                         write!(f, ".{name}")?;
                         match refers_to.get() {
-                            Some(PathElemRefersTo::Interface(_)) => {}
+                            Some(PathElemRefersTo::Interface(md_id, interface)) => {
+                                let md = &globals[*md_id];
+                                let md_name = md.link_info.get_full_name();
+                                if let Some(interface) = interface {
+                                    let interf_name = &md.interfaces[*interface].name;
+                                    write!(f, "({md_name}:{interf_name})")?;
+                                } else {
+                                    write!(f, "({md_name}:?)")?;
+                                }
+                            }
                             None => write!(f, "?")?,
                         }
                     }
