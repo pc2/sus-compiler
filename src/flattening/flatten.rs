@@ -553,6 +553,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             is_state,
                             port_id,
                             parent_interface,
+                            is_standalone_port: true,
                         }
                     } else {
                         let is_state = state_kw.is_some();
@@ -639,6 +640,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         is_state,
                         port_id,
                         parent_interface,
+                        is_standalone_port: false,
                     }
                 }
                 d @ DeclarationKind::RegularGenerative { .. } => {
@@ -1608,6 +1610,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     is_state: false,
                     parent_interface,
                     port_id: UUID::PLACEHOLDER,
+                    is_standalone_port: false,
                 },
                 cursor,
             );
@@ -1619,6 +1622,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     is_state: false,
                     parent_interface,
                     port_id: UUID::PLACEHOLDER,
+                    is_standalone_port: false,
                 },
                 cursor,
             );

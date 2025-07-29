@@ -396,6 +396,7 @@ impl core::fmt::Debug for DeclarationKind {
                 is_state,
                 port_id,
                 parent_interface,
+                is_standalone_port: _,
             } => {
                 if *is_state {
                     f.write_str("state")?;

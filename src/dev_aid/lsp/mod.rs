@@ -3,7 +3,11 @@ mod semantic_tokens;
 mod tree_walk;
 
 use crate::{
-    alloc::zip_eq, compiler_top::LinkerExtraFileInfoManager, linker::GlobalUUID, prelude::*,
+    alloc::zip_eq,
+    compiler_top::LinkerExtraFileInfoManager,
+    dev_aid::ariadne_interface::{pretty_print_many_spans, pretty_print_span},
+    linker::GlobalUUID,
+    prelude::*,
     util::contains_duplicates,
 };
 
@@ -307,6 +311,20 @@ fn gather_all_references_in_one_file(linker: &Linker, file_id: FileUUID, pos: us
     }
 }
 
+fn assert_all_refs_of_correct_length(
+    location: Span,
+    refs: &[Span],
+    location_file: &FileData,
+    other_spans_file: &FileData,
+) {
+    if refs.iter().any(|r| r.size() != location.size()) {
+        let refs_vec: Vec<_> = refs.iter().map(|r| (String::new(), r.as_range())).collect();
+        pretty_print_span(location_file, location.as_range(), "Original location Span");
+        pretty_print_many_spans(other_spans_file, &refs_vec);
+        panic!("One of the spans was not of the same size as the original span!")
+    }
+}
+
 fn gather_all_references_across_all_files(
     linker: &Linker,
     file_id: FileUUID,
@@ -314,23 +332,20 @@ fn gather_all_references_across_all_files(
 ) -> Vec<(FileUUID, Vec<Span>)> {
     let mut ref_locations = Vec::new();
 
+    let original_file = &linker.files[file_id];
     if let Some((location, hover_info)) = get_selected_object(linker, file_id, pos) {
         let refers_to = RefersTo::from(hover_info);
         if refers_to.is_global() {
             for (other_file_id, other_file) in &linker.files {
                 let found_refs = gather_references_in_file(linker, other_file, refers_to);
-                for r in &found_refs {
-                    assert!(location.size() == r.size())
-                }
+                assert_all_refs_of_correct_length(location, &found_refs, original_file, other_file);
                 if !found_refs.is_empty() {
                     ref_locations.push((other_file_id, found_refs))
                 }
             }
         } else if let Some(local) = refers_to.local {
             let found_refs = for_each_local_reference_in_global(linker, local.0, local.1);
-            for r in &found_refs {
-                assert!(location.size() == r.size())
-            }
+            assert_all_refs_of_correct_length(location, &found_refs, original_file, original_file);
             if !found_refs.is_empty() {
                 ref_locations.push((file_id, found_refs))
             }

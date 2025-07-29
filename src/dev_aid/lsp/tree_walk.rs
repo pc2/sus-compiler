@@ -59,9 +59,13 @@ impl From<LocationInfo<'_>> for RefersTo {
                     | DeclarationKind::RegularWire { .. }
                     | DeclarationKind::StructField(..) => {}
                     DeclarationKind::Port {
-                        parent_interface, ..
+                        parent_interface,
+                        is_standalone_port,
+                        ..
                     } => {
-                        result.interface = Some((obj_id.unwrap_module(), parent_interface));
+                        if is_standalone_port {
+                            result.interface = Some((obj_id.unwrap_module(), parent_interface));
+                        }
                     }
                     DeclarationKind::TemplateParameter(template_id) => {
                         result.parameter = Some((obj_id, template_id))

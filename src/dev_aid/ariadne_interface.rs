@@ -194,7 +194,7 @@ pub fn pretty_print_spans_in_reverse_order(file_data: &FileData, spans: Vec<Rang
     }
 }
 
-pub fn pretty_print_span(file_data: &FileData, span: Range<usize>, label: String) {
+pub fn pretty_print_span(file_data: &FileData, span: Range<usize>, label: impl ToString) {
     let text_len = file_data.file_text.len();
     let mut source = NamedSource {
         source: Source::from(file_data.file_text.file_text.clone()),
