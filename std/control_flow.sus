@@ -2,20 +2,20 @@
 module Iterator #(int MAX) {
 	state int #(FROM: 0, TO: MAX + 2) current_limit
 	state int #(FROM: 0, TO: MAX + 1) value_state
-	output state bool may_next
+	output state bool may_next'0
 	initial current_limit = 0
 	initial value_state = 0
 	initial may_next = false
 
 	/// Requires `!may_next`
-	action start : int #(FROM: 0, TO: MAX + 2) up_to {
+	action start'0 : int #(FROM: 0, TO: MAX + 2) up_to'0 {
 		current_limit = up_to
 		value_state = 0
 		may_next = true
 	}
 
 	/// Requires `may_next`
-	action next : -> int #(FROM: 0, TO: MAX + 1) value, bool last {
+	action next'0 : -> int #(FROM: 0, TO: MAX + 1) value'0, bool last'0 {
 		last = value_state == current_limit
 		value = value_state
 		when !last {
@@ -28,17 +28,17 @@ module Iterator #(int MAX) {
 
 module FixedSizeIterator #(int TO) {
 	state int #(FROM: 0, TO) value_state
-	output state bool may_next
+	output state bool may_next'0
 	initial value_state = 0
 	initial may_next = false
 
 	/// Requires `!may_next`
-	action start {
+	action start'0 {
 		value_state = 0
 		may_next = true
 	}
 	/// Requires `may_next`
-	action next : -> int #(FROM: 0, TO) value, bool last {
+	action next'0 : -> int #(FROM: 0, TO) value'0, bool last'0 {
 		last = value_state == TO - 1
 		value = value_state
 		when !last {

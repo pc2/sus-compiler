@@ -152,7 +152,7 @@ module.exports = grammar({
             ))
         ),
         for_statement: $ => seq(
-            'for',
+            field('for_kw', 'for'),
             field('for_decl', $.declaration),
             'in',
             field('from', $._expression),

@@ -1,7 +1,9 @@
 use sus_proc_macro::get_builtin_const;
 
+use crate::alloc::ArenaAllocator;
+use crate::dev_aid::ariadne_interface::pretty_print_many_spans;
 use crate::flattening::WriteModifiers;
-use crate::linker::{GlobalRef, IsExtern};
+use crate::linker::{FileData, GlobalRef, IsExtern};
 use crate::prelude::*;
 use crate::typing::abstract_type::AbstractInnerType;
 use crate::typing::template::TemplateKind;
@@ -10,12 +12,17 @@ use super::*;
 
 use super::{Expression, ExpressionOutput, ExpressionSource, Instruction, WireReferenceRoot};
 
-pub fn perform_lints(pass: &mut LinkerPass, errors: &ErrorCollector) {
+pub fn perform_lints(
+    pass: &mut LinkerPass,
+    errors: &ErrorCollector,
+    files: &ArenaAllocator<FileData, FileUUIDMarker>,
+) {
     let (working_on, globals) = pass.get_with_context();
     let ctx = LintContext {
         working_on,
         errors,
         globals,
+        file_data: &files[working_on.get_span_file().1],
     };
     ctx.extern_objects_may_not_have_type_template_args();
     ctx.lint_instructions();
@@ -24,6 +31,7 @@ pub fn perform_lints(pass: &mut LinkerPass, errors: &ErrorCollector) {
 
 struct LintContext<'l> {
     working_on: GlobalRef<'l>,
+    file_data: &'l FileData,
     errors: &'l ErrorCollector<'l>,
     globals: GlobalResolver<'l, 'l>,
 }
@@ -264,6 +272,25 @@ impl LintContext<'_> {
             }
         }
 
+        if crate::debug::is_enabled("print-unused-vars-map") {
+            println!("Find Unused Variables Fanins:");
+            for (to, fanins) in &instruction_fanins {
+                let is_target = if is_instance_used_map[to] {
+                    " target"
+                } else {
+                    ""
+                };
+                println!("{to:?}{is_target} <- {:?}", fanins.as_slice());
+            }
+            let spans: Vec<_> = self
+                .working_on
+                .instructions
+                .iter()
+                .map(|(id, instr)| (format!("{id:?}"), instr.get_span()))
+                .collect();
+            pretty_print_many_spans(self.file_data, &spans);
+        }
+
         // All asserts and declarations starting with '_' are also terminals
         for (instr_id, instr) in &self.working_on.instructions {
             match instr {
@@ -325,6 +352,24 @@ impl LintContext<'_> {
                         instruction_fanins[instr_id].push(id);
                     });
                 }
+                Instruction::Interface(stm) => {
+                    if let Some(lat_spec) = stm.latency_specifier {
+                        instruction_fanins[instr_id].push(lat_spec);
+                    }
+                    for id in FlatIDRange::new(stm.then_block.0, stm.else_block.1) {
+                        if let Instruction::Expression(Expression {
+                            output: ExpressionOutput::MultiWrite(writes),
+                            ..
+                        }) = &self.working_on.instructions[id]
+                        {
+                            for wr in writes {
+                                if let Some(flat_root) = wr.to.root.get_root_flat() {
+                                    instruction_fanins[flat_root].push(instr_id);
+                                }
+                            }
+                        }
+                    }
+                }
                 Instruction::Expression(expr) => {
                     expr.source.for_each_dependency(&mut |id| {
                         instruction_fanins[instr_id].push(id);
@@ -337,9 +382,7 @@ impl LintContext<'_> {
                             match &fc_wr.root {
                                 WireReferenceRoot::LocalSubmodule(fc_target)
                                 | WireReferenceRoot::LocalInterface(fc_target) => {
-                                    for arg in &fc.arguments {
-                                        instruction_fanins[*fc_target].push(*arg);
-                                    }
+                                    instruction_fanins[*fc_target].push(instr_id);
                                 }
                                 WireReferenceRoot::LocalDecl(_)
                                 | WireReferenceRoot::NamedConstant(_)
@@ -364,40 +407,15 @@ impl LintContext<'_> {
                 }
                 Instruction::IfStatement(stm) => {
                     for id in FlatIDRange::new(stm.then_block.0, stm.else_block.1) {
-                        if let Instruction::Expression(Expression {
-                            output: ExpressionOutput::MultiWrite(writes),
-                            ..
-                        }) = &self.working_on.instructions[id]
-                        {
-                            for wr in writes {
-                                if let Some(flat_root) = wr.to.root.get_root_flat() {
-                                    instruction_fanins[flat_root].push(stm.condition);
-                                }
-                            }
-                        }
-                    }
-                }
-                Instruction::Interface(stm) => {
-                    if let Some(lat_spec) = stm.latency_specifier {
-                        instruction_fanins[instr_id].push(lat_spec);
-                    }
-                    for id in FlatIDRange::new(stm.then_block.0, stm.else_block.1) {
-                        if let Instruction::Expression(Expression {
-                            output: ExpressionOutput::MultiWrite(writes),
-                            ..
-                        }) = &self.working_on.instructions[id]
-                        {
-                            for wr in writes {
-                                if let Some(flat_root) = wr.to.root.get_root_flat() {
-                                    instruction_fanins[flat_root].push(instr_id);
-                                }
-                            }
-                        }
+                        instruction_fanins[id].push(stm.condition);
                     }
                 }
                 Instruction::ForStatement(stm) => {
                     instruction_fanins[stm.loop_var_decl].push(stm.start);
                     instruction_fanins[stm.loop_var_decl].push(stm.end);
+                    for id in stm.loop_body {
+                        instruction_fanins[id].push(stm.loop_var_decl);
+                    }
                 }
             }
         }

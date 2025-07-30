@@ -318,8 +318,8 @@ fn assert_all_refs_of_correct_length(
     other_spans_file: &FileData,
 ) {
     if refs.iter().any(|r| r.size() != location.size()) {
-        let refs_vec: Vec<_> = refs.iter().map(|r| (String::new(), r.as_range())).collect();
-        pretty_print_span(location_file, location.as_range(), "Original location Span");
+        let refs_vec: Vec<_> = refs.iter().map(|r| (String::new(), *r)).collect();
+        pretty_print_span(location_file, location, "Original location Span");
         pretty_print_many_spans(other_spans_file, &refs_vec);
         panic!("One of the spans was not of the same size as the original span!")
     }

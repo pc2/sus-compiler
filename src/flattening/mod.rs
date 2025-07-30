@@ -915,6 +915,7 @@ pub struct IfStatement {
 #[derive(Debug)]
 pub struct ForStatement {
     pub parent_condition: Option<ParentCondition>,
+    pub for_kw_span: Span,
     pub loop_var_decl: FlatID,
     pub start: FlatID,
     pub end: FlatID,
@@ -1059,9 +1060,8 @@ impl Instruction {
             Instruction::Declaration(declaration) => declaration.name_span,
             Instruction::Interface(act_trig) => act_trig.name_span,
             Instruction::Expression(expression) => expression.span,
-            Instruction::IfStatement(_) | Instruction::ForStatement(_) => {
-                unreachable!("{self:?} is control flow! Shouldn't ask it's span")
-            }
+            Instruction::IfStatement(if_stm) => if_stm.if_keyword_span,
+            Instruction::ForStatement(for_stm) => for_stm.for_kw_span,
         }
     }
     pub fn get_name(&self) -> &str {

@@ -18,6 +18,8 @@ Flattening LatencyOffset
 Flattening CrossDomain
 Flattening CrossAction
 Flattening CrossActionNoData
+Flattening LatencyOffsetAction
+Flattening LatencyOffsetActionNoData
 Flattening IntToBits
 Flattening BitsToInt
 Flattening UIntToBits
@@ -185,6 +187,8 @@ Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking CrossAction
 Typechecking CrossActionNoData
+Typechecking LatencyOffsetAction
+Typechecking LatencyOffsetActionNoData
 Typechecking IntToBits
 Typechecking BitsToInt
 Typechecking UIntToBits
@@ -366,6 +370,8 @@ Lints LatencyOffset
 Lints CrossDomain
 Lints CrossAction
 Lints CrossActionNoData
+Lints LatencyOffsetAction
+Lints LatencyOffsetActionNoData
 Lints IntToBits
 Lints BitsToInt
 Lints UIntToBits

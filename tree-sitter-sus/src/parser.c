@@ -13,7 +13,7 @@
 #define ALIAS_COUNT 0
 #define TOKEN_COUNT 61
 #define EXTERNAL_TOKEN_COUNT 0
-#define FIELD_COUNT 43
+#define FIELD_COUNT 44
 #define MAX_ALIAS_SEQUENCE_LENGTH 7
 #define MAX_RESERVED_WORD_SET_SIZE 0
 #define PRODUCTION_ID_COUNT 70
@@ -837,34 +837,35 @@ enum ts_field_identifiers {
   field_expr_or_decl = 13,
   field_extern_marker = 14,
   field_for_decl = 15,
-  field_from = 16,
-  field_index = 17,
-  field_index_a = 18,
-  field_index_b = 19,
-  field_inputs = 20,
-  field_interface_kind = 21,
-  field_interface_ports = 22,
-  field_is_global_path = 23,
-  field_item = 24,
-  field_latency_specifier = 25,
-  field_left = 26,
-  field_local = 27,
-  field_name = 28,
-  field_namespace_list = 29,
-  field_object_type = 30,
-  field_operator = 31,
-  field_outputs = 32,
-  field_right = 33,
-  field_slice = 34,
-  field_statement_type = 35,
-  field_template_args = 36,
-  field_template_declaration_arguments = 37,
-  field_then_block = 38,
-  field_to = 39,
-  field_type = 40,
-  field_type_arg = 41,
-  field_val_arg = 42,
-  field_write_modifiers = 43,
+  field_for_kw = 16,
+  field_from = 17,
+  field_index = 18,
+  field_index_a = 19,
+  field_index_b = 20,
+  field_inputs = 21,
+  field_interface_kind = 22,
+  field_interface_ports = 23,
+  field_is_global_path = 24,
+  field_item = 25,
+  field_latency_specifier = 26,
+  field_left = 27,
+  field_local = 28,
+  field_name = 29,
+  field_namespace_list = 30,
+  field_object_type = 31,
+  field_operator = 32,
+  field_outputs = 33,
+  field_right = 34,
+  field_slice = 35,
+  field_statement_type = 36,
+  field_template_args = 37,
+  field_template_declaration_arguments = 38,
+  field_then_block = 39,
+  field_to = 40,
+  field_type = 41,
+  field_type_arg = 42,
+  field_val_arg = 43,
+  field_write_modifiers = 44,
 };
 
 static const char * const ts_field_names[] = {
@@ -884,6 +885,7 @@ static const char * const ts_field_names[] = {
   [field_expr_or_decl] = "expr_or_decl",
   [field_extern_marker] = "extern_marker",
   [field_for_decl] = "for_decl",
+  [field_for_kw] = "for_kw",
   [field_from] = "from",
   [field_index] = "index",
   [field_index_a] = "index_a",
@@ -983,7 +985,7 @@ static const TSMapSlice ts_field_map_slices[PRODUCTION_ID_COUNT] = {
   [66] = {.index = 166, .length = 1},
   [67] = {.index = 167, .length = 2},
   [68] = {.index = 169, .length = 7},
-  [69] = {.index = 176, .length = 4},
+  [69] = {.index = 176, .length = 5},
 };
 
 static const TSFieldMapEntry ts_field_map_entries[] = {
@@ -1234,6 +1236,7 @@ static const TSFieldMapEntry ts_field_map_entries[] = {
   [176] =
     {field_block, 6},
     {field_for_decl, 1},
+    {field_for_kw, 0},
     {field_from, 3},
     {field_to, 5},
 };

@@ -692,7 +692,7 @@ impl LinkInfo {
             }
             println!();
             let span = self.get_instruction_span(id);
-            spans_print.push((format!("{id:?} {domain}"), span.as_range()));
+            spans_print.push((format!("{id:?} {domain}"), span));
         }
         pretty_print_many_spans(file_data, &spans_print);
     }

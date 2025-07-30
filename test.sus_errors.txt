@@ -7338,11 +7338,11 @@ Error: Typing Error: function argument expects 'int' but was given 'bool'
       │                       ────┬───  
       │                           ╰───── Typing Error: function argument expects 'int' but was given 'bool'
       │
-      ├─[ control_flow.sus:11:45 ]
+      ├─[ control_flow.sus:11:47 ]
       │
-   11 │     action start : int #(FROM: 0, TO: MAX + 2) up_to {
-      │                                                ──┬──  
-      │                                                  ╰──── 'up_to' declared here
+   11 │     action start'0 : int #(FROM: 0, TO: MAX + 2) up_to'0 {
+      │                                                  ──┬──  
+      │                                                    ╰──── 'up_to' declared here
 ──────╯
 Error: Excess argument. Function takes 1 args, but 2 were passed.
       ╭─[ test.sus:1061:30 ]
@@ -7353,7 +7353,7 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │
       ├─[ control_flow.sus:11:9 ]
       │
-   11 │     action start : int #(FROM: 0, TO: MAX + 2) up_to {
+   11 │     action start'0 : int #(FROM: 0, TO: MAX + 2) up_to'0 {
       │            ──┬──  
       │              ╰──── Interface 'start' defined here
 ──────╯
@@ -7377,13 +7377,13 @@ Error: No such field 'iter' on Iterator. Available fields are 'Iterator', 'may_n
       │        ────┬───  
       │            ╰───── Module 'Iterator' defined here. module Iterator #(int MAX):
 domain clk:
-output state bool may_next
-action start:
-	input int #(FROM: 0, TO: MAX + 2) up_to
-action next:
+output state bool may_next'0
+action start'0:
+	input int #(FROM: 0, TO: MAX + 2) up_to'0
+action next'0:
 	->
-	output int #(FROM: 0, TO: MAX + 1) value
-	output bool last
+	output int #(FROM: 0, TO: MAX + 1) value'0
+	output bool last'0
 ──────╯
 Error: Used 'if' in a non generative context, use 'when' instead
       ╭─[ test.sus:1065:2 ]
@@ -7568,13 +7568,6 @@ output bool may_pop
 action pop:
 	->
 	output T pop_data
-──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1158:27 ]
-      │
- 1158 │        reg reg reg reg reg int heavy_computation = request_data()
-      │                                ────────┬────────  
-      │                                        ╰────────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Conflicting specified latency
 
@@ -8507,9 +8500,9 @@ Warning: Unused port 'bits'
       │                                           │  
       │                                           ╰── b declared here
       │
-      ├─[ core.sus:126:66 ]
+      ├─[ core.sus:160:66 ]
       │
-  126 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+  160 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                                                  ──┬─  
       │                                                                    ╰─── Port 'bits' declared here
 ──────╯
@@ -8522,9 +8515,9 @@ Warning: Unused port 'value'
       │                                           │  
       │                                           ╰── b declared here
       │
-      ├─[ core.sus:126:37 ]
+      ├─[ core.sus:160:37 ]
       │
-  126 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+  160 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                     ──┬──  
       │                                       ╰──── Port 'value' declared here
 ──────╯

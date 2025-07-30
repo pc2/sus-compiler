@@ -1,5 +1,5 @@
 use std::{
-    fmt::{Debug, Display},
+    fmt::Debug,
     ops::{Index, Range},
 };
 

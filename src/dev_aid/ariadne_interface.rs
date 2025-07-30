@@ -3,6 +3,7 @@ use std::{ops::Range, path::PathBuf};
 
 use crate::compiler_top::LinkerExtraFileInfoManager;
 use crate::linker::FileData;
+use crate::prelude::Span;
 use crate::prelude::*;
 
 use crate::{
@@ -194,12 +195,14 @@ pub fn pretty_print_spans_in_reverse_order(file_data: &FileData, spans: Vec<Rang
     }
 }
 
-pub fn pretty_print_span(file_data: &FileData, span: Range<usize>, label: impl ToString) {
+pub fn pretty_print_span(file_data: &FileData, span: Span, label: impl ToString) {
     let text_len = file_data.file_text.len();
     let mut source = NamedSource {
         source: Source::from(file_data.file_text.file_text.clone()),
         name: &file_data.file_identifier,
     };
+
+    let span = span.as_range();
 
     // If span not in file, just don't print it. This happens.
     if span.end > text_len {
@@ -223,7 +226,7 @@ pub fn pretty_print_span(file_data: &FileData, span: Range<usize>, label: impl T
     report.finish().print(&mut source).unwrap();
 }
 
-pub fn pretty_print_many_spans(file_data: &FileData, spans: &[(String, Range<usize>)]) {
+pub fn pretty_print_many_spans(file_data: &FileData, spans: &[(String, Span)]) {
     let text_len = file_data.file_text.len();
     let mut source = NamedSource {
         source: Source::from(file_data.file_text.file_text.clone()),
@@ -237,9 +240,10 @@ pub fn pretty_print_many_spans(file_data: &FileData, spans: &[(String, Range<usi
     }
 
     let mut report: ReportBuilder<'_, Range<usize>> =
-        Report::build(ReportKind::Advice, spans[0].1.clone()).with_config(config);
+        Report::build(ReportKind::Advice, spans[0].1.as_range()).with_config(config);
 
     for (text, span) in spans.iter().rev() {
+        let span = span.as_range();
         // If span not in file, just don't print it. This happens.
         if span.end > text_len {
             println!(

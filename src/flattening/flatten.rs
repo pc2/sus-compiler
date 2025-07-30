@@ -1208,6 +1208,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     }
 
     fn flatten_for_statement(&mut self, cursor: &mut Cursor<'c>) {
+        cursor.field(field!("for_kw"));
+        let for_kw_span = cursor.span();
         cursor.field(field!("for_decl"));
         let loop_var_decl = self.flatten_declaration::<false>(
             DeclarationKind::RegularGenerative { read_only: true },
@@ -1225,6 +1227,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             .instructions
             .alloc(Instruction::ForStatement(ForStatement {
                 parent_condition: self.current_parent_condition,
+                for_kw_span,
                 loop_var_decl,
                 start,
                 end,

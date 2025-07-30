@@ -80,7 +80,7 @@ pub fn debug_print_span(span: Span, label: String) {
             eprintln!("No FileData registered!");
         } else {
             let fd: &FileData = unsafe { &*ptr };
-            pretty_print_span(fd, span.as_range(), label);
+            pretty_print_span(fd, span, label);
         }
     })
 }

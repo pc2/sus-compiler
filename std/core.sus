@@ -105,6 +105,40 @@ module CrossActionNoData {
         out()
     }
 }
+module LatencyOffsetAction #(T, int OFFSET, int DATA_DELAY) {
+    T stored_data
+    bool is_valid
+    
+    action in'0 : T din'DATA_DELAY {
+        is_valid = true
+        stored_data = din
+    } else {
+        is_valid = false
+    }
+
+    trigger out'OFFSET : T dout'OFFSET+DATA_DELAY
+
+    when LatencyOffset #(OFFSET)(is_valid) {
+        out(LatencyOffset #(OFFSET)(stored_data))
+    }
+}
+
+module LatencyOffsetActionNoData #(int OFFSET) {
+    bool is_valid
+    
+    action in'0 {
+        is_valid = true
+    } else {
+        is_valid = false
+    }
+
+    trigger out'OFFSET
+
+    when LatencyOffset #(OFFSET)(is_valid) {
+        out()
+    }
+}
+
 
 __builtin__ module IntToBits #(int NUM_BITS) {
     interface IntToBits : int #(FROM: -pow2 #(E: NUM_BITS - 1), TO: pow2 #(E: NUM_BITS - 1)) value'0 -> bool[NUM_BITS] bits'0

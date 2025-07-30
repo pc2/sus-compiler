@@ -258,8 +258,8 @@ impl Linker {
         }
 
         for global_id in &global_ids {
-            self.pass("Lints", *global_id, |pass, errors, _files| {
-                perform_lints(pass, errors);
+            self.pass("Lints", *global_id, |pass, errors, files| {
+                perform_lints(pass, errors, files);
             });
         }
         self.checkpoint(&global_ids, AFTER_LINTS_CP);

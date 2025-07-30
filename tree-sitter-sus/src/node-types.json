@@ -801,6 +801,16 @@
           }
         ]
       },
+      "for_kw": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "for",
+            "named": false
+          }
+        ]
+      },
       "from": {
         "multiple": false,
         "required": true,

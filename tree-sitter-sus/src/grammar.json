@@ -657,8 +657,12 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "STRING",
-          "value": "for"
+          "type": "FIELD",
+          "name": "for_kw",
+          "content": {
+            "type": "STRING",
+            "value": "for"
+          }
         },
         {
           "type": "FIELD",
