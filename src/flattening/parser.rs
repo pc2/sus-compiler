@@ -24,9 +24,9 @@ fn print_current_node_indented<'ft>(file_text: &'ft FileText, cursor: &TreeCurso
     let cursor_span = Span::from(n.byte_range());
     let node_name = get_readable_node_name(file_text, kind, cursor_span);
     if let Some(field_name) = cursor.field_name() {
-        println!("{indent} {field_name}: {node_name} [{cursor_span}]");
+        println!("{indent} {field_name}: {node_name} [{cursor_span:?}]");
     } else {
-        println!("{indent} {node_name} [{cursor_span}]");
+        println!("{indent} {node_name} [{cursor_span:?}]");
     }
     node_name
 }
@@ -88,7 +88,7 @@ impl<'t> Cursor<'t> {
                 break;
             }
         }
-        println!("Current node: {this_node_kind}, {this_node_span}");
+        println!("Current node: {this_node_kind}, {this_node_span:?}");
     }
 
     #[track_caller]

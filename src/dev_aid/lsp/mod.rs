@@ -136,7 +136,7 @@ fn convert_diagnostic(err: CompileError, main_file_text: &FileText, linker: &Lin
         let info_span = info.position;
         assert!(
             info_file.file_text.is_span_valid(info_span),
-            "bad info in {}:\n{}; in err: {}.\nSpan is {info_span}, but file length is {}",
+            "bad info in {}:\n{}; in err: {}.\nSpan is {info_span:?}, but file length is {}",
             info_file.file_identifier,
             info.info,
             err.reason,

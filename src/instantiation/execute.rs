@@ -638,8 +638,7 @@ fn concretize_type_recurse(
                         assert_eq!(wr_named.id, name.id);
                         concretize_global_ref(linker, wr_named, concretizer)?
                     }
-                    Some(_) => unreachable!("Can't get Array from Non-Array WrittenType!"), // TODO Fix with Let bindings (#57)
-                    None => ConcreteGlobalReference {
+                    None | Some(WrittenType::Error(_)) => ConcreteGlobalReference {
                         id: name.id,
                         template_args: target.template_parameters.map(|(_, arg)| match &arg.kind {
                             TemplateKind::Type(_) => {
@@ -650,6 +649,7 @@ fn concretize_type_recurse(
                             }
                         }),
                     },
+                    Some(t) => unreachable!("Expected a Named Written type (PeanoType is Zero), but found {t:?}"),
                 })
             }
             AbstractInnerType::Unknown(_) => {
@@ -663,8 +663,8 @@ fn concretize_type_recurse(
                     let (content, arr_size, _) = arr.deref();
                     (Some(content), concretizer.get_value(*arr_size)?)
                 }
-                Some(_) => unreachable!("Impossible: Can't get Array from Non-Array WrittenType!"), // TODO Fix with Let bindings (#57)
-                None => (None, concretizer.alloc_unknown()),
+                None | Some(WrittenType::Error(_))  => (None, concretizer.alloc_unknown()),
+                Some(t) => unreachable!("Expected an Array Written type (PeanoType is Succ(_)), but found {t:?}"),
             };
             ConcreteType::Array(Box::new((
                 concretize_type_recurse(linker, inner, one_down, new_wr_typ, concretizer)?,

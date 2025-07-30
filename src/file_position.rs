@@ -1,12 +1,12 @@
 use std::{
-    fmt::Display,
+    fmt::{Debug, Display},
     ops::{Index, Range},
 };
 
 use crate::prelude::FileUUID;
 
 /// [Span] is defined as byte-byte idx. Start inclusive, end exclusive
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Span(usize, usize);
 
 impl From<Range<usize>> for Span {
@@ -68,10 +68,10 @@ impl Ord for Span {
     }
 }
 
-impl Display for Span {
+impl Debug for Span {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.debug();
-        f.write_fmt(format_args!("{}..{}", self.0, self.1))
+        f.debug_tuple("Span").field(&self.0).field(&self.1).finish()
     }
 }
 
