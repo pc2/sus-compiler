@@ -1896,7 +1896,8 @@
   },
   {
     "type": "doc_comment",
-    "named": true
+    "named": true,
+    "extra": true
   },
   {
     "type": "domain",
@@ -1952,7 +1953,8 @@
   },
   {
     "type": "multi_line_comment",
-    "named": true
+    "named": true,
+    "extra": true
   },
   {
     "type": "number",
@@ -1968,7 +1970,8 @@
   },
   {
     "type": "single_line_comment",
-    "named": true
+    "named": true,
+    "extra": true
   },
   {
     "type": "state",

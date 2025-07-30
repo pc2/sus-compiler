@@ -35,7 +35,7 @@ colored = "3.0.0"
 replace_with = "0.1.8"
 
 # Tree sitter
-tree-sitter = "~0.24.7"
+tree-sitter = "0.25"
 tree-sitter-sus = {version = "~0.3.0-devel", path = "./tree-sitter-sus"}
 
 sus-proc-macro = {version = "~0.3.0-devel", path = "./sus-proc-macro"}

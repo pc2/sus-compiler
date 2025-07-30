@@ -15,7 +15,7 @@ rust-version = "1.78"
 [dependencies]
 
 # Tree sitter
-tree-sitter = "~0.24.7"
+tree-sitter = "0.25"
 tree-sitter-sus = {version = "~0.3.0-devel", path = "../tree-sitter-sus"}
 regex = "1.11.1"
 
