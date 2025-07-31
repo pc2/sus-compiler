@@ -16,6 +16,7 @@ use crate::to_string::join_string_iter;
 use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
 
 use std::cell::OnceCell;
+use std::collections::HashSet;
 use std::fmt::{Display, Write};
 use std::rc::Rc;
 
@@ -449,12 +450,54 @@ fn perform_instantiation(
 
     // Don't instantiate modules that already errored. Otherwise instantiator may crash
     if md.link_info.errors.did_error {
-        println!("Not Instantiating {name} due to flattening errors");
+        let mut errors = ErrorCollector::new_empty(md.link_info.file, &linker.files);
+        errors.set_did_error();
+        let msg = format!("Not Instantiating {name} due to abstract typing errors");
+        errors.warn(md.link_info.name_span, msg);
         return InstantiatedModule {
             global_ref,
             mangled_name: mangle_name(&name),
             name,
-            errors: ErrorStore::new_did_error(),
+            errors: errors.into_storage(),
+            interface_ports: Default::default(),
+            wires: Default::default(),
+            submodules: Default::default(),
+            generation_state: md
+                .link_info
+                .instructions
+                .map(|_| SubModuleOrWire::Unassigned),
+        };
+    }
+    let submodules_with_abs_type_errors: HashSet<_> = md
+        .link_info
+        .resolved_globals
+        .referenced_globals
+        .iter()
+        .filter_map(|global| {
+            let found_link_info: &LinkInfo = &linker.globals[*global];
+
+            found_link_info
+                .errors
+                .did_error
+                .then(|| found_link_info.get_full_name())
+        })
+        .collect();
+
+    if !submodules_with_abs_type_errors.is_empty() {
+        let mut errors = ErrorCollector::new_empty(md.link_info.file, &linker.files);
+        errors.set_did_error();
+        let mut msg =
+            format!("Not Instantiating {name} due to abstract typing errors of submodules:\n");
+        for s in submodules_with_abs_type_errors {
+            writeln!(msg, "- {s}").unwrap();
+        }
+        errors.warn(md.link_info.name_span, msg);
+
+        return InstantiatedModule {
+            global_ref,
+            mangled_name: mangle_name(&name),
+            name,
+            errors: errors.into_storage(),
             interface_ports: Default::default(),
             wires: Default::default(),
             submodules: Default::default(),

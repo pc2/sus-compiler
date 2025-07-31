@@ -33,6 +33,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │             ┬  
      │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Warning: Not Instantiating generative #() due to abstract typing errors
+     ╭─[ test.sus:141:8 ]
+     │
+ 141 │ module generative {
+     │        ─────┬────  
+     │             ╰────── Not Instantiating generative #() due to abstract typing errors
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:144:13 ]
      │
@@ -134,6 +141,13 @@ Error: Error instantiating submodule
  180 │     reg int a, st[2], reg reg b = assignment_producer()
      │                                   ──────────┬──────────  
      │                                             ╰──────────── Error instantiating submodule
+─────╯
+Warning: Not Instantiating multiply_add_with_latencies #() due to abstract typing errors
+     ╭─[ test.sus:217:8 ]
+     │
+ 217 │ module multiply_add_with_latencies {
+     │        ─────────────┬─────────────  
+     │                     ╰─────────────── Not Instantiating multiply_add_with_latencies #() due to abstract typing errors
 ─────╯
 Error: A function call expects this to be an interface, but found a regular wire
      ╭─[ test.sus:219:17 ]
@@ -248,6 +262,13 @@ If you do not wish to change your design, then 'virtually' connect this port to 
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+─────╯
+Warning: Not Instantiating permute24 #() due to abstract typing errors
+     ╭─[ test.sus:247:8 ]
+     │
+ 247 │ module permute24 {
+     │        ────┬────  
+     │            ╰────── Not Instantiating permute24 #() due to abstract typing errors
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:248:37 ]
@@ -1905,6 +1926,13 @@ Error: 'contains_submodule_submodule' conflicts with other declarations:
      │        ──────────────┬─────────────  
      │                      ╰─────────────── Conflicts with
 ─────╯
+Warning: Not Instantiating contains_submodule_submodule #() due to abstract typing errors
+     ╭─[ test.sus:441:8 ]
+     │
+ 441 │ module contains_submodule_submodule {
+     │        ──────────────┬─────────────  
+     │                      ╰─────────────── Not Instantiating contains_submodule_submodule #() due to abstract typing errors
+─────╯
 Error: A function call expects this to be a callable interface, the interface `doNothing` is not callable
      ╭─[ test.sus:445:2 ]
      │
@@ -1922,6 +1950,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  462 │     bool b = xor(true, false)
      │          ┬  
      │          ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Not Instantiating use_submodule_named_ports #() due to abstract typing errors
+     ╭─[ test.sus:583:8 ]
+     │
+ 583 │ module use_submodule_named_ports {
+     │        ────────────┬────────────  
+     │                    ╰────────────── Not Instantiating use_submodule_named_ports #() due to abstract typing errors
 ─────╯
 Error: No such field 'port_a' on submodule_named_ports. Available fields are 'submodule_named_ports'
      ╭─[ test.sus:590:5 ]
@@ -1985,6 +2020,13 @@ Error: 'contains_submodule_submodule' conflicts with other declarations:
      │        ──────────────┬─────────────  
      │                      ╰─────────────── 'contains_submodule_submodule' conflicts with other declarations:
 ─────╯
+Warning: Not Instantiating contains_submodule_submodule #() due to abstract typing errors
+     ╭─[ test.sus:597:8 ]
+     │
+ 597 │ module contains_submodule_submodule {
+     │        ──────────────┬─────────────  
+     │                      ╰─────────────── Not Instantiating contains_submodule_submodule #() due to abstract typing errors
+─────╯
 Error: A function call expects this to be a callable interface, the interface `doNothing` is not callable
      ╭─[ test.sus:601:2 ]
      │
@@ -2023,6 +2065,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  625 │     interface offset_backwards : bool i'0 -> bool o'-5
      │                                       ┬  
      │                                       ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Not Instantiating dual_port_mem #() due to abstract typing errors
+     ╭─[ test.sus:629:8 ]
+     │
+ 629 │ module dual_port_mem {
+     │        ──────┬──────  
+     │              ╰──────── Not Instantiating dual_port_mem #() due to abstract typing errors
 ─────╯
 Error: This declaration conflicts with a previous declaration in the same scope
      ╭─[ test.sus:632:25 ]
@@ -2145,6 +2194,13 @@ interface out:
      │                       ┬  
      │                       ╰── No such field 'o' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
 ─────╯
+Warning: Not Instantiating use_fifo #() due to abstract typing errors
+     ╭─[ test.sus:647:8 ]
+     │
+ 647 │ module use_fifo {
+     │        ────┬───  
+     │            ╰───── Not Instantiating use_fifo #() due to abstract typing errors
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:651:11 ]
      │
@@ -2191,6 +2247,13 @@ Error: Excess argument. Function takes 0 args, but 1 were passed.
   70 │     action pop : -> T pop_data {
      │            ─┬─  
      │             ╰─── Interface 'pop' defined here
+─────╯
+Warning: Not Instantiating test_separated_domain #() due to abstract typing errors
+     ╭─[ test.sus:658:8 ]
+     │
+ 658 │ module test_separated_domain {
+     │        ──────────┬──────────  
+     │                  ╰──────────── Not Instantiating test_separated_domain #() due to abstract typing errors
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:659:44 ]
@@ -2268,6 +2331,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                             ───┬──  
      │                                ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Warning: Not Instantiating use_no_input_module #() due to abstract typing errors
+     ╭─[ test.sus:677:8 ]
+     │
+ 677 │ module use_no_input_module {
+     │        ─────────┬─────────  
+     │                 ╰─────────── Not Instantiating use_no_input_module #() due to abstract typing errors
+─────╯
 Error: A function call expects this to be a callable interface, the interface `no_port_module` is not callable
      ╭─[ test.sus:678:2 ]
      │
@@ -2304,6 +2374,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                             ┬  
      │                                             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Warning: Not Instantiating test_write_to_gen_var #() due to abstract typing errors
+     ╭─[ test.sus:690:8 ]
+     │
+ 690 │ module test_write_to_gen_var {
+     │        ──────────┬──────────  
+     │                  ╰──────────── Not Instantiating test_write_to_gen_var #() due to abstract typing errors
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:691:6 ]
      │
@@ -2327,6 +2404,13 @@ Error: Attempting to write from a non-generative value to a generative value
      │         │  
      │         ╰── Attempting to write from a non-generative value to a generative value
 ─────╯
+Warning: Not Instantiating use_bad_interface #() due to abstract typing errors
+     ╭─[ test.sus:704:8 ]
+     │
+ 704 │ module use_bad_interface {
+     │        ────────┬────────  
+     │                ╰────────── Not Instantiating use_bad_interface #() due to abstract typing errors
+─────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
      ╭─[ test.sus:707:2 ]
      │
@@ -2349,6 +2433,13 @@ interface v:
  707 │     mm.a
      │        ┬  
      │        ╰── No such field 'a' on mod_with_unused_interface. Available fields are 'mod_with_unused_interface', 'v'
+─────╯
+Warning: Not Instantiating sequenceDownFrom #() due to abstract typing errors
+     ╭─[ test.sus:720:8 ]
+     │
+ 720 │ module sequenceDownFrom {
+     │        ────────┬───────  
+     │                ╰───────── Not Instantiating sequenceDownFrom #() due to abstract typing errors
 ─────╯
 Error: This declaration conflicts with a previous declaration in the same scope
      ╭─[ test.sus:723:25 ]
@@ -2475,26 +2566,23 @@ interface out:
      │                        ┬  
      │                        ╰── No such field 'o' on cross_int. Available fields are 'cross_int', 'in', 'out'
 ─────╯
+Warning: Not Instantiating sumUpTo #() due to abstract typing errors of submodules:
+- sequenceDownFrom
+
+     ╭─[ test.sus:749:8 ]
+     │
+ 749 │ module sumUpTo {
+     │        ───┬───  
+     │           ╰───── Not Instantiating sumUpTo #() due to abstract typing errors of submodules:
+- sequenceDownFrom
+
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:750:30 ]
      │
  750 │     interface sumUpTo : bool start
      │                              ──┬──  
      │                                ╰──── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-     ╭─[ test.sus:752:19 ]
-     │
- 752 │     sequenceDownFrom sdf
-     │                      ─┬─  
-     │                       ╰─── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:752:19 ]
-     │
- 752 │     sequenceDownFrom sdf
-     │                      ─┬─  
-     │                       ╰─── Error instantiating submodule
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:756:7 ]
@@ -2510,13 +2598,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │          ─────┬────  
      │               ╰────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-     ╭─[ test.sus:758:23 ]
-     │
- 758 │     bool iter_valid, int iter_index = sdf.iter()
-     │                          ─────┬────  
-     │                               ╰────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:758:23 ]
      │
@@ -2524,33 +2605,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                          ─────┬────  
      │                               ╰────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-     ╭─[ test.sus:760:7 ]
-     │
- 760 │        int idx = iter_index
-     │            ─┬─  
-     │             ╰─── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:760:7 ]
      │
  760 │        int idx = iter_index
      │            ─┬─  
      │             ╰─── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-     ╭─[ test.sus:760:13 ]
-     │
- 760 │        int idx = iter_index
-     │                  ─────┬────  
-     │                       ╰────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
-     ╭─[ test.sus:763:6 ]
-     │
- 763 │     int beep
-     │         ──┬─  
-     │           ╰─── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:763:6 ]
@@ -2653,6 +2713,13 @@ Error: 'BITWIDTH' is not a valid template argument of FIFO
   54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
      │        ──┬─  
      │          ╰─── 'FIFO' defined here
+─────╯
+Warning: Not Instantiating use_test #() due to abstract typing errors
+     ╭─[ test.sus:778:8 ]
+     │
+ 778 │ module use_test {
+     │        ────┬───  
+     │            ╰───── Not Instantiating use_test #() due to abstract typing errors
 ─────╯
 Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:779:2 ]
@@ -6893,6 +6960,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                               ──┬──  
      │                                 ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Warning: Not Instantiating run_instruction #() due to abstract typing errors
+     ╭─[ test.sus:889:8 ]
+     │
+ 889 │ module run_instruction {
+     │        ───────┬───────  
+     │               ╰───────── Not Instantiating run_instruction #() due to abstract typing errors
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:890:42 ]
      │
@@ -7003,6 +7077,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                                              ─┬  
      │                                                               ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Warning: Not Instantiating use_no_main_interface #() due to abstract typing errors
+     ╭─[ test.sus:910:8 ]
+     │
+ 910 │ module use_no_main_interface {
+     │        ──────────┬──────────  
+     │                  ╰──────────── Not Instantiating use_no_main_interface #() due to abstract typing errors
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:913:6 ]
      │
@@ -7039,6 +7120,13 @@ Error: A function call expects this to be a callable interface, the interface `n
      │             ────────┬────────  
      │                     ╰────────── A function call expects this to be a callable interface, the interface `no_main_interface` is not callable
 ─────╯
+Warning: Not Instantiating moduleWithBadDeclaration #() due to abstract typing errors
+     ╭─[ test.sus:917:8 ]
+     │
+ 917 │ module moduleWithBadDeclaration {
+     │        ────────────┬───────────  
+     │                    ╰───────────── Not Instantiating moduleWithBadDeclaration #() due to abstract typing errors
+─────╯
 Error: Typing Error: array size expects 'int' but was given 'bool'
      ╭─[ test.sus:918:6 ]
      │
@@ -7053,6 +7141,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │               ┬  
      │               ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Warning: Not Instantiating moduleWithBadInterface #() due to abstract typing errors
+     ╭─[ test.sus:921:8 ]
+     │
+ 921 │ module moduleWithBadInterface {
+     │        ───────────┬──────────  
+     │                   ╰──────────── Not Instantiating moduleWithBadInterface #() due to abstract typing errors
+─────╯
 Error: Typing Error: array size expects 'int' but was given 'bool'
      ╭─[ test.sus:922:41 ]
      │
@@ -7066,6 +7161,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  922 │     interface moduleWithBadInterface : int[true] a
      │                                                  ┬  
      │                                                  ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Not Instantiating useModuleWithBadInterface #() due to abstract typing errors
+     ╭─[ test.sus:925:8 ]
+     │
+ 925 │ module useModuleWithBadInterface {
+     │        ────────────┬────────────  
+     │                    ╰────────────── Not Instantiating useModuleWithBadInterface #() due to abstract typing errors
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:926:9 ]
@@ -7100,6 +7202,13 @@ Error: No Global of the name 'I' was found. Did you forget to import it?
  936 │         SUM_UP = SUM_UP + DATA[I]
      │                                ┬  
      │                                ╰── No Global of the name 'I' was found. Did you forget to import it?
+─────╯
+Warning: Not Instantiating m #() due to abstract typing errors
+     ╭─[ test.sus:942:8 ]
+     │
+ 942 │ module m {
+     │        ┬  
+     │        ╰── Not Instantiating m #() due to abstract typing errors
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:943:13 ]
@@ -7230,6 +7339,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │         ──┬──  
      │           ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Warning: Not Instantiating implicit_domain_forbidden #() due to abstract typing errors
+      ╭─[ test.sus:1005:8 ]
+      │
+ 1005 │ module implicit_domain_forbidden {
+      │        ────────────┬────────────  
+      │                    ╰────────────── Not Instantiating implicit_domain_forbidden #() due to abstract typing errors
+──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1006:12 ]
       │
@@ -7247,6 +7363,13 @@ Error: When using explicit domains, no port is allowed to be declared on the imp
  1008 │     domain bad_domain
       │            ─────┬────  
       │                 ╰────── When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
+──────╯
+Warning: Not Instantiating conflicting_domain_with_port_name #() due to abstract typing errors
+      ╭─[ test.sus:1013:8 ]
+      │
+ 1013 │ module conflicting_domain_with_port_name {
+      │        ────────────────┬────────────────  
+      │                        ╰────────────────── Not Instantiating conflicting_domain_with_port_name #() due to abstract typing errors
 ──────╯
 Error: This declaration conflicts with a previous declaration in the same scope
       ╭─[ test.sus:1015:12 ]
@@ -7276,12 +7399,26 @@ Error: This declaration conflicts with a previous declaration in the same scope
       │            ────┬────  
       │                ╰────── This declaration conflicts with a previous declaration in the same scope
 ──────╯
+Warning: Not Instantiating make_infinite_type #() due to abstract typing errors
+      ╭─[ test.sus:1027:8 ]
+      │
+ 1027 │ module make_infinite_type {
+      │        ─────────┬────────  
+      │                 ╰────────── Not Instantiating make_infinite_type #() due to abstract typing errors
+──────╯
 Error: Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects '?[][...]' but was given '?[...]'
       ╭─[ test.sus:1030:2 ]
       │
  1030 │     mtinf.a = mtinf.b
       │     ───┬───  
       │        ╰───── Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects '?[][...]' but was given '?[...]'
+──────╯
+Warning: Not Instantiating UseDualPortMem #() due to abstract typing errors
+      ╭─[ test.sus:1035:8 ]
+      │
+ 1035 │ module UseDualPortMem {
+      │        ───────┬──────  
+      │               ╰──────── Not Instantiating UseDualPortMem #() due to abstract typing errors
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1037:8 ]
@@ -7318,6 +7455,13 @@ Error: A function call expects this to be an interface, but found a regular wire
       │                 ────┬───  
       │                     ╰───── A function call expects this to be an interface, but found a regular wire
 ──────╯
+Warning: Not Instantiating example_FIFO #() due to abstract typing errors
+      ╭─[ test.sus:1049:8 ]
+      │
+ 1049 │ module example_FIFO {
+      │        ──────┬─────  
+      │              ╰─────── Not Instantiating example_FIFO #() due to abstract typing errors
+──────╯
 Error: 'READY_SLACK' is not a valid template argument of FIFO
       ╭─[ test.sus:1050:19 ]
       │
@@ -7330,6 +7474,13 @@ Error: 'READY_SLACK' is not a valid template argument of FIFO
    54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
       │        ──┬─  
       │          ╰─── 'FIFO' defined here
+──────╯
+Warning: Not Instantiating use_Iterator #() due to abstract typing errors
+      ╭─[ test.sus:1053:8 ]
+      │
+ 1053 │ module use_Iterator {
+      │        ──────┬─────  
+      │              ╰─────── Not Instantiating use_Iterator #() due to abstract typing errors
 ──────╯
 Error: Typing Error: function argument expects 'int' but was given 'bool'
       ╭─[ test.sus:1061:20 ]
@@ -7520,6 +7671,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │          ─────┬────  
       │               ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: Not Instantiating use_infer_me #() due to abstract typing errors
+      ╭─[ test.sus:1131:8 ]
+      │
+ 1131 │ module use_infer_me {
+      │        ──────┬─────  
+      │              ╰─────── Not Instantiating use_infer_me #() due to abstract typing errors
+──────╯
 Error: Excess argument. Function takes 1 args, but 2 were passed.
       ╭─[ test.sus:1134:47 ]
       │
@@ -7530,6 +7688,13 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
  1139 │     interface infer_me : bool x'0 -> bool y'A
       │               ────┬───  
       │                   ╰───── Interface 'infer_me' defined here
+──────╯
+Warning: Not Instantiating instantiate_fifo #() due to abstract typing errors
+      ╭─[ test.sus:1152:8 ]
+      │
+ 1152 │ module instantiate_fifo {
+      │        ────────┬───────  
+      │                ╰───────── Not Instantiating instantiate_fifo #() due to abstract typing errors
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1153:51 ]
@@ -8114,6 +8279,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                                                         ───┬──  
       │                                                            ╰──── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: Not Instantiating use_MultiStateLoop #() due to abstract typing errors
+      ╭─[ test.sus:1247:8 ]
+      │
+ 1247 │ module use_MultiStateLoop {
+      │        ─────────┬────────  
+      │                 ╰────────── Not Instantiating use_MultiStateLoop #() due to abstract typing errors
+──────╯
 Error: An action requires a block
       ╭─[ test.sus:1251:3 ]
       │
@@ -8413,6 +8585,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │            ─┬  
       │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: Not Instantiating use_FIFO #() due to abstract typing errors
+      ╭─[ test.sus:1367:8 ]
+      │
+ 1367 │ module use_FIFO {
+      │        ────┬───  
+      │            ╰───── Not Instantiating use_FIFO #() due to abstract typing errors
+──────╯
 Error: 'READY_SLACK' is not a valid template argument of FIFO
       ╭─[ test.sus:1368:23 ]
       │
@@ -8438,6 +8617,13 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
    63 │     action push : T push_data {
       │            ──┬─  
       │              ╰─── Interface 'push' defined here
+──────╯
+Warning: Not Instantiating write_to_generative_through_when #() due to abstract typing errors
+      ╭─[ test.sus:1373:8 ]
+      │
+ 1373 │ module write_to_generative_through_when {
+      │        ────────────────┬───────────────  
+      │                        ╰───────────────── Not Instantiating write_to_generative_through_when #() due to abstract typing errors
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1374:11 ]

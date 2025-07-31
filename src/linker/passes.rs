@@ -81,7 +81,7 @@ impl<'l> LinkerPass<'l> {
 /// See [GlobalResolver]
 #[derive(Debug)]
 pub struct ResolvedGlobals {
-    referenced_globals: Vec<GlobalUUID>,
+    pub referenced_globals: Vec<GlobalUUID>,
     all_resolved: bool,
 }
 

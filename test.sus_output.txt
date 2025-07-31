@@ -583,7 +583,6 @@ Checking array accesses blur #()
 Instantiating Unpack4 #()
 Concrete Typechecking Unpack4 #()
 Checking array accesses Unpack4 #()
-Not Instantiating generative #() due to flattening errors
 Instantiating add_indices_to_array #()
 Concrete Typechecking add_indices_to_array #()
 Checking array accesses add_indices_to_array #()
@@ -594,12 +593,10 @@ Concrete Typechecking test_various_assignments #()
 Instantiating first_bit_idx_6 #()
 Concrete Typechecking first_bit_idx_6 #()
 Checking array accesses first_bit_idx_6 #()
-Not Instantiating multiply_add_with_latencies #() due to flattening errors
 Instantiating first_bit_idx_24 #()
 Concrete Typechecking first_bit_idx_24 #()
 Instantiating permute #()
 Concrete Typechecking permute #()
-Not Instantiating permute24 #() due to flattening errors
 Instantiating test_single_wire #()
 Concrete Typechecking test_single_wire #()
 Checking array accesses test_single_wire #()
@@ -652,7 +649,6 @@ Checking array accesses submodule #()
 Instantiating doNothing #()
 Concrete Typechecking doNothing #()
 Checking array accesses doNothing #()
-Not Instantiating contains_submodule_submodule #() due to flattening errors
 Instantiating xor #()
 Concrete Typechecking xor #()
 Checking array accesses xor #()
@@ -677,8 +673,6 @@ Checking array accesses use_my_mod #()
 Instantiating submodule_named_ports #()
 Concrete Typechecking submodule_named_ports #()
 Checking array accesses submodule_named_ports #()
-Not Instantiating use_submodule_named_ports #() due to flattening errors
-Not Instantiating contains_submodule_submodule #() due to flattening errors
 Instantiating cross_bool #()
 Concrete Typechecking cross_bool #()
 Checking array accesses cross_bool #()
@@ -691,22 +685,12 @@ Checking array accesses cross_memory #()
 Instantiating offset_backwards #()
 Concrete Typechecking offset_backwards #()
 Checking array accesses offset_backwards #()
-Not Instantiating dual_port_mem #() due to flattening errors
-Not Instantiating use_fifo #() due to flattening errors
-Not Instantiating test_separated_domain #() due to flattening errors
 Instantiating no_port_module #()
 Concrete Typechecking no_port_module #()
 Checking array accesses no_port_module #()
-Not Instantiating use_no_input_module #() due to flattening errors
 Instantiating mod_with_unused_interface #()
 Concrete Typechecking mod_with_unused_interface #()
 Checking array accesses mod_with_unused_interface #()
-Not Instantiating test_write_to_gen_var #() due to flattening errors
-Not Instantiating use_bad_interface #() due to flattening errors
-Not Instantiating sequenceDownFrom #() due to flattening errors
-Instantiating sumUpTo #()
-Concrete Typechecking sumUpTo #()
-Not Instantiating use_test #() due to flattening errors
 Instantiating testTinyTestMod #()
 Concrete Typechecking testTinyTestMod #()
 Instantiating tinyTestMod #(beep: 3)
@@ -748,15 +732,9 @@ Checking array accesses use_permute #()
 Instantiating instruction_decoder #()
 Concrete Typechecking instruction_decoder #()
 Checking array accesses instruction_decoder #()
-Not Instantiating run_instruction #() due to flattening errors
 Instantiating no_main_interface #()
 Concrete Typechecking no_main_interface #()
 Checking array accesses no_main_interface #()
-Not Instantiating use_no_main_interface #() due to flattening errors
-Not Instantiating moduleWithBadDeclaration #() due to flattening errors
-Not Instantiating moduleWithBadInterface #() due to flattening errors
-Not Instantiating useModuleWithBadInterface #() due to flattening errors
-Not Instantiating m #() due to flattening errors
 Instantiating xyz #()
 Concrete Typechecking xyz #()
 Instantiating numbersToAddUp #()
@@ -780,26 +758,18 @@ Instantiating sized_int_add #(LEFT_SIZE: 4, RIGHT_SIZE: 3, OUTPUT_SIZE: 5)
 Concrete Typechecking sized_int_add #(LEFT_SIZE: 4, RIGHT_SIZE: 3, OUTPUT_SIZE: 5)
 Checking array accesses sized_int_add #(LEFT_SIZE: 4, RIGHT_SIZE: 3, OUTPUT_SIZE: 5)
 Checking array accesses use_sized_int_add #()
-Not Instantiating implicit_domain_forbidden #() due to flattening errors
-Not Instantiating conflicting_domain_with_port_name #() due to flattening errors
-Not Instantiating make_infinite_type #() due to flattening errors
-Not Instantiating UseDualPortMem #() due to flattening errors
-Not Instantiating example_FIFO #() due to flattening errors
-Not Instantiating use_Iterator #() due to flattening errors
 Instantiating UseBuiltinConstants #()
 Instantiating FailingAssert #()
 Instantiating latency_counting_disjoint_blocks #()
 Concrete Typechecking latency_counting_disjoint_blocks #()
 Instantiating latency_counting_disjoint_blocks_merge_error #()
 Concrete Typechecking latency_counting_disjoint_blocks_merge_error #()
-Not Instantiating use_infer_me #() due to flattening errors
 Instantiating infer_from_local_context #()
 Concrete Typechecking infer_from_local_context #()
 Instantiating infer_me #(A: 5)
 Concrete Typechecking infer_me #(A: 5)
 Checking array accesses infer_me #(A: 5)
 Checking array accesses infer_from_local_context #()
-Not Instantiating instantiate_fifo #() due to flattening errors
 Instantiating inference_edge_case #()
 Concrete Typechecking inference_edge_case #()
 Instantiating infer_me #(A: 2)
@@ -812,7 +782,6 @@ Instantiating testArrayWrite #()
 Concrete Typechecking testArrayWrite #()
 Instantiating instantiate_infer_me_with_poison_output #()
 Concrete Typechecking instantiate_infer_me_with_poison_output #()
-Not Instantiating use_MultiStateLoop #() due to flattening errors
 Instantiating CombineArray #()
 Concrete Typechecking CombineArray #()
 Instantiating useUnknownLatency #()
@@ -837,8 +806,6 @@ Instantiating use_ranks #()
 Instantiating testInts #()
 Concrete Typechecking testInts #()
 Checking array accesses testInts #()
-Not Instantiating use_FIFO #() due to flattening errors
-Not Instantiating write_to_generative_through_when #() due to flattening errors
 Instantiating InstantiateTransmutes #()
 Concrete Typechecking InstantiateTransmutes #()
 Instantiating transmute_to_bits #(T: type bool #()[60])
