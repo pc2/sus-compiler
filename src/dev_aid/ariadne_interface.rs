@@ -56,7 +56,7 @@ pub struct FileSourcesManager {
 
 impl LinkerExtraFileInfoManager for FileSourcesManager {
     fn convert_filename(&self, path: &Path) -> String {
-        path.to_string_lossy().into_owned()
+        path.canonicalize().unwrap().to_string_lossy().to_string()
     }
 
     fn on_file_added(&mut self, file_id: FileUUID, linker: &Linker) {
@@ -93,7 +93,7 @@ pub fn compile_all(file_paths: Vec<PathBuf>) -> (Linker, FileSourcesManager) {
         };
 
         linker.add_file_text(
-            file_path.to_string_lossy().into_owned(),
+            file_source_manager.convert_filename(&file_path),
             file_text,
             &mut file_source_manager,
         );

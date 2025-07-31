@@ -36,6 +36,7 @@ struct SpanDebuggerStackElement {
     global_obj_name: String,
     debugging_enabled: bool,
     span_history: CircularBuffer<SPAN_TOUCH_HISTORY_SIZE, Span>,
+    file_data: *const FileData,
 }
 
 thread_local! {
@@ -85,23 +86,6 @@ pub fn debug_print_span(span: Span, label: String) {
     })
 }
 
-/// Print the last [NUM_SPANS_TO_PRINT] touched spans on panic to aid in debugging
-///
-/// If not defused, it will print when dropped, ostensibly when being unwound from a panic
-///
-/// Must call [Self::defuse] when no panic occurred
-///
-/// This struct uses a shared thread_local resource: [SPANS_HISTORY], so no two can exist at the same time (within the same thread).
-///
-/// Maybe future work can remove dependency on Linker lifetime with some unsafe code.
-pub struct SpanDebugger<'text> {
-    file_data: &'text FileData,
-    started_at: std::time::Instant,
-    /// Kills the process if a SpanDebugger lives longer than config.kill_timeout
-    #[allow(unused)]
-    out_of_time_killer: OutOfTimeKiller,
-}
-
 fn print_stack_top(enter_exit: &str) {
     DEBUG_STACK.with_borrow(|stack| {
         if !config().enabled_debug_paths.contains("spandebugger") {
@@ -125,67 +109,55 @@ fn print_stack_top(enter_exit: &str) {
     })
 }
 
-impl<'text> SpanDebugger<'text> {
-    pub fn new(stage: &'static str, global_obj_name: String, file_data: &'text FileData) -> Self {
-        MOST_RECENT_FILE_DATA.with(|ptr| {
-            let file_data = file_data as *const FileData;
-            ptr.store(
-                file_data as *mut FileData,
-                std::sync::atomic::Ordering::SeqCst,
-            )
-        });
-        let config = config();
+pub fn panic_guard<R>(
+    stage: &'static str,
+    global_obj_name: String,
+    file_data: &FileData,
+    f: impl FnOnce() -> R,
+) -> R {
+    MOST_RECENT_FILE_DATA.with(|ptr| {
+        let file_data = file_data as *const FileData;
+        ptr.store(
+            file_data as *mut FileData,
+            std::sync::atomic::Ordering::SeqCst,
+        )
+    });
+    let config = config();
 
-        let oot_killer_str = format!("{stage} {global_obj_name}");
+    let oot_killer_str = format!("{stage} {global_obj_name}");
 
-        DEBUG_STACK.with_borrow_mut(|history| {
-            let debugging_enabled = config.debug_whitelist.is_empty()
-                && !config.enabled_debug_paths.is_empty()
-                || config
-                    .debug_whitelist
-                    .iter()
-                    .any(|v| global_obj_name.contains(v));
+    DEBUG_STACK.with_borrow_mut(|history| {
+        let debugging_enabled = config.debug_whitelist.is_empty()
+            && !config.enabled_debug_paths.is_empty()
+            || config
+                .debug_whitelist
+                .iter()
+                .any(|v| global_obj_name.contains(v));
 
-            history.debug_stack.push(SpanDebuggerStackElement {
-                stage,
-                global_obj_name,
-                debugging_enabled,
-                span_history: CircularBuffer::new(),
-            });
-        });
-        print_stack_top("Enter ");
-
-        Self {
+        history.debug_stack.push(SpanDebuggerStackElement {
+            stage,
+            global_obj_name,
+            debugging_enabled,
+            span_history: CircularBuffer::new(),
             file_data,
-            started_at: std::time::Instant::now(),
-            out_of_time_killer: OutOfTimeKiller::new(oot_killer_str),
-        }
-    }
-}
-
-impl Drop for SpanDebugger<'_> {
-    fn drop(&mut self) {
-        let time_taken = std::time::Instant::now() - self.started_at;
-        print_stack_top(&format!(
-            "Exit (Took {})",
-            humantime::format_duration(time_taken)
-        ));
-
-        DEBUG_STACK.with_borrow_mut(|stack| {
-            if std::thread::panicking() {
-                let last_stack_elem = stack.debug_stack.last().unwrap();
-                eprintln!(
-                    "Panic happened in Span-guarded context {} in {}",
-                    last_stack_elem.stage.red(),
-                    last_stack_elem.global_obj_name.red()
-                );
-                print_most_recent_spans(self.file_data, last_stack_elem)
-            } else {
-                let _ = stack.debug_stack.pop().unwrap();
-            }
         });
-        print_stack_top("");
-    }
+    });
+    print_stack_top("Enter ");
+
+    let started_at = std::time::Instant::now();
+    let _out_of_time_killer = OutOfTimeKiller::new(oot_killer_str);
+
+    let result = f(); // On panic, skips the following code (of course _out_of_time_killer is still Dropped)
+
+    let time_taken = std::time::Instant::now() - started_at;
+    print_stack_top(&format!("Exit (Took {:.2}s)", time_taken.as_secs_f64()));
+
+    // Clean up most recent debug stack frame. DOES NOT TRIGGER ON PANIC, such that it doesn't destroy the state for [setup_panic_handler]
+    DEBUG_STACK.with_borrow_mut(|stack| {
+        let _ = stack.debug_stack.pop().unwrap();
+    });
+
+    result
 }
 
 /// Check if the debug path is enabled
@@ -226,6 +198,16 @@ pub fn setup_panic_handler() {
         default_hook(info);
 
         DEBUG_STACK.with_borrow(|history| {
+            if let Some(last_stack_elem) = history.debug_stack.last() {
+                eprintln!(
+                    "Panic happened in Span-guarded context {} in {}",
+                    last_stack_elem.stage.red(),
+                    last_stack_elem.global_obj_name.red()
+                );
+                let file_data = unsafe { &*last_stack_elem.file_data };
+                //pretty_print_span(file_data, span, label);
+                print_most_recent_spans(file_data, last_stack_elem);
+            }
             println!("Most recent available debug paths:");
             for (ctx, d) in &history.recent_debug_options {
                 if let Some(ctx) = ctx {
@@ -247,13 +229,12 @@ pub fn create_dump_on_panic(linker: &mut Linker, f: impl FnOnce(&mut Linker)) {
 
     use std::fs;
     use std::io::Write;
-    use std::time::SystemTime;
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(linker)));
 
     if let Err(panic_info) = result {
         // Get ~/.sus/crash_dumps/{timestamp}
-        let cur_time = humantime::format_rfc3339(SystemTime::now());
+        let cur_time = chrono::Local::now();
 
         let failure_name = DEBUG_STACK.with_borrow(|history| {
             if let Some(SpanDebuggerStackElement {
@@ -262,7 +243,11 @@ pub fn create_dump_on_panic(linker: &mut Linker, f: impl FnOnce(&mut Linker)) {
                 ..
             }) = history.debug_stack.last()
             {
-                format!("{stage} {global_obj_name} {cur_time}")
+                let global_obj_name = global_obj_name.replace(char::is_whitespace, "");
+                format!(
+                    "{stage}_{global_obj_name}_{}",
+                    cur_time.format("%Y-%m-%d_%H:%M:%S")
+                )
             } else {
                 format!("no module {cur_time}")
             }
@@ -329,9 +314,9 @@ fn spawn_watchdog_thread() {
             if deadline <= now && entry.alive.load(std::sync::atomic::Ordering::SeqCst) {
                 println!("⏰⏰⏰⏰⏰⏰⏰⏰⏰"); // To show in stdout when this happens too
                 eprintln!(
-                    "⏰ OutOfTimeKiller triggered in {} after it took more than {} to execute ⏰",
+                    "⏰ OutOfTimeKiller triggered in {} after it took more than {:.2} seconds to execute ⏰",
                     entry.info,
-                    humantime::format_duration(now - entry.started_at)
+                    (now - entry.started_at).as_secs_f64()
                 );
                 eprintln!("Process will now be terminated.");
                 std::process::exit(1);

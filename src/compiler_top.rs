@@ -2,7 +2,6 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use crate::config::EarlyExitUpTo;
-use crate::debug::create_dump_on_panic;
 use crate::flattening::typecheck::{perform_lints, typecheck};
 use crate::linker::checkpoint::{
     AFTER_FLATTEN_CP, AFTER_INITIAL_PARSE_CP, AFTER_LINTS_CP, AFTER_TYPE_CHECK_CP,
@@ -14,10 +13,7 @@ use crate::typing::concrete_type::ConcreteGlobalReference;
 use sus_proc_macro::{get_builtin_const, get_builtin_type};
 use tree_sitter::Parser;
 
-use crate::{
-    config::config, debug::SpanDebugger, errors::ErrorStore, file_position::FileText,
-    linker::FileData,
-};
+use crate::{config::config, errors::ErrorStore, file_position::FileText, linker::FileData};
 
 use crate::config::get_sus_home;
 use crate::flattening::{flatten_all_globals, gather_initial_file_data};
@@ -32,15 +28,11 @@ pub fn get_crash_dumps_dir() -> PathBuf {
 /// Any extra operations that should happen when files are added or removed from the linker. Such as caching line offsets.
 pub trait LinkerExtraFileInfoManager {
     /// This is there to give an acceptable identifier that can be printed
-    fn convert_filename(&self, path: &Path) -> String {
-        path.to_string_lossy().into_owned()
-    }
+    fn convert_filename(&self, path: &Path) -> String;
     fn on_file_added(&mut self, _file_id: FileUUID, _linker: &Linker) {}
     fn on_file_updated(&mut self, _file_id: FileUUID, _linker: &Linker) {}
     fn before_file_remove(&mut self, _file_id: FileUUID, _linker: &Linker) {}
 }
-
-impl LinkerExtraFileInfoManager for () {}
 
 impl Linker {
     pub fn add_standard_library<ExtraInfoManager: LinkerExtraFileInfoManager>(
@@ -106,7 +98,7 @@ impl Linker {
         info_mngr: &mut ExtraInfoManager,
     ) {
         let file_text = std::fs::read_to_string(file_path).unwrap();
-        let file_identifier: String = info_mngr.convert_filename(file_path);
+        let file_identifier = info_mngr.convert_filename(file_path);
         self.add_file_text(file_identifier, file_text, info_mngr);
     }
 
@@ -155,12 +147,12 @@ impl Linker {
         });
 
         self.with_file_builder(file_id, |builder| {
-            let _panic_guard = SpanDebugger::new(
+            crate::debug::panic_guard(
                 "gather_initial_file_data in add_file",
                 builder.file_data.file_identifier.clone(),
                 builder.file_data,
+                || gather_initial_file_data(builder),
             );
-            gather_initial_file_data(builder);
         });
         let assoc_vals = self.files[file_id].associated_values.clone();
         self.checkpoint(&assoc_vals, AFTER_INITIAL_PARSE_CP);
@@ -190,12 +182,12 @@ impl Linker {
             file_data.tree = tree;
 
             self.with_file_builder(file_id, |builder| {
-                let _panic_guard = SpanDebugger::new(
+                crate::debug::panic_guard(
                     "gather_initial_file_data in update_file",
                     builder.file_data.file_identifier.clone(),
                     builder.file_data,
+                    || gather_initial_file_data(builder),
                 );
-                gather_initial_file_data(builder);
             });
             let assoc_vals = self.files[file_id].associated_values.clone();
             self.checkpoint(&assoc_vals, AFTER_INITIAL_PARSE_CP);
@@ -212,7 +204,7 @@ impl Linker {
     }
 
     pub fn recompile_all_report_panics(&mut self) {
-        create_dump_on_panic(self, |slf| slf.recompile_all())
+        crate::debug::create_dump_on_panic(self, |slf| slf.recompile_all())
     }
 
     pub fn recompile_all(&mut self) {

@@ -7,7 +7,7 @@
     "--sus-home", ".",
     "--lsp",
     // Tracking down slow compilations
-    "--kill-timeout", "2000ms",
+    "--kill-timeout", "2.0",
     "test.sus"
     //, "--upto", "typecheck"
   ],

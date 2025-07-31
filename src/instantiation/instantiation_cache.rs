@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::{collections::HashMap, rc::Rc};
 
-use crate::debug::SpanDebugger;
 use crate::errors::CompileError;
 use crate::instantiation::perform_instantiation;
 use crate::typing::concrete_type::ConcreteGlobalReference;
@@ -100,9 +99,9 @@ impl Instantiator {
 
             let md = &linker.modules[global_ref.id];
             let file = &linker.files[md.link_info.file];
-            let _panic_guard = SpanDebugger::new("instantiating", name, file);
-
-            let result = perform_instantiation(linker, global_ref.clone());
+            let result = crate::debug::panic_guard("instantiating", name, file, || {
+                perform_instantiation(linker, global_ref.clone())
+            });
 
             let result_ref = Rc::new(result);
             let mut cache_borrow = self.cache.borrow_mut();

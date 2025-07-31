@@ -32,3 +32,5 @@ for dump in "$CRASHDUMPS_DIR"/*; do
         echo "Crash or error (code $status) in $dump, keeping."
     fi
 done
+
+echo "All dumps handled"

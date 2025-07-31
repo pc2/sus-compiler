@@ -1,6 +1,7 @@
 use clap::{Arg, Command, ValueEnum};
 use std::collections::HashSet;
 use std::sync::OnceLock;
+use std::time::Duration;
 use std::{
     env,
     ffi::{OsStr, OsString},
@@ -109,11 +110,11 @@ fn command_builder() -> Command {
         .arg(Arg::new("kill-timeout")
             .long("kill-timeout")
             .hide(true)
-            .help("Sets how long an individual part of the compiler can take, before terminating. Set to 0 to disable")
+            .help("Sets how long (in seconds) an individual part of the compiler can take, before terminating. Set to 0 to disable")
             .action(clap::ArgAction::Set)
-            .default_value("0s")
-            .value_parser(|duration : &str| {
-                humantime::parse_duration(duration)
+            .default_value("0.0")
+            .value_parser(|duration : &str| -> Result<Duration, String> {
+                Ok(Duration::from_secs_f64(duration.parse::<f64>().map_err(|e| e.to_string())?))
             }))
         .arg(Arg::new("codegen")
             .long("codegen")
@@ -239,9 +240,7 @@ where
         codegen,
         debug_whitelist,
         enabled_debug_paths,
-        kill_timeout: *matches
-            .get_one::<std::time::Duration>("kill-timeout")
-            .unwrap(),
+        kill_timeout: *matches.get_one::<Duration>("kill-timeout").unwrap(),
         standalone,
         early_exit: *matches.get_one("upto").unwrap(),
         use_color,

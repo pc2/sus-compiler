@@ -1,5 +1,4 @@
 use crate::{
-    debug::SpanDebugger,
     flattening::{Instruction, NamedConstant},
     instantiation::instantiation_cache::Instantiator,
     linker::passes::ResolvedGlobals,

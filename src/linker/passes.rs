@@ -33,26 +33,27 @@ impl Linker {
         let resolved_globals = std::mem::take(&mut working_on_mut.resolved_globals);
 
         println!("{pass_name} {}", &working_on_mut.name);
-        let _panic_guard = SpanDebugger::new(
+        crate::debug::panic_guard(
             pass_name,
             working_on_mut.name.clone(),
             &self.files[working_on_mut.file],
+            || {
+                let mut linker_pass = LinkerPass {
+                    resolved_globals,
+                    globals: &mut self.globals,
+                    global_namespace: &self.global_namespace,
+                    cur_global: global_id,
+                };
+                f(&mut linker_pass, &errors, &self.files);
+
+                let resolved_globals = linker_pass.resolved_globals;
+                let working_on_mut = &mut self.globals[global_id];
+                assert!(working_on_mut.errors.is_untouched());
+                working_on_mut.errors = errors.into_storage();
+                assert!(working_on_mut.resolved_globals.is_untouched());
+                working_on_mut.resolved_globals = resolved_globals;
+            },
         );
-
-        let mut linker_pass = LinkerPass {
-            resolved_globals,
-            globals: &mut self.globals,
-            global_namespace: &self.global_namespace,
-            cur_global: global_id,
-        };
-        f(&mut linker_pass, &errors, &self.files);
-
-        let resolved_globals = linker_pass.resolved_globals;
-        let working_on_mut = &mut self.globals[global_id];
-        assert!(working_on_mut.errors.is_untouched());
-        working_on_mut.errors = errors.into_storage();
-        assert!(working_on_mut.resolved_globals.is_untouched());
-        working_on_mut.resolved_globals = resolved_globals;
     }
 }
 
