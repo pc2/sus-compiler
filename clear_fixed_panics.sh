@@ -7,7 +7,8 @@ if [ "$#" -ne 1 ]; then
 fi
 
 CRASHDUMPS_DIR="$1"
-SUS_COMPILER="/home/lennart/Desktop/sus-compiler/target/release/sus_compiler"
+cargo build
+SUS_COMPILER="/home/lennart/Desktop/sus-compiler/target/debug/sus_compiler"
 
 if [ ! -d "$CRASHDUMPS_DIR" ]; then
     echo "Directory $CRASHDUMPS_DIR does not exist."

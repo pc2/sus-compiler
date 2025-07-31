@@ -171,14 +171,20 @@ fn recurse_down_expression(
                         Some(left_v)
                     }
                 }
-                BinaryOperator::Divide => (left_v.is_const() && right_v.is_const()).then(|| {
-                    left_v.const_factor /= right_v.const_factor;
-                    left_v
-                }),
-                BinaryOperator::Modulo => (left_v.is_const() && right_v.is_const()).then(|| {
-                    left_v.const_factor %= right_v.const_factor;
-                    left_v
-                }),
+                BinaryOperator::Divide => (left_v.is_const()
+                    && right_v.is_const()
+                    && right_v.const_factor != 0)
+                    .then(|| {
+                        left_v.const_factor /= right_v.const_factor;
+                        left_v
+                    }),
+                BinaryOperator::Modulo => (left_v.is_const()
+                    && right_v.is_const()
+                    && right_v.const_factor != 0)
+                    .then(|| {
+                        left_v.const_factor %= right_v.const_factor;
+                        left_v
+                    }),
                 _other => None,
             }
         }
