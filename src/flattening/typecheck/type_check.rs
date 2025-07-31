@@ -171,14 +171,17 @@ impl<'l> TypeCheckingContext<'l> {
                                 .error(
                                     *name_span,
                                     format!(
-                                        "The type of this object is a local interfaec '{}'. You cannot use struct fields on local interfaces",
+                                        "The type of this object is a local interface '{}'. You cannot use struct fields on local interfaces",
                                         interface_decl.name
                                     ),
                                 )
                                 .info_obj_same_file(interface_decl);
                             self.type_checker.alloc_unknown()
                         }
-                        AbstractInnerType::Named(_) => todo!("Structs"),
+                        AbstractInnerType::Named(_) => {
+                            self.errors.todo(*name_span, "Structs");
+                            self.type_checker.alloc_unknown() // todo!("Structs")
+                        }
                         // TODO "subinterfaces"
                         AbstractInnerType::Interface(md_ref, _interface) => {
                             let md = self.globals.get_submodule(md_ref);

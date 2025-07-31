@@ -236,7 +236,7 @@ impl Value {
                 })
             }
             AbstractInnerType::Named(AbstractGlobalReference { .. }) => {
-                todo!("Structs")
+                return Err("TODO: Structs".to_string()); // todo!("Structs")
             }
             AbstractInnerType::Unknown(_) => unreachable!("Caught by typecheck"),
             AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => {
