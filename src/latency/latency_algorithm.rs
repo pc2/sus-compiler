@@ -835,13 +835,14 @@ impl LatencyInferenceProblem {
         fanins: ListOfLists<FanInOut>,
         ports: &LatencyCountingPorts,
         specified_latencies: &[SpecifiedLatency],
-    ) -> Option<Self> {
-        find_positive_latency_cycle(&fanins, specified_latencies).ok()?;
-
+    ) -> Result<Self, LatencyCountingError> {
         let fanouts = fanins.faninout_complement();
 
+        find_positive_latency_cycle(&fanins, specified_latencies)
+            .map_err(|e| e.to_lc_error(&fanouts))?;
+
         let mut mem = SolutionMemory::new(fanouts.len());
-        let partial_solutions = solve_port_latencies(&fanouts, ports, &mut mem).ok()?;
+        let partial_solutions = solve_port_latencies(&fanouts, ports, &mut mem)?;
 
         let mut new_edges = Vec::new();
         for partial_sol in partial_solutions {
@@ -851,10 +852,14 @@ impl LatencyInferenceProblem {
         let fanins = fanins.extend_lists_with_new_elements(new_edges);
         let fanouts = fanins.faninout_complement();
 
-        Some(Self { fanouts, mem })
+        Ok(Self { fanouts, mem })
     }
 
-    pub fn infer_edge(&mut self, from: usize, to: usize) -> Result<i64, InferenceFailure> {
+    pub fn infer_max_edge_latency(
+        &mut self,
+        from: usize,
+        to: usize,
+    ) -> Result<i64, InferenceFailure> {
         let mut solution = self
             .mem
             .make_solution_with_initial_values(&[SpecifiedLatency {
@@ -910,7 +915,7 @@ pub fn infer_unknown_latency_edges<ID>(
         return; // Could not infer anything
     }
 
-    let Some(mut inference_problem) =
+    let Ok(mut inference_problem) =
         LatencyInferenceProblem::new(fanins, ports, specified_latencies)
     else {
         return;
@@ -920,7 +925,7 @@ pub fn infer_unknown_latency_edges<ID>(
         let infer_me = &mut values_to_infer[candidate.target_to_infer];
 
         if let Ok(largest_latency) =
-            inference_problem.infer_edge(candidate.to_node, candidate.from_node)
+            inference_problem.infer_max_edge_latency(candidate.to_node, candidate.from_node)
         {
             infer_me
                 .apply_candidate((-largest_latency - candidate.offset) / candidate.multiply_var_by);

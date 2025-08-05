@@ -122,11 +122,9 @@ impl<'inst> ValueUnifier<'inst> {
                         // We can simply unwrap, because a source only appears in the HashMap if it's actually encountered, and thus at least one other var matches with it!
                         let common_subtype = common_subtype.unwrap().clone();
 
-                        // Values used in subtyping relations are always resolved in a forward direction (so a value b that depends on value a only gets resolved after a is resolved)
-                        // That's why we can safely assert
                         unifier
                             .set(var_sources.target, Value::Integer(common_subtype))
-                            .unwrap();
+                            .expect("Values used in subtyping relations are always resolved in a forward direction (so a value b that depends on value a only gets resolved after a is resolved) That's why we can safely assert");
                     });
                 }
             }

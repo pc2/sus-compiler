@@ -38,7 +38,7 @@ module RAM #(T, int DEPTH) {
     }
 }
 
-extern module RawFIFO #(int WIDTH, int DEPTH, int MAY_PUSH_LATENCY) {
+extern module RawFIFO #(int WIDTH, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
     domain clk
     action rst'0 {}
 
@@ -48,11 +48,11 @@ extern module RawFIFO #(int WIDTH, int DEPTH, int MAY_PUSH_LATENCY) {
     
     domain read
     output bool may_pop'0
-    action pop'0 : -> bool[WIDTH] pop_data'2 {}
+    action pop'0 : -> bool[WIDTH] pop_data'0 {}
 }
 
-module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
-    RawFIFO fifo
+module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
+    RawFIFO#(DEPTH, MAY_PUSH_LATENCY, EXTRA_IN_FLIGHT) fifo
     domain clk
     action rst {
         fifo.rst()

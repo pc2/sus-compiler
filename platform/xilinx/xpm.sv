@@ -140,7 +140,7 @@ xpm_memory_sdpram_inst (
 endmodule
 
 
-module RawFIFO #(parameter int WIDTH = 8, parameter int DEPTH = 32, parameter int MAY_PUSH_LATENCY = 5)(
+module RawFIFO #(parameter int WIDTH = 8, parameter int DEPTH = 32, parameter int MAY_PUSH_LATENCY = 5, parameter int EXTRA_IN_FLIGHT = 0)(
     input logic clk,
     input logic rst,
     output logic may_push,
@@ -160,7 +160,7 @@ logic prog_full;
 assign may_push = !prog_full;
 
 // Minus one because READ_MODE == "std", if it were fallthrough this wouldn't be
-localparam PROG_FULL_THRESH = DEPTH - MAY_PUSH_LATENCY - 1;
+localparam PROG_FULL_THRESH = DEPTH - MAY_PUSH_LATENCY - EXTRA_IN_FLIGHT - 1;
 
 xpm_fifo_sync #(
    .CASCADE_HEIGHT(0),            // DECIMAL
@@ -168,7 +168,7 @@ xpm_fifo_sync #(
    .ECC_MODE("no_ecc"),           // String
    .EN_SIM_ASSERT_ERR("error"), // String
    .FIFO_MEMORY_TYPE("auto"),     // String
-   .FIFO_READ_LATENCY(2),         // DECIMAL
+   .FIFO_READ_LATENCY(0),         // DECIMAL
    .FIFO_WRITE_DEPTH(DEPTH),       // DECIMAL
    .FULL_RESET_VALUE(0),          // DECIMAL
    .PROG_EMPTY_THRESH(0),        // DECIMAL

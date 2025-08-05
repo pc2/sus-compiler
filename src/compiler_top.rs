@@ -107,11 +107,21 @@ impl Linker {
         directory: &PathBuf,
         info_mngr: &mut ExtraInfoManager,
     ) {
-        let mut files = std::fs::read_dir(directory)
-            .unwrap()
-            .map(|res| res.map(|e| e.path()))
-            .collect::<Result<Vec<_>, std::io::Error>>()
-            .unwrap();
+        let dir_read = std::fs::read_dir(directory);
+        let dir_read = match dir_read {
+            Ok(d) => d,
+            Err(_) => panic!("Can't read directory {}", directory.to_string_lossy()),
+        };
+        let mut files: Vec<_> = dir_read
+            .map(|res| match res {
+                Ok(path) => path.path(),
+                Err(err) => panic!(
+                    "No such file or directory {} in {}",
+                    err,
+                    directory.to_string_lossy()
+                ),
+            })
+            .collect();
         files.sort();
         for file in files {
             let file_path = file.canonicalize().unwrap();
