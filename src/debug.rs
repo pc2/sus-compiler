@@ -109,7 +109,7 @@ fn print_stack_top(enter_exit: &str) {
     })
 }
 
-pub fn panic_guard<R>(
+pub fn debug_context<R>(
     stage: &'static str,
     global_obj_name: String,
     file_data: &FileData,

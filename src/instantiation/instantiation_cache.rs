@@ -99,7 +99,7 @@ impl Instantiator {
 
             let md = &linker.modules[global_ref.id];
             let file = &linker.files[md.link_info.file];
-            let result = crate::debug::panic_guard("instantiating", name, file, || {
+            let result = crate::debug::debug_context("instantiating", name, file, || {
                 perform_instantiation(linker, global_ref.clone())
             });
 

@@ -125,6 +125,8 @@ pub fn get_builtin_const(token_stream: TokenStream) -> TokenStream {
     .into()
 }
 
+/// This could be a macro_rules!, but then rust insists on binding the line number to the macro.
+/// By wrapping it in a proc_macro rust can only assign the `__debug_breakpoint!` usage location for the lldb breakpoint
 #[proc_macro]
 pub fn __debug_breakpoint(_input: TokenStream) -> TokenStream {
     quote! {
@@ -153,6 +155,8 @@ pub fn __debug_breakpoint(_input: TokenStream) -> TokenStream {
     .into()
 }
 
+/// This could be a macro_rules!, but then rust insists on binding the line number to the macro.
+/// By wrapping it in a proc_macro rust can only assign the `__debug_breakpoint_if!` usage location for the lldb breakpoint
 #[proc_macro]
 pub fn __debug_breakpoint_if(input: TokenStream) -> TokenStream {
     let expr: syn::Expr = syn::parse_macro_input!(input as syn::Expr);

@@ -157,7 +157,7 @@ impl Linker {
         });
 
         self.with_file_builder(file_id, |builder| {
-            crate::debug::panic_guard(
+            crate::debug::debug_context(
                 "gather_initial_file_data in add_file",
                 builder.file_data.file_identifier.clone(),
                 builder.file_data,
@@ -192,7 +192,7 @@ impl Linker {
             file_data.tree = tree;
 
             self.with_file_builder(file_id, |builder| {
-                crate::debug::panic_guard(
+                crate::debug::debug_context(
                     "gather_initial_file_data in update_file",
                     builder.file_data.file_identifier.clone(),
                     builder.file_data,

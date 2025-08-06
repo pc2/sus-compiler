@@ -14,9 +14,9 @@ cargo build
 
 To edit the tree-sitter grammar and regenerate [tree-sitter-sus/src/parser.c](./tree-sitter_sus/src/parser.c), you will need [`tree-sitter-cli`](https://docs.rs/tree-sitter-cli/latest/tree_sitter_cli/). 
 
-To avoid headaches due to mismatching versions, we use `tree-sitter-cli v0.24.7`
+To avoid headaches due to mismatching versions, we use `tree-sitter-cli v0.25.8`
 ```sh
-cargo install tree-sitter-cli@0.24.7
+cargo install tree-sitter-cli@0.25.8
 ```
 
 You can use the [tree-sitter-sus/tree.sh](tree-sitter-sus/tree.sh) script to regenerate the parser, and show some useful information about it. 
@@ -41,3 +41,6 @@ This can be done by simply re-running
 ./test.sus_regression.sh
 ```
 Afterwards, inspect the changes to [test.sus_output.txt](./test.sus_output.txt) and [test.sus_errors.txt](./test.sus_errors.txt) before committing. 
+
+## Debugging
+See [docs/debug.md](docs/debug.md).

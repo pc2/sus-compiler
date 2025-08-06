@@ -33,7 +33,7 @@ impl Linker {
         let resolved_globals = std::mem::take(&mut working_on_mut.resolved_globals);
 
         println!("{pass_name} {}", &working_on_mut.name);
-        crate::debug::panic_guard(
+        crate::debug::debug_context(
             pass_name,
             working_on_mut.name.clone(),
             &self.files[working_on_mut.file],

@@ -410,7 +410,7 @@ fn handle_request(
 
             let range = if let Some((location, info)) = get_selected_object(linker, file_uuid, pos)
             {
-                if config().lsp_debug_mode {
+                if crate::debug::is_enabled("lsp-debug") {
                     hover_list.push(MarkedString::String(format!("{info:?}")))
                 } else {
                     hover_list = hover(info, linker, file_data);

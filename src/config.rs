@@ -39,10 +39,15 @@ pub struct StandaloneCodegenSettings {
 pub struct ConfigStruct {
     pub use_lsp: bool,
     #[allow(unused)]
-    pub lsp_debug_mode: bool,
-    #[allow(unused)]
     pub lsp_port: u16,
     pub codegen: bool,
+    pub standalone: Option<StandaloneCodegenSettings>,
+    pub use_color: bool,
+    pub ci: bool,
+    pub target_language: TargetLanguage,
+    pub files: Vec<PathBuf>,
+    pub sus_home_override: Option<PathBuf>,
+
     /// Enable debugging printouts and figures
     ///
     /// If an element in this list is a substring of a [crate::debug::SpanDebugger] message, then debugging is enabled.
@@ -53,13 +58,7 @@ pub struct ConfigStruct {
     pub debug_whitelist: Vec<String>,
     pub kill_timeout: std::time::Duration,
     pub enabled_debug_paths: HashSet<String>,
-    pub standalone: Option<StandaloneCodegenSettings>,
     pub early_exit: EarlyExitUpTo,
-    pub use_color: bool,
-    pub ci: bool,
-    pub target_language: TargetLanguage,
-    pub files: Vec<PathBuf>,
-    pub sus_home_override: Option<PathBuf>,
     pub no_redump: bool,
 }
 
@@ -91,31 +90,6 @@ fn command_builder() -> Command {
             .long("lsp")
             .help("Enable LSP mode")
             .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("lsp-debug")
-            .long("lsp-debug")
-            .hide(true)
-            .help("Enable LSP debug mode")
-            .requires("lsp")
-            .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("debug")
-            .long("debug")
-            .hide(true)
-            .help("Enable specific debug paths for specific modules. Path names are found by searching for crate::debug::is_enabled in the source code. ")
-            .action(clap::ArgAction::Append))
-        .arg(Arg::new("debug-whitelist")
-            .long("debug-whitelist")
-            .hide(true)
-            .help("Enable debug prints and figures for specific modules.\nDebugging checks if the current debug stage print has one of the debug-whitelist arguments as a substring. So passing 'FIFO' debugs all FIFO stuff, but passing 'Typechecking FIFO' only shows debug prints during typechecking. To show everything, pass --debug-whitelist-is-blacklist")
-            .action(clap::ArgAction::Append))
-        .arg(Arg::new("kill-timeout")
-            .long("kill-timeout")
-            .hide(true)
-            .help("Sets how long (in seconds) an individual part of the compiler can take, before terminating. Set to 0 to disable")
-            .action(clap::ArgAction::Set)
-            .default_value("0.0")
-            .value_parser(|duration : &str| -> Result<Duration, String> {
-                Ok(Duration::from_secs_f64(duration.parse::<f64>().map_err(|e| e.to_string())?))
-            }))
         .arg(Arg::new("codegen")
             .long("codegen")
             .help("Enable code generation for all modules. This creates a file named [ModuleName].sv per module.")
@@ -179,6 +153,26 @@ fn command_builder() -> Command {
                 }
             })
         )
+        // Debug stuff
+        .arg(Arg::new("debug")
+            .long("debug")
+            .hide(true)
+            .help("Enable specific debug paths for specific modules. Path names are found by searching for crate::debug::is_enabled in the source code. ")
+            .action(clap::ArgAction::Append))
+        .arg(Arg::new("debug-whitelist")
+            .long("debug-whitelist")
+            .hide(true)
+            .help("Enable debug prints and figures for specific modules.\nDebugging checks if the current debug stage print has one of the debug-whitelist arguments as a substring. So passing 'FIFO' debugs all FIFO stuff, but passing 'Typechecking FIFO' only shows debug prints during typechecking. To show everything, pass --debug-whitelist-is-blacklist")
+            .action(clap::ArgAction::Append))
+        .arg(Arg::new("kill-timeout")
+            .long("kill-timeout")
+            .hide(true)
+            .help("Sets how long (in seconds) an individual part of the compiler can take, before terminating. Set to 0 to disable")
+            .action(clap::ArgAction::Set)
+            .default_value("0.0")
+            .value_parser(|duration : &str| -> Result<Duration, String> {
+                Ok(Duration::from_secs_f64(duration.parse::<f64>().map_err(|e| e.to_string())?))
+            }))
         .arg(Arg::new("no-redump")
             .long("no-redump")
             .hide(true)
@@ -235,7 +229,6 @@ where
 
     Ok(ConfigStruct {
         use_lsp: matches.get_flag("lsp"),
-        lsp_debug_mode: matches.get_flag("lsp-debug"),
         lsp_port: *matches.get_one("socket").unwrap(),
         codegen,
         debug_whitelist,
