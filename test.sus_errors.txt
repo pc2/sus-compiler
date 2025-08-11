@@ -2710,7 +2710,7 @@ Error: 'BITWIDTH' is not a valid template argument of FIFO
      │
      ├─[ xpm.sus:54:8 ]
      │
-  54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+  54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
      │        ──┬─  
      │          ╰─── 'FIFO' defined here
 ─────╯
@@ -7471,7 +7471,7 @@ Error: 'READY_SLACK' is not a valid template argument of FIFO
       │
       ├─[ xpm.sus:54:8 ]
       │
-   54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+   54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
       │        ──┬─  
       │          ╰─── 'FIFO' defined here
 ──────╯
@@ -7710,18 +7710,18 @@ Warning: Used 'when' in a generative context, use 'if' instead
       │     ──┬─  
       │       ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
-Error: No such field 'ready' on FIFO #(T: type ?[...], DEPTH: _, MAY_PUSH_LATENCY: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
+Error: No such field 'ready' on FIFO #(T: type ?[...], DEPTH: _, MAY_PUSH_LATENCY: _, EXTRA_IN_FLIGHT: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
       ╭─[ test.sus:1157:12 ]
       │
  1157 │     when fifo.ready {
       │               ──┬──  
-      │                 ╰──── No such field 'ready' on FIFO #(T: type ?[...], DEPTH: _, MAY_PUSH_LATENCY: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
+      │                 ╰──── No such field 'ready' on FIFO #(T: type ?[...], DEPTH: _, MAY_PUSH_LATENCY: _, EXTRA_IN_FLIGHT: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
       │
       ├─[ xpm.sus:54:8 ]
       │
-   54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+   54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
       │        ──┬─  
-      │          ╰─── Module 'FIFO' defined here. module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY):
+      │          ╰─── Module 'FIFO' defined here. module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT):
 domain clk:
 action rst:
 domain write:
@@ -8601,7 +8601,7 @@ Error: 'READY_SLACK' is not a valid template argument of FIFO
       │
       ├─[ xpm.sus:54:8 ]
       │
-   54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+   54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
       │        ──┬─  
       │          ╰─── 'FIFO' defined here
 ──────╯
@@ -8903,10 +8903,3 @@ Error: Slice 4:3 has a negative length.
       │                                                     ─┬─  
       │                                                      ╰─── Slice 4:3 has a negative length.
 ──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-    ╭─[ xpm.sus:54:22 ]
-    │
- 54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
-    │                      ──┬──  
-    │                        ╰──── Unused Variable: This variable does not affect the output ports of this module
-────╯
