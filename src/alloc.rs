@@ -1,10 +1,10 @@
 use std::{
-    cmp::Ordering,
     fmt::{Debug, Formatter},
     hash::{Hash, Hasher},
     iter::Enumerate,
     marker::PhantomData,
     ops::{Index, IndexMut},
+    slice::GetDisjointMutError,
 };
 
 use crate::append_only_vec::AppendOnlyVec;
@@ -347,13 +347,13 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
             .map(|(id, _)| id)
     }
     #[track_caller]
-    pub fn get2_mut(
+    pub fn get_disjoint_mut<const N: usize>(
         &mut self,
-        UUID(uuid_a, _): UUID<IndexMarker>,
-        UUID(uuid_b, _): UUID<IndexMarker>,
-    ) -> Option<(&mut T, &mut T)> {
-        get2_mut(&mut self.data, uuid_a, uuid_b)
-            .map(|(a, b)| (a.as_mut().unwrap(), b.as_mut().unwrap()))
+        ids: [UUID<IndexMarker>; N],
+    ) -> Result<[&mut T; N], GetDisjointMutError> {
+        let indices: [usize; N] = ids.map(|id| id.0);
+        let many = self.data.get_disjoint_mut(indices)?;
+        Ok(many.map(|r| r.as_mut().unwrap()))
     }
 }
 
@@ -575,21 +575,6 @@ impl<T, IndexMarker> Default for FlatAlloc<T, IndexMarker> {
     }
 }
 
-/// TODO replace once get_many_mut stabilizes (In Rust 1.86 apparently)
-pub fn get2_mut<T>(slice: &mut [T], a: usize, b: usize) -> Option<(&mut T, &mut T)> {
-    match b.cmp(&a) {
-        Ordering::Equal => None,
-        Ordering::Less => {
-            let (l, r) = slice.split_at_mut(a);
-            Some((&mut r[0], &mut l[b]))
-        }
-        Ordering::Greater => {
-            let (l, r) = slice.split_at_mut(b);
-            Some((&mut l[a], &mut r[0]))
-        }
-    }
-}
-
 impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     pub const EMPTY_FLAT_ALLOC: Self = Self::new();
 
@@ -754,13 +739,14 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     pub fn range_since(&self, id: UUID<IndexMarker>) -> UUIDRange<IndexMarker> {
         UUIDRange(id, UUID(self.data.len(), PhantomData))
     }
-    /// TODO replace once get_many_mut stabilizes
-    pub fn get2_mut(
+
+    #[track_caller]
+    pub fn get_disjoint_mut<const N: usize>(
         &mut self,
-        id_a: UUID<IndexMarker>,
-        id_b: UUID<IndexMarker>,
-    ) -> Option<(&mut T, &mut T)> {
-        get2_mut(&mut self.data, id_a.0, id_b.0)
+        ids: [UUID<IndexMarker>; N],
+    ) -> Result<[&mut T; N], GetDisjointMutError> {
+        let indices: [usize; N] = ids.map(|id| id.0);
+        self.data.get_disjoint_mut(indices)
     }
     pub fn get(&self, id: UUID<IndexMarker>) -> Option<&T> {
         self.data.get(id.0)

@@ -582,7 +582,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         }
 
         for (target, root) in selects_to_check {
-            let (target, root) = self.wires.get2_mut(target, root).unwrap();
+            let [target, root] = self.wires.get_disjoint_mut([target, root]).unwrap();
             let_unwrap!(
                 RealWireDataSource::Select { root: _, path },
                 &mut target.source

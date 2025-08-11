@@ -223,17 +223,19 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
             (Unifyable::Unknown(idx_a), Unifyable::Unknown(idx_b)) => {
                 let idx_a = self.store.ptrs[*idx_a];
                 let idx_b = self.store.ptrs[*idx_b];
-                match self.store.known_values.get2_mut(idx_a, idx_b) {
-                    Some((
-                        KnownValue::Unknown {
-                            backrefs: backrefs_a,
-                            used_in: used_in_a,
-                        },
-                        KnownValue::Unknown {
-                            backrefs: backrefs_b,
-                            used_in: used_in_b,
-                        },
-                    )) => {
+                match self.store.known_values.get_disjoint_mut([idx_a, idx_b]) {
+                    Ok(
+                        [
+                            KnownValue::Unknown {
+                                backrefs: backrefs_a,
+                                used_in: used_in_a,
+                            },
+                            KnownValue::Unknown {
+                                backrefs: backrefs_b,
+                                used_in: used_in_b,
+                            },
+                        ],
+                    ) => {
                         if backrefs_a.len() > backrefs_b.len() {
                             // Merge into a
                             merge_vec_into(used_in_a, std::mem::take(used_in_b));
@@ -253,7 +255,12 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
                         }
                         true
                     }
-                    Some((KnownValue::Unknown { backrefs, used_in }, KnownValue::Known(_))) => {
+                    Ok(
+                        [
+                            KnownValue::Unknown { backrefs, used_in },
+                            KnownValue::Known(_),
+                        ],
+                    ) => {
                         // Resolve references to a to point to b
                         for v in &*backrefs {
                             self.store.ptrs[*v] = idx_b;
@@ -267,7 +274,12 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
                         self.store.known_values.free(idx_a);
                         true
                     }
-                    Some((KnownValue::Known(_), KnownValue::Unknown { backrefs, used_in })) => {
+                    Ok(
+                        [
+                            KnownValue::Known(_),
+                            KnownValue::Unknown { backrefs, used_in },
+                        ],
+                    ) => {
                         // Resolve references to b to point to a
                         for v in &*backrefs {
                             self.store.ptrs[*v] = idx_a;
@@ -281,8 +293,8 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
                         self.store.known_values.free(idx_b);
                         true
                     }
-                    Some((KnownValue::Known(x), KnownValue::Known(y))) => x == y,
-                    None => true,
+                    Ok([KnownValue::Known(x), KnownValue::Known(y)]) => x == y,
+                    Err(_) => true,
                 }
             }
         }

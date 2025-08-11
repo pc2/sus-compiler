@@ -39,7 +39,7 @@ impl<T: Debug + Clone> Debug for Interior<T> {
 ///
 /// - [UniCell] starts out [UniCell::UNKNOWN]. No interior references can be taken in this state. (But the type variable we refer to *can* be updated)
 /// - At some point, it is set to some Known value. After this point references to this interior value can be taken.
-///     Afterwards, we can *never* reset a Known back to an Unknown, or mess with it in any mutable way. (Panics when trying otherwise)
+///   Afterwards, we can *never* reset a Known back to an Unknown, or mess with it in any mutable way. (Panics when trying otherwise)
 pub struct UniCell<T: Debug + Clone>(UnsafeCell<Interior<T>>);
 
 impl<T: Debug + Clone> Debug for UniCell<T> {
