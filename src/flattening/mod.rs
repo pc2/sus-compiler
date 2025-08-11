@@ -19,7 +19,7 @@ pub use initialization::gather_initial_file_data;
 use crate::linker::{Documentation, LinkInfo};
 use crate::value::Value;
 
-use crate::typing::template::{TVec, TemplateArg, TemplateKind};
+use crate::typing::template::{TVec, TemplateKind};
 
 /// Modules are compiled in 4 stages. All modules must pass through each stage before advancing to the next stage.
 ///
@@ -849,29 +849,6 @@ pub struct WrittenTemplateArg {
     pub value_span: Span,
     pub refers_to: OnceCell<TemplateID>,
     pub kind: Option<TemplateKind<WrittenType, FlatID>>,
-}
-
-pub type AbstractTemplateArg = TemplateKind<TemplateArg<WrittenType>, TemplateArg<FlatID>>;
-
-impl AbstractTemplateArg {
-    pub fn map_is_provided(&self) -> Option<(Span, Span, TemplateKind<&WrittenType, &FlatID>)> {
-        match self {
-            TemplateKind::Type(TemplateArg::Provided {
-                name_span,
-                value_span,
-                arg,
-                ..
-            }) => Some((*name_span, *value_span, TemplateKind::Type(arg))),
-            TemplateKind::Value(TemplateArg::Provided {
-                name_span,
-                value_span,
-                arg,
-                ..
-            }) => Some((*name_span, *value_span, TemplateKind::Value(arg))),
-            TemplateKind::Type(TemplateArg::NotProvided { .. }) => None,
-            TemplateKind::Value(TemplateArg::NotProvided { .. }) => None,
-        }
-    }
 }
 
 /// The textual representation of a type expression in the source code.

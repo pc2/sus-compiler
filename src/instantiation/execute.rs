@@ -513,269 +513,126 @@ struct InterfaceWires {
     interface_span: Span,
 }
 
-trait Concretizer {
-    fn get_type(&mut self, id: TemplateID) -> ConcreteType;
-    fn get_value(&mut self, expr: FlatID) -> ExecutionResult<UnifyableValue>;
-    fn alloc_unknown(&mut self) -> UnifyableValue;
-}
-
-struct LocalTypeConcretizer<'substitutor, 'linker> {
-    template_args: &'linker TVec<ConcreteTemplateArg>,
-    generation_state: &'linker GenerationState<'linker>,
-    type_substitutor: &'substitutor mut ValueUnifierAlloc,
-}
-impl Concretizer for LocalTypeConcretizer<'_, '_> {
-    fn get_type(&mut self, id: TemplateID) -> ConcreteType {
-        self.template_args[id].unwrap_type().clone()
-    }
-    fn get_value(&mut self, expr: FlatID) -> ExecutionResult<UnifyableValue> {
-        Ok(self
-            .generation_state
-            .get_generation_value(expr)?
-            .clone()
-            .into())
-    }
-
-    fn alloc_unknown(&mut self) -> UnifyableValue {
-        self.type_substitutor.alloc_unknown()
-    }
-}
-struct SubModuleTypeConcretizer<'substitutor, 'linker> {
-    submodule_template_args: &'linker TVec<ConcreteTemplateArg>,
-    instructions: &'linker FlatAlloc<Instruction, FlatIDMarker>,
-    type_substitutor: &'substitutor mut ValueUnifierAlloc,
-}
-impl Concretizer for SubModuleTypeConcretizer<'_, '_> {
-    fn get_type(&mut self, id: TemplateID) -> ConcreteType {
-        self.submodule_template_args[id].unwrap_type().clone()
-    }
-
-    /// Part of Template Value Inference.
-    ///
-    /// Specifically, for code like this:
-    ///
-    /// ```sus
-    /// module add_all #(int Size) {
-    ///     input int[Size] arr // We're targeting the 'Size' within the array size
-    ///     output int total
-    /// }
-    /// ```
-    fn get_value(&mut self, expr: FlatID) -> ExecutionResult<UnifyableValue> {
-        let expr = self.instructions[expr].unwrap_expression();
-        Ok(match &expr.source {
-            ExpressionSource::WireRef(wr) => {
-                if !wr.path.is_empty() {
-                    return Ok(self.type_substitutor.alloc_unknown());
-                } // Must be a plain, no fuss reference to a de
-                let WireReferenceRoot::LocalDecl(wire_declaration) = &wr.root else {
-                    return Ok(self.type_substitutor.alloc_unknown());
-                };
-                let template_arg_decl = self.instructions[*wire_declaration].unwrap_declaration();
-                let DeclarationKind::TemplateParameter(template_id) = &template_arg_decl.decl_kind
-                else {
-                    return Ok(self.type_substitutor.alloc_unknown());
-                };
-                self.submodule_template_args[*template_id]
-                    .unwrap_value()
-                    .clone()
-            }
-            ExpressionSource::Literal(cst) => cst.clone().into(),
-            _ => self.type_substitutor.alloc_unknown(),
-        })
-    }
-
-    fn alloc_unknown(&mut self) -> UnifyableValue {
-        self.type_substitutor.alloc_unknown()
-    }
-}
-
-fn concretize_global_ref<ID: Copy + Into<GlobalUUID>>(
-    linker: &Linker,
-    global_ref: &GlobalReference<ID>,
-    concretizer: &mut impl Concretizer,
-) -> ExecutionResult<ConcreteGlobalReference<ID>> {
-    let target: &LinkInfo = &linker.globals[global_ref.id.into()];
-    let template_args = target.template_parameters.try_map2(
-        &global_ref.template_arg_types,
-        |(param_id, param, abs_typ)| -> ExecutionResult<ConcreteTemplateArg> {
-            Ok(match &param.kind {
-                TemplateKind::Type(_) => {
-                    let wr_typ = global_ref.get_type_arg_for(param_id);
-                    let abs_typ = abs_typ.unwrap_type();
-                    TemplateKind::Type(concretize_type_recurse(
-                        linker,
-                        &abs_typ.inner,
-                        &abs_typ.rank,
-                        wr_typ,
-                        concretizer,
-                    )?)
-                }
-                TemplateKind::Value(_) => {
-                    TemplateKind::Value(if let Some(v) = global_ref.get_value_arg_for(param_id) {
-                        concretizer.get_value(v)?
-                    } else {
-                        concretizer.alloc_unknown()
-                    })
-                }
-            })
-        },
-    )?;
-    Ok(ConcreteGlobalReference {
-        id: global_ref.id,
-        template_args,
-    })
-}
-
-fn concretize_type_recurse(
-    linker: &Linker,
-    inner: &AbstractInnerType,
-    rank: &PeanoType,
-    wr_typ: Option<&WrittenType>,
-    concretizer: &mut impl Concretizer,
-) -> ExecutionResult<ConcreteType> {
-    Ok(match rank {
-        PeanoType::Zero => match inner {
-            AbstractInnerType::Template(id) => concretizer.get_type(*id),
-            AbstractInnerType::Named(name) => {
-                let target = &linker.types[name.id].link_info;
-                ConcreteType::Named(match wr_typ {
-                    Some(WrittenType::Named(wr_named)) => {
-                        assert_eq!(wr_named.id, name.id);
-                        concretize_global_ref(linker, wr_named, concretizer)?
-                    }
-                    None => ConcreteGlobalReference {
-                        id: name.id,
-                        template_args: target.template_parameters.map(|(_, arg)| match &arg.kind {
-                            TemplateKind::Type(_) => {
-                                todo!("Abstract Type Args aren't yet supported!")
-                            }
-                            TemplateKind::Value(_) => {
-                                TemplateKind::Value(concretizer.alloc_unknown())
-                            }
-                        }),
-                    },
-                    Some(t) => unreachable!(
-                        "Expected a Named Written type (PeanoType is Zero), but found {t:?}"
-                    ),
-                })
-            }
-            AbstractInnerType::Unknown(_) => {
-                unreachable!("Should have been resolved already!")
-            }
-            AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => {
-                unreachable!(
-                    "Cannot concretize an interface type. Only proper wire types are concretizeable! Should have been caught by typecheck!"
-                )
-            }
-        },
-        PeanoType::Succ(one_down) => {
-            let (new_wr_typ, size) = match wr_typ {
-                Some(WrittenType::Array(_span, arr)) => {
-                    let (content, arr_size, _) = arr.deref();
-                    (Some(content), concretizer.get_value(*arr_size)?)
-                }
-                None => (None, concretizer.alloc_unknown()),
-                Some(t) => unreachable!(
-                    "Expected an Array Written type (PeanoType is Succ(_)), but found {t:?}"
-                ),
-            };
-            ConcreteType::Array(Box::new((
-                concretize_type_recurse(linker, inner, one_down, new_wr_typ, concretizer)?,
-                size,
-            )))
-        }
-        PeanoType::Unknown(_) => {
-            caught_by_typecheck!("No PeanoType::Unknown should be left in execute!")
-        }
-    })
-}
-
 impl<'l> ExecutionContext<'l> {
-    fn alloc_array_dimensions_stack(&mut self, peano_type: &PeanoType) -> Vec<UnifyableValue> {
-        (0..peano_type.count().unwrap())
-            .map(|_| self.type_substitutor.alloc_unknown())
-            .collect()
-    }
-    /// Uses the current context to turn a [WrittenType] into a [ConcreteType].
-    ///
-    /// Failures are fatal.
-    fn concretize_type(
-        &mut self,
-        abs: &AbstractRankedType,
-        wr_typ: &WrittenType,
-    ) -> ExecutionResult<ConcreteType> {
-        let mut concretizer = LocalTypeConcretizer {
-            template_args: self.working_on_template_args,
-            generation_state: &self.generation_state,
-            type_substitutor: &mut self.type_substitutor,
-        };
-        concretize_type_recurse(
-            self.linker,
-            &abs.inner,
-            &abs.rank,
-            Some(wr_typ),
-            &mut concretizer,
-        )
-    }
-
     fn execute_global_ref<ID: Copy + Into<GlobalUUID>>(
         &mut self,
         global_ref: &GlobalReference<ID>,
     ) -> ExecutionResult<ConcreteGlobalReference<ID>> {
-        let mut concretizer = LocalTypeConcretizer {
-            template_args: self.working_on_template_args,
-            generation_state: &self.generation_state,
-            type_substitutor: &mut self.type_substitutor,
-        };
-        concretize_global_ref(self.linker, global_ref, &mut concretizer)
+        let target: &LinkInfo = &self.linker.globals[global_ref.id.into()];
+        let template_args = target.template_parameters.try_map2(
+            &global_ref.template_arg_types,
+            |(param_id, param, abs_typ)| -> ExecutionResult<ConcreteTemplateArg> {
+                Ok(match &param.kind {
+                    TemplateKind::Type(_) => {
+                        let wr_typ = global_ref.get_type_arg_for(param_id);
+                        let abs_typ = abs_typ.unwrap_type();
+                        TemplateKind::Type(self.concretize_type_recurse(
+                            &abs_typ.inner,
+                            &abs_typ.rank,
+                            wr_typ,
+                        )?)
+                    }
+                    TemplateKind::Value(_) => TemplateKind::Value(
+                        if let Some(v) = global_ref.get_value_arg_for(param_id) {
+                            self.generation_state
+                                .get_generation_value(v)?
+                                .clone()
+                                .into()
+                        } else {
+                            self.type_substitutor.alloc_unknown()
+                        },
+                    ),
+                })
+            },
+        )?;
+        Ok(ConcreteGlobalReference {
+            id: global_ref.id,
+            template_args,
+        })
     }
 
-    /// Uses the current context to turn a [AbstractRankedType] into a [ConcreteType].
-    ///
-    /// Failures as impossible as we don't need to read from [Self::generation_state]
-    fn concretize_type_no_written_reference(&mut self, abs: &AbstractRankedType) -> ConcreteType {
-        let mut concretizer = LocalTypeConcretizer {
-            template_args: self.working_on_template_args,
-            generation_state: &self.generation_state,
-            type_substitutor: &mut self.type_substitutor,
-        };
-        concretize_type_recurse(self.linker, &abs.inner, &abs.rank, None, &mut concretizer).unwrap()
-    }
-    /// Uses the current context to turn a [WrittenType] from a [SubModule] into a [ConcreteType].
-    ///
-    /// Cannot fail, since we're not using [Self::generation_state]
-    fn concretize_submodule_port_type(
-        type_substitutor: &mut ValueUnifierAlloc,
-        linker: &Linker,
-        submodule_port: &Port,
-        submodule_template_args: &TVec<ConcreteTemplateArg>,
-        submodule_link_info: &LinkInfo,
-    ) -> (ConcreteType, bool) {
-        match &submodule_link_info.instructions[submodule_port.declaration_instruction] {
-            Instruction::Declaration(submodule_decl) => {
-                let mut concretizer = SubModuleTypeConcretizer {
-                    submodule_template_args,
-                    instructions: &submodule_link_info.instructions,
-                    type_substitutor,
-                };
-                let typ = concretize_type_recurse(
-                    linker,
-                    &submodule_decl.typ.inner,
-                    &submodule_decl.typ.rank,
-                    Some(&submodule_decl.typ_expr),
-                    &mut concretizer,
-                )
-                .unwrap();
-                (typ, false)
-            }
-            Instruction::Interface(interface_decl) => match interface_decl.interface_kind {
-                InterfaceKind::RegularInterface => {
-                    unreachable!("Non-conditional interfaces can't have condition")
+    fn concretize_type_recurse(
+        &mut self,
+        inner: &AbstractInnerType,
+        rank: &PeanoType,
+        wr_typ: Option<&WrittenType>,
+    ) -> ExecutionResult<ConcreteType> {
+        Ok(match rank {
+            PeanoType::Zero => match inner {
+                AbstractInnerType::Template(id) => {
+                    self.working_on_template_args[*id].unwrap_type().clone()
                 }
-                InterfaceKind::Action(_) | InterfaceKind::Trigger(_) => (ConcreteType::BOOL, true),
+                AbstractInnerType::Named(name) => {
+                    let target = &self.linker.types[name.id].link_info;
+                    ConcreteType::Named(match wr_typ {
+                        Some(WrittenType::Named(wr_named)) => {
+                            assert_eq!(wr_named.id, name.id);
+                            self.execute_global_ref(wr_named)?
+                        }
+                        None => ConcreteGlobalReference {
+                            id: name.id,
+                            template_args: target.template_parameters.map(|(_, arg)| {
+                                match &arg.kind {
+                                    TemplateKind::Type(_) => {
+                                        todo!("Abstract Type Args aren't yet supported!")
+                                    }
+                                    TemplateKind::Value(_) => {
+                                        TemplateKind::Value(self.type_substitutor.alloc_unknown())
+                                    }
+                                }
+                            }),
+                        },
+                        Some(t) => unreachable!(
+                            "Expected a Named Written type (PeanoType is Zero), but found {t:?}"
+                        ),
+                    })
+                }
+                AbstractInnerType::Unknown(_) => {
+                    unreachable!("Should have been resolved already!")
+                }
+                AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => {
+                    unreachable!(
+                        "Cannot concretize an interface type. Only proper wire types are concretizeable! Should have been caught by typecheck!"
+                    )
+                }
             },
-            _ => unreachable!("Ports can only point to Declaration or InterfaceDeclaration"),
-        }
+            PeanoType::Succ(one_down) => {
+                let (new_wr_typ, size) = match wr_typ {
+                    Some(WrittenType::Array(_span, arr)) => {
+                        let (content, arr_size, _) = arr.deref();
+                        (
+                            Some(content),
+                            self.generation_state
+                                .get_generation_value(*arr_size)?
+                                .clone()
+                                .into(),
+                        )
+                    }
+                    None => (None, self.type_substitutor.alloc_unknown()),
+                    Some(t) => unreachable!(
+                        "Expected an Array Written type (PeanoType is Succ(_)), but found {t:?}"
+                    ),
+                };
+                ConcreteType::Array(Box::new((
+                    self.concretize_type_recurse(inner, one_down, new_wr_typ)?,
+                    size,
+                )))
+            }
+            PeanoType::Unknown(_) => {
+                caught_by_typecheck!("No PeanoType::Unknown should be left in execute!")
+            }
+        })
+    }
+
+    /// Uses the current context to turn a [AbstractRankedType] + maybe [WrittenType] into a [ConcreteType].
+    ///
+    /// When no [WrittenType] is provided, this cannot error
+    fn concretize_type(
+        &mut self,
+        abs: &AbstractRankedType,
+        wr_typ: Option<&WrittenType>,
+    ) -> ExecutionResult<ConcreteType> {
+        self.concretize_type_recurse(&abs.inner, &abs.rank, wr_typ)
     }
 
     fn evaluate_builtin_constant(
@@ -1227,22 +1084,43 @@ impl<'l> ExecutionContext<'l> {
                 },
                 Direction::Output => RealWireDataSource::ReadOnly,
             };
-            let (typ, is_condition) = Self::concretize_submodule_port_type(
-                &mut self.type_substitutor,
-                self.linker,
-                port_data,
-                &submod_instance.refers_to.template_args,
-                &submod_md.link_info,
-            );
+
             let original_instruction = submod_instance.original_instruction;
+            let name = self
+                .unique_name_producer
+                .get_unique_name(format!("_{}_{}", submod_instance.name, port_data.name));
+
+            let (typ, is_condition) = match &submod_md.link_info.instructions
+                [port_data.declaration_instruction]
+            {
+                Instruction::Declaration(submodule_decl) => {
+                    let original_global_ref =
+                        submod_instance.get_original_global_ref(&self.link_info.instructions);
+                    let substituted_type = submodule_decl
+                        .typ
+                        .substitute_template_args(&original_global_ref.template_arg_types);
+
+                    // We don't pass the WrittenType of the port declaration, because we want fresh variables such that
+                    let typ = self.concretize_type(&substituted_type, None).unwrap();
+                    (typ, false)
+                }
+                Instruction::Interface(interface_decl) => match interface_decl.interface_kind {
+                    InterfaceKind::RegularInterface => {
+                        unreachable!("Non-conditional interfaces can't have condition")
+                    }
+                    InterfaceKind::Action(_) | InterfaceKind::Trigger(_) => {
+                        (ConcreteType::BOOL, true)
+                    }
+                },
+                _ => unreachable!("Ports can only point to Declaration or InterfaceDeclaration"),
+            };
+
             let new_wire = self.wires.alloc(RealWire {
                 source,
                 original_instruction,
                 domain,
                 typ,
-                name: self
-                    .unique_name_producer
-                    .get_unique_name(format!("_{}_{}", submod_instance.name, port_data.name)),
+                name,
                 specified_latency: AbsLat::UNKNOWN,
                 absolute_latency: AbsLat::UNKNOWN,
                 is_port: None,
@@ -1399,6 +1277,11 @@ impl<'l> ExecutionContext<'l> {
         }
     }
 
+    fn alloc_array_dimensions_stack(&mut self, peano_type: &PeanoType) -> Vec<UnifyableValue> {
+        (0..peano_type.count().unwrap())
+            .map(|_| self.type_substitutor.alloc_unknown())
+            .collect()
+    }
     fn expression_to_real_wire(
         &mut self,
         expression: &'l Expression,
@@ -1442,7 +1325,7 @@ impl<'l> ExecutionContext<'l> {
                 let func_expr =
                     self.link_info.instructions[fc.func_wire_ref].unwrap_subexpression();
                 let_unwrap!(ExpressionSource::WireRef(f_wr), &func_expr.source);
-                let func_interface = self.get_interface(f_wr, original_instruction, domain)?;
+                let func_interface = self.get_interface(f_wr, fc.func_wire_ref, domain)?;
 
                 if let Some(condition) = func_interface.condition_wire {
                     let true_wire = self.alloc_bool(true, original_instruction, domain);
@@ -1477,7 +1360,8 @@ impl<'l> ExecutionContext<'l> {
             }
         };
         let typ = self
-            .concretize_type_no_written_reference(expression.as_single_output_expr().unwrap().typ);
+            .concretize_type(expression.as_single_output_expr().unwrap().typ, None)
+            .unwrap();
         Ok(vec![self.wires.alloc(RealWire {
             name: self.unique_name_producer.get_unique_name(""),
             typ,
@@ -1503,7 +1387,7 @@ impl<'l> ExecutionContext<'l> {
         wire_decl: &Declaration,
         original_instruction: FlatID,
     ) -> ExecutionResult<SubModuleOrWire> {
-        let typ = self.concretize_type(&wire_decl.typ, &wire_decl.typ_expr)?;
+        let typ = self.concretize_type(&wire_decl.typ, Some(&wire_decl.typ_expr))?;
 
         Ok(if wire_decl.decl_kind.is_generative() {
             let value: Value =
@@ -1800,7 +1684,7 @@ impl<'l> ExecutionContext<'l> {
                             let_unwrap!(ExpressionSource::WireRef(interface), &wr_expr.source);
                             let domain = wr_expr.domain.unwrap_physical();
                             let trig_interface =
-                                self.get_interface(interface, original_instruction, domain)?;
+                                self.get_interface(interface, if_stm.condition, domain)?;
 
                             self.condition_stack.push(ConditionStackElem {
                                 condition_wire: trig_interface.condition_wire.unwrap(),
