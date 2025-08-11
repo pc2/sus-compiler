@@ -602,7 +602,9 @@ impl ModuleTypingContext<'_> {
             let typ_str = typ.display(&self.linker.globals).to_string().red();
             let domain_name = domain.display(&self.md.domains);
             let name = name.green();
-            print!("{name}: {is_port_str}{typ_str}'{absolute_latency} {domain_name} [{original_instruction:?}]");
+            print!(
+                "{name}: {is_port_str}{typ_str}'{absolute_latency} {domain_name} [{original_instruction:?}]"
+            );
             match source {
                 RealWireDataSource::ReadOnly => println!(" = ReadOnly"),
                 RealWireDataSource::Multiplexer { is_state, sources } => {

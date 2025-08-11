@@ -1,6 +1,6 @@
 use std::{borrow::Cow, path::PathBuf};
 
-use dot::{render, Edges, GraphWalk, Id, LabelText, Labeller, Nodes, Style};
+use dot::{Edges, GraphWalk, Id, LabelText, Labeller, Nodes, Style, render};
 
 use crate::{
     alloc::FlatAlloc,

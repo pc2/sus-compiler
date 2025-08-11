@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 
 use quote::{quote, quote_spanned};
 use regex::Regex;
-use syn::{parse_macro_input, LitStr};
+use syn::{LitStr, parse_macro_input};
 
 #[proc_macro]
 pub fn kind(token_stream: TokenStream) -> TokenStream {

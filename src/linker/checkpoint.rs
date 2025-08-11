@@ -69,7 +69,8 @@ impl Linker {
             let link_info = &mut self.globals[*id];
 
             let expected_checkpoint = link_info.checkpoints.len();
-            assert!(expected_checkpoint == checkpoint_id,
+            assert!(
+                expected_checkpoint == checkpoint_id,
                 "In {}: The new checkpoint is not what was expected. The new checkpoint was {}, whereas the expected next checkpoint is {}",
                 link_info.get_full_name(),
                 CHECKPOINT_NAMES[checkpoint_id],

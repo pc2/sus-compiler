@@ -16,9 +16,9 @@ use crate::value::Value;
 
 use ibig::IBig;
 use latency_algorithm::{
-    add_cycle_to_extra_fanin, infer_unknown_latency_edges, is_valid, solve_latencies, FanInOut,
-    LatencyCountingError, LatencyCountingPorts, LatencyInferenceCandidate, SpecifiedLatency,
-    ValueToInfer,
+    FanInOut, LatencyCountingError, LatencyCountingPorts, LatencyInferenceCandidate,
+    SpecifiedLatency, ValueToInfer, add_cycle_to_extra_fanin, infer_unknown_latency_edges,
+    is_valid, solve_latencies,
 };
 
 use self::list_of_lists::ListOfLists;
@@ -481,7 +481,9 @@ impl ModuleTypingContext<'_> {
                     first_write_desired_latency,
                     writes_involved.last().unwrap().to_latency,
                 );
-                let rest_of_message = format!(" part of a net-positive latency cycle of +{net_roundtrip_latency}\n\n{path_message}\nWhich conflicts with the starting latency");
+                let rest_of_message = format!(
+                    " part of a net-positive latency cycle of +{net_roundtrip_latency}\n\n{path_message}\nWhich conflicts with the starting latency"
+                );
 
                 /*let unique_write_instructions =
                     filter_unique_write_flats(&writes_involved, &self.md.link_info.instructions);
@@ -525,7 +527,12 @@ impl ModuleTypingContext<'_> {
                 for (port, a, b) in bad_ports {
                     let port_instr = self.wires[latency_node_meanings[port]].original_instruction;
                     let port_name_span = self.md.link_info.instructions[port_instr].get_span();
-                    error(port_name_span, format!("Cannot determine port latency. Options are {a} and {b}\nTry specifying an explicit latency or rework the module to remove this ambiguity"));
+                    error(
+                        port_name_span,
+                        format!(
+                            "Cannot determine port latency. Options are {a} and {b}\nTry specifying an explicit latency or rework the module to remove this ambiguity"
+                        ),
+                    );
                 }
             }
             LatencyCountingError::UnreachablePortInThisDomain { hit_and_not_hit } => {

@@ -1,18 +1,18 @@
 //! Latency Counting concerns three types of nodes:
 //! - Late nodes: These usually correspond to inputs. LC tries to make these as late as possible
 //! - Early nodes: Usually correspond to outputs. LC tries to make these as early as possible
-//!     (therby squeezing the inputs and outputs together as closely as possible)
+//!   (therby squeezing the inputs and outputs together as closely as possible)
 //! - Neutral nodes: These just need to get some absolute latency assigned.
-//!     LC will make these as early as possible, without affecting late nodes.
-//!     Neutral nodes not constrained by Late nodes get added in last, by a single backwards pass
+//!   LC will make these as early as possible, without affecting late nodes.
+//!   Neutral nodes not constrained by Late nodes get added in last, by a single backwards pass
 //!
 //! Latency counting works in two stages:
 //! - First we start from the ports (the early and late nodes).
-//!     From here we try to discover other ports, by walking the dependency graph
-//!     Any ports we discover must be unambiguously reachable at the exact same absolute latency from other ports
+//!   From here we try to discover other ports, by walking the dependency graph
+//!   Any ports we discover must be unambiguously reachable at the exact same absolute latency from other ports
 //! - Once we have found all ports, and no port reports a conflicting latency, we can fill in the internal latencies
-//!     This starts from the late ports, and seeds them with the found latencies.
-//!     From here it keeps all the found latencies, such that the resulting latencies are all as early as possible.
+//!   This starts from the late ports, and seeds them with the found latencies.
+//!   From here it keeps all the found latencies, such that the resulting latencies are all as early as possible.
 
 use std::collections::VecDeque;
 
@@ -552,7 +552,9 @@ fn print_latency_test_case(
     println!("    let inputs = {:?};", ports.inputs());
     println!("    let outputs = {:?};", ports.outputs());
     println!("    let specified_latencies = {specified_latencies:?};");
-    println!("    let _found_latencies = solve_latencies_test_case(&fanins, &inputs, &outputs, &specified_latencies).unwrap();");
+    println!(
+        "    let _found_latencies = solve_latencies_test_case(&fanins, &inputs, &outputs, &specified_latencies).unwrap();"
+    );
     println!("}}");
     println!("==== END LATENCY TEST CASE ====");
 }
@@ -598,8 +600,12 @@ fn print_inference_test_case<ID>(
         println!("    let {id:?} = values_to_infer.alloc(ValueToInfer::new(()));");
     }
     println!("    let inference_edges = vec!{inference_edges:?};");
-    println!("    let partial_submodule_info = PartialSubmoduleInfo {{inference_edges, extra_fanin: Vec::new()}};");
-    println!("    infer_unknown_latency_edges(fanins, &ports, &specified_latencies, partial_submodule_info, &mut values_to_infer).unwrap();");
+    println!(
+        "    let partial_submodule_info = PartialSubmoduleInfo {{inference_edges, extra_fanin: Vec::new()}};"
+    );
+    println!(
+        "    infer_unknown_latency_edges(fanins, &ports, &specified_latencies, partial_submodule_info, &mut values_to_infer).unwrap();"
+    );
     println!("}}");
     println!("==== END INFERENCE TEST CASE ====");
 }
@@ -682,7 +688,10 @@ pub fn solve_latencies(
         let mut working_latencies = mem.make_solution_with_initial_values(specified_latencies);
         let mut no_bad_port_errors = Vec::new();
         working_latencies.merge_port_groups(&mut solution_seeds, ports, &mut no_bad_port_errors);
-        assert!(no_bad_port_errors.is_empty(), "Adding the specified latencies cannot create new bad port errors, because it only applies in the edge case that all specified ports are disjoint inputs, or outputs");
+        assert!(
+            no_bad_port_errors.is_empty(),
+            "Adding the specified latencies cannot create new bad port errors, because it only applies in the edge case that all specified ports are disjoint inputs, or outputs"
+        );
     }
 
     let mut final_solution = vec![UNSET; fanouts.len()];
@@ -725,11 +734,11 @@ pub fn solve_latencies(
         solution.explore_all_connected_nodes(&fanins, &fanouts);
 
         // Of course, all other specified latencies are in the exact same solution
-        if let Some(representative) = specified_latencies.first() {
-            if is_valid(solution.solution[representative.node]) {
-                solution.offset_to_pin_node_to(*representative);
-                seed_start -= SEPARATE_SEED_OFFSET;
-            }
+        if let Some(representative) = specified_latencies.first()
+            && is_valid(solution.solution[representative.node])
+        {
+            solution.offset_to_pin_node_to(*representative);
+            seed_start -= SEPARATE_SEED_OFFSET;
         }
 
         solution.copy_to(&mut final_solution);

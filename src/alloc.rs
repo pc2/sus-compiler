@@ -131,7 +131,7 @@ impl<IndexMarker> UUIDRange<IndexMarker> {
         self.len() == 0
     }
     pub fn contains(&self, id: UUID<IndexMarker>) -> bool {
-        self.0 .0 >= id.0 && self.1 .0 < id.0
+        self.0.0 >= id.0 && self.1.0 < id.0
     }
     pub fn iter(&self) -> UUIDRangeIter<IndexMarker> {
         self.into_iter()
@@ -156,17 +156,17 @@ impl<IndexMarker> UUIDRange<IndexMarker> {
         })
     }
     pub fn len(&self) -> usize {
-        self.1 .0 - self.0 .0
+        self.1.0 - self.0.0
     }
     pub fn unwrap_len_1(&self) -> UUID<IndexMarker> {
         assert!(self.len() == 1);
         self.0
     }
     pub fn first(&self) -> Option<UUID<IndexMarker>> {
-        (self.0 .0 < self.1 .0).then_some(self.0)
+        (self.0.0 < self.1.0).then_some(self.0)
     }
     pub fn last(&self) -> Option<UUID<IndexMarker>> {
-        (self.0 .0 < self.1 .0).then_some(UUID(self.1 .0 - 1, PhantomData))
+        (self.0.0 < self.1.0).then_some(UUID(self.1.0 - 1, PhantomData))
     }
 }
 
@@ -215,11 +215,11 @@ impl<IndexMarker> Iterator for UUIDRangeIter<IndexMarker> {
     type Item = UUID<IndexMarker>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.0 .0 == self.1 .0 {
+        if self.0.0 == self.1.0 {
             None
         } else {
-            let result = UUID(self.0 .0, PhantomData);
-            self.0 .0 += 1;
+            let result = UUID(self.0.0, PhantomData);
+            self.0.0 += 1;
             Some(result)
         }
     }
@@ -231,18 +231,18 @@ impl<IndexMarker> Iterator for UUIDRangeIter<IndexMarker> {
 
 impl<IndexMarker> ExactSizeIterator for UUIDRangeIter<IndexMarker> {
     fn len(&self) -> usize {
-        self.1 .0 - self.0 .0
+        self.1.0 - self.0.0
     }
 }
 
 impl<IndexMarker> UUIDRangeIter<IndexMarker> {
     pub fn skip_to(&mut self, to: UUID<IndexMarker>) {
-        assert!(to.0 >= self.0 .0);
-        assert!(to.0 <= self.1 .0);
+        assert!(to.0 >= self.0.0);
+        assert!(to.0 <= self.1.0);
         self.0 = to;
     }
     pub fn len(&self) -> usize {
-        self.1 .0 - self.0 .0
+        self.1.0 - self.0.0
     }
     pub fn is_empty(&self) -> bool {
         self.len() == 0
@@ -647,7 +647,10 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
         IndexMarker: UUIDMarker,
     {
         let found_id = self.alloc(value);
-        assert_eq!(id, found_id, "There was an element inserted between a call to [FlatAlloc::get_next_alloc_id] and [FlatAlloc::alloc_next_alloc_id]")
+        assert_eq!(
+            id, found_id,
+            "There was an element inserted between a call to [FlatAlloc::get_next_alloc_id] and [FlatAlloc::alloc_next_alloc_id]"
+        )
     }
     pub fn len(&self) -> usize {
         self.data.len()
@@ -948,12 +951,12 @@ pub struct ZippedIterator<
 }
 
 impl<
-        IDMarker,
-        OA,
-        OB,
-        IterA: Iterator<Item = (UUID<IDMarker>, OA)>,
-        IterB: Iterator<Item = (UUID<IDMarker>, OB)>,
-    > Iterator for ZippedIterator<IDMarker, OA, OB, IterA, IterB>
+    IDMarker,
+    OA,
+    OB,
+    IterA: Iterator<Item = (UUID<IDMarker>, OA)>,
+    IterB: Iterator<Item = (UUID<IDMarker>, OB)>,
+> Iterator for ZippedIterator<IDMarker, OA, OB, IterA, IterB>
 {
     type Item = (UUID<IDMarker>, OA, OB);
 
@@ -996,14 +999,14 @@ pub struct ZippedIterator3<
 }
 
 impl<
-        IDMarker,
-        OA,
-        OB,
-        OC,
-        IterA: Iterator<Item = (UUID<IDMarker>, OA)>,
-        IterB: Iterator<Item = (UUID<IDMarker>, OB)>,
-        IterC: Iterator<Item = (UUID<IDMarker>, OC)>,
-    > Iterator for ZippedIterator3<IDMarker, OA, OB, OC, IterA, IterB, IterC>
+    IDMarker,
+    OA,
+    OB,
+    OC,
+    IterA: Iterator<Item = (UUID<IDMarker>, OA)>,
+    IterB: Iterator<Item = (UUID<IDMarker>, OB)>,
+    IterC: Iterator<Item = (UUID<IDMarker>, OC)>,
+> Iterator for ZippedIterator3<IDMarker, OA, OB, OC, IterA, IterB, IterC>
 {
     type Item = (UUID<IDMarker>, OA, OB, OC);
 

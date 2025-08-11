@@ -24,7 +24,7 @@ use crate::{
     linker::FileData,
 };
 
-use tree_walk::{get_selected_object, InGlobal, LocationInfo};
+use tree_walk::{InGlobal, LocationInfo, get_selected_object};
 
 use self::tree_walk::RefersTo;
 
@@ -287,10 +287,10 @@ fn for_each_local_reference_in_global(
 ) -> Vec<Span> {
     let mut ref_locations = Vec::new();
     tree_walk::visit_all_in_module(linker, obj_id, |span, info| {
-        if let LocationInfo::InGlobal(_, _, f_id, _) = info {
-            if local == f_id {
-                ref_locations.push(span);
-            }
+        if let LocationInfo::InGlobal(_, _, f_id, _) = info
+            && local == f_id
+        {
+            ref_locations.push(span);
         }
     });
     ref_locations
@@ -626,7 +626,9 @@ fn main_loop(
 }
 
 pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
-    std::env::set_var("RUST_BACKTRACE", "1"); // Enable backtrace because I can't set it in Env vars
+    unsafe {
+        std::env::set_var("RUST_BACKTRACE", "1");
+    } // Enable backtrace because I can't set it in Env vars
 
     println!("starting LSP server");
 

@@ -10,7 +10,7 @@ use crate::flattening::{
     Declaration, DomainInfo, Instruction, Interface, InterfaceDeclaration, Module, Port,
     SubModuleInstance,
 };
-use crate::linker::{checkpoint::ErrorCheckpoint, FileData, LinkInfo};
+use crate::linker::{FileData, LinkInfo, checkpoint::ErrorCheckpoint};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ErrorLevel {
@@ -63,7 +63,7 @@ impl ErrorStore {
     }
 
     pub fn take(&mut self) -> Self {
-        std::mem::replace(self, ErrorStore::new())
+        std::mem::take(self)
     }
 
     pub fn checkpoint(&self) -> ErrorCheckpoint {
@@ -375,7 +375,9 @@ impl ErrorInfoObject for Instruction {
             Instruction::Declaration(decl) => decl.make_info(file),
             Instruction::Interface(decl) => decl.make_info(file),
             Instruction::Expression(_) => None,
-            _ => unreachable!("At least there shouldn't be cases where we're referring to something other than SubModule or Declaration")
+            _ => unreachable!(
+                "At least there shouldn't be cases where we're referring to something other than SubModule or Declaration"
+            ),
         }
     }
 }

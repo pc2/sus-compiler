@@ -1,7 +1,7 @@
 use sus_proc_macro::{field, kind, kw};
 
-use crate::linker::passes::ResolvedGlobals;
 use crate::linker::IsExtern;
+use crate::linker::passes::ResolvedGlobals;
 use crate::prelude::*;
 
 use crate::flattening::Module;

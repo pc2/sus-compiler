@@ -179,13 +179,13 @@ impl<'l> ModuleTypingContext<'l> {
                     }
                 }
                 RealWireDataSource::Multiplexer { is_state, sources } => {
-                    if let Some(is_state) = is_state {
-                        if !is_state.is_of_type(&w.typ) {
-                            self.errors.error(
-                                w.get_span(self.link_info),
-                                "Wire's initial value is not a subtype of the wire's type!",
-                            );
-                        }
+                    if let Some(is_state) = is_state
+                        && !is_state.is_of_type(&w.typ)
+                    {
+                        self.errors.error(
+                            w.get_span(self.link_info),
+                            "Wire's initial value is not a subtype of the wire's type!",
+                        );
                     }
                     for s in sources {
                         self.check_wire_ref_bounds(&w.typ, &s.to_path);

@@ -12,7 +12,7 @@ use crate::linker::IsExtern;
 use crate::linker::{GlobalUUID, LinkInfo};
 use crate::prelude::*;
 use crate::typing::abstract_type::{
-    AbstractInnerType, AbstractRankedType, PeanoType, BOOL_SCALAR, INT_SCALAR,
+    AbstractInnerType, AbstractRankedType, BOOL_SCALAR, INT_SCALAR, PeanoType,
 };
 use crate::typing::concrete_type::ConcreteTemplateArg;
 use crate::typing::domain_type::DomainType;
@@ -24,7 +24,7 @@ use ibig::{IBig, UBig};
 use sus_proc_macro::get_builtin_const;
 
 use crate::flattening::*;
-use crate::value::{compute_binary_op, compute_unary_op, Value};
+use crate::value::{Value, compute_binary_op, compute_unary_op};
 
 use crate::typing::{concrete_type::ConcreteType, template::TemplateKind};
 
@@ -247,7 +247,12 @@ impl GenerationState<'_> {
                         if from_len != slice_len {
                             let from = slice.start;
                             let to = slice.end;
-                            return Err((span, format!("Attempting to write to this slice {from}:{to} (length {slice_len}) with an array of length {from_len}.")));
+                            return Err((
+                                span,
+                                format!(
+                                    "Attempting to write to this slice {from}:{to} (length {slice_len}) with an array of length {from_len}."
+                                ),
+                            ));
                         }
                         for new_pair in zip_eq(&mut target[slice.clone()], value.into_iter()) {
                             new_targets.push(new_pair)
@@ -649,13 +654,19 @@ fn concretize_type_recurse(
                             }
                         }),
                     },
-                    Some(t) => unreachable!("Expected a Named Written type (PeanoType is Zero), but found {t:?}"),
+                    Some(t) => unreachable!(
+                        "Expected a Named Written type (PeanoType is Zero), but found {t:?}"
+                    ),
                 })
             }
             AbstractInnerType::Unknown(_) => {
                 unreachable!("Should have been resolved already!")
             }
-            AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => unreachable!("Cannot concretize an interface type. Only proper wire types are concretizeable! Should have been caught by typecheck!")
+            AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => {
+                unreachable!(
+                    "Cannot concretize an interface type. Only proper wire types are concretizeable! Should have been caught by typecheck!"
+                )
+            }
         },
         PeanoType::Succ(one_down) => {
             let (new_wr_typ, size) = match wr_typ {
@@ -663,8 +674,10 @@ fn concretize_type_recurse(
                     let (content, arr_size, _) = arr.deref();
                     (Some(content), concretizer.get_value(*arr_size)?)
                 }
-                None  => (None, concretizer.alloc_unknown()),
-                Some(t) => unreachable!("Expected an Array Written type (PeanoType is Succ(_)), but found {t:?}"),
+                None => (None, concretizer.alloc_unknown()),
+                Some(t) => unreachable!(
+                    "Expected an Array Written type (PeanoType is Succ(_)), but found {t:?}"
+                ),
             };
             ConcreteType::Array(Box::new((
                 concretize_type_recurse(linker, inner, one_down, new_wr_typ, concretizer)?,
@@ -1121,7 +1134,12 @@ impl<'l> ExecutionContext<'l> {
         const_span: Span,
     ) -> ExecutionResult<WireID> {
         if value.contains_unset() {
-            return Err((const_span, format!("This compile-time value was not fully resolved by the time it needed to be converted to a wire: {value}")));
+            return Err((
+                const_span,
+                format!(
+                    "This compile-time value was not fully resolved by the time it needed to be converted to a wire: {value}"
+                ),
+            ));
         }
         Ok(self.wires.alloc(RealWire {
             typ: value
@@ -1668,11 +1686,11 @@ impl<'l> ExecutionContext<'l> {
         expr: &'l Expression,
         original_instruction: FlatID,
     ) -> ExecutionResult<SubModuleOrWire> {
-        if let ExpressionOutput::SubExpression(typ) = &expr.output {
-            if typ.inner.is_interface() {
-                // Interface execution is up to whoever calls it
-                return Ok(SubModuleOrWire::Unassigned);
-            }
+        if let ExpressionOutput::SubExpression(typ) = &expr.output
+            && typ.inner.is_interface()
+        {
+            // Interface execution is up to whoever calls it
+            return Ok(SubModuleOrWire::Unassigned);
         }
         Ok(match expr.domain.get() {
             DomainType::Generative => {

@@ -4,7 +4,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 use std::ops::Deref;
 
-use crate::alloc::{ArenaAllocator, UUIDAllocator, UUIDMarker, UUID};
+use crate::alloc::{ArenaAllocator, UUID, UUIDAllocator, UUIDMarker};
 use crate::append_only_vec::AppendOnlyVec;
 use crate::prelude::*;
 
@@ -346,13 +346,12 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
         let constr_id = self.constraints.reserve();
         let mut num_unknown_dependencies = 0;
         for d in dependencies {
-            if let Unifyable::Unknown(var_id) = d {
-                if let KnownValue::Unknown { used_in, .. } =
+            if let Unifyable::Unknown(var_id) = d
+                && let KnownValue::Unknown { used_in, .. } =
                     &mut self.store.known_values[self.store.ptrs[*var_id]]
-                {
-                    num_unknown_dependencies += 1;
-                    used_in.push(constr_id);
-                }
+            {
+                num_unknown_dependencies += 1;
+                used_in.push(constr_id);
             }
         }
         ConstraintReservation(constr_id, num_unknown_dependencies)

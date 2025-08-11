@@ -14,20 +14,23 @@ impl FinalizationContext {
                     }
                 }
                 Instruction::Declaration(declaration) => {
-                    assert!(declaration
-                        .domain
-                        .get_mut()
-                        .fully_substitute(&self.domain_checker));
+                    assert!(
+                        declaration
+                            .domain
+                            .get_mut()
+                            .fully_substitute(&self.domain_checker)
+                    );
                 }
                 Instruction::Expression(expr) => {
                     assert!(expr.domain.get_mut().fully_substitute(&self.domain_checker));
 
                     if let ExpressionOutput::MultiWrite(writes) = &mut expr.output {
                         for w in writes {
-                            assert!(w
-                                .target_domain
-                                .get_mut()
-                                .fully_substitute(&self.domain_checker));
+                            assert!(
+                                w.target_domain
+                                    .get_mut()
+                                    .fully_substitute(&self.domain_checker)
+                            );
                         }
                     }
                 }
@@ -126,14 +129,13 @@ impl<'l> TypeCheckingContext<'l> {
                             WriteModifiers::Connection { .. } => {
                                 if let Some(condition_domain) =
                                     self.get_condition_domain(expression.parent_condition)
+                                    && target_domain.0 != DomainType::Generative
                                 {
-                                    if target_domain.0 != DomainType::Generative {
-                                        self.unify_physicals(
-                                            target_domain,
-                                            condition_domain,
-                                            "the runtime condition",
-                                        );
-                                    }
+                                    self.unify_physicals(
+                                        target_domain,
+                                        condition_domain,
+                                        "the runtime condition",
+                                    );
                                 }
                             }
                             WriteModifiers::Initial { initial_kw_span } => {
@@ -224,13 +226,13 @@ impl<'l> TypeCheckingContext<'l> {
     ///
     /// But the domains behave differently.
     /// - Reading:
-    ///     The domains combine to form the lowest common denominator.
-    ///     If all are generative this becomes generative
-    ///     At least one non-generative domain makes the whole thing non-generative
-    ///     It should be supplied with a generative output_typ domain when generative, and an unknown domain variable otherwise
+    ///   The domains combine to form the lowest common denominator.
+    ///   If all are generative this becomes generative
+    ///   At least one non-generative domain makes the whole thing non-generative
+    ///   It should be supplied with a generative output_typ domain when generative, and an unknown domain variable otherwise
     /// - Writing:
-    ///     The output_typ domain should be generative when wire_ref.root is generative, or a generative value is required such as with "initial"
-    ///     When wire_ref.root is not generative, it should be an unknown domain variable
+    ///   The output_typ domain should be generative when wire_ref.root is generative, or a generative value is required such as with "initial"
+    ///   When wire_ref.root is not generative, it should be an unknown domain variable
     fn get_wireref_root_domain(&mut self, wire_ref: &WireReference) -> Option<DomainType> {
         match &wire_ref.root {
             WireReferenceRoot::LocalDecl(id) => {

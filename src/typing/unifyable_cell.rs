@@ -17,7 +17,9 @@ impl<T: Debug + Clone> Clone for Interior<T> {
             Self::Known(arg0) => Self::Known(arg0.clone()),
             Self::SubstitutesTo(var) => Self::SubstitutesTo(*var),
             Self::Unallocated => {
-                unreachable!("Cannot clone Unallocated! That would add an incorrect dependency! Use [Substitutor::clone_type] instead!")
+                unreachable!(
+                    "Cannot clone Unallocated! That would add an incorrect dependency! Use [Substitutor::clone_type] instead!"
+                )
             }
         }
     }
@@ -93,7 +95,9 @@ impl<T: Debug + Clone> UniCell<T> {
             // Careful here! If we use the &mut for the check, then we've technically created UB between here and the panic. That's why we have to use a *const _, and only create the mutable ref when we're sure no shares exist
             let content = unsafe { &*context_ptr_while_maybe_shared };
             if !matches!(content, Interior::Unallocated) {
-                unreachable!("`set_initial({v:?})` on a UniCell that's not in the Unallocated state ({content:?})!");
+                unreachable!(
+                    "`set_initial({v:?})` on a UniCell that's not in the Unallocated state ({content:?})!"
+                );
             }
         }
 

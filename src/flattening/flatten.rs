@@ -1,7 +1,7 @@
 use std::cell::OnceCell;
 use std::num::NonZeroU16;
 
-use crate::alloc::{ArenaAllocator, UUIDRange, UUID};
+use crate::alloc::{ArenaAllocator, UUID, UUIDRange};
 
 use crate::linker::passes::{GlobalResolver, LinkerPass};
 use crate::prelude::*;
@@ -336,8 +336,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             .error(
                                 span,
                                 format!(
-                                "This is not a {accepted_text}, it is a local variable instead!"
-                            ),
+                                    "This is not a {accepted_text}, it is a local variable instead!"
+                                ),
                             )
                             .info_obj_same_file(&self.instructions[instr]);
 
@@ -1458,12 +1458,12 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     fn parse_domain(&mut self, cursor: &mut Cursor<'c>) {
         let (domain_name_span, domain_name) =
             cursor.field_span(field!("name"), kind!("identifier"));
-        if self.domains.is_empty() {
-            if let Some(existing_port) = self.ports.iter().next() {
-                // Sad Path: Having ports on the implicit clk domain is not allowed.
-                self.errors.error(domain_name_span, "When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.")
+        if self.domains.is_empty()
+            && let Some(existing_port) = self.ports.iter().next()
+        {
+            // Sad Path: Having ports on the implicit clk domain is not allowed.
+            self.errors.error(domain_name_span, "When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.")
                         .info_same_file(existing_port.1.decl_span, "A domain should be explicitly defined before this port");
-            }
         }
         let domain_id = self.domains.alloc(DomainInfo {
             name: domain_name.to_owned(),
@@ -1514,7 +1514,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     /// See [Self::flatten_standalone_decls]
     /// Two cases:
     /// - Left side of assignment:
-    ///     No modules, Yes write modifiers, Only assignable expressions
+    ///   No modules, Yes write modifiers, Only assignable expressions
     fn flatten_assignment_left_side(&mut self, cursor: &mut Cursor<'c>) -> Vec<WriteTo> {
         cursor.collect_list(kind!("assign_left_side"), |cursor| {
             cursor.go_down(kind!("assign_to"), |cursor| {
@@ -1548,7 +1548,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
     /// See [Self::flatten_assignment_left_side]
     /// - Standalone declarations:
-    ///     Yes modules, No write modifiers, Yes expressions (-> single expressions)
+    ///   Yes modules, No write modifiers, Yes expressions (-> single expressions)
     fn flatten_standalone_decls(&mut self, cursor: &mut Cursor<'c>) {
         let mut is_first_item = true;
         cursor.list(kind!("assign_left_side"), |cursor| {
@@ -1869,9 +1869,9 @@ fn flatten_global(pass: &mut LinkerPass, errors: &ErrorCollector, cursor: &mut C
     }
 
     let (md, globals) = pass.get_with_context();
-    if let GlobalObj::Module(md) = md {
-        if crate::debug::is_enabled("print-abstract-pre-typecheck") {
-            md.print_flattened_module(cursor.file_data, globals.globals);
-        }
+    if let GlobalObj::Module(md) = md
+        && crate::debug::is_enabled("print-abstract-pre-typecheck")
+    {
+        md.print_flattened_module(cursor.file_data, globals.globals);
     }
 }

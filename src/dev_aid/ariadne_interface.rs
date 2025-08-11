@@ -88,7 +88,9 @@ pub fn compile_all(file_paths: Vec<PathBuf>) -> (Linker, FileSourcesManager) {
             Ok(file_text) => file_text,
             Err(reason) => {
                 let file_path_disp = file_path.display();
-                panic!("Could not open file '{file_path_disp}' for syntax highlighting because {reason}")
+                panic!(
+                    "Could not open file '{file_path_disp}' for syntax highlighting because {reason}"
+                )
             }
         };
 

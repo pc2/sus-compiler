@@ -513,7 +513,7 @@ mod tests {
         instantiation::SubModulePort,
         latency::{
             latency_algorithm::{
-                infer_unknown_latency_edges, mk_fan, FanInOut, LatencyCountingPorts,
+                FanInOut, LatencyCountingPorts, infer_unknown_latency_edges, mk_fan,
             },
             list_of_lists::ListOfLists,
         },

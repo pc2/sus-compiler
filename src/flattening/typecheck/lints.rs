@@ -295,13 +295,12 @@ impl LintContext<'_> {
         for (instr_id, instr) in &self.working_on.instructions {
             match instr {
                 Instruction::Expression(expr) => {
-                    if let ExpressionSource::WireRef(wr) = &expr.source {
-                        if let WireReferenceRoot::NamedConstant(cst) = &wr.root {
-                            if cst.id == get_builtin_const!("assert") {
-                                is_instance_used_map[instr_id] = true;
-                                wire_to_explore_queue.push(instr_id);
-                            }
-                        }
+                    if let ExpressionSource::WireRef(wr) = &expr.source
+                        && let WireReferenceRoot::NamedConstant(cst) = &wr.root
+                        && cst.id == get_builtin_const!("assert")
+                    {
+                        is_instance_used_map[instr_id] = true;
+                        wire_to_explore_queue.push(instr_id);
                     }
                 }
                 Instruction::Declaration(decl) => {
@@ -325,10 +324,10 @@ impl LintContext<'_> {
 
         // Now produce warnings from the unused list
         for (id, inst) in self.working_on.instructions.iter() {
-            if !is_instance_used_map[id] {
-                if let Instruction::Declaration(decl) = inst {
-                    self.errors.warn(decl.name_span, "Unused Variable: This variable does not affect the output ports of this module");
-                }
+            if !is_instance_used_map[id]
+                && let Instruction::Declaration(decl) = inst
+            {
+                self.errors.warn(decl.name_span, "Unused Variable: This variable does not affect the output ports of this module");
             }
         }
     }

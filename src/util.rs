@@ -83,8 +83,7 @@ macro_rules! let_unwrap {
         // First try matching by reference to avoid consuming
         let __val = $val;
         #[allow(unused_variables)]
-        let $pat = &__val
-        else {
+        let $pat = &__val else {
             panic!(
                 "let_unwrap! failed: expected {}, found {:?}",
                 stringify!($pat),
@@ -104,8 +103,7 @@ macro_rules! unwrap_variant {
         // First try matching by reference to avoid consuming
         let __val = $val;
         #[allow(unused_variables)]
-        let $variant(__content) = &__val
-        else {
+        let $variant(__content) = &__val else {
             panic!(
                 "let_unwrap! failed: expected {}(_), found {:?}",
                 stringify!($variant),

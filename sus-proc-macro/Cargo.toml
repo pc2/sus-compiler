@@ -3,14 +3,14 @@ name = "sus-proc-macro"
 description = "Proc-macros for use in the sus-compiler"
 version = "0.3.0-devel"
 authors = ["Lennart Van Hirtum <lennart.vanhirtum@gmail.com>"]
-edition = "2021"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/pc2/sus-compiler"
 homepage = "https://github.com/pc2/sus-compiler"
 readme = "README.md"
 keywords = ["sus", "fpga", "hdl", "proc-macro", "tree-sitter"]
 categories = ["compilers", "text-processing"]
-rust-version = "1.78"
+edition = "2024"
+rust-version = "1.89"
 
 [dependencies]
 

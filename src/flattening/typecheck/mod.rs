@@ -5,8 +5,8 @@ mod type_check;
 use crate::{
     alloc::UUIDAllocator,
     linker::{
-        passes::{GlobalResolver, LinkerPass},
         GlobalObj,
+        passes::{GlobalResolver, LinkerPass},
     },
     typing::type_inference::{
         AbstractTypeSubstitutor, FailedUnification, TypeSubstitutor, TypeUnifier,
@@ -63,9 +63,10 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
             UUIDAllocator::new_start_from(md.domains.get_next_alloc_id());
         for (_, d) in domain_checker.iter() {
             if d.get().is_none() {
-                assert!(d
-                    .set(DomainType::Physical(leftover_domain_alloc.alloc()))
-                    .is_ok());
+                assert!(
+                    d.set(DomainType::Physical(leftover_domain_alloc.alloc()))
+                        .is_ok()
+                );
             }
         }
     }
@@ -122,7 +123,12 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
         let expected_name = expected.display(globals.globals, link_info).to_string();
         let found_name = found.display(globals.globals, link_info).to_string();
         errors
-            .error(span, format!("Typing Error: {context} expects '{expected_name}' but was given '{found_name}'"))
+            .error(
+                span,
+                format!(
+                    "Typing Error: {context} expects '{expected_name}' but was given '{found_name}'"
+                ),
+            )
             .add_info_list(infos);
 
         assert_ne!(found, expected);

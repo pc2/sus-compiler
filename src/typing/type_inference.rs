@@ -7,7 +7,7 @@ use std::ops::{BitAnd, BitAndAssign, Deref, DerefMut};
 use crate::errors::ErrorInfo;
 use crate::prelude::*;
 
-use crate::alloc::{zip_eq, UUIDMarker, UUID};
+use crate::alloc::{UUID, UUIDMarker, zip_eq};
 use crate::typing::abstract_type::AbstractGlobalReference;
 use crate::typing::domain_type::DomainType;
 use crate::typing::template::TemplateKind;
@@ -142,7 +142,10 @@ impl<MyType: HindleyMilner> TypeSubstitutor<MyType> {
     /// but immediately apply substitutions to [Self::substitution_map]
     #[must_use]
     fn unify(&self, a: &MyType, b: &MyType) -> UnifyResult {
-        let result = match (a.get_hm_info(), b.get_hm_info(), a, b) {
+        // Very expensive, only enable if there are issues
+        //#[cfg(debug_assertions)]
+        //self.check_no_unknown_loop();
+        match (a.get_hm_info(), b.get_hm_info(), a, b) {
             (HindleyMilnerInfo::TypeVar(a_var), HindleyMilnerInfo::TypeVar(b_var), _, _) => {
                 if a_var == b_var {
                     UnifyResult::Success // Same var, all ok
@@ -173,12 +176,7 @@ impl<MyType: HindleyMilner> TypeSubstitutor<MyType> {
                     self.try_fill_empty_var(v, tf)
                 }
             }
-        };
-
-        // Very expensive, only enable if there are issues
-        //#[cfg(debug_assertions)]
-        //self.check_no_unknown_loop();
-        result
+        }
     }
 
     /// Used for sanity-checking. The graph of Unknown nodes must be non-cyclical, such that we don't create infinite types
@@ -433,9 +431,11 @@ impl HindleyMilner for DomainType {
 
     fn get_hm_info(&self) -> HindleyMilnerInfo<DomainID, DomainVariableIDMarker> {
         match self {
-            DomainType::Generative => unreachable!("No explicit comparisons with Generative Possible. These should be filtered out first"),
+            DomainType::Generative => unreachable!(
+                "No explicit comparisons with Generative Possible. These should be filtered out first"
+            ),
             DomainType::Physical(domain_id) => HindleyMilnerInfo::TypeFunc(*domain_id),
-            DomainType::Unknown(var) => HindleyMilnerInfo::TypeVar(*var)
+            DomainType::Unknown(var) => HindleyMilnerInfo::TypeVar(*var),
         }
     }
 

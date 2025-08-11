@@ -3,10 +3,10 @@ use std::path::{Path, PathBuf};
 
 use crate::config::EarlyExitUpTo;
 use crate::flattening::typecheck::{perform_lints, typecheck};
+use crate::linker::GlobalObj;
 use crate::linker::checkpoint::{
     AFTER_FLATTEN_CP, AFTER_INITIAL_PARSE_CP, AFTER_LINTS_CP, AFTER_TYPE_CHECK_CP,
 };
-use crate::linker::GlobalObj;
 use crate::prelude::*;
 use crate::typing::concrete_type::ConcreteGlobalReference;
 
@@ -138,10 +138,12 @@ impl Linker {
         info_mngr: &mut ExtraInfoManager,
     ) -> FileUUID {
         // File doesn't yet exist
-        assert!(!self
-            .files
-            .iter()
-            .any(|fd| fd.1.file_identifier == file_identifier));
+        assert!(
+            !self
+                .files
+                .iter()
+                .any(|fd| fd.1.file_identifier == file_identifier)
+        );
 
         let mut parser = Parser::new();
         parser.set_language(&tree_sitter_sus::language()).unwrap();

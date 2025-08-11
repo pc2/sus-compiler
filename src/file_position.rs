@@ -87,7 +87,7 @@ impl BracketSpan {
     }
     pub fn inner_span(&self) -> Span {
         self.0.debug();
-        Span(self.0 .0 + 1, self.0 .1 - 1).debug()
+        Span(self.0.0 + 1, self.0.1 - 1).debug()
     }
     pub fn outer_span(&self) -> Span {
         self.0.debug();
@@ -95,11 +95,11 @@ impl BracketSpan {
     }
     pub fn open_bracket(&self) -> Span {
         self.0.debug();
-        Span(self.0 .0, self.0 .0 + 1).debug()
+        Span(self.0.0, self.0.0 + 1).debug()
     }
     pub fn close_bracket(&self) -> Span {
         self.0.debug();
-        Span(self.0 .1 - 1, self.0 .1).debug()
+        Span(self.0.1 - 1, self.0.1).debug()
     }
 }
 

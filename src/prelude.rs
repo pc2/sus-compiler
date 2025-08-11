@@ -26,7 +26,7 @@ pub use sus_proc_macro::__debug_breakpoint_if;
 
 // private imports, for the IDs
 
-use crate::alloc::{UUIDMarker, UUIDRange, UUID};
+use crate::alloc::{UUID, UUIDMarker, UUIDRange};
 
 // Global IDs
 

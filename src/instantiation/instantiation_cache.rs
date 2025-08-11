@@ -105,10 +105,12 @@ impl Instantiator {
 
             let result_ref = Rc::new(result);
             let mut cache_borrow = self.cache.borrow_mut();
-            assert!(cache_borrow
-                .cache
-                .insert(global_ref, result_ref.clone())
-                .is_none());
+            assert!(
+                cache_borrow
+                    .cache
+                    .insert(global_ref, result_ref.clone())
+                    .is_none()
+            );
             result_ref
         };
 

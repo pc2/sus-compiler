@@ -506,7 +506,7 @@ impl Linker {
                     std::mem::replace::<Box<[GlobalUUID]>>(colission, Box::new([])).into_vec();
                 retain_vec.retain(|g| !to_remove_set.contains(g));
                 *colission = retain_vec.into_boxed_slice();
-                colission.len() > 0
+                !colission.is_empty()
             }
         });
 
@@ -521,8 +521,7 @@ impl Linker {
 
     pub fn with_file_builder(&mut self, file_id: FileUUID, f: impl FnOnce(FileBuilder<'_>)) {
         let mut associated_values = Vec::new();
-        let mut parsing_errors =
-            std::mem::replace(&mut self.files[file_id].parsing_errors, ErrorStore::new());
+        let mut parsing_errors = std::mem::take(&mut self.files[file_id].parsing_errors);
         let file_data = &self.files[file_id];
         let other_parsing_errors =
             ErrorCollector::from_storage(parsing_errors.take(), file_id, &self.files);

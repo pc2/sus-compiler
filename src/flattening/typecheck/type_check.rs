@@ -194,7 +194,7 @@ impl<'l> TypeCheckingContext<'l> {
                                 .set(PathElemRefersTo::Interface(md_ref.id, interface))
                                 .unwrap();
 
-                            let new_typ = if let Some(interface) = interface {
+                            if let Some(interface) = interface {
                                 if let Some(InterfaceDeclKind::SinglePort(port_decl)) =
                                     md.md.interfaces[interface].declaration_instruction
                                 {
@@ -227,9 +227,7 @@ impl<'l> TypeCheckingContext<'l> {
                                     .info_obj(obj);
 
                                 self.type_checker.alloc_unknown()
-                            };
-
-                            new_typ
+                            }
                         }
                         AbstractInnerType::Unknown(_) => self.type_checker.alloc_unknown(), // todo!("Structs")
                     }
@@ -491,7 +489,9 @@ impl<'l> TypeCheckingContext<'l> {
                 let interface = &submod.md.interfaces[*interface];
                 let Some(interface) = interface.declaration_instruction else {
                     let name = &interface.name;
-                    let err_text = format!("{context} expects this to be a callable interface, the interface `{name}` is not callable");
+                    let err_text = format!(
+                        "{context} expects this to be a callable interface, the interface `{name}` is not callable"
+                    );
                     self.errors
                         .error(wire_ref.get_total_span(), err_text)
                         .info_obj_different_file(interface, submod.md.link_info.file);
@@ -573,7 +573,9 @@ impl<'l> TypeCheckingContext<'l> {
                 out_typ
             }
             ExpressionSource::FuncCall(func_call) => {
-                if let Some(interface) = self.get_callable_func(func_call.func_wire_ref, "A function call") {
+                if let Some(interface) =
+                    self.get_callable_func(func_call.func_wire_ref, "A function call")
+                {
                     self.report_errors_for_bad_function_call(
                         func_call,
                         &interface,
@@ -597,7 +599,9 @@ impl<'l> TypeCheckingContext<'l> {
             ExpressionSource::Literal(value) => match value {
                 Value::Bool(_) => BOOL_SCALAR,
                 Value::Integer(_) => INT_SCALAR.clone(),
-                Value::Array(_) => unreachable!("Value::get_type_abs is only ever used for terminal Values, because any array instantiations would be Expression::ArrayConstruct"),
+                Value::Array(_) => unreachable!(
+                    "Value::get_type_abs is only ever used for terminal Values, because any array instantiations would be Expression::ArrayConstruct"
+                ),
                 Value::Unset => unreachable!(),
             },
             ExpressionSource::ArrayConstruct(arr) => {
@@ -771,7 +775,9 @@ impl<'l> TypeCheckingContext<'l> {
         if !matches!(&f.interface_kind, InterfaceKind::Trigger(_)) {
             let interface_name = &f.name;
             let kind_str = f.interface_kind.as_string();
-            let err = format!("Can only use conditional bindings on triggers. '{interface_name}' is an {kind_str}");
+            let err = format!(
+                "Can only use conditional bindings on triggers. '{interface_name}' is an {kind_str}"
+            );
             self.errors.error(condition_expr.span, err).info_obj(&trig);
         }
 

@@ -2,8 +2,8 @@ use std::{
     cell::RefCell,
     ops::Range,
     sync::{
-        atomic::{AtomicBool, AtomicPtr},
         Arc, LazyLock, Mutex,
+        atomic::{AtomicBool, AtomicPtr},
     },
     thread,
     time::{Duration, Instant},
@@ -69,7 +69,10 @@ fn print_most_recent_spans(file_data: &FileData, history: &SpanDebuggerStackElem
         }
     }
 
-    println!("Panic unwinding. Printing the last {} spans. BEWARE: These spans may not correspond to this file, thus incorrect spans are possible!", spans_to_print.len());
+    println!(
+        "Panic unwinding. Printing the last {} spans. BEWARE: These spans may not correspond to this file, thus incorrect spans are possible!",
+        spans_to_print.len()
+    );
     pretty_print_spans_in_reverse_order(file_data, spans_to_print);
 }
 
@@ -304,12 +307,13 @@ fn spawn_watchdog_thread() {
     if duration.is_zero() {
         return; // No watchdog
     }
-    thread::spawn(move || loop {
-        thread::sleep(Duration::from_millis(50));
+    thread::spawn(move || {
+        loop {
+            thread::sleep(Duration::from_millis(50));
 
-        let mut timers = WATCHDOG.lock().unwrap();
-        let now = Instant::now();
-        timers.retain(|entry| {
+            let mut timers = WATCHDOG.lock().unwrap();
+            let now = Instant::now();
+            timers.retain(|entry| {
             let deadline = entry.started_at + duration;
             if deadline <= now && entry.alive.load(std::sync::atomic::Ordering::SeqCst) {
                 println!("⏰⏰⏰⏰⏰⏰⏰⏰⏰"); // To show in stdout when this happens too
@@ -324,6 +328,7 @@ fn spawn_watchdog_thread() {
                 deadline > now
             }
         });
+        }
     });
 }
 

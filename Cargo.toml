@@ -3,14 +3,14 @@ name = "sus_compiler"
 description = "Compiler for the SUS Hardware Design Language"
 version = "0.3.0-devel"
 authors = ["Lennart Van Hirtum <lennart.vanhirtum@gmail.com>"]
-edition = "2021"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/pc2/sus-compiler"
 homepage = "https://github.com/pc2/sus-compiler"
 readme = "README.md"
 keywords = ["sus", "fpga", "vlsi", "hdl", "verilog"]
 categories = ["compilers", "text-processing"]
-rust-version = "1.80"
+edition = "2024"
+rust-version = "1.89"
 
 include = ["/src", "/std/*", "/README.md", "/LICENSE", "/CHANGELOG.md", "/build.rs", "/rustfmt.toml"]
 

@@ -29,7 +29,7 @@ use std::io::Write;
 use prelude::*;
 
 use codegen::{CodeGenBackend, VHDLCodegenBackend, VerilogCodegenBackend};
-use config::{config, initialize_config_from_cli_args, EarlyExitUpTo};
+use config::{EarlyExitUpTo, config, initialize_config_from_cli_args};
 use dev_aid::ariadne_interface::*;
 use flattening::Module;
 use instantiation::InstantiatedModule;

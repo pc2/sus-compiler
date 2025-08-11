@@ -511,7 +511,7 @@ pub enum ExpressionSource {
 /// We make the distinction between [SubExpression] that can only represent one output, and [MultiWrite], which can represent multiple outputs.
 /// Workarounds like putting multiple outputs together in a tuple would not work, because:
 /// - The function call syntax is just a convenient syntax sugar for connecting multiple inputs and outputs simultaneously.
-///     We want to conceptually keep the signals separate. Both input and output signals, while keeping the function call syntax that programmers are used to.
+///   We want to conceptually keep the signals separate. Both input and output signals, while keeping the function call syntax that programmers are used to.
 /// - Forcing all outputs together into one type would bind them together for latency counting, which we don't want
 /// - We refuse to have tuple types
 #[derive(Debug)]
@@ -727,7 +727,9 @@ pub struct FuncCall {
 
 impl FuncCall {
     pub fn could_be_at_compile_time(&self) -> bool {
-        todo!("self.name_span.is_none() but also other requirements, like if the module is a function")
+        todo!(
+            "self.name_span.is_none() but also other requirements, like if the module is a function"
+        )
     }
 }
 

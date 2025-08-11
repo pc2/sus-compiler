@@ -20,7 +20,7 @@ jobs:
         submodules: recursive
     - uses: actions-rs/toolchain@v1
       with:
-        toolchain: 1.82
+        toolchain: 1.89
         override: true
         components: rustfmt, clippy
     - name: Build
@@ -40,7 +40,7 @@ jobs:
         submodules: recursive
     - uses: actions-rs/toolchain@v1
       with:
-        toolchain: 1.82
+        toolchain: 1.89
         override: true
         components: rustfmt, clippy
     - name: format
