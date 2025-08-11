@@ -21,8 +21,8 @@ use std::fmt::{Display, Write};
 use std::rc::Rc;
 
 use crate::flattening::{
-    BinaryOperator, Direction, ExpressionSource, Instruction, Module, PartSelectDirection,
-    UnaryOperator,
+    BinaryOperator, Direction, Expression, ExpressionSource, GlobalReference, Instruction, Module,
+    PartSelectDirection, UnaryOperator, WireReference, WireReferenceRoot,
 };
 use crate::{errors::ErrorStore, value::Value};
 
@@ -172,14 +172,32 @@ impl SubModule {
     fn get_span(&self, link_info: &LinkInfo) -> Span {
         match &link_info.instructions[self.original_instruction] {
             Instruction::SubModule(sub_module_instance) => sub_module_instance.name_span,
-            Instruction::Expression(expression) => {
-                let ExpressionSource::FuncCall(fc) = &expression.source else {
-                    unreachable!()
-                };
-                let func_wire_ref_expr =
-                    link_info.instructions[fc.func_wire_ref].unwrap_expression();
-                func_wire_ref_expr.span
-            }
+            Instruction::Expression(Expression {
+                source:
+                    ExpressionSource::WireRef(WireReference {
+                        root: WireReferenceRoot::NamedModule(_),
+                        ..
+                    }),
+                span,
+                ..
+            }) => *span,
+            _ => unreachable!(),
+        }
+    }
+    fn get_original_global_ref<'linker>(
+        &self,
+        instructions: &'linker FlatAlloc<Instruction, FlatIDMarker>,
+    ) -> &'linker GlobalReference<ModuleUUID> {
+        match &instructions[self.original_instruction] {
+            Instruction::SubModule(sm) => &sm.module_ref,
+            Instruction::Expression(Expression {
+                source:
+                    ExpressionSource::WireRef(WireReference {
+                        root: WireReferenceRoot::NamedModule(md_ref),
+                        ..
+                    }),
+                ..
+            }) => md_ref,
             _ => unreachable!(),
         }
     }

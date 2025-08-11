@@ -96,6 +96,15 @@ impl AbstractRankedType {
             rank: PeanoType::Succ(Box::new(self.rank)),
         }
     }
+    pub fn rank_up_multi(self, cnt: usize) -> Self {
+        let mut cur = self;
+
+        for _ in 0..cnt {
+            cur = cur.rank_up()
+        }
+
+        cur
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -132,4 +141,49 @@ impl PeanoType {
 pub struct AbstractGlobalReference<ID> {
     pub id: ID,
     pub template_arg_types: TVec<TemplateKind<AbstractRankedType, ()>>,
+}
+
+impl AbstractRankedType {
+    pub fn substitute_template_args(
+        &self,
+        args: &TVec<TemplateKind<AbstractRankedType, ()>>,
+    ) -> Self {
+        match &self.inner {
+            // We don't recursively substitute the type we get from the template arg, because those are in a different namespace
+            AbstractInnerType::Template(id) => args[*id]
+                .unwrap_type()
+                .clone()
+                .rank_up_multi(self.rank.count_unwrap()),
+            AbstractInnerType::Named(named_ref) => AbstractRankedType {
+                inner: AbstractInnerType::Named(named_ref.substitute_template_args(args)),
+                rank: self.rank.clone(),
+            },
+            AbstractInnerType::Interface(module_ref, interface_id) => AbstractRankedType {
+                inner: AbstractInnerType::Interface(
+                    module_ref.substitute_template_args(args),
+                    *interface_id,
+                ),
+                rank: self.rank.clone(),
+            },
+            AbstractInnerType::LocalInterface(_) => self.clone(),
+            AbstractInnerType::Unknown(_) => unreachable!(),
+        }
+    }
+}
+
+impl<ID: Copy> AbstractGlobalReference<ID> {
+    pub fn substitute_template_args(
+        &self,
+        args: &TVec<TemplateKind<AbstractRankedType, ()>>,
+    ) -> Self {
+        let template_arg_types = self.template_arg_types.map(|(_, arg)| match arg {
+            TemplateKind::Type(t) => TemplateKind::Type(t.substitute_template_args(args)),
+            TemplateKind::Value(()) => TemplateKind::Value(()),
+        });
+
+        Self {
+            id: self.id,
+            template_arg_types,
+        }
+    }
 }
