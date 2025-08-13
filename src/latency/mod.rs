@@ -6,19 +6,14 @@ pub mod port_latency_inference;
 use std::fmt::{Debug, Display, Write};
 use std::{cmp::max, iter::zip};
 
+use crate::alloc::zip_eq;
 use crate::dev_aid::dot_graphs::display_latency_count_graph;
 use crate::errors::ErrorInfoObject;
 use crate::prelude::*;
-use crate::typing::value_unifier::ValueUnifierStore;
-use crate::{alloc::zip_eq, typing::value_unifier::ValueUnifier};
 
-use crate::value::Value;
-
-use ibig::IBig;
 use latency_algorithm::{
-    FanInOut, LatencyCountingError, LatencyCountingPorts, LatencyInferenceCandidate,
-    SpecifiedLatency, ValueToInfer, add_cycle_to_extra_fanin, infer_unknown_latency_edges,
-    is_valid, solve_latencies,
+    FanInOut, LatencyCountingError, LatencyCountingPorts, SpecifiedLatency,
+    add_cycle_to_extra_fanin, is_valid, solve_latencies,
 };
 
 use self::list_of_lists::ListOfLists;
@@ -128,22 +123,19 @@ fn make_path_info_string(
 }
 
 /// We do all Domains together, as this simplifies the code.
-#[derive(Default)]
 pub struct LatencyCountingProblem {
     pub map_wire_to_latency_node: FlatAlloc<usize, WireIDMarker>,
     pub map_latency_node_to_wire: Vec<WireID>,
 
     pub ports: LatencyCountingPorts,
     pub specified_latencies: Vec<SpecifiedLatency>,
-    pub inference_variables:
-        FlatAlloc<ValueToInfer<(SubModuleID, TemplateID)>, InferenceVarIDMarker>,
-    pub inference_edges: Vec<LatencyInferenceCandidate>,
-    // "to" comes first
+
+    /// "to" comes first
     pub edges: Vec<(usize, FanInOut)>,
 }
 
 impl LatencyCountingProblem {
-    fn new(ctx: &ModuleTypingContext, unifier: &ValueUnifierStore) -> Self {
+    fn new(ctx: &ModuleTypingContext) -> Self {
         let mut map_latency_node_to_wire = Vec::new();
         let mut specified_latencies = Vec::new();
 
@@ -185,25 +177,43 @@ impl LatencyCountingProblem {
                 });
         }
 
-        // Inference
-        let mut inference_variables = FlatAlloc::new();
-        let mut inference_edges = Vec::new();
-
+        // For reuse of memory
+        let mut cur_cycle = Vec::new();
         // Submodules
-        for (sm_id, sm) in &ctx.submodules {
-            let local_inference_edges = sm.get_interface_relative_latencies(
-                ctx.linker,
-                sm_id,
-                unifier,
-                &mut inference_variables,
-            );
+        for (_, sm) in &ctx.submodules {
+            let sm_md = &ctx.linker.modules[sm.refers_to.id];
 
-            local_inference_edges.apply_to_global_domain(
-                &sm.port_map,
-                &map_wire_to_latency_node,
-                &mut edges,
-                &mut inference_edges,
-            );
+            if let Some(instance) = sm.instance.get() {
+                // The module has already been instantiated, so we know all local absolute latencies
+                // No inference edges, No poison edges
+
+                for d in sm_md.domains.id_range() {
+                    for (_, port, wire) in
+                        crate::alloc::zip_eq(&instance.interface_ports, &sm.port_map)
+                    {
+                        if let (Some(port), Some(wire)) = (port, wire)
+                            && port.domain == d
+                        {
+                            let latency = port.absolute_latency.unwrap();
+                            let node = map_wire_to_latency_node[wire.maps_to_wire];
+                            cur_cycle.push(SpecifiedLatency { latency, node });
+                        }
+                    }
+                    add_cycle_to_extra_fanin(&cur_cycle, &mut edges);
+                    cur_cycle.clear();
+                }
+            } else {
+                for pg in &sm_md.inference_info.port_groups {
+                    for &(port_id, latency) in pg {
+                        if let Some(port) = &sm.port_map[port_id] {
+                            let node = map_wire_to_latency_node[port.maps_to_wire];
+                            cur_cycle.push(SpecifiedLatency { node, latency });
+                        }
+                    }
+                    add_cycle_to_extra_fanin(&cur_cycle, &mut edges);
+                    cur_cycle.clear();
+                }
+            }
         }
 
         // Finish up by adding a Specified Latencies cycle, because solve_latencies and inferernce expects that
@@ -214,8 +224,6 @@ impl LatencyCountingProblem {
             map_latency_node_to_wire,
             ports,
             specified_latencies,
-            inference_variables,
-            inference_edges,
             edges,
         }
     }
@@ -258,6 +266,49 @@ impl LatencyCountingProblem {
                 file_name,
             );
         }
+    }
+}
+
+pub struct LatencyInferenceProblem {
+    pub latency_count_problem: LatencyCountingProblem,
+    pub algo_inference_problem: latency_algorithm::LatencyInferenceProblem,
+}
+impl LatencyInferenceProblem {
+    pub fn new(ctx: &ModuleTypingContext) -> Option<Self> {
+        let mut lc = LatencyCountingProblem::new(ctx);
+
+        // Add poison edges
+        for (_, sm) in &ctx.submodules {
+            let sm_md = &ctx.linker.modules[sm.refers_to.id];
+            if sm.instance.get().is_none() {
+                for &(from, to) in &sm_md.inference_info.extra_poison {
+                    if let (Some(from), Some(to)) = (&sm.port_map[from], &sm.port_map[to]) {
+                        let to = lc.map_wire_to_latency_node[to.maps_to_wire];
+                        let from = lc.map_wire_to_latency_node[from.maps_to_wire];
+                        lc.edges.push((to, FanInOut::mk_poison(from)));
+                    }
+                }
+            }
+        }
+
+        let algo_inference_problem = latency_algorithm::LatencyInferenceProblem::new(
+            lc.make_fanins(),
+            &lc.ports,
+            &lc.specified_latencies,
+        )?;
+        Some(LatencyInferenceProblem {
+            algo_inference_problem,
+            latency_count_problem: lc,
+        })
+    }
+    pub fn infer(
+        &mut self,
+        from: WireID,
+        to: WireID,
+    ) -> Result<i64, latency_algorithm::InferenceFailure> {
+        let from = self.latency_count_problem.map_wire_to_latency_node[from];
+        let to = self.latency_count_problem.map_wire_to_latency_node[to];
+        self.algo_inference_problem.infer_max_edge_latency(from, to)
     }
 }
 
@@ -321,8 +372,8 @@ impl InstantiatedModule {
 impl ModuleTypingContext<'_> {
     // Returns a proper interface if all ports involved did not produce an error. If a port did produce an error then returns None.
     // Computes all latencies involved
-    pub fn compute_latencies(&mut self, unifier: &ValueUnifierStore) {
-        let mut problem = LatencyCountingProblem::new(self, unifier);
+    pub fn compute_latencies(&mut self) {
+        let mut problem = LatencyCountingProblem::new(self);
         // Remove all poisoned edges as solve_latencies doesn't deal with them
         problem.remove_poison_edges();
 
@@ -375,42 +426,6 @@ impl ModuleTypingContext<'_> {
             let port_wire = &self.wires[port.wire];
             port.absolute_latency = port_wire.absolute_latency;
             port.typ = port_wire.typ.clone();
-        }
-    }
-
-    pub fn infer_parameters_for_latencies<'inst>(&'inst self, unifier: &mut ValueUnifier<'inst>) {
-        let mut problem = LatencyCountingProblem::new(self, &unifier.store);
-        let fanins = problem.make_fanins();
-
-        problem.debug(
-            self,
-            None,
-            "dot-latency-infer",
-            "latency_inference_problem.dot",
-        );
-
-        // We don't need to report the error, they'll bubble up later anyway during [solve_latencies]
-        infer_unknown_latency_edges(
-            fanins,
-            &problem.ports,
-            &problem.specified_latencies,
-            &problem.inference_edges,
-            &mut problem.inference_variables,
-        );
-
-        for (_, var) in problem.inference_variables.into_iter() {
-            if let Some(inferred_value) = var.get() {
-                let _ = AbsLat::new(inferred_value); // Trigger the AbsLat too close to AbsLat::UNKNOWN assert
-                let (submod_id, arg_id) = var.back_reference;
-
-                // The value wasn't known before, now it is
-                unifier
-                    .set(
-                        self.submodules[submod_id].refers_to.template_args[arg_id].unwrap_value(),
-                        Value::Integer(IBig::from(inferred_value)),
-                    )
-                    .unwrap();
-            }
         }
     }
 

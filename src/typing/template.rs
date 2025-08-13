@@ -1,4 +1,3 @@
-use super::abstract_type::AbstractRankedType;
 use crate::prelude::*;
 use ibig::IBig;
 
@@ -116,39 +115,6 @@ pub struct GenerativeParameterKind {
 /// See [Parameter]
 #[derive(Debug)]
 pub struct TypeParameterKind {}
-
-/// An argument passed to a template parameter.
-///
-/// See [GlobalReference]
-///
-/// Not to be confused with [Parameter], which it is passed into.
-///
-/// When instantiated, this becomes a [ConcreteTemplateArg]
-#[derive(Debug)]
-pub enum TemplateArg<T> {
-    Provided {
-        name_span: Span,
-        value_span: Span,
-        arg: T,
-        abs_typ: AbstractRankedType,
-    },
-    NotProvided {
-        abs_typ: AbstractRankedType,
-    },
-}
-
-impl<T> TemplateArg<T> {
-    pub fn get_abstract_typ(&self) -> &AbstractRankedType {
-        match self {
-            TemplateArg::Provided { abs_typ, .. } | TemplateArg::NotProvided { abs_typ } => abs_typ,
-        }
-    }
-    pub fn get_abstract_typ_mut(&mut self) -> &mut AbstractRankedType {
-        match self {
-            TemplateArg::Provided { abs_typ, .. } | TemplateArg::NotProvided { abs_typ } => abs_typ,
-        }
-    }
-}
 
 /// A convienent type alias for all places where lists of template args are needed
 pub type TVec<T> = FlatAlloc<T, TemplateIDMarker>;

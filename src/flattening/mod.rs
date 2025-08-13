@@ -51,7 +51,7 @@ pub struct Module {
     pub ports: FlatAlloc<Port, PortIDMarker>,
 
     /// Created in Stage 2: Flattening
-    pub latency_inference_info: PortLatencyInferenceInfo,
+    pub inference_info: PortLatencyInferenceInfo,
 
     /// Created in Stage 2: Initialization
     pub domains: FlatAlloc<DomainInfo, DomainIDMarker>,

@@ -155,10 +155,10 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
 
     if let GlobalObj::Module(md) = pass.get_mut() {
         // Also create the inference info now.
-        md.latency_inference_info = PortLatencyInferenceInfo::make(
+        md.inference_info = PortLatencyInferenceInfo::make(
             &md.ports,
             &md.link_info.instructions,
-            md.link_info.template_parameters.len(),
+            &md.link_info.template_parameters,
         );
     }
 }

@@ -264,7 +264,7 @@ impl<'a> GraphWalk<'a, usize, LatencyEdge<'a>> for Problem<'a> {
             ));
         }
 
-        for infer_edge in &self.lc_problem.inference_edges {
+        /*for infer_edge in &self.lc_problem.inference_edges {
             let var = &self.lc_problem.inference_variables[infer_edge.target_to_infer];
             let submod = &self.submodules[var.back_reference.0];
             let submod_md = &self.linker.modules[submod.refers_to.id];
@@ -284,7 +284,7 @@ impl<'a> GraphWalk<'a, usize, LatencyEdge<'a>> for Problem<'a> {
                     multiplier: infer_edge.multiply_var_by,
                 },
             ));
-        }
+        }*/
 
         result.into()
     }

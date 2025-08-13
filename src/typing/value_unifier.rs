@@ -276,18 +276,6 @@ impl Value {
 }
 
 impl FullySubstitutable<Value, ConcreteTypeVariableIDMarker> for ConcreteType {
-    fn gather_all_substitutables<'slf>(&'slf self, gather_here: &mut Vec<&'slf UnifyableValue>) {
-        match self {
-            ConcreteType::Named(global_ref) => global_ref
-                .template_args
-                .gather_all_substitutables(gather_here),
-            ConcreteType::Array(arr) => {
-                let (content, sz) = arr.deref();
-                gather_here.push(sz);
-                content.gather_all_substitutables(gather_here);
-            }
-        }
-    }
     fn fully_substitute(&mut self, substitutor: &ValueUnifierStore) -> bool {
         match self {
             ConcreteType::Named(global_ref) => {
@@ -299,21 +287,30 @@ impl FullySubstitutable<Value, ConcreteTypeVariableIDMarker> for ConcreteType {
             }
         }
     }
-}
-
-impl FullySubstitutable<Value, ConcreteTypeVariableIDMarker> for TVec<ConcreteTemplateArg> {
-    fn gather_all_substitutables<'slf>(&'slf self, gather_here: &mut Vec<&'slf UnifyableValue>) {
-        for (_, arg) in self {
-            match arg {
-                TemplateKind::Type(t) => t.gather_all_substitutables(gather_here),
-                TemplateKind::Value(v) => gather_here.push(v),
+    fn can_fully_substitute(&self, substitutor: &ValueUnifierStore) -> bool {
+        match self {
+            ConcreteType::Named(global_ref) => {
+                global_ref.template_args.can_fully_substitute(substitutor)
+            }
+            ConcreteType::Array(arr) => {
+                let (content, sz) = arr.deref();
+                content.can_fully_substitute(substitutor) & sz.can_fully_substitute(substitutor)
             }
         }
     }
+}
+
+impl FullySubstitutable<Value, ConcreteTypeVariableIDMarker> for TVec<ConcreteTemplateArg> {
     fn fully_substitute(&mut self, substitutor: &ValueUnifierStore) -> bool {
         self.iter_mut().all(|(_, arg)| match arg {
             TemplateKind::Type(t) => t.fully_substitute(substitutor),
             TemplateKind::Value(v) => v.fully_substitute(substitutor),
+        })
+    }
+    fn can_fully_substitute(&self, substitutor: &ValueUnifierStore) -> bool {
+        self.iter().all(|(_, arg)| match arg {
+            TemplateKind::Type(t) => t.can_fully_substitute(substitutor),
+            TemplateKind::Value(v) => v.can_fully_substitute(substitutor),
         })
     }
 }

@@ -130,13 +130,6 @@ impl ConcreteType {
         let (arr, sz) = self.unwrap_array();
         (arr, sz.unwrap_integer())
     }
-    pub fn down_array(&self) -> &ConcreteType {
-        let ConcreteType::Array(arr_box) = self else {
-            unreachable!("Must be an array!")
-        };
-        let (sub, _sz) = arr_box.deref();
-        sub
-    }
     pub fn contains_unknown(&self) -> bool {
         match self {
             ConcreteType::Named(global_ref) => global_ref

@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
 
+use ibig::IBig;
+use ibig::ops::DivRem;
+
 /*pub fn all_equal_in_iter<T: Eq + Debug>(iter: impl IntoIterator<Item = T>) -> Option<T> {
     let mut iter = iter.into_iter();
     let first = iter.next()?;
@@ -54,6 +57,96 @@ pub fn contains_duplicates<T: Eq + std::hash::Hash>(iter: impl IntoIterator<Item
         }
     }
     false
+}
+
+/// Partitions a mutable slice in place according to a predicate.
+///
+/// All elements for which `pred` returns `true` are moved to the front of the slice,
+/// and all elements for which it returns `false` are moved to the back.
+/// The relative order of elements is **not** preserved.
+///
+/// Returns the index of the first element in the `false` partition.
+///
+/// # Example
+///
+/// ```
+/// let mut arr = [1, 2, 3, 4, 5, 6];
+/// let mid = partition_in_place(&mut arr, |&x| x % 2 == 0);
+/// assert_eq!(mid, 3); // three even numbers at the start
+/// assert!(arr[..mid].iter().all(|&x| x % 2 == 0));
+/// assert!(arr[mid..].iter().all(|&x| x % 2 != 0));
+/// ```
+pub fn partition_in_place<T, F>(slice: &mut [T], mut pred: F) -> usize
+where
+    F: FnMut(&T) -> bool,
+{
+    let mut left = 0;
+    let mut right = slice.len();
+
+    while left != right {
+        if pred(&slice[left]) {
+            left += 1;
+        } else {
+            right -= 1;
+            slice.swap(left, right);
+        }
+    }
+    left
+}
+
+pub fn floor_div(a: IBig, b: &IBig) -> IBig {
+    let different_signs = (a < IBig::from(0)) ^ (b < &IBig::from(0));
+    let (div, rem) = a.div_rem(b);
+    if rem != IBig::from(0) && different_signs {
+        div - 1
+    } else {
+        div
+    }
+}
+pub fn ceil_div(a: IBig, b: &IBig) -> IBig {
+    let same_signs = (a < IBig::from(0)) == (b < &IBig::from(0));
+    let (div, rem) = a.div_rem(b);
+    if rem != IBig::from(0) && same_signs {
+        div + 1
+    } else {
+        div
+    }
+}
+#[test]
+fn test_floor_and_ceil_div() {
+    for ai in -10..=10 {
+        for bi in -10..=10 {
+            if bi == 0 {
+                continue; // skip division by zero
+            }
+            let a = IBig::from(ai);
+            let b = IBig::from(bi);
+
+            // expected values from floating-point floor/ceil
+            let af = ai as f64;
+            let bf = bi as f64;
+            let expected_floor = (af / bf).floor() as i64;
+            let expected_ceil = (af / bf).ceil() as i64;
+
+            let floor_result = floor_div(a.clone(), &b);
+            let ceil_result = ceil_div(a, &b);
+
+            assert_eq!(
+                floor_result,
+                IBig::from(expected_floor),
+                "floor_div failed for a={}, b={}",
+                ai,
+                bi
+            );
+            assert_eq!(
+                ceil_result,
+                IBig::from(expected_ceil),
+                "ceil_div failed for a={}, b={}",
+                ai,
+                bi
+            );
+        }
+    }
 }
 
 #[derive(Debug)]

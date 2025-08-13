@@ -18,9 +18,9 @@ These are optional paths that can be enabled at commandline. They allow for a mo
 | `--debug print-execution-state` | After each instruction is executed, prints the whole execution state |
 | `--debug print-concrete` | Prints the generated wires and their types for a given module instance after execution and concrete typechecking |
 | `--debug print-concrete-pre-typecheck` | Prints the generated wires for a given module instance before concrete typechecking |
-| `--debug dot-dependency-graph` | Creates a `{module_name}.dot` file with a graph representation of the generated circuit |
 | `--debug print-solve_latencies-test-case` | Prints a `#[test]` case representation of the Latency Counting problem of a given module for use in [src/latency/latency_algorithm.rs](../src/latency/latency_algorithm.rs) |
 | `--debug print-infer_unknown_latency_edges-test-case` | Prints a `#[test]` case representation of the Latency Inference Counting problem of a given module for use in [src/latency/latency_algorithm.rs](../src/latency/latency_algorithm.rs) |
+| `--debug dot-dependency-graph` | Creates a `{module_name}.dot` file with a graph representation of the generated circuit |
 | `--debug dot-latency-problem` | Dot debug the problem graph for latency counting in `solve_latencies_problem.dot` |
 | `--debug dot-latency-solution` | Dot debug the solution graph for latency counting in `solve_latencies_solution.dot` |
 | `--debug dot-latency-infer` | Dot debug the problem graph for latency inference in `latency_inference_problem.dot` |
@@ -33,7 +33,7 @@ When the compiler panics, it dumps the contents of the user-specified files in `
 Crashes can also be debugged on master with the "Debug Crash Dump" [.vscode/launch.json](../.vscode/launch.json) configuration. 
 
 ## Timeout crash
-`sus_compiler --kill-timeout 2.0` will enable a timeout killer that kills the compiler if any `debug_context()`-ed context takes longer than 2s to complete. Useful to prevent runaway LSPs
+`sus_compiler --kill-timeout 2.0` will enable a timeout killer that kills the compiler if any `debug_context()`-ed context takes longer than 2s to complete. Useful to prevent runaway LSPs. Disabled by default. 
 
 ## Breakpoints, debug prints, spans
 All debug features abide by `--debug-whitelist`

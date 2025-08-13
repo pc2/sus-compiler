@@ -65,6 +65,14 @@ pub struct FanInOut {
     /// If None, then this is a poisoned edge
     pub delta_latency: Option<i64>,
 }
+impl FanInOut {
+    pub fn mk_poison(to_node: usize) -> Self {
+        Self {
+            to_node,
+            delta_latency: None,
+        }
+    }
+}
 
 impl ListOfLists<FanInOut> {
     pub fn faninout_complement(&self) -> ListOfLists<FanInOut> {
@@ -844,14 +852,20 @@ impl LatencyInferenceProblem {
         fanins: ListOfLists<FanInOut>,
         ports: &LatencyCountingPorts,
         specified_latencies: &[SpecifiedLatency],
-    ) -> Result<Self, LatencyCountingError> {
+    ) -> Option<Self> {
         let fanouts = fanins.faninout_complement();
 
-        find_positive_latency_cycle(&fanins, specified_latencies)
-            .map_err(|e| e.to_lc_error(&fanouts))?;
+        if fanins.len() == 0 {
+            return Some(LatencyInferenceProblem {
+                fanouts,
+                mem: SolutionMemory::new(0),
+            });
+        }
+
+        find_positive_latency_cycle(&fanins, specified_latencies).ok()?;
 
         let mut mem = SolutionMemory::new(fanouts.len());
-        let partial_solutions = solve_port_latencies(&fanouts, ports, &mut mem)?;
+        let partial_solutions = solve_port_latencies(&fanouts, ports, &mut mem).ok()?;
 
         let mut new_edges = Vec::new();
         for partial_sol in partial_solutions {
@@ -861,7 +875,7 @@ impl LatencyInferenceProblem {
         let fanins = fanins.extend_lists_with_new_elements(new_edges);
         let fanouts = fanins.faninout_complement();
 
-        Ok(Self { fanouts, mem })
+        Some(Self { fanouts, mem })
     }
 
     pub fn infer_max_edge_latency(
@@ -924,7 +938,7 @@ pub fn infer_unknown_latency_edges<ID>(
         return; // Could not infer anything
     }
 
-    let Ok(mut inference_problem) =
+    let Some(mut inference_problem) =
         LatencyInferenceProblem::new(fanins, ports, specified_latencies)
     else {
         return;
