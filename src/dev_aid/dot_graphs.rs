@@ -6,9 +6,10 @@ use crate::{
     alloc::FlatAlloc,
     flattening::Direction,
     instantiation::{ForEachContainedWire, ModuleTypingContext, RealWire, SubModule},
-    latency::LatencyCountingProblem,
+    latency::{LatencyCountingProblem, port_latency_inference::InferenceTarget},
     linker::Linker,
     prelude::{SubModuleID, SubModuleIDMarker, WireID, WireIDMarker},
+    typing::template::TemplateKind,
 };
 
 pub fn display_generated_hardware_structure(md_instance: &ModuleTypingContext<'_>) {
@@ -264,27 +265,43 @@ impl<'a> GraphWalk<'a, usize, LatencyEdge<'a>> for Problem<'a> {
             ));
         }
 
-        /*for infer_edge in &self.lc_problem.inference_edges {
-            let var = &self.lc_problem.inference_variables[infer_edge.target_to_infer];
-            let submod = &self.submodules[var.back_reference.0];
-            let submod_md = &self.linker.modules[submod.refers_to.id];
-            let var_param = submod_md.link_info.template_parameters[var.back_reference.1]
-                .kind
-                .unwrap_value();
-            let var_decl = submod_md.link_info.instructions[var_param.declaration_instruction]
-                .unwrap_declaration();
+        for (_, sm) in self.submodules {
+            if sm.instance.get().is_some() {
+                continue; // Don't use infer edges for submodules that have been correctly instantiated
+            }
+            let sm_md = &self.linker.modules[sm.refers_to.id];
 
-            result.push((
-                infer_edge.from_node,
-                infer_edge.to_node,
-                LCEdgeType::Infer {
-                    in_submod: &submod.name,
-                    var: &var_decl.name,
-                    offset: infer_edge.offset,
-                    multiplier: infer_edge.multiply_var_by,
-                },
-            ));
-        }*/
+            for (_, infer_info, param) in crate::alloc::zip_eq(
+                &sm_md.inference_info.parameter_inference_candidates,
+                &sm_md.link_info.parameters,
+            ) {
+                match infer_info {
+                    TemplateKind::Type(_t_info) => {}
+                    TemplateKind::Value(v_info) => {
+                        for c in &v_info.candidates {
+                            if let InferenceTarget::PortLatency { from, to } = &c.target {
+                                let (Some(from), Some(to)) =
+                                    (&sm.port_map[*from], &sm.port_map[*to])
+                                else {
+                                    continue;
+                                };
+                                let from =
+                                    self.lc_problem.map_wire_to_latency_node[from.maps_to_wire];
+                                let to = self.lc_problem.map_wire_to_latency_node[to.maps_to_wire];
+
+                                let edge = LCEdgeType::Infer {
+                                    in_submod: &sm.name,
+                                    var: &param.name,
+                                    offset: i64::try_from(&c.offset).unwrap(),
+                                    multiplier: i64::try_from(&c.mul_by).unwrap(),
+                                };
+                                result.push((from, to, edge));
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         result.into()
     }

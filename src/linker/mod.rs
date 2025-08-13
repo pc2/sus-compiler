@@ -93,7 +93,7 @@ pub struct LinkInfo {
     pub resolved_globals: ResolvedGlobals,
     pub is_extern: IsExtern,
 
-    pub template_parameters: TVec<Parameter>,
+    pub parameters: TVec<Parameter>,
 
     /// Created in Stage 2: Flattening. type data is filled out during Typechecking
     pub instructions: FlatAlloc<Instruction, FlatIDMarker>,
@@ -117,7 +117,7 @@ impl LinkInfo {
     }
     pub fn get_full_name_and_template_args(&self, file_text: &FileText) -> String {
         let mut template_args: Vec<&str> = Vec::new();
-        for (_id, t) in &self.template_parameters {
+        for (_id, t) in &self.parameters {
             match &t.kind {
                 TemplateKind::Type(TypeParameterKind {}) => template_args.push(&t.name),
                 TemplateKind::Value(GenerativeParameterKind {

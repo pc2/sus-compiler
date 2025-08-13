@@ -519,7 +519,7 @@ impl<'l> ExecutionContext<'l> {
         global_ref: &GlobalReference<ID>,
     ) -> ExecutionResult<ConcreteGlobalReference<ID>> {
         let target: &LinkInfo = &self.linker.globals[global_ref.id.into()];
-        let template_args = target.template_parameters.try_map2(
+        let template_args = target.parameters.try_map2(
             &global_ref.template_arg_types,
             |(param_id, param, abs_typ)| -> ExecutionResult<ConcreteTemplateArg> {
                 Ok(match &param.kind {
@@ -571,7 +571,7 @@ impl<'l> ExecutionContext<'l> {
                         }
                         None => ConcreteGlobalReference {
                             id: name.id,
-                            template_args: target.template_parameters.map(|(_, arg)| {
+                            template_args: target.parameters.map(|(_, arg)| {
                                 match &arg.kind {
                                     TemplateKind::Type(_) => {
                                         todo!("Abstract Type Args aren't yet supported!")

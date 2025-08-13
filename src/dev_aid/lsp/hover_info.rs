@@ -1,3 +1,4 @@
+use crate::latency::port_latency_inference::ValueInferStrategy;
 use crate::prelude::*;
 use crate::typing::domain_type::DomainType;
 use crate::typing::template::TemplateKind;
@@ -6,11 +7,12 @@ use lsp_types::{LanguageString, MarkedString};
 
 use crate::flattening::{DeclarationKind, InterfaceDeclKind, InterfaceToDomainMap};
 use crate::instantiation::SubModuleOrWire;
-use crate::linker::{Documentation, FileData, GlobalUUID, LinkInfo};
+use crate::linker::{Documentation, FileData, GlobalObj, GlobalUUID, LinkInfo};
 
 use crate::typing::template::{GenerativeParameterKind, TypeParameterKind};
 
 use super::tree_walk::{InGlobal, LocationInfo};
+use std::fmt::Write;
 
 struct HoverCollector<'l> {
     list: Vec<MarkedString>,
@@ -78,6 +80,68 @@ impl HoverCollector<'_> {
             }
         }
     }
+
+    fn hover_infer_info_for_params(
+        &mut self,
+        linker: &Linker,
+        obj_id: GlobalUUID,
+        template_id: TemplateID,
+    ) {
+        if let GlobalObj::Module(md) = linker.globals.get(obj_id) {
+            let arg_name = &md.link_info.parameters[template_id].name;
+            match &md.inference_info.parameter_inference_candidates[template_id] {
+                TemplateKind::Type(t_info) => {
+                    let mut total_text = String::new();
+                    if t_info.candidates.is_empty() {
+                        writeln!(total_text, "{arg_name} has no inference candidates").unwrap();
+                    } else {
+                        writeln!(total_text, "{arg_name} can be inferred from:").unwrap();
+                    }
+                    for (idx, c) in t_info.candidates.iter().enumerate() {
+                        let relation = if idx < t_info.num_inputs { "<:" } else { "=" };
+                        let path = c.display(md, linker);
+                        writeln!(total_text, "{{*}} {relation} {arg_name} in {path}").unwrap();
+                    }
+                    self.monospace(total_text);
+                }
+                TemplateKind::Value(v_info) => {
+                    let mut total_text = String::new();
+                    let (can_infer, cant_infer) =
+                        v_info.candidates.split_at(v_info.total_inference_upto);
+                    if can_infer.is_empty() {
+                        writeln!(
+                            total_text,
+                            "{arg_name} has no acceptable inference candidates"
+                        )
+                        .unwrap();
+                    } else {
+                        match v_info.total_inference_strategy {
+                            ValueInferStrategy::Unify | ValueInferStrategy::Exact => {
+                                writeln!(total_text, "{arg_name} can be inferred if at least one of the following constraint resolves:")
+                            }
+                            ValueInferStrategy::Min => {
+                                writeln!(total_text, "{arg_name} can be inferred as an integer value that is as high as possible, without violating any of the following constraints:")
+                            }
+                            ValueInferStrategy::Max => {
+                                writeln!(total_text, "{arg_name} can be inferred as an integer value that is as low as possible, without violating any of the following constraints:")
+                            }
+                        }
+                        .unwrap();
+                    }
+                    for c in can_infer {
+                        writeln!(total_text, "- {}", c.display(arg_name, md, linker)).unwrap();
+                    }
+                    if !cant_infer.is_empty() {
+                        writeln!(total_text, "The following constraints were found, but aren't used for inference here").unwrap();
+                        for c in cant_infer {
+                            writeln!(total_text, "- {}", c.display(arg_name, md, linker)).unwrap();
+                        }
+                    }
+                    self.monospace(total_text);
+                }
+            }
+        }
+    }
 }
 
 pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<MarkedString> {
@@ -118,6 +182,10 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
 
             hover.documentation(&decl.documentation);
             hover.sus_code(details_vec.join(" "));
+
+            if let DeclarationKind::TemplateParameter(param_id) = &decl.decl_kind {
+                hover.hover_infer_info_for_params(linker, obj_id, *param_id);
+            }
 
             hover.gather_hover_infos(obj_id, decl_id, decl.decl_kind.is_generative());
         }
@@ -174,15 +242,13 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.gather_hover_infos(obj_id, id, expr.domain == DomainType::Generative);
         }
         LocationInfo::Type(typ, link_info) => {
-            hover.sus_code(
-                typ.display(linker, &link_info.template_parameters)
-                    .to_string(),
-            );
+            hover.sus_code(typ.display(linker, &link_info.parameters).to_string());
         }
         LocationInfo::Parameter(obj_id, link_info, _template_id, template_arg) => {
+            let arg_name = &template_arg.name;
             match &template_arg.kind {
                 TemplateKind::Type(TypeParameterKind {}) => {
-                    hover.monospace(format!("type {}", template_arg.name));
+                    hover.monospace(format!("type {arg_name}"));
                 }
                 TemplateKind::Value(GenerativeParameterKind {
                     decl_span: _,
@@ -190,12 +256,8 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 }) => {
                     let decl =
                         link_info.instructions[*declaration_instruction].unwrap_declaration();
-                    hover.sus_code(format!(
-                        "param {} {}",
-                        decl.typ_expr
-                            .display(linker, &link_info.template_parameters),
-                        template_arg.name
-                    ));
+                    let typ_displ = decl.typ_expr.display(linker, &link_info.parameters);
+                    hover.sus_code(format!("param {typ_displ} {arg_name}",));
                     hover.gather_hover_infos(obj_id, *declaration_instruction, true);
                 }
             }

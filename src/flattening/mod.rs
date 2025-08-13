@@ -768,19 +768,16 @@ impl<ID: Copy> GlobalReference<ID> {
     pub fn resolve_template_args(&self, errors: &ErrorCollector, target: &LinkInfo) {
         let full_object_name = target.get_full_name();
 
-        let mut previous_uses: TVec<Option<Span>> = target.template_parameters.map(|_| None);
+        let mut previous_uses: TVec<Option<Span>> = target.parameters.map(|_| None);
 
         for arg in &self.template_args {
             let name = &arg.name;
-            if let Some(refers_to) = target
-                .template_parameters
-                .find(|_, param| param.name == arg.name)
-            {
+            if let Some(refers_to) = target.parameters.find(|_, param| param.name == arg.name) {
                 arg.refers_to.set(refers_to).unwrap();
             }
 
             if let Some(&refer_to) = arg.refers_to.get() {
-                let param = &target.template_parameters[refer_to];
+                let param = &target.parameters[refer_to];
 
                 match (&param.kind, &arg.kind) {
                     (TemplateKind::Value(_), Some(TemplateKind::Type(_))) => {
