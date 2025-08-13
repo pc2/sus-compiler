@@ -72,7 +72,7 @@ fn initialize_global_object(
     let (name_span, name) = cursor.field_to_string(field!("name"), kind!("identifier"));
 
     let link_info = LinkInfo {
-        template_parameters: FlatAlloc::new(),
+        parameters: FlatAlloc::new(),
         instructions: FlatAlloc::new(),
         documentation: cursor.extract_gathered_comments(),
         file: builder.file_id,

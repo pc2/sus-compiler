@@ -32,7 +32,7 @@ impl<'l> TypeCheckingContext<'l> {
         // parameters for use by creating the types to compare against the value parameters
         let template_arg_types =
             target_link_info
-                .template_parameters
+                .parameters
                 .map(|(id, param)| match &param.kind {
                     TemplateKind::Type(_) => TemplateKind::Type({
                         if let Some(wr_typ) = global_ref.get_type_arg_for(id) {
@@ -152,7 +152,7 @@ impl<'l> TypeCheckingContext<'l> {
                 } => {
                     walking_typ = match &walking_typ.inner {
                         AbstractInnerType::Template(template_id) => {
-                            let template_arg = &self.link_info.template_parameters[*template_id];
+                            let template_arg = &self.link_info.parameters[*template_id];
                             self.errors
                                 .error(
                                     *name_span,
@@ -293,7 +293,7 @@ impl<'l> TypeCheckingContext<'l> {
                 Some(TemplateKind::Value(from_expr)) => {
                     if let Some(template_id) = arg.refers_to.get() {
                         let TemplateKind::Value(remote_parameter) =
-                            &target_link_info.template_parameters[*template_id].kind
+                            &target_link_info.parameters[*template_id].kind
                         else {
                             // Error handled by [GlobalReference::resolve_template_args]
                             continue;
@@ -839,7 +839,7 @@ impl AbstractTypeSubstitutor {
 
         let template_arg_types =
             target_link_info
-                .template_parameters
+                .parameters
                 .map(|(_, param)| match &param.kind {
                     TemplateKind::Type(_) => TemplateKind::Type(
                         global_ref

@@ -224,7 +224,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                         target_name_elem,
                         target_link_info,
                         refers_to,
-                        &target_link_info.template_parameters[refers_to],
+                        &target_link_info.parameters[refers_to],
                     ),
                 );
             }
@@ -349,7 +349,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                             parent,
                             link_info,
                             *template_id,
-                            &link_info.template_parameters[*template_id],
+                            &link_info.parameters[*template_id],
                         ),
                     );
                 }
@@ -372,7 +372,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
     ) {
         self.visit(link_info.name_span, LocationInfo::Global(name_elem));
 
-        for (template_id, template_arg) in &link_info.template_parameters {
+        for (template_id, template_arg) in &link_info.parameters {
             if let TemplateKind::Type(TypeParameterKind {}) = &template_arg.kind {
                 self.visit(
                     template_arg.name_span,

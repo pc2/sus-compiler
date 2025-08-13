@@ -158,7 +158,7 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
         md.inference_info = PortLatencyInferenceInfo::make(
             &md.ports,
             &md.link_info.instructions,
-            &md.link_info.template_parameters,
+            &md.link_info.parameters,
         );
     }
 }

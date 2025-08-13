@@ -226,7 +226,7 @@ impl LintContext<'_> {
 
     fn extern_objects_may_not_have_type_template_args(&self) {
         if self.working_on.is_extern == IsExtern::Extern {
-            for (_id, arg) in &self.working_on.template_parameters {
+            for (_id, arg) in &self.working_on.parameters {
                 if let TemplateKind::Type(_) = &arg.kind {
                     self.errors.error(
                         arg.name_span,

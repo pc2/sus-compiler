@@ -1,12 +1,16 @@
 use colored::Colorize;
+use ibig::IBig;
 use sus_proc_macro::kw;
 
 use crate::alloc::zip_eq;
 use crate::flattening::typecheck::TyCell;
+use crate::latency::port_latency_inference::{
+    InferenceCandidate, InferenceTarget, InferenceTargetPath, SubtypeInferencePathElem,
+};
 use crate::prelude::*;
 
 use crate::typing::abstract_type::{AbstractGlobalReference, AbstractInnerType};
-use crate::typing::concrete_type::ConcreteGlobalReference;
+use crate::typing::concrete_type::{ConcreteGlobalReference, SubtypeRelation};
 use crate::typing::domain_type::DomainType;
 use crate::typing::set_unifier::Unifyable;
 use crate::typing::template::{Parameter, TVec, TemplateKind};
@@ -57,9 +61,7 @@ impl AbstractRankedType {
         FmtWrapper(move |f| {
             let res = match &self.inner {
                 AbstractInnerType::Unknown(_) => write!(f, "?"),
-                AbstractInnerType::Template(id) => {
-                    f.write_str(&link_info.template_parameters[*id].name)
-                }
+                AbstractInnerType::Template(id) => f.write_str(&link_info.parameters[*id].name),
                 AbstractInnerType::Named(name) => {
                     f.write_fmt(format_args!("{}", name.display(globals, link_info)))
                 }
@@ -137,10 +139,7 @@ impl<ID: Into<GlobalUUID> + Copy> AbstractGlobalReference<ID> {
                 return Ok(());
             }
             f.write_str(" #(")?;
-            let args_iter = zip_eq(
-                &self.template_arg_types,
-                &target_link_info.template_parameters,
-            );
+            let args_iter = zip_eq(&self.template_arg_types, &target_link_info.parameters);
             join_string_iter_formatter(", ", f, args_iter, |(_, typ, param), f| {
                 write!(f, "{}: ", &param.name)?;
                 match typ {
@@ -178,20 +177,14 @@ impl<ID: Into<GlobalUUID> + Copy> GlobalReference<ID> {
                  f| {
                     write!(f, "{name} -> ")?;
                     if let Some(found) = refers_to.get() {
-                        write!(
-                            f,
-                            "{}: ",
-                            &target_link_info.template_parameters[*found].name
-                        )?;
+                        write!(f, "{}: ", &target_link_info.parameters[*found].name)?;
                     } else {
                         f.write_str("?: ")?;
                     }
                     match kind {
-                        Some(TemplateKind::Type(wr_typ)) => write!(
-                            f,
-                            "type {}",
-                            wr_typ.display(globals, &link_info.template_parameters)
-                        ),
+                        Some(TemplateKind::Type(wr_typ)) => {
+                            write!(f, "type {}", wr_typ.display(globals, &link_info.parameters))
+                        }
                         Some(TemplateKind::Value(v_id)) => write!(f, "{v_id:?}"),
                         None => f.write_str("INVALID"),
                     }
@@ -298,7 +291,7 @@ impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
     pub fn display<'v>(&'v self, globals: &'v LinkerGlobals) -> impl Display + 'v {
         let target_link_info = &globals[self.id.into()];
         FmtWrapper(move |f| {
-            assert!(self.template_args.len() == target_link_info.template_parameters.len());
+            assert!(self.template_args.len() == target_link_info.parameters.len());
             let object_full_name = target_link_info.get_full_name();
             f.write_str(&object_full_name)?;
             if self.template_args.is_empty() {
@@ -308,7 +301,7 @@ impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
             }
             let mut is_first = true;
             for (_id, arg, arg_in_target) in
-                zip_eq(&self.template_args, &target_link_info.template_parameters)
+                zip_eq(&self.template_args, &target_link_info.parameters)
             {
                 if !is_first {
                     f.write_str(", ")?;
@@ -495,6 +488,109 @@ impl Display for SliceType {
     }
 }
 
+/// port: int#(MIN: {*})
+impl InferenceTargetPath {
+    pub fn display(&self, md: &Module, linker: &Linker) -> impl Display {
+        FmtWrapper(|f| {
+            let port = &md.ports[self.port];
+            let port_decl =
+                md.link_info.instructions[port.declaration_instruction].unwrap_declaration();
+
+            fn recurse_print(
+                f: &mut std::fmt::Formatter<'_>,
+                linker: &Linker,
+                md: &Module,
+                typ: &WrittenType,
+                path: &[SubtypeInferencePathElem],
+            ) -> std::fmt::Result {
+                if let Some((cur_elem, rest)) = path.split_first() {
+                    match cur_elem {
+                        SubtypeInferencePathElem::DownArray => {
+                            let_unwrap!(WrittenType::Array(_, arr_box), typ);
+                            let (content, _sz, _) = arr_box.deref();
+                            recurse_print(f, linker, md, content, rest)?;
+                            f.write_str("[]")
+                        }
+                        SubtypeInferencePathElem::ArraySize => {
+                            let_unwrap!(WrittenType::Array(_, arr_box), typ);
+                            let (content, _sz, _) = arr_box.deref();
+                            recurse_print(f, linker, md, content, rest)?;
+                            f.write_str("[{*}]")
+                        }
+                        SubtypeInferencePathElem::InNamed(arg_id) => {
+                            let_unwrap!(WrittenType::Named(named), typ);
+                            let named_type = &linker.types[named.id];
+                            let named_name = &named_type.link_info.name;
+                            let param_name = &named_type.link_info.parameters[*arg_id].name;
+
+                            write!(f, "{named_name} #({param_name}: ")?;
+                            match &named.get_arg_for(*arg_id).unwrap().kind.as_ref().unwrap() {
+                                TemplateKind::Type(t) => recurse_print(f, linker, md, t, rest)?,
+                                TemplateKind::Value(_) => {
+                                    assert!(rest.is_empty());
+                                    f.write_str("{*}")?
+                                }
+                            }
+                            f.write_str(")")
+                        }
+                    }
+                } else {
+                    write!(
+                        f,
+                        "{}",
+                        typ.display(&linker.globals, &md.link_info.parameters)
+                    )
+                }
+            }
+
+            recurse_print(f, linker, md, &port_decl.typ_expr, &self.path)?;
+            write!(f, " {}", &port_decl.name)
+        })
+    }
+}
+
+impl InferenceCandidate {
+    /// V * 5 + 3 <= {*} in int#(FROM: {*}) port
+    /// V * 5 + 3 <= {t} - {f} in a'{t}, b'{f}
+    pub fn display(&self, candidate_name: &str, md: &Module, linker: &Linker) -> impl Display {
+        FmtWrapper(|f| {
+            let relation = match self.relation {
+                SubtypeRelation::Exact => "==",
+                SubtypeRelation::Min => "<=",
+                SubtypeRelation::Max => ">=",
+            };
+            f.write_str(candidate_name)?;
+            if self.mul_by != IBig::from(1) {
+                write!(f, " * {}", self.mul_by)?;
+            }
+            if self.offset != IBig::from(0) {
+                if self.offset < IBig::from(0) {
+                    write!(f, " - {}", -&self.offset)?;
+                } else {
+                    write!(f, " + {}", self.offset)?;
+                }
+            }
+            write!(f, " {relation} ")?;
+
+            match &self.target {
+                InferenceTarget::Subtype(path) => {
+                    let path = path.display(md, linker);
+                    write!(f, "{{*}} in {path}")
+                }
+                InferenceTarget::PortLatency { from, to } => {
+                    let from = &md.ports[*from];
+                    let to = &md.ports[*to];
+                    write!(
+                        f,
+                        "{{t}} - {{f}} in {}'{{f}} and {}'{{t}}",
+                        from.name, to.name
+                    )
+                }
+            }
+        })
+    }
+}
+
 impl LinkInfo {
     fn debug_name(&self, instr_id: FlatID) -> impl Display + '_ {
         let name = self.get_instruction_name(instr_id).unwrap();
@@ -570,7 +666,7 @@ impl LinkInfo {
                     latency_specifier,
                     ..
                 }) => {
-                    let typ_expr = typ_expr.display(globals, &self.template_parameters);
+                    let typ_expr = typ_expr.display(globals, &self.parameters);
                     let name = name.green();
                     let typ = typ.display(globals, self);
                     print!("{decl_kind:?} {typ_expr} ({typ}) {name}");

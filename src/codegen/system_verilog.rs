@@ -737,7 +737,7 @@ impl<'g> CodeGenerationContext<'g> {
         join_string_iter(
             &mut self.program_text,
             ", ",
-            zip_eq(concrete_template_args, &link_info.template_parameters),
+            zip_eq(concrete_template_args, &link_info.parameters),
             |result, (_, arg, arg_name)| {
                 let arg_name = &arg_name.name;
                 match arg {

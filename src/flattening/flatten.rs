@@ -1859,7 +1859,7 @@ fn flatten_global(pass: &mut LinkerPass, errors: &ErrorCollector, cursor: &mut C
 
     let link_info = working_on_mut.get_link_info();
     link_info.instructions = instructions;
-    link_info.template_parameters = parameters;
+    link_info.parameters = parameters;
 
     // If an instruction has itself as parent when, it would create a deadlock
     for (id, instr) in &link_info.instructions {

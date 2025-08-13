@@ -277,7 +277,7 @@ impl Linker {
         for (id, md) in &self.modules {
             // Already instantiate any modules without parameters
             // Can immediately instantiate modules that have no template args
-            if md.link_info.template_parameters.is_empty() {
+            if md.link_info.parameters.is_empty() {
                 let _inst = self.instantiator.instantiate(
                     self,
                     ConcreteGlobalReference {
