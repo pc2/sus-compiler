@@ -1,10 +1,21 @@
+use std::borrow::Cow;
+use std::ops::Deref;
+
 use ibig::IBig;
+use ibig::ops::DivRem;
 use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::{zip_eq, zip_eq3};
+use crate::latency::LatencyInferenceProblem;
+use crate::latency::port_latency_inference::{
+    InferenceCandidate, InferenceTarget, InferenceTargetPath, ValueInferStrategy,
+};
+use crate::typing::concrete_type::SubtypeRelation;
 use crate::typing::set_unifier::{DelayedErrorCollector, FullySubstitutable, Unifyable};
+use crate::typing::template::TemplateKind;
 use crate::typing::value_unifier::{ValueErrorReporter, ValueUnifierStore};
 use crate::typing::{concrete_type::ConcreteType, value_unifier::ValueUnifier};
+use crate::util::{ceil_div, floor_div};
 
 use super::*;
 
@@ -108,23 +119,34 @@ fn get_min_max(potentials: impl IntoIterator<Item = IBig>) -> (IBig, IBig) {
     (min, max)
 }
 
+enum InferredInt<'s> {
+    /// Means the inference candidate can be discarded
+    PortNotUsed,
+    /// Means the port is valid, but the target couldn't be computed. Invalidates [ValueInferStrategy::Min] and [ValueInferStrategy::Max]
+    NotFound,
+    /// Valid value! Can be used for inferring
+    Found(Cow<'s, IBig>),
+}
+
 impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
     pub fn typecheck(&mut self, type_substitutor_alloc: ValueUnifierAlloc) {
         let error_reporter = DelayedErrorCollector::new();
 
         let mut unifier = ValueUnifier::from_alloc(type_substitutor_alloc);
 
-        for (_, wire) in &self.wires {
-            self.typecheck_wire(wire, &mut unifier, &error_reporter);
-        }
+        // We do submodules first, such that we don't need to worry handle unification failure
         for (_, sm) in &self.submodules {
-            self.typecheck_submodule(sm, &mut unifier);
+            self.add_submodule_subtype_constraints(sm, &mut unifier);
+        }
+        for (_, wire) in &self.wires {
+            self.add_wire_subtype_constraints(wire, &mut unifier, &error_reporter);
         }
 
         unifier.execute_ready_constraints();
 
+        let mut all_submod_ids: Vec<SubModuleID> = self.submodules.id_range().iter().collect();
         loop {
-            self.infer_parameters_for_latencies(&mut unifier);
+            self.try_infer_submodule_params(&mut unifier, &mut all_submod_ids);
             if !unifier.execute_ready_constraints() {
                 break;
             }
@@ -136,7 +158,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
 
         self.finalize(&substitutor);
 
-        self.compute_latencies(&substitutor);
+        self.compute_latencies();
     }
     /*fn peano_to_nested_array_of(
         &mut self,
@@ -206,7 +228,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         current_type_in_progress
     }*/
 
-    fn typecheck_wire(
+    fn add_wire_subtype_constraints(
         &'inst self,
         out: &'inst RealWire,
         unifier: &mut ValueUnifier<'inst>,
@@ -457,89 +479,298 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         };
     }
 
-    fn typecheck_submodule(&'inst self, sm: &'inst SubModule, unifier: &mut ValueUnifier<'inst>) {
+    fn get_port_typ(&self, sm: &SubModule, port_id: PortID) -> Option<&ConcreteType> {
+        let port = &sm.port_map[port_id].as_ref()?;
+        let port_wire = &self.wires[port.maps_to_wire];
+        Some(&port_wire.typ)
+    }
+
+    fn get_port_value(
+        &self,
+        sm: &SubModule,
+        path: &InferenceTargetPath,
+    ) -> Option<&UnifyableValue> {
+        let port = &sm.port_map[path.port].as_ref()?;
+        let port_wire = &self.wires[port.maps_to_wire];
+        Some(path.follow_value_path(&port_wire.typ))
+    }
+
+    fn add_submodule_subtype_constraints(
+        &'inst self,
+        sm: &'inst SubModule,
+        unifier: &mut ValueUnifier<'inst>,
+    ) {
         assert!(sm.instance.get().is_none());
 
-        // Check if there's any argument that isn't known
-        let mut substitutables = Vec::new();
-        sm.refers_to
-            .template_args
-            .gather_all_substitutables(&mut substitutables);
+        let sm_md = &self.linker[sm.refers_to.id];
 
-        unifier.add_constraint(substitutables, |unifier| {
-            let submod_instr = &self.link_info.instructions[sm.original_instruction];
+        for (_, concrete_param, infer_info) in crate::alloc::zip_eq(
+            &sm.refers_to.template_args,
+            &sm_md.inference_info.parameter_inference_candidates,
+        ) {
+            match concrete_param.and_by_ref(infer_info) {
+                TemplateKind::Type((t_param, t_info)) => {
+                    let (inputs, outputs) = t_info.candidates.split_at(t_info.num_inputs);
+                    unifier.create_subtype_constraint(inputs.iter().filter_map(|c| {
+                        let port = &sm.port_map[c.port].as_ref()?;
+                        let port_wire = &self.wires[port.maps_to_wire];
+                        Some((t_param, c.follow_type_path(&port_wire.typ)))
+                    }));
+                    for c in outputs {
+                        let Some(port_typ) = self.get_port_typ(sm, c.port) else {
+                            continue;
+                        };
+                        assert!(
+                            unifier.unify_concrete_all(t_param, c.follow_type_path(port_typ)),
+                            "Since this is the first time outputs are unified, this cannot fail"
+                        )
+                    }
+                }
+                TemplateKind::Value((v_param, v_info)) => {
+                    if v_info.total_inference_strategy != ValueInferStrategy::Unify {
+                        continue;
+                        // Others handled by [Self::try_infer_submodule_params]
+                    };
+                    for c in &v_info.candidates[..v_info.total_inference_upto] {
+                        assert_eq!(c.mul_by, IBig::from(1));
+                        assert_eq!(c.offset, IBig::from(0));
+                        assert_eq!(c.relation, SubtypeRelation::Exact);
+                        let_unwrap!(InferenceTarget::Subtype(target_path), &c.target);
+                        let Some(target_value) = &self.get_port_value(sm, target_path) else {
+                            continue;
+                        };
+                        assert!(
+                            unifier.unify(v_param, target_value),
+                            "Since this is the first time values are unified, this cannot fail"
+                        )
+                    }
+                }
+            }
+        }
+    }
 
-            let mut refers_to_clone = sm.refers_to.clone();
-            refers_to_clone
-                .template_args
-                .fully_substitute(&unifier.store);
+    fn get_infer_target_value(
+        &'inst self,
+        sm: &SubModule,
+        candidate: &InferenceCandidate,
+        unifier: &'inst ValueUnifier<'inst>,
+        latency_infer_problem: &mut Option<LatencyInferenceProblem>,
+    ) -> InferredInt<'inst> {
+        match &candidate.target {
+            InferenceTarget::Subtype(path) => {
+                let Some(port) = &sm.port_map[path.port] else {
+                    return InferredInt::PortNotUsed;
+                };
+                let port_wire = &self.wires[port.maps_to_wire];
+                let v = path.follow_value_path(&port_wire.typ);
+                let Some(v) = unifier.store.get_substitution(v) else {
+                    return InferredInt::NotFound;
+                };
+                InferredInt::Found(Cow::Borrowed(v.unwrap_integer()))
+            }
+            InferenceTarget::PortLatency { from, to } => {
+                let (Some(from), Some(to)) = (&sm.port_map[*from], &sm.port_map[*to]) else {
+                    return InferredInt::PortNotUsed;
+                };
+                let Some(infer_problem) = latency_infer_problem else {
+                    return InferredInt::NotFound;
+                };
+                match infer_problem.infer(from.maps_to_wire, to.maps_to_wire) {
+                    Ok(result) => InferredInt::Found(Cow::Owned(IBig::from(result))),
+                    Err(_) => InferredInt::NotFound,
+                }
+            }
+        }
+    }
+    fn try_infer_submodule_params(
+        &'inst self,
+        unifier: &mut ValueUnifier<'inst>,
+        sm_ids: &mut Vec<SubModuleID>,
+    ) {
+        let mut lat_inf = LatencyInferenceProblem::new(self);
 
-            let instance = self
-                .linker
-                .instantiator
-                .instantiate(self.linker, refers_to_clone);
+        for sm_id in sm_ids.iter() {
+            let sm = &self.submodules[*sm_id];
+            let sm_md = &self.linker[sm.refers_to.id];
 
-            if let Some(instance) = instance {
-                let sub_module = &self.linker.modules[sm.refers_to.id];
-
-                for (_port_id, concrete_port, source_code_port, connecting_wire) in
-                    zip_eq3(&instance.interface_ports, &sub_module.ports, &sm.port_map)
-                {
-                    match (concrete_port, connecting_wire) {
-                        (None, None) => {} // Invalid port not connected, good!
-                        (None, Some(connecting_wire)) => {
-                            // Port is not enabled, but attempted to be used
-                            // A question may be "What if no port was in the source code? There would be no error reported"
-                            // But this is okay, because nonvisible ports are only possible for function calls
-                            // We have a second routine that reports invalid interfaces.
-                            for span in &connecting_wire.name_refs {
-                                let port_name = &source_code_port.name;
-                                let err = format!("Port '{port_name}' is used, but the instantiated module has this port disabled");
-                                self.errors
-                                    .error(*span, err)
-                                    .info_obj_different_file(
-                                        source_code_port,
-                                        sub_module.link_info.file,
-                                    )
-                                    .info_obj_same_file(submod_instr);
+            for (_, concrete_param, infer_info) in crate::alloc::zip_eq(
+                &sm.refers_to.template_args,
+                &sm_md.inference_info.parameter_inference_candidates,
+            ) {
+                let TemplateKind::Value((concrete_param, infer_info)) =
+                    concrete_param.and_by_ref(infer_info)
+                else {
+                    continue;
+                };
+                if !concrete_param.is_unknown() {
+                    continue;
+                }
+                let mut total = None;
+                match infer_info.total_inference_strategy {
+                    ValueInferStrategy::Unify => {
+                        continue; // Handled by [Self::add_submodule_subtype_constraints]
+                    }
+                    ValueInferStrategy::Exact => {
+                        for info in &infer_info.candidates[..infer_info.total_inference_upto] {
+                            match self.get_infer_target_value(sm, info, unifier, &mut lat_inf) {
+                                InferredInt::PortNotUsed => continue,
+                                InferredInt::NotFound => continue,
+                                InferredInt::Found(v) => {
+                                    let (div, rem) =
+                                        (v.deref() - &info.offset).div_rem(&info.mul_by);
+                                    if rem == IBig::from(0) {
+                                        // Ignore exact values that don't divide properly
+                                        total = Some(div);
+                                        break; // Success! We've found *a* value for the parameter
+                                    }
+                                }
                             }
                         }
-                        (Some(_concrete_port), None) => {
-                            // Port is enabled, but not used
-                            self.errors
-                                .warn(
-                                    submod_instr.get_span(),
-                                    format!("Unused port '{}'", source_code_port.name),
-                                )
-                                .info_obj_different_file(
-                                    source_code_port,
-                                    sub_module.link_info.file,
-                                )
-                                .info_obj_same_file(submod_instr);
+                    }
+                    ValueInferStrategy::Min => {
+                        // Constraints:
+                        // V * 3 + 5 >= 6 -> V at least 1
+                        // V * -2 + 3 <= 6 -> V at least -1
+                        //
+                        // => Minimize Integer V such that
+                        // V >= 1 / 3
+                        // V >= 3 / -2 -> ceil-div
+                        for info in &infer_info.candidates[..infer_info.total_inference_upto] {
+                            match self.get_infer_target_value(sm, info, unifier, &mut lat_inf) {
+                                InferredInt::PortNotUsed => continue, // Missing ports are okay, just skip their inference value
+                                InferredInt::NotFound => {
+                                    total = None;
+                                    break; // Missing value means failed inference
+                                }
+                                InferredInt::Found(v) => {
+                                    let needed = ceil_div(v.deref() - &info.offset, &info.mul_by);
+                                    total = Some(if let Some(cur_total) = total {
+                                        IBig::min(cur_total, needed)
+                                    } else {
+                                        needed
+                                    });
+                                }
+                            }
                         }
-                        (Some(concrete_port), Some(connecting_wire)) => {
-                            let wire = &self.wires[connecting_wire.maps_to_wire];
-                            // Failures are reported in final_checks
-                            let _ = match source_code_port.direction {
-                                // Subtype relations always flow FORWARD.
-                                Direction::Input => {
-                                    unifier.unify_concrete_only_exact(&wire.typ, &concrete_port.typ)
+                    }
+                    ValueInferStrategy::Max => {
+                        // Constraints:
+                        // V * 3 + 5 <= 6 -> V at most 0
+                        // V * -2 + 3 >= 6 -> V at most -2
+                        //
+                        // => Maximize Integer V such that
+                        // V <= 1 / 3
+                        // V <= 3 / -2 -> floor-div
+                        for info in &infer_info.candidates[..infer_info.total_inference_upto] {
+                            match self.get_infer_target_value(sm, info, unifier, &mut lat_inf) {
+                                InferredInt::PortNotUsed => continue, // Missing ports are okay, just skip their inference value
+                                InferredInt::NotFound => {
+                                    total = None;
+                                    break; // Missing value means failed inference
                                 }
-                                Direction::Output => {
-                                    unifier.unify_concrete_all(&wire.typ, &concrete_port.typ)
+                                InferredInt::Found(v) => {
+                                    let needed = floor_div(v.deref() - &info.offset, &info.mul_by);
+                                    total = Some(if let Some(cur_total) = total {
+                                        IBig::max(cur_total, needed)
+                                    } else {
+                                        needed
+                                    });
                                 }
-                            };
+                            }
                         }
                     }
                 }
-                sm.instance.set(instance).unwrap();
+                if let Some(total) = total {
+                    unifier.set(concrete_param, Value::Integer(total)).unwrap();
+                    // Success! We found the inferred value!
+                }
+            }
+        }
+
+        // And now instantiate the modules we can
+        sm_ids.retain(|id| {
+            let sm = &self.submodules[*id];
+
+            if sm
+                .refers_to
+                .template_args
+                .can_fully_substitute(&unifier.store)
+            {
+                self.try_instantiate_submodule(sm, unifier);
+                false
             } else {
-                self.errors
-                    .error(submod_instr.get_span(), "Error instantiating submodule");
+                true
             }
         });
     }
+    fn try_instantiate_submodule(&'inst self, sm: &SubModule, unifier: &mut ValueUnifier<'inst>) {
+        let submod_instr = &self.link_info.instructions[sm.original_instruction];
 
+        let mut refers_to_clone = sm.refers_to.clone();
+        refers_to_clone
+            .template_args
+            .fully_substitute(&unifier.store);
+
+        let instance = self
+            .linker
+            .instantiator
+            .instantiate(self.linker, refers_to_clone);
+
+        let Some(instance) = instance else {
+            self.errors
+                .error(submod_instr.get_span(), "Error instantiating submodule");
+            return;
+        };
+        let sub_module = &self.linker.modules[sm.refers_to.id];
+
+        for (_port_id, concrete_port, source_code_port, connecting_wire) in
+            zip_eq3(&instance.interface_ports, &sub_module.ports, &sm.port_map)
+        {
+            match (concrete_port, connecting_wire) {
+                (None, None) => {} // Invalid port not connected, good!
+                (None, Some(connecting_wire)) => {
+                    // Port is not enabled, but attempted to be used
+                    // A question may be "What if no port was in the source code? There would be no error reported"
+                    // But this is okay, because nonvisible ports are only possible for function calls
+                    // We have a second routine that reports invalid interfaces.
+                    for span in &connecting_wire.name_refs {
+                        let port_name = &source_code_port.name;
+                        let err = format!(
+                            "Port '{port_name}' is used, but the instantiated module has this port disabled"
+                        );
+                        self.errors
+                            .error(*span, err)
+                            .info_obj_different_file(source_code_port, sub_module.link_info.file)
+                            .info_obj_same_file(submod_instr);
+                    }
+                }
+                (Some(_concrete_port), None) => {
+                    // Port is enabled, but not used
+                    self.errors
+                        .warn(
+                            submod_instr.get_span(),
+                            format!("Unused port '{}'", source_code_port.name),
+                        )
+                        .info_obj_different_file(source_code_port, sub_module.link_info.file)
+                        .info_obj_same_file(submod_instr);
+                }
+                (Some(concrete_port), Some(connecting_wire)) => {
+                    let wire = &self.wires[connecting_wire.maps_to_wire];
+                    // Failures are reported in final_checks
+                    let _ = match source_code_port.direction {
+                        // Subtype relations always flow FORWARD.
+                        Direction::Input => {
+                            unifier.unify_concrete_only_exact(&wire.typ, &concrete_port.typ)
+                        }
+                        Direction::Output => {
+                            unifier.unify_concrete_all(&wire.typ, &concrete_port.typ)
+                        }
+                    };
+                }
+            }
+        }
+        sm.instance.set(instance).unwrap();
+    }
     /// Calls [FullySubstitutable::fully_substitute] on everything. From this point on the substitutor is unneccesary
     fn finalize(&mut self, substitutor: &ValueUnifierStore) {
         let mut selects_to_check = Vec::new();

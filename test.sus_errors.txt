@@ -125,22 +125,22 @@ Error: Could not finalize this type, some parameters were still unknown: int #(F
      ╭─[ test.sus:180:32 ]
      │
  180 │     reg int a, st[2], reg reg b = assignment_producer()
-     │                                   ──────────┬──────────  
-     │                                             ╰──────────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
+     │                                   ─────────┬─────────  
+     │                                            ╰─────────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
      ╭─[ test.sus:180:32 ]
      │
  180 │     reg int a, st[2], reg reg b = assignment_producer()
-     │                                   ──────────┬──────────  
-     │                                             ╰──────────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
+     │                                   ─────────┬─────────  
+     │                                            ╰─────────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ─────╯
 Error: Error instantiating submodule
      ╭─[ test.sus:180:32 ]
      │
  180 │     reg int a, st[2], reg reg b = assignment_producer()
-     │                                   ──────────┬──────────  
-     │                                             ╰──────────── Error instantiating submodule
+     │                                   ─────────┬─────────  
+     │                                            ╰─────────── Error instantiating submodule
 ─────╯
 Warning: Not Instantiating multiply_add_with_latencies #() due to abstract typing errors
      ╭─[ test.sus:217:8 ]
@@ -1864,8 +1864,8 @@ Which conflicts with the starting latency
      ╭─[ test.sus:363:9 ]
      │
  363 │     test = module_taking_time(test+a)
-     │            ─────────────┬────────────  
-     │                         ╰────────────── This instruction is part of a net-positive latency cycle of +5
+     │            ─────────┬────────  
+     │                     ╰────────── This instruction is part of a net-positive latency cycle of +5
 
 test'5
 -> __4_i'0 (-5)
@@ -7689,6 +7689,13 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │               ────┬───  
       │                   ╰───── Interface 'infer_me' defined here
 ──────╯
+Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
+      ╭─[ test.sus:1149:12 ]
+      │
+ 1149 │     out_val = infer_me(in_val) | heavily_pipelined_computation
+      │               ────┬───  
+      │                   ╰───── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
+──────╯
 Warning: Not Instantiating instantiate_fifo #() due to abstract typing errors
       ╭─[ test.sus:1152:8 ]
       │
@@ -7734,30 +7741,19 @@ action pop:
 	->
 	output T pop_data
 ──────╯
-Error: Conflicting specified latency
-
-a'0
--> _x_x'0 (+0)
--> loose_inbetween'2 (+2)
--> _y_x'2 (+0)
--> b'4 (+2)
-
-But this was specified as b'3
-      ╭─[ test.sus:1176:52 ]
+Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
+      ╭─[ test.sus:1181:11 ]
       │
- 1176 │     interface inference_edge_case: bool a'0 -> bool b'3
-      │                                         ┬             ┬  
-      │                                         ╰──────────────── 'a' declared here
-      │                                                       │  
-      │                                                       ╰── Conflicting specified latency
-
-a'0
--> _x_x'0 (+0)
--> loose_inbetween'2 (+2)
--> _y_x'2 (+0)
--> b'4 (+2)
-
-But this was specified as b'3
+ 1181 │     infer_me x
+      │              ┬  
+      │              ╰── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
+──────╯
+Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
+      ╭─[ test.sus:1182:11 ]
+      │
+ 1182 │     infer_me y
+      │              ┬  
+      │              ╰── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1193:7 ]
@@ -8480,6 +8476,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                       ┬  
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_delta #(V: ?)
+      ╭─[ test.sus:1311:22 ]
+      │
+ 1311 │     infer_me_with_delta inf
+      │                         ─┬─  
+      │                          ╰─── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_delta #(V: ?)
+──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1318:20 ]
       │
@@ -8493,6 +8496,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1320 │     interface b: bool p'0 -> bool q'-V+30
       │                       ┬  
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_negative_delta #(V: ?)
+      ╭─[ test.sus:1326:31 ]
+      │
+ 1326 │     infer_me_with_negative_delta inf
+      │                                  ─┬─  
+      │                                   ╰─── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_negative_delta #(V: ?)
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1332:35 ]

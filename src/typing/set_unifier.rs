@@ -37,10 +37,10 @@ impl UUIDMarker for ConstraintIDMarker {
 /// Referencing [Unifyable::Unknown] is a strong code smell.
 /// It is likely you should use [crate::typing::type_inference::TypeSubstitutor::unify_must_succeed]
 /// or [crate::typing::type_inference::TypeSubstitutor::unify_report_error] instead
-///
-/// It should only occur in creation `Unifyable::Unknown(self.type_substitutor.alloc())`
 pub enum Unifyable<T, IDMarker> {
+    /// Using [Unifyable::Set] directly is probably an antipattern. Use `unifier.store.get_substitution()` instead
     Set(T),
+    /// Using [Unifyable::Unknown] directly is probably an antipattern. It should only occur in creation `Unifyable::Unknown(self.type_substitutor.alloc())`
     Unknown(UUID<IDMarker>),
 }
 
@@ -397,20 +397,11 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
 }
 
 pub trait FullySubstitutable<T: Clone, IDMarker> {
-    fn gather_all_substitutables<'slf>(
-        &'slf self,
-        gather_here: &mut Vec<&'slf Unifyable<T, IDMarker>>,
-    );
     fn fully_substitute(&mut self, substitutor: &SetUnifierStore<T, IDMarker>) -> bool;
+    fn can_fully_substitute(&self, substitutor: &SetUnifierStore<T, IDMarker>) -> bool;
 }
 
 impl<T: Clone, IDMarker> FullySubstitutable<T, IDMarker> for Unifyable<T, IDMarker> {
-    fn gather_all_substitutables<'slf>(
-        &'slf self,
-        gather_here: &mut Vec<&'slf Unifyable<T, IDMarker>>,
-    ) {
-        gather_here.push(self);
-    }
     fn fully_substitute(&mut self, substitutor: &SetUnifierStore<T, IDMarker>) -> bool {
         match self {
             Unifyable::Set(_) => true,
@@ -420,6 +411,15 @@ impl<T: Clone, IDMarker> FullySubstitutable<T, IDMarker> for Unifyable<T, IDMark
                     *self = Unifyable::Set(new_v.clone());
                     true
                 }
+            },
+        }
+    }
+    fn can_fully_substitute(&self, substitutor: &SetUnifierStore<T, IDMarker>) -> bool {
+        match self {
+            Unifyable::Set(_) => true,
+            Unifyable::Unknown(id) => match &substitutor.known_values[substitutor.ptrs[*id]] {
+                KnownValue::Unknown { .. } => false,
+                KnownValue::Known(_) => true,
             },
         }
     }

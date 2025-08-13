@@ -90,7 +90,7 @@ fn initialize_global_object(
             builder.add_module(Module {
                 link_info,
                 ports: FlatAlloc::new(),
-                latency_inference_info: PortLatencyInferenceInfo::default(),
+                inference_info: PortLatencyInferenceInfo::default(),
                 domains: FlatAlloc::new(),
                 interfaces: FlatAlloc::new(),
             });
