@@ -9,7 +9,7 @@ use ibig::IBig;
 use unique_names::UniqueNames;
 
 use crate::alloc::zip_eq;
-use crate::latency::AbsLat;
+use crate::latency::{AbsLat, InferenceFailure};
 use crate::linker::LinkInfo;
 use crate::prelude::*;
 use crate::to_string::join_string_iter;
@@ -420,6 +420,8 @@ pub enum InferenceResult {
     PortNotUsed,
     /// Means the port is valid, but the target couldn't be computed. Invalidates [ValueInferStrategy::Min] and [ValueInferStrategy::Max]
     NotFound,
+    /// Latency Error
+    LatencyError(InferenceFailure),
     /// Valid value! Can be used for inferring
     Found(IBig),
 }

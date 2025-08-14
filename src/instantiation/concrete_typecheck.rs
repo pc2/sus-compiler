@@ -565,7 +565,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 };
                 match latency_infer_problem.infer(from.maps_to_wire, to.maps_to_wire) {
                     Ok(result) => InferenceResult::Found(IBig::from(result)),
-                    Err(_) => InferenceResult::NotFound,
+                    Err(err) => InferenceResult::LatencyError(err),
                 }
             }
         }
@@ -619,7 +619,9 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                             *last = self.get_infer_target_value(sm, info, unifier, &mut lat_inf);
                             match last {
                                 InferenceResult::PortNotUsed => continue,
-                                InferenceResult::NotFound => continue,
+                                InferenceResult::NotFound | InferenceResult::LatencyError(_) => {
+                                    continue;
+                                }
                                 InferenceResult::Found(v) => {
                                     let (div, rem) = (&*v - &info.offset).div_rem(&info.mul_by);
                                     if rem == IBig::from(0) {
@@ -646,7 +648,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                             *last = self.get_infer_target_value(sm, info, unifier, &mut lat_inf);
                             match last {
                                 InferenceResult::PortNotUsed => continue, // Missing ports are okay, just skip their inference value
-                                InferenceResult::NotFound => {
+                                InferenceResult::NotFound | InferenceResult::LatencyError(_) => {
                                     total = None;
                                     break; // Missing value means failed inference
                                 }
@@ -676,7 +678,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                             *last = self.get_infer_target_value(sm, info, unifier, &mut lat_inf);
                             match last {
                                 InferenceResult::PortNotUsed => continue, // Missing ports are okay, just skip their inference value
-                                InferenceResult::NotFound => {
+                                InferenceResult::NotFound | InferenceResult::LatencyError(_) => {
                                     total = None;
                                     break; // Missing value means failed inference
                                 }

@@ -5,6 +5,7 @@ use sus_proc_macro::kw;
 use crate::alloc::zip_eq;
 use crate::flattening::typecheck::TyCell;
 use crate::instantiation::{InferenceResult, SubModule};
+use crate::latency::InferenceFailure;
 use crate::latency::port_latency_inference::{
     InferenceCandidate, InferenceTarget, InferenceTargetPath, SubtypeInferencePathElem,
     ValueInferStrategy,
@@ -590,6 +591,13 @@ impl Display for InferenceResult {
         match self {
             InferenceResult::PortNotUsed => f.write_str("N/C"),
             InferenceResult::NotFound => f.write_str("?"),
+            InferenceResult::LatencyError(InferenceFailure::BadProblem) => {
+                f.write_str("? bad problem")
+            }
+            InferenceResult::LatencyError(InferenceFailure::NotReached) => {
+                f.write_str("? not reached")
+            }
+            InferenceResult::LatencyError(InferenceFailure::Poison) => f.write_str("? poisoned"),
             InferenceResult::Found(v) => write!(f, "{v}"),
         }
     }
