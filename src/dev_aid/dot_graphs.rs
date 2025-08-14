@@ -4,7 +4,7 @@ use std::fs::{self, File};
 use dot2::label::Text;
 use dot2::{Edges, GraphWalk, Id, Labeller, Nodes, Style, render};
 
-use crate::to_string::FmtWrapper;
+use crate::to_string::{FmtWrapper, join_string_iter_formatter};
 use crate::{
     alloc::FlatAlloc,
     flattening::Direction,
@@ -37,9 +37,9 @@ fn unique_file_name(
 }
 
 fn try_convert_dot_to_image(dot_path: &std::path::Path) {
-    let output_path = dot_path.with_extension("png");
+    let output_path = dot_path.with_extension("svg");
     match std::process::Command::new("dot")
-        .arg("-Tpng")
+        .arg("-Tsvg")
         .arg(dot_path)
         .arg("-o")
         .arg(&output_path)
@@ -215,190 +215,257 @@ pub fn display_latency_count_graph(
     }
 
     let (mut file, path) = unique_file_name(module_name, dot_type).unwrap();
-    render(
-        &Problem {
+
+    use std::io::Write;
+    write!(
+        file,
+        "{}",
+        custom_render_latency_count_graph(
             lc_problem,
             wires,
             submodules,
             linker,
             solution,
-            extra_node_info,
-        },
-        &mut file,
+            module_name
+        )
     )
     .unwrap();
     try_convert_dot_to_image(&path);
 }
 
-#[derive(Clone, Copy)]
-enum LCEdgeType<'a> {
-    Normal(i64),
-    Infer {
-        in_submod: &'a str,
-        var: &'a str,
-        offset: i64,
-        multiplier: i64,
-    },
-    Poison,
+struct NodeId {
+    id: String,
+    valid_parent: Option<SubModuleID>,
+    print_separate: bool,
 }
 
-type LatencyEdge<'a> = (usize, usize, LCEdgeType<'a>);
+fn custom_render_latency_count_graph(
+    lc_problem: &LatencyCountingProblem,
+    wires: &FlatAlloc<RealWire, WireIDMarker>,
+    submodules: &FlatAlloc<SubModule, SubModuleIDMarker>,
+    linker: &Linker,
+    solution: Option<&[i64]>,
+    graph_name: &str,
+) -> impl std::fmt::Display {
+    FmtWrapper(move |f| {
+        let digraph_name = graph_name;
+        writeln!(f, "digraph \"{digraph_name}\" {{")?;
+        writeln!(f, "    rankdir=LR;")?;
+        writeln!(f, "    ranksep=1.5;")?;
+        // writeln!(f, "    node [shape=ellipse];")?;
 
-struct Problem<'a> {
-    lc_problem: &'a LatencyCountingProblem,
-    wires: &'a FlatAlloc<RealWire, WireIDMarker>,
-    submodules: &'a FlatAlloc<SubModule, SubModuleIDMarker>,
-    linker: &'a Linker,
-    solution: Option<&'a [i64]>,
-    extra_node_info: Vec<(Option<Direction>, Option<i64>)>,
-}
+        // Generate all node ids and labels first
+        let mut node_ids: Vec<NodeId> = (0..lc_problem.map_latency_node_to_wire.len())
+            .map(|n| NodeId {
+                id: format!("n{}", n),
+                valid_parent: None,
+                print_separate: true,
+            })
+            .collect();
 
-impl<'a> Labeller<'a> for Problem<'a> {
-    type Node = usize;
-    type Edge = LatencyEdge<'a>;
-    type Subgraph = SubModuleID;
+        let write_wire = |f: &mut std::fmt::Formatter, wire_id: WireID, node_ids: &mut [NodeId]| {
+            let wire = &wires[wire_id];
+            let name = &wire.name;
+            let idx = lc_problem.map_wire_to_latency_node[wire_id];
+            let id = &node_ids[idx].id;
+            let mut label = name.to_string();
+            if let Some(sol) = solution {
+                let sol = sol[idx];
 
-    fn graph_id(&'a self) -> dot2::Result<Id<'a>> {
-        Id::new("lcGraph")
-    }
-
-    fn node_id(&'a self, n: &usize) -> dot2::Result<Id<'a>> {
-        Id::new(format!("n{n}"))
-    }
-
-    fn node_label(&'a self, n: &usize) -> dot2::Result<Text<'a>> {
-        let name = &self.wires[self.lc_problem.map_latency_node_to_wire[*n]].name;
-        let mut result = format!("[{name}] ");
-        if let Some(sol) = self.solution {
-            result.push_str(&sol[*n].to_string())
-        }
-        if let Some(specified) = self.extra_node_info[*n].1 {
-            use std::fmt::Write;
-            write!(result, " specified {specified}").unwrap();
-        }
-        Ok(Text::LabelStr(result.into()))
-    }
-
-    fn edge_label(&'a self, e: &LatencyEdge) -> Text<'a> {
-        Text::LabelStr(match e.2 {
-            LCEdgeType::Normal(delta) => delta.to_string().into(),
-            LCEdgeType::Infer {
-                var,
-                in_submod,
-                offset,
-                multiplier,
-            } => format!("Infer <= {multiplier} * {in_submod}.{var} + {offset}").into(),
-            LCEdgeType::Poison => "poison".into(),
-        })
-    }
-
-    fn edge_color(&'a self, e: &LatencyEdge) -> Option<Text<'a>> {
-        match e.2 {
-            LCEdgeType::Normal(_) => None,
-            LCEdgeType::Infer { .. } => Some(Text::LabelStr("green".into())),
-            LCEdgeType::Poison => Some(Text::LabelStr("red".into())),
-        }
-    }
-
-    fn node_color(&'a self, node: &usize) -> Option<Text<'a>> {
-        self.extra_node_info[*node]
-            .0
-            .map(|direction| Text::LabelStr(direction.node_color().into()))
-    }
-
-    // New: group nodes by submodule using subgraphs
-    fn subgraph_id(&'a self, subgraph: &SubModuleID) -> Option<Id<'a>> {
-        Some(Id::new(format!("cluster_submod_{subgraph:?}")).unwrap())
-    }
-
-    fn subgraph_label(&'a self, subgraph: &SubModuleID) -> Text<'a> {
-        let sm = &self.submodules[*subgraph];
-        Text::LabelStr(Cow::Borrowed(&sm.name))
-    }
-}
-
-impl<'a> GraphWalk<'a> for Problem<'a> {
-    type Node = usize;
-    type Edge = LatencyEdge<'a>;
-    type Subgraph = SubModuleID;
-
-    fn nodes(&'a self) -> Nodes<'a, usize> {
-        (0..self.lc_problem.map_latency_node_to_wire.len()).collect()
-    }
-
-    fn edges(&'a self) -> Edges<'a, LatencyEdge<'a>> {
-        let mut result = Vec::with_capacity(self.lc_problem.edges.len());
-
-        for (to, fan_from) in &self.lc_problem.edges {
-            result.push((
-                fan_from.to_node,
-                *to,
-                if let Some(delta) = fan_from.delta_latency {
-                    LCEdgeType::Normal(delta)
+                use std::fmt::Write;
+                if sol != i64::MIN && sol != i64::MAX {
+                    write!(label, "'{sol}")?;
                 } else {
-                    LCEdgeType::Poison
-                },
-            ));
+                    write!(label, "'?")?;
+                }
+            }
+            if let Some(specified) = wire.specified_latency.get() {
+                use std::fmt::Write as _;
+                write!(label, " specified {specified}").unwrap();
+            }
+            write!(f, "    {id} [label=\"{label}\"")?;
+            match wire.is_port {
+                Some(Direction::Input) => {
+                    node_ids[idx].id = format!("{id}:e");
+                    // Makes the nice rightwards arrow-ey shape
+                    writeln!(f, ",shape=cds,style=filled,fillcolor=darkolivegreen3];")
+                }
+                Some(Direction::Output) => {
+                    node_ids[idx].id = format!("{id}:w");
+                    writeln!(f, ",shape=cds,style=filled,fillcolor=skyblue];")
+                }
+                None => writeln!(f, ",style=filled,fillcolor=bisque];"),
+            }
+        };
+        for (sm_id, sm) in submodules {
+            let sm_md = &linker.modules[sm.refers_to.id];
+            if let Some(inst) = sm.instance.get() {
+                let inst_name = &inst.name;
+                let sm_name = &sm.name;
+                let mut inputs = Vec::new();
+                let mut outputs = Vec::new();
+                for (_, p) in inst.interface_ports.iter_valids() {
+                    let p_wire = &inst.wires[p.wire];
+
+                    match p.direction {
+                        Direction::Input => inputs.push(p_wire),
+                        Direction::Output => outputs.push(p_wire),
+                    }
+                }
+
+                write!(
+                    f,
+                    "    {sm_id:?}[shape=record,style=filled,fillcolor=bisque,label=\"{inst_name} | {{"
+                )?;
+                if !inputs.is_empty() {
+                    write!(f, " {{ ")?;
+                    join_string_iter_formatter(" | ", f, &inputs, |p_wire, f| {
+                        let name = &p_wire.name;
+                        let abs_lat = &p_wire.absolute_latency;
+                        write!(f, "<{name}> {name}'{abs_lat}")
+                    })?;
+                    write!(f, " }} |")?;
+                }
+                write!(f, " {sm_name} ")?;
+                if !outputs.is_empty() {
+                    write!(f, "| {{ ")?;
+                    join_string_iter_formatter(" | ", f, &outputs, |p_wire, f| {
+                        let name = &p_wire.name;
+                        let abs_lat = &p_wire.absolute_latency;
+                        write!(f, "<{name}> {name}'{abs_lat}")
+                    })?;
+                    write!(f, " }} ")?;
+                }
+                writeln!(f, "}}\"];")?;
+
+                for (_, maps_to, port) in crate::alloc::zip_eq(&sm.port_map, &inst.interface_ports)
+                {
+                    let (Some(maps_to), Some(port)) = (maps_to, port) else {
+                        continue;
+                    };
+                    let p_name = &inst.wires[port.wire].name;
+                    let node =
+                        &mut node_ids[lc_problem.map_wire_to_latency_node[maps_to.maps_to_wire]];
+                    node.print_separate = false;
+                    node.id = format!("{sm_id:?}:{p_name}");
+                    node.valid_parent = Some(sm_id);
+                }
+            } else {
+                let failed_sm_name = sm.refers_to.display(&linker.globals);
+                writeln!(f, "subgraph cluster_{sm_id:?} {{")?;
+                writeln!(f, "    label=\"{failed_sm_name}\";")?;
+                writeln!(f, "    style=filled;")?;
+                writeln!(f, "    color=lightgrey;")?;
+
+                writeln!(f, "    {{ rank=same;")?;
+                for (port_id, port) in sm.port_map.iter_valids() {
+                    if sm_md.ports[port_id].direction == Direction::Input {
+                        let idx = lc_problem.map_wire_to_latency_node[port.maps_to_wire];
+                        node_ids[idx].print_separate = false;
+                        write_wire(f, port.maps_to_wire, &mut node_ids)?;
+                    }
+                }
+                writeln!(f, "    }}")?;
+                writeln!(f, "    {{ rank=same;")?;
+                for (port_id, port) in sm.port_map.iter_valids() {
+                    if sm_md.ports[port_id].direction == Direction::Output {
+                        let idx = lc_problem.map_wire_to_latency_node[port.maps_to_wire];
+                        node_ids[idx].print_separate = false;
+                        write_wire(f, port.maps_to_wire, &mut node_ids)?;
+                    }
+                }
+                writeln!(f, "    }}")?;
+
+                writeln!(f, "}}")?;
+            }
         }
 
-        for (_, sm) in self.submodules {
-            if sm.instance.get().is_some() {
-                continue; // Don't use infer edges for submodules that have been correctly instantiated
+        for (wire_id, _) in wires {
+            let idx = lc_problem.map_wire_to_latency_node[wire_id];
+            if !node_ids[idx].print_separate {
+                continue;
             }
-            let sm_md = &self.linker.modules[sm.refers_to.id];
+            write_wire(f, wire_id, &mut node_ids)?;
+        }
 
+        // Edges (normal and poison)
+        for (to, fan_from) in &lc_problem.edges {
+            let from = fan_from.to_node;
+
+            let NodeId {
+                id: to_id,
+                valid_parent: to_submod,
+                ..
+            } = &node_ids[*to];
+            let NodeId {
+                id: from_id,
+                valid_parent: from_submod,
+                ..
+            } = &node_ids[from];
+
+            // Skip edges withing entirely known modules
+            if let (Some(to_submod), Some(from_submod)) = (to_submod, from_submod)
+                && to_submod == from_submod
+            {
+                continue;
+            }
+
+            match fan_from.delta_latency {
+                Some(0) => {
+                    writeln!(f, "    {from_id} -> {to_id};")?;
+                }
+                Some(delta) => {
+                    writeln!(f, "    {from_id} -> {to_id} [label={delta}];")?;
+                }
+                None => {
+                    writeln!(f, "    {from_id} -> {to_id} [label=poison, color=red];")?;
+                }
+            }
+        }
+
+        // Inference edges (green)
+        for (_, sm) in submodules {
+            if sm.instance.get().is_some() {
+                continue;
+            }
+            let sm_md = &linker.modules[sm.refers_to.id];
             for (_, infer_info, param) in crate::alloc::zip_eq(
                 &sm_md.inference_info.parameter_inference_candidates,
                 &sm_md.link_info.parameters,
             ) {
-                match infer_info {
-                    TemplateKind::Type(_t_info) => {}
-                    TemplateKind::Value(v_info) => {
-                        for c in &v_info.candidates {
-                            if let InferenceTarget::PortLatency { from, to } = &c.target {
-                                let (Some(from), Some(to)) =
-                                    (&sm.port_map[*from], &sm.port_map[*to])
-                                else {
-                                    continue;
-                                };
-                                let from =
-                                    self.lc_problem.map_wire_to_latency_node[from.maps_to_wire];
-                                let to = self.lc_problem.map_wire_to_latency_node[to.maps_to_wire];
-
-                                let edge = LCEdgeType::Infer {
-                                    in_submod: &sm.name,
-                                    var: &param.name,
-                                    offset: i64::try_from(&c.offset).unwrap(),
-                                    multiplier: i64::try_from(&c.mul_by).unwrap(),
-                                };
-                                result.push((from, to, edge));
-                            }
+                if let TemplateKind::Value(v_info) = infer_info {
+                    for c in &v_info.candidates {
+                        if let InferenceTarget::PortLatency { from, to } = &c.target {
+                            let (Some(from), Some(to)) = (&sm.port_map[*from], &sm.port_map[*to])
+                            else {
+                                continue;
+                            };
+                            let from_idx = lc_problem.map_wire_to_latency_node[from.maps_to_wire];
+                            let to_idx = lc_problem.map_wire_to_latency_node[to.maps_to_wire];
+                            let from_id = &node_ids[from_idx].id;
+                            let to_id = &node_ids[to_idx].id;
+                            let param = &param.name;
+                            let mul = i64::try_from(&c.mul_by).unwrap();
+                            let add = i64::try_from(&c.offset).unwrap();
+                            let label = match (mul, add) {
+                                (1, 0) => param.to_string(),
+                                (-1, 0) => format!("-{param}"),
+                                (1, add) if add < 0 => format!("-{param} - {}", -add),
+                                (1, add) => format!("-{param} + {add}"),
+                                (mul, add) if add < 0 => format!("{mul} * {param} - {}", -add),
+                                (mul, add) => format!("{mul} * {param} + {add}"),
+                            };
+                            writeln!(
+                                f,
+                                "    {from_id} -> {to_id} [label=\"{label}\", color=green];"
+                            )?;
                         }
                     }
                 }
             }
         }
 
-        result.into()
-    }
-
-    fn source(&'a self, edge: &LatencyEdge) -> usize {
-        edge.0
-    }
-
-    fn target(&'a self, edge: &LatencyEdge) -> usize {
-        edge.1
-    }
-
-    fn subgraphs(&'a self) -> dot2::Subgraphs<'a, Self::Subgraph> {
-        self.submodules.id_range().into_iter().collect()
-    }
-
-    fn subgraph_nodes(&'a self, s: &SubModuleID) -> dot2::Nodes<'a, Self::Node> {
-        let sm = &self.submodules[*s];
-        sm.port_map
-            .iter_valids()
-            .map(|(_, map_to)| self.lc_problem.map_wire_to_latency_node[map_to.maps_to_wire])
-            .collect()
-    }
+        writeln!(f, "}}")?;
+        Ok(())
+    })
 }
