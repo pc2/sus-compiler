@@ -1,8 +1,5 @@
-use std::borrow::Cow;
 use std::fs::{self, File};
-
-use dot2::label::Text;
-use dot2::{Edges, GraphWalk, Id, Labeller, Nodes, Style, render};
+use std::io::Write;
 
 use crate::to_string::{FmtWrapper, join_string_iter_formatter};
 use crate::{
@@ -65,131 +62,74 @@ fn try_convert_dot_to_image(dot_path: &std::path::Path) {
 
 pub fn display_generated_hardware_structure(md_instance: &ModuleTypingContext<'_>) {
     let (mut file, path) = unique_file_name(&md_instance.name, "hw_structure").unwrap();
-    render(md_instance, &mut file).unwrap();
+    write!(file, "{}", custom_render_hardware_structure(md_instance)).unwrap();
     try_convert_dot_to_image(&path);
 }
 
-#[derive(Clone, Copy)]
-pub enum NodeType {
-    Wire(WireID),
-    SubModule(SubModuleID),
-}
+fn custom_render_hardware_structure<'a>(
+    md_instance: &'a ModuleTypingContext<'a>,
+) -> impl std::fmt::Display + 'a {
+    FmtWrapper(move |f| {
+        writeln!(f, "digraph \"{}\" {{", md_instance.mangled_name)?;
+        writeln!(f, "    rankdir=LR;")?;
+        writeln!(f, "    ranksep=1.5;")?;
 
-impl Direction {
-    fn node_color(&self) -> &'static str {
-        match self {
-            Direction::Input => "red",
-            Direction::Output => "blue",
-        }
-    }
-}
-
-pub type EdgeType = (NodeType, NodeType);
-
-impl<'inst> Labeller<'inst> for ModuleTypingContext<'_> {
-    type Node = NodeType;
-    type Edge = EdgeType;
-    type Subgraph = ();
-
-    fn graph_id(&'inst self) -> dot2::Result<Id<'inst>> {
-        Id::new(&self.mangled_name)
-    }
-
-    fn node_id(&'inst self, n: &NodeType) -> dot2::Result<Id<'inst>> {
-        Id::new(match *n {
-            NodeType::Wire(id) => {
-                let wire = &self.wires[id];
-                &wire.name
-            }
-            NodeType::SubModule(id) => {
-                let sm = &self.submodules[id];
-                &sm.name
-            }
-        })
-    }
-
-    fn node_label(&'inst self, n: &NodeType) -> dot2::Result<Text<'inst>> {
-        Ok(Text::LabelStr(match *n {
-            NodeType::Wire(id) => {
-                let wire = &self.wires[id];
-                let name = &wire.name;
-                let abs_lat = wire.absolute_latency;
-                Cow::Owned(format!("{name}'{abs_lat}"))
-            }
-            NodeType::SubModule(id) => {
-                let sm = &self.submodules[id];
-                Cow::Borrowed(&sm.name)
-            }
-        }))
-    }
-
-    fn node_style(&'inst self, n: &NodeType) -> Style {
-        match n {
-            NodeType::Wire(w_id) => match self.wires[*w_id].is_port {
-                Some(Direction::Input) => Style::Bold,
-                Some(Direction::Output) => Style::Bold,
-                None => Style::None,
-            },
-            NodeType::SubModule(_) => Style::Filled,
-        }
-    }
-
-    fn node_color<'a>(&'a self, n: &NodeType) -> Option<Text<'inst>> {
-        match n {
-            NodeType::Wire(w_id) => self.wires[*w_id]
-                .is_port
-                .map(|d| Text::LabelStr(Cow::Borrowed(d.node_color()))),
-            NodeType::SubModule(_) => None,
-        }
-    }
-}
-
-impl<'inst> GraphWalk<'inst> for ModuleTypingContext<'_> {
-    type Node = NodeType;
-    type Edge = EdgeType;
-    type Subgraph = ();
-
-    fn nodes(&'inst self) -> Nodes<'inst, NodeType> {
-        self.wires
-            .iter()
-            .map(|(w, _)| NodeType::Wire(w))
-            .chain(self.submodules.iter().map(|(s, _)| NodeType::SubModule(s)))
-            .collect()
-    }
-
-    fn edges(&'inst self) -> Edges<'inst, EdgeType> {
-        let mut edges = Vec::new();
-
-        for (id, w) in &self.wires {
-            w.source
-                .for_each_wire(&mut |v| edges.push((NodeType::Wire(v), NodeType::Wire(id))));
+        // Emit nodes for wires
+        for (_, wire) in &md_instance.wires {
+            let name = &wire.name;
+            let abs_lat = wire.absolute_latency;
+            let label = format!("{}'{}", name, abs_lat);
+            let (style, color) = match wire.is_port {
+                Some(Direction::Input) => ("bold", "red"),
+                Some(Direction::Output) => ("bold", "blue"),
+                None => ("", "black"),
+            };
+            writeln!(
+                f,
+                "    \"{}\" [label=\"{}\" style={} color={}];",
+                name, label, style, color
+            )?;
         }
 
-        for (submod_id, s) in &self.submodules {
-            let s_md = &self.linker.modules[s.refers_to.id];
-            for (port_id, port) in s.port_map.iter_valids() {
+        // Emit nodes for submodules
+        for (_, sm) in &md_instance.submodules {
+            writeln!(
+                f,
+                "    \"{}\" [label=\"{}\" style=filled];",
+                sm.name, sm.name
+            )?;
+        }
+
+        // Emit edges for wires
+        for (id, w) in &md_instance.wires {
+            w.source.for_each_wire(&mut |v| {
+                let from = &md_instance.wires[v].name;
+                let to = &md_instance.wires[id].name;
+                writeln!(f, "    \"{}\" -> \"{}\";", from, to).ok();
+            });
+        }
+
+        // Emit edges for submodules
+        for (_, sm) in &md_instance.submodules {
+            let s_md = &md_instance.linker.modules[sm.refers_to.id];
+            let sm_name = &sm.name;
+            for (port_id, port) in sm.port_map.iter_valids() {
                 let w_id = port.maps_to_wire;
+                let w_name = &md_instance.wires[w_id].name;
                 match s_md.ports[port_id].direction {
                     Direction::Input => {
-                        edges.push((NodeType::Wire(w_id), NodeType::SubModule(submod_id)));
+                        writeln!(f, "    \"{}\" -> \"{}\";", w_name, sm_name)?;
                     }
                     Direction::Output => {
-                        edges.push((NodeType::SubModule(submod_id), NodeType::Wire(w_id)));
+                        writeln!(f, "    \"{}\" -> \"{}\";", sm_name, w_name)?;
                     }
                 }
             }
         }
 
-        Cow::from(edges)
-    }
-
-    fn source(&'inst self, edge: &EdgeType) -> NodeType {
-        edge.0
-    }
-
-    fn target(&'inst self, edge: &EdgeType) -> NodeType {
-        edge.1
-    }
+        writeln!(f, "}}")?;
+        Ok(())
+    })
 }
 
 pub fn display_latency_count_graph(
