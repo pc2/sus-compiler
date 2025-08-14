@@ -1,9 +1,9 @@
 pub mod ariadne_interface;
 
-#[cfg(feature = "dot")]
+#[cfg(feature = "dot2")]
 pub mod dot_graphs;
 
-#[cfg(not(feature = "dot"))]
+#[cfg(not(feature = "dot2"))]
 pub mod dot_graphs {
     pub fn display_generated_hardware_structure(
         _md_instance: &crate::instantiation::ModuleTypingContext<'_>,

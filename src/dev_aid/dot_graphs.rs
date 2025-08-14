@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 use std::fs::{self, File};
 
-use dot::{Edges, GraphWalk, Id, LabelText, Labeller, Nodes, Style, render};
+use dot2::label::Text;
+use dot2::{Edges, GraphWalk, Id, Labeller, Nodes, Style, render};
 
 use crate::{
     alloc::FlatAlloc,
@@ -68,7 +69,7 @@ pub fn display_generated_hardware_structure(md_instance: &ModuleTypingContext<'_
 }
 
 #[derive(Clone, Copy)]
-enum NodeType {
+pub enum NodeType {
     Wire(WireID),
     SubModule(SubModuleID),
 }
@@ -82,14 +83,18 @@ impl Direction {
     }
 }
 
-type EdgeType = (NodeType, NodeType);
+pub type EdgeType = (NodeType, NodeType);
 
-impl<'inst> Labeller<'inst, NodeType, EdgeType> for ModuleTypingContext<'_> {
-    fn graph_id(&'inst self) -> Id<'inst> {
-        Id::new(&self.mangled_name).unwrap()
+impl<'inst> Labeller<'inst> for ModuleTypingContext<'_> {
+    type Node = NodeType;
+    type Edge = EdgeType;
+    type Subgraph = ();
+
+    fn graph_id(&'inst self) -> dot2::Result<Id<'inst>> {
+        Id::new(&self.mangled_name)
     }
 
-    fn node_id(&'inst self, n: &NodeType) -> Id<'inst> {
+    fn node_id(&'inst self, n: &NodeType) -> dot2::Result<Id<'inst>> {
         Id::new(match *n {
             NodeType::Wire(id) => {
                 let wire = &self.wires[id];
@@ -100,11 +105,10 @@ impl<'inst> Labeller<'inst, NodeType, EdgeType> for ModuleTypingContext<'_> {
                 &sm.name
             }
         })
-        .unwrap()
     }
 
-    fn node_label(&'inst self, n: &NodeType) -> LabelText<'inst> {
-        LabelText::LabelStr(match *n {
+    fn node_label(&'inst self, n: &NodeType) -> dot2::Result<Text<'inst>> {
+        Ok(Text::LabelStr(match *n {
             NodeType::Wire(id) => {
                 let wire = &self.wires[id];
                 let name = &wire.name;
@@ -115,7 +119,7 @@ impl<'inst> Labeller<'inst, NodeType, EdgeType> for ModuleTypingContext<'_> {
                 let sm = &self.submodules[id];
                 Cow::Borrowed(&sm.name)
             }
-        })
+        }))
     }
 
     fn node_style(&'inst self, n: &NodeType) -> Style {
@@ -129,17 +133,21 @@ impl<'inst> Labeller<'inst, NodeType, EdgeType> for ModuleTypingContext<'_> {
         }
     }
 
-    fn node_color<'a>(&'a self, n: &NodeType) -> Option<LabelText<'a>> {
+    fn node_color<'a>(&'a self, n: &NodeType) -> Option<Text<'inst>> {
         match n {
             NodeType::Wire(w_id) => self.wires[*w_id]
                 .is_port
-                .map(|d| LabelText::LabelStr(Cow::Borrowed(d.node_color()))),
+                .map(|d| Text::LabelStr(Cow::Borrowed(d.node_color()))),
             NodeType::SubModule(_) => None,
         }
     }
 }
 
-impl<'inst> GraphWalk<'inst, NodeType, EdgeType> for ModuleTypingContext<'_> {
+impl<'inst> GraphWalk<'inst> for ModuleTypingContext<'_> {
+    type Node = NodeType;
+    type Edge = EdgeType;
+    type Subgraph = ();
+
     fn nodes(&'inst self) -> Nodes<'inst, NodeType> {
         self.wires
             .iter()
@@ -244,16 +252,20 @@ struct Problem<'a> {
     extra_node_info: Vec<(Option<Direction>, Option<i64>)>,
 }
 
-impl<'a> Labeller<'a, usize, LatencyEdge<'a>> for Problem<'a> {
-    fn graph_id(&'a self) -> Id<'a> {
-        Id::new("lcGraph").unwrap()
+impl<'a> Labeller<'a> for Problem<'a> {
+    type Node = usize;
+    type Edge = LatencyEdge<'a>;
+    type Subgraph = ();
+
+    fn graph_id(&'a self) -> dot2::Result<Id<'a>> {
+        Id::new("lcGraph")
     }
 
-    fn node_id(&'a self, n: &usize) -> Id<'a> {
-        Id::new(format!("n{n}")).unwrap()
+    fn node_id(&'a self, n: &usize) -> dot2::Result<Id<'a>> {
+        Id::new(format!("n{n}"))
     }
 
-    fn node_label(&'a self, n: &usize) -> LabelText<'a> {
+    fn node_label(&'a self, n: &usize) -> dot2::Result<Text<'a>> {
         let name = &self.wires[self.lc_problem.map_latency_node_to_wire[*n]].name;
         let mut result = format!("[{name}] ");
 
@@ -264,11 +276,11 @@ impl<'a> Labeller<'a, usize, LatencyEdge<'a>> for Problem<'a> {
             use std::fmt::Write;
             write!(result, " specified {specified}").unwrap();
         }
-        LabelText::LabelStr(result.into())
+        Ok(Text::LabelStr(result.into()))
     }
 
-    fn edge_label(&'a self, e: &LatencyEdge) -> LabelText<'a> {
-        LabelText::LabelStr(match e.2 {
+    fn edge_label(&'a self, e: &LatencyEdge) -> Text<'a> {
+        Text::LabelStr(match e.2 {
             LCEdgeType::Normal(delta) => delta.to_string().into(),
             LCEdgeType::Infer {
                 var,
@@ -280,22 +292,26 @@ impl<'a> Labeller<'a, usize, LatencyEdge<'a>> for Problem<'a> {
         })
     }
 
-    fn edge_color(&'a self, e: &LatencyEdge) -> Option<LabelText<'a>> {
+    fn edge_color(&'a self, e: &LatencyEdge) -> Option<Text<'a>> {
         match e.2 {
             LCEdgeType::Normal(_) => None,
-            LCEdgeType::Infer { .. } => Some(LabelText::LabelStr("green".into())),
-            LCEdgeType::Poison => Some(LabelText::LabelStr("red".into())),
+            LCEdgeType::Infer { .. } => Some(Text::LabelStr("green".into())),
+            LCEdgeType::Poison => Some(Text::LabelStr("red".into())),
         }
     }
 
-    fn node_color(&'a self, node: &usize) -> Option<LabelText<'a>> {
+    fn node_color(&'a self, node: &usize) -> Option<Text<'a>> {
         self.extra_node_info[*node]
             .0
-            .map(|direction| LabelText::LabelStr(direction.node_color().into()))
+            .map(|direction| Text::LabelStr(direction.node_color().into()))
     }
 }
 
-impl<'a> GraphWalk<'a, usize, LatencyEdge<'a>> for Problem<'a> {
+impl<'a> GraphWalk<'a> for Problem<'a> {
+    type Node = usize;
+    type Edge = LatencyEdge<'a>;
+    type Subgraph = ();
+
     fn nodes(&'a self) -> Nodes<'a, usize> {
         (0..self.lc_problem.map_latency_node_to_wire.len()).collect()
     }
