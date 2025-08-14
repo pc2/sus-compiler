@@ -19,7 +19,7 @@ use std::collections::VecDeque;
 use crate::{
     alloc::FlatAlloc,
     flattening::Direction,
-    latency::{AbsLat, CALCULATE_LATENCY_LATER},
+    latency::{AbsLat, CALCULATE_LATENCY_LATER, InferenceFailure},
     prelude::{InferenceVarIDMarker, LatencyCountInferenceVarID},
 };
 
@@ -901,12 +901,6 @@ impl LatencyInferenceProblem {
             Ok(found_target_latency)
         }
     }
-}
-
-pub enum InferenceFailure {
-    NotReached,
-    Poison,
-    BadProblem,
 }
 
 /// Tries to infer the inference edges given in [inference_candidates].
