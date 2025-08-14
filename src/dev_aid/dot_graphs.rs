@@ -4,6 +4,7 @@ use std::fs::{self, File};
 use dot2::label::Text;
 use dot2::{Edges, GraphWalk, Id, Labeller, Nodes, Style, render};
 
+use crate::to_string::FmtWrapper;
 use crate::{
     alloc::FlatAlloc,
     flattening::Direction,
@@ -255,7 +256,7 @@ struct Problem<'a> {
 impl<'a> Labeller<'a> for Problem<'a> {
     type Node = usize;
     type Edge = LatencyEdge<'a>;
-    type Subgraph = ();
+    type Subgraph = SubModuleID;
 
     fn graph_id(&'a self) -> dot2::Result<Id<'a>> {
         Id::new("lcGraph")
@@ -268,7 +269,6 @@ impl<'a> Labeller<'a> for Problem<'a> {
     fn node_label(&'a self, n: &usize) -> dot2::Result<Text<'a>> {
         let name = &self.wires[self.lc_problem.map_latency_node_to_wire[*n]].name;
         let mut result = format!("[{name}] ");
-
         if let Some(sol) = self.solution {
             result.push_str(&sol[*n].to_string())
         }
@@ -305,12 +305,22 @@ impl<'a> Labeller<'a> for Problem<'a> {
             .0
             .map(|direction| Text::LabelStr(direction.node_color().into()))
     }
+
+    // New: group nodes by submodule using subgraphs
+    fn subgraph_id(&'a self, subgraph: &SubModuleID) -> Option<Id<'a>> {
+        Some(Id::new(format!("cluster_submod_{subgraph:?}")).unwrap())
+    }
+
+    fn subgraph_label(&'a self, subgraph: &SubModuleID) -> Text<'a> {
+        let sm = &self.submodules[*subgraph];
+        Text::LabelStr(Cow::Borrowed(&sm.name))
+    }
 }
 
 impl<'a> GraphWalk<'a> for Problem<'a> {
     type Node = usize;
     type Edge = LatencyEdge<'a>;
-    type Subgraph = ();
+    type Subgraph = SubModuleID;
 
     fn nodes(&'a self) -> Nodes<'a, usize> {
         (0..self.lc_problem.map_latency_node_to_wire.len()).collect()
@@ -378,5 +388,17 @@ impl<'a> GraphWalk<'a> for Problem<'a> {
 
     fn target(&'a self, edge: &LatencyEdge) -> usize {
         edge.1
+    }
+
+    fn subgraphs(&'a self) -> dot2::Subgraphs<'a, Self::Subgraph> {
+        self.submodules.id_range().into_iter().collect()
+    }
+
+    fn subgraph_nodes(&'a self, s: &SubModuleID) -> dot2::Nodes<'a, Self::Node> {
+        let sm = &self.submodules[*s];
+        sm.port_map
+            .iter_valids()
+            .map(|(_, map_to)| self.lc_problem.map_wire_to_latency_node[map_to.maps_to_wire])
+            .collect()
     }
 }
