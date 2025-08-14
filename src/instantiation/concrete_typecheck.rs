@@ -3,6 +3,7 @@ use ibig::ops::DivRem;
 use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::{zip_eq, zip_eq3};
+use crate::dev_aid::dot_graphs::display_latency_count_graph;
 use crate::latency::LatencyInferenceProblem;
 use crate::latency::port_latency_inference::{
     InferenceCandidate, InferenceTarget, InferenceTargetPath, ValueInferStrategy,
@@ -134,6 +135,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         unifier.execute_ready_constraints();
 
         let mut all_submod_ids: Vec<SubModuleID> = self.submodules.id_range().iter().collect();
+
         loop {
             self.try_infer_submodule_params(&mut unifier, &mut all_submod_ids);
             if !unifier.execute_ready_constraints() {
@@ -543,7 +545,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         sm: &SubModule,
         candidate: &InferenceCandidate,
         unifier: &'inst ValueUnifier<'inst>,
-        latency_infer_problem: &mut Option<LatencyInferenceProblem>,
+        latency_infer_problem: &mut LatencyInferenceProblem,
     ) -> InferenceResult {
         match &candidate.target {
             InferenceTarget::Subtype(path) => {
@@ -561,10 +563,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 let (Some(from), Some(to)) = (&sm.port_map[*from], &sm.port_map[*to]) else {
                     return InferenceResult::PortNotUsed;
                 };
-                let Some(infer_problem) = latency_infer_problem else {
-                    return InferenceResult::NotFound;
-                };
-                match infer_problem.infer(from.maps_to_wire, to.maps_to_wire) {
+                match latency_infer_problem.infer(from.maps_to_wire, to.maps_to_wire) {
                     Ok(result) => InferenceResult::Found(IBig::from(result)),
                     Err(_) => InferenceResult::NotFound,
                 }
@@ -577,6 +576,19 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         sm_ids: &mut Vec<SubModuleID>,
     ) {
         let mut lat_inf = LatencyInferenceProblem::new(self);
+
+        if crate::debug::is_enabled("dot-latency-infer") {
+            __debug_breakpoint!();
+            display_latency_count_graph(
+                &lat_inf.latency_count_problem,
+                &self.wires,
+                &self.submodules,
+                self.linker,
+                None,
+                &self.name,
+                "inference_problem",
+            );
+        }
 
         for sm_id in sm_ids.iter() {
             let sm = &self.submodules[*sm_id];

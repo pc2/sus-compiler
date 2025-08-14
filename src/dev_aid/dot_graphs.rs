@@ -1,4 +1,5 @@
-use std::{borrow::Cow, path::PathBuf};
+use std::borrow::Cow;
+use std::fs::{self, File};
 
 use dot::{Edges, GraphWalk, Id, LabelText, Labeller, Nodes, Style, render};
 
@@ -12,8 +13,24 @@ use crate::{
     typing::template::TemplateKind,
 };
 
+/// Ensures dot_output exists and returns a File in dot_output with a unique name based on `module_name`, `dot_type`, and `.dot` extension.
+fn unique_file_name(module_name: &str, dot_type: &str) -> std::io::Result<File> {
+    let dir = "dot_output";
+    fs::create_dir_all(dir)?;
+    let mut path = std::path::PathBuf::from(dir);
+    let mut file_name = format!("{module_name}_{dot_type}.dot");
+    path.push(&file_name);
+    let mut count = 1;
+    while path.exists() {
+        file_name = format!("{module_name}_{dot_type}_{count}.dot");
+        path.set_file_name(&file_name);
+        count += 1;
+    }
+    File::create(path)
+}
+
 pub fn display_generated_hardware_structure(md_instance: &ModuleTypingContext<'_>) {
-    let mut file = std::fs::File::create(format!("{}.dot", md_instance.name)).unwrap();
+    let mut file = unique_file_name(&md_instance.name, "hw_structure").unwrap();
     render(md_instance, &mut file).unwrap();
 }
 
@@ -139,7 +156,8 @@ pub fn display_latency_count_graph(
     submodules: &FlatAlloc<SubModule, SubModuleIDMarker>,
     linker: &Linker,
     solution: Option<&[i64]>,
-    filename: &str,
+    module_name: &str,
+    dot_type: &str,
 ) {
     // true for input
     let mut extra_node_info = vec![(None, None); lc_problem.map_latency_node_to_wire.len()];
@@ -154,9 +172,7 @@ pub fn display_latency_count_graph(
         extra_node_info[spec.node].1 = Some(spec.latency);
     }
 
-    use std::str::FromStr;
-
-    let mut file = std::fs::File::create(PathBuf::from_str(filename).unwrap()).unwrap();
+    let mut file = unique_file_name(module_name, dot_type).unwrap();
     render(
         &Problem {
             lc_problem,

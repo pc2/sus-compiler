@@ -1224,7 +1224,12 @@ impl<'l> ExecutionContext<'l> {
                 Ok(self.get_submodule_interface(submod_id, interface, name_span, domain))
             }
             WireReferenceRoot::NamedModule(module_ref) => {
-                let submod_id = self.instantiate_submodule(module_ref, "", original_instruction)?;
+                let md = &self.linker.modules[module_ref.id];
+                let submod_id = self.instantiate_submodule(
+                    module_ref,
+                    &md.link_info.name,
+                    original_instruction,
+                )?;
 
                 assert!(interface_ref.path.is_empty());
                 Ok(self.get_submodule_interface(

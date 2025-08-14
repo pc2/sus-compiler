@@ -906,6 +906,7 @@ impl LatencyInferenceProblem {
 pub enum InferenceFailure {
     NotReached,
     Poison,
+    BadProblem,
 }
 
 /// Tries to infer the inference edges given in [inference_candidates].
