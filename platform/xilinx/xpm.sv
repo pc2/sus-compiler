@@ -168,7 +168,7 @@ xpm_fifo_sync #(
    .ECC_MODE("no_ecc"),           // String
    .EN_SIM_ASSERT_ERR("error"), // String
    .FIFO_MEMORY_TYPE("auto"),     // String
-   .FIFO_READ_LATENCY(0),         // DECIMAL
+   .FIFO_READ_LATENCY(2),         // DECIMAL
    .FIFO_WRITE_DEPTH(DEPTH),       // DECIMAL
    .FULL_RESET_VALUE(0),          // DECIMAL
    .PROG_EMPTY_THRESH(0),        // DECIMAL

@@ -2224,7 +2224,7 @@ Error: Excess output targets. Function returns 1 results, but 2 targets were giv
      │
      ├─[ xpm.sus:70:12 ]
      │
-  70 │     action pop : -> T pop_data {
+  70 │     action pop'0 : -> T pop_data'2 {
      │            ─┬─  
      │             ╰─── Interface 'pop' defined here
 ─────╯
@@ -2244,7 +2244,7 @@ Error: Excess argument. Function takes 0 args, but 1 were passed.
      │
      ├─[ xpm.sus:70:12 ]
      │
-  70 │     action pop : -> T pop_data {
+  70 │     action pop'0 : -> T pop_data'2 {
      │            ─┬─  
      │             ╰─── Interface 'pop' defined here
 ─────╯
@@ -6912,11 +6912,23 @@ Error: Could not finalize this type, some parameters were still unknown: int #(F
      │                          ╰──── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ─────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: replicate #(T: type int #(FROM: ?, TO: ?)[30], NUM_REPLS: 20)
+T can be inferred from:
+{*} <: T in T data
+{*} = T in T[] result
+NUM_REPLS can be inferred if at least one of the following constraint resolves:
+- NUM_REPLS == {*} in T[{*}] result
+
      ╭─[ test.sus:851:46 ]
      │
  851 │     replicate #(NUM_REPLS: 20, T: type int[30]) b
      │                                                 ┬  
      │                                                 ╰── Could not infer the parameters of this submodule, some parameters were still unknown: replicate #(T: type int #(FROM: ?, TO: ?)[30], NUM_REPLS: 20)
+T can be inferred from:
+{*} <: T in T data
+{*} = T in T[] result
+NUM_REPLS can be inferred if at least one of the following constraint resolves:
+- NUM_REPLS == {*} in T[{*}] result
+
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:854:6 ]
@@ -7291,11 +7303,19 @@ Error: Could not finalize this type, some parameters were still unknown: int #(F
      │                  ╰── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[5]
 ─────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: CrossDomain #(T: type int #(FROM: ?, TO: ?)[5])
+T can be inferred from:
+{*} <: T in T in
+{*} = T in T out
+
      ╭─[ test.sus:958:14 ]
      │
  958 │     CrossDomain cr
      │                 ─┬  
      │                  ╰── Could not infer the parameters of this submodule, some parameters were still unknown: CrossDomain #(T: type int #(FROM: ?, TO: ?)[5])
+T can be inferred from:
+{*} <: T in T in
+{*} = T in T out
+
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)[5]
      ╭─[ test.sus:960:10 ]
@@ -7690,11 +7710,17 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │                   ╰───── Interface 'infer_me' defined here
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
+A can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
+- A <= x'{*} - y'{*}  ({*} = ?)
+
       ╭─[ test.sus:1149:12 ]
       │
  1149 │     out_val = infer_me(in_val) | heavily_pipelined_computation
       │               ────┬───  
       │                   ╰───── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
+A can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
+- A <= x'{*} - y'{*}  ({*} = ?)
+
 ──────╯
 Warning: Not Instantiating instantiate_fifo #() due to abstract typing errors
       ╭─[ test.sus:1152:8 ]
@@ -7733,27 +7759,39 @@ domain clk:
 action rst:
 domain write:
 output bool may_push'-MAY_PUSH_LATENCY
-action push:
-	input T push_data
+action push'0:
+	input T push_data'0
 domain read:
-output bool may_pop
-action pop:
+output bool may_pop'0
+action pop'0:
 	->
-	output T pop_data
+	output T pop_data'2
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
+A can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
+- A <= x'{*} - y'{*}  ({*} = ?)
+
       ╭─[ test.sus:1181:11 ]
       │
  1181 │     infer_me x
       │              ┬  
       │              ╰── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
+A can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
+- A <= x'{*} - y'{*}  ({*} = ?)
+
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
+A can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
+- A <= x'{*} - y'{*}  ({*} = ?)
+
       ╭─[ test.sus:1182:11 ]
       │
  1182 │     infer_me y
       │              ┬  
       │              ╰── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
+A can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
+- A <= x'{*} - y'{*}  ({*} = ?)
+
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1193:7 ]
@@ -8211,11 +8249,17 @@ Error: Could not finalize this type, some parameters were still unknown: int #(F
       │                                 ╰───────── Could not finalize this type, some parameters were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_poison_output #(N: ?)
+N can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
+- N <= i'{*} - o'{*}  ({*} = ?)
+
       ╭─[ test.sus:1223:19 ]
       │
  1223 │     bool x, bool y = infer_me_with_poison_output(i)
       │                      ─────────────┬─────────────  
       │                                   ╰─────────────── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_poison_output #(N: ?)
+N can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
+- N <= i'{*} - o'{*}  ({*} = ?)
+
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1228:34 ]
@@ -8435,11 +8479,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                             ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: unknownLatency #(V: ?)
+V has no acceptable inference candidates
+
       ╭─[ test.sus:1282:17 ]
       │
  1282 │     unknownLatency ulat
       │                    ──┬─  
       │                      ╰─── Could not infer the parameters of this submodule, some parameters were still unknown: unknownLatency #(V: ?)
+V has no acceptable inference candidates
+
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1288:20 ]
@@ -8456,11 +8504,25 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_conflicting_directions #(V: ?)
+V has no acceptable inference candidates
+The following constraints were found, but aren't used for inference here
+- V * -1 <= x'{*} - q'{*}
+- V <= p'{*} - y'{*}
+- V * -1 <= p'{*} - q'{*}
+- V <= x'{*} - y'{*}
+
       ╭─[ test.sus:1296:34 ]
       │
  1296 │     infer_me_conflicting_directions inf
       │                                     ─┬─  
       │                                      ╰─── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_conflicting_directions #(V: ?)
+V has no acceptable inference candidates
+The following constraints were found, but aren't used for inference here
+- V * -1 <= x'{*} - q'{*}
+- V <= p'{*} - y'{*}
+- V * -1 <= p'{*} - q'{*}
+- V <= x'{*} - y'{*}
+
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1303:20 ]
@@ -8477,11 +8539,23 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_delta #(V: ?)
+V can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
+- V + 30 <= x'{*} - q'{*}  ({*} = ?)
+- V <= p'{*} - y'{*}  ({*} = ?)
+- V + 30 <= p'{*} - q'{*}  ({*} = ?)
+- V <= x'{*} - y'{*}  ({*} = ?)
+
       ╭─[ test.sus:1311:22 ]
       │
  1311 │     infer_me_with_delta inf
       │                         ─┬─  
       │                          ╰─── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_delta #(V: ?)
+V can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
+- V + 30 <= x'{*} - q'{*}  ({*} = ?)
+- V <= p'{*} - y'{*}  ({*} = ?)
+- V + 30 <= p'{*} - q'{*}  ({*} = ?)
+- V <= x'{*} - y'{*}  ({*} = ?)
+
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1318:20 ]
@@ -8498,11 +8572,23 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_negative_delta #(V: ?)
+V can be inferred as an integer value that is as low as possible, without violating any of the following constraints:
+- V * -1 + 30 <= x'{*} - q'{*}  ({*} = ?)
+- V * -1 <= p'{*} - y'{*}  ({*} = ?)
+- V * -1 + 30 <= p'{*} - q'{*}  ({*} = ?)
+- V * -1 <= x'{*} - y'{*}  ({*} = ?)
+
       ╭─[ test.sus:1326:31 ]
       │
  1326 │     infer_me_with_negative_delta inf
       │                                  ─┬─  
       │                                   ╰─── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_negative_delta #(V: ?)
+V can be inferred as an integer value that is as low as possible, without violating any of the following constraints:
+- V * -1 + 30 <= x'{*} - q'{*}  ({*} = ?)
+- V * -1 <= p'{*} - y'{*}  ({*} = ?)
+- V * -1 + 30 <= p'{*} - q'{*}  ({*} = ?)
+- V * -1 <= x'{*} - y'{*}  ({*} = ?)
+
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1332:35 ]
@@ -8540,11 +8626,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                      ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_inputs_only #(V: ?)
+V has no acceptable inference candidates
+
       ╭─[ test.sus:1342:2 ]
       │
  1342 │     infer_me_inputs_only(x, y)
       │     ──────────┬─────────  
       │               ╰─────────── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_inputs_only #(V: ?)
+V has no acceptable inference candidates
+
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1347:14 ]
@@ -8624,7 +8714,7 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │
       ├─[ xpm.sus:63:12 ]
       │
-   63 │     action push : T push_data {
+   63 │     action push'0 : T push_data'0 {
       │            ──┬─  
       │              ╰─── Interface 'push' defined here
 ──────╯
@@ -8681,11 +8771,17 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                  ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: transmute_from_bits #(T: type int #(FROM: ?, TO: ?)[30])
+T can be inferred from:
+{*} = T in T value
+
       ╭─[ test.sus:1388:41 ]
       │
  1388 │     transmute_from_bits #(T: type int[30]) a
       │                                            ┬  
       │                                            ╰── Could not infer the parameters of this submodule, some parameters were still unknown: transmute_from_bits #(T: type int #(FROM: ?, TO: ?)[30])
+T can be inferred from:
+{*} = T in T value
+
 ──────╯
 Warning: Unused port 'bits'
       ╭─[ test.sus:1389:40 ]
@@ -8718,11 +8814,17 @@ Warning: Unused port 'value'
       │                                       ╰──── Port 'value' declared here
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: transmute_to_bits #(T: type int #(FROM: ?, TO: ?)[3][3][5])
+T can be inferred from:
+{*} <: T in T value
+
       ╭─[ test.sus:1390:44 ]
       │
  1390 │     transmute_to_bits #(T: type int[3][3][5]) c
       │                                               ┬  
       │                                               ╰── Could not infer the parameters of this submodule, some parameters were still unknown: transmute_to_bits #(T: type int #(FROM: ?, TO: ?)[3][3][5])
+T can be inferred from:
+{*} <: T in T value
+
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1394:28 ]

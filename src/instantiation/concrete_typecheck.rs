@@ -1,6 +1,3 @@
-use std::borrow::Cow;
-use std::ops::Deref;
-
 use ibig::IBig;
 use ibig::ops::DivRem;
 use sus_proc_macro::get_builtin_type;
@@ -10,6 +7,7 @@ use crate::latency::LatencyInferenceProblem;
 use crate::latency::port_latency_inference::{
     InferenceCandidate, InferenceTarget, InferenceTargetPath, ValueInferStrategy,
 };
+use crate::to_string::display_all_infer_params;
 use crate::typing::concrete_type::SubtypeRelation;
 use crate::typing::set_unifier::{DelayedErrorCollector, FullySubstitutable, Unifyable};
 use crate::typing::template::TemplateKind;
@@ -117,15 +115,6 @@ fn get_min_max(potentials: impl IntoIterator<Item = IBig>) -> (IBig, IBig) {
         }
     }
     (min, max)
-}
-
-enum InferredInt<'s> {
-    /// Means the inference candidate can be discarded
-    PortNotUsed,
-    /// Means the port is valid, but the target couldn't be computed. Invalidates [ValueInferStrategy::Min] and [ValueInferStrategy::Max]
-    NotFound,
-    /// Valid value! Can be used for inferring
-    Found(Cow<'s, IBig>),
 }
 
 impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
@@ -555,29 +544,29 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         candidate: &InferenceCandidate,
         unifier: &'inst ValueUnifier<'inst>,
         latency_infer_problem: &mut Option<LatencyInferenceProblem>,
-    ) -> InferredInt<'inst> {
+    ) -> InferenceResult {
         match &candidate.target {
             InferenceTarget::Subtype(path) => {
                 let Some(port) = &sm.port_map[path.port] else {
-                    return InferredInt::PortNotUsed;
+                    return InferenceResult::PortNotUsed;
                 };
                 let port_wire = &self.wires[port.maps_to_wire];
                 let v = path.follow_value_path(&port_wire.typ);
                 let Some(v) = unifier.store.get_substitution(v) else {
-                    return InferredInt::NotFound;
+                    return InferenceResult::NotFound;
                 };
-                InferredInt::Found(Cow::Borrowed(v.unwrap_integer()))
+                InferenceResult::Found(v.unwrap_integer().clone())
             }
             InferenceTarget::PortLatency { from, to } => {
                 let (Some(from), Some(to)) = (&sm.port_map[*from], &sm.port_map[*to]) else {
-                    return InferredInt::PortNotUsed;
+                    return InferenceResult::PortNotUsed;
                 };
                 let Some(infer_problem) = latency_infer_problem else {
-                    return InferredInt::NotFound;
+                    return InferenceResult::NotFound;
                 };
                 match infer_problem.infer(from.maps_to_wire, to.maps_to_wire) {
-                    Ok(result) => InferredInt::Found(Cow::Owned(IBig::from(result))),
-                    Err(_) => InferredInt::NotFound,
+                    Ok(result) => InferenceResult::Found(IBig::from(result)),
+                    Err(_) => InferenceResult::NotFound,
                 }
             }
         }
@@ -593,8 +582,9 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
             let sm = &self.submodules[*sm_id];
             let sm_md = &self.linker[sm.refers_to.id];
 
-            for (_, concrete_param, infer_info) in crate::alloc::zip_eq(
+            for (_, concrete_param, last_vals, infer_info) in crate::alloc::zip_eq3(
                 &sm.refers_to.template_args,
+                sm.last_infer_values.borrow_mut().iter_mut(),
                 &sm_md.inference_info.parameter_inference_candidates,
             ) {
                 let TemplateKind::Value((concrete_param, infer_info)) =
@@ -611,13 +601,16 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         continue; // Handled by [Self::add_submodule_subtype_constraints]
                     }
                     ValueInferStrategy::Exact => {
-                        for info in &infer_info.candidates[..infer_info.total_inference_upto] {
-                            match self.get_infer_target_value(sm, info, unifier, &mut lat_inf) {
-                                InferredInt::PortNotUsed => continue,
-                                InferredInt::NotFound => continue,
-                                InferredInt::Found(v) => {
-                                    let (div, rem) =
-                                        (v.deref() - &info.offset).div_rem(&info.mul_by);
+                        for (info, last) in crate::util::zip_eq(
+                            &infer_info.candidates[..infer_info.total_inference_upto],
+                            last_vals.iter_mut(),
+                        ) {
+                            *last = self.get_infer_target_value(sm, info, unifier, &mut lat_inf);
+                            match last {
+                                InferenceResult::PortNotUsed => continue,
+                                InferenceResult::NotFound => continue,
+                                InferenceResult::Found(v) => {
+                                    let (div, rem) = (&*v - &info.offset).div_rem(&info.mul_by);
                                     if rem == IBig::from(0) {
                                         // Ignore exact values that don't divide properly
                                         total = Some(div);
@@ -635,15 +628,19 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         // => Minimize Integer V such that
                         // V >= 1 / 3
                         // V >= 3 / -2 -> ceil-div
-                        for info in &infer_info.candidates[..infer_info.total_inference_upto] {
-                            match self.get_infer_target_value(sm, info, unifier, &mut lat_inf) {
-                                InferredInt::PortNotUsed => continue, // Missing ports are okay, just skip their inference value
-                                InferredInt::NotFound => {
+                        for (info, last) in crate::util::zip_eq(
+                            &infer_info.candidates[..infer_info.total_inference_upto],
+                            last_vals.iter_mut(),
+                        ) {
+                            *last = self.get_infer_target_value(sm, info, unifier, &mut lat_inf);
+                            match last {
+                                InferenceResult::PortNotUsed => continue, // Missing ports are okay, just skip their inference value
+                                InferenceResult::NotFound => {
                                     total = None;
                                     break; // Missing value means failed inference
                                 }
-                                InferredInt::Found(v) => {
-                                    let needed = ceil_div(v.deref() - &info.offset, &info.mul_by);
+                                InferenceResult::Found(v) => {
+                                    let needed = ceil_div(&*v - &info.offset, &info.mul_by);
                                     total = Some(if let Some(cur_total) = total {
                                         IBig::min(cur_total, needed)
                                     } else {
@@ -661,15 +658,19 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         // => Maximize Integer V such that
                         // V <= 1 / 3
                         // V <= 3 / -2 -> floor-div
-                        for info in &infer_info.candidates[..infer_info.total_inference_upto] {
-                            match self.get_infer_target_value(sm, info, unifier, &mut lat_inf) {
-                                InferredInt::PortNotUsed => continue, // Missing ports are okay, just skip their inference value
-                                InferredInt::NotFound => {
+                        for (info, last) in crate::util::zip_eq(
+                            &infer_info.candidates[..infer_info.total_inference_upto],
+                            last_vals.iter_mut(),
+                        ) {
+                            *last = self.get_infer_target_value(sm, info, unifier, &mut lat_inf);
+                            match last {
+                                InferenceResult::PortNotUsed => continue, // Missing ports are okay, just skip their inference value
+                                InferenceResult::NotFound => {
                                     total = None;
                                     break; // Missing value means failed inference
                                 }
-                                InferredInt::Found(v) => {
-                                    let needed = floor_div(v.deref() - &info.offset, &info.mul_by);
+                                InferenceResult::Found(v) => {
+                                    let needed = floor_div(&*v - &info.offset, &info.mul_by);
                                     total = Some(if let Some(cur_total) = total {
                                         IBig::max(cur_total, needed)
                                     } else {
@@ -823,8 +824,9 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
 
         for (_, sm) in &mut self.submodules {
             if !sm.refers_to.template_args.fully_substitute(substitutor) {
-                self.errors.error(sm.get_span(self.link_info), format!("Could not infer the parameters of this submodule, some parameters were still unknown: {}", 
-                    sm.refers_to.display(self.linker)
+                self.errors.error(sm.get_span(self.link_info), format!("Could not infer the parameters of this submodule, some parameters were still unknown: {}\n{}", 
+                    sm.refers_to.display(self.linker),
+                    display_all_infer_params(self.linker, sm)
                 ));
             } else if let Err(reason) = sm.refers_to.report_if_errors(
                 self.linker,

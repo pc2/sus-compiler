@@ -13,9 +13,10 @@ use crate::latency::AbsLat;
 use crate::linker::LinkInfo;
 use crate::prelude::*;
 use crate::to_string::join_string_iter;
+use crate::typing::template::TVec;
 use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
 
-use std::cell::OnceCell;
+use std::cell::{OnceCell, RefCell};
 use std::collections::HashSet;
 use std::fmt::{Display, Write};
 use std::rc::Rc;
@@ -164,6 +165,7 @@ pub struct SubModule {
     pub original_instruction: FlatID,
     pub instance: OnceCell<Rc<InstantiatedModule>>,
     pub refers_to: ConcreteGlobalReference<ModuleUUID>,
+    pub last_infer_values: RefCell<TVec<Vec<InferenceResult>>>,
     pub port_map: FlatAlloc<Option<SubModulePort>, PortIDMarker>,
     pub interface_call_sites: FlatAlloc<Vec<Span>, InterfaceIDMarker>,
     pub name: String,
@@ -410,6 +412,16 @@ impl Executed {
         };
         (ctx, self.type_var_alloc)
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum InferenceResult {
+    /// Means the inference candidate can be discarded
+    PortNotUsed,
+    /// Means the port is valid, but the target couldn't be computed. Invalidates [ValueInferStrategy::Min] and [ValueInferStrategy::Max]
+    NotFound,
+    /// Valid value! Can be used for inferring
+    Found(IBig),
 }
 
 pub struct ModuleTypingContext<'l> {
@@ -697,6 +709,7 @@ impl ModuleTypingContext<'_> {
                 original_instruction,
                 instance,
                 refers_to,
+                last_infer_values: _,
                 port_map,
                 interface_call_sites: _,
                 name,

@@ -7,6 +7,7 @@
 use std::borrow::Cow;
 use std::ops::{Deref, Index, IndexMut, Range};
 
+use crate::latency::port_latency_inference::ValueInferStrategy;
 use crate::let_unwrap;
 use crate::linker::IsExtern;
 use crate::linker::{GlobalUUID, LinkInfo};
@@ -571,14 +572,12 @@ impl<'l> ExecutionContext<'l> {
                         }
                         None => ConcreteGlobalReference {
                             id: name.id,
-                            template_args: target.parameters.map(|(_, arg)| {
-                                match &arg.kind {
-                                    TemplateKind::Type(_) => {
-                                        todo!("Abstract Type Args aren't yet supported!")
-                                    }
-                                    TemplateKind::Value(_) => {
-                                        TemplateKind::Value(self.type_substitutor.alloc_unknown())
-                                    }
+                            template_args: target.parameters.map(|(_, arg)| match &arg.kind {
+                                TemplateKind::Type(_) => {
+                                    todo!("Abstract Type Args aren't yet supported!")
+                                }
+                                TemplateKind::Value(_) => {
+                                    TemplateKind::Value(self.type_substitutor.alloc_unknown())
                                 }
                             }),
                         },
@@ -1558,6 +1557,20 @@ impl<'l> ExecutionContext<'l> {
         Ok(self.submodules.alloc(SubModule {
             original_instruction,
             instance: OnceCell::new(),
+            last_infer_values: RefCell::new(
+                sub_module
+                    .inference_info
+                    .parameter_inference_candidates
+                    .map(|(_, info)| {
+                        if let TemplateKind::Value(v) = info
+                            && v.total_inference_strategy != ValueInferStrategy::Unify
+                        {
+                            vec![InferenceResult::NotFound; v.total_inference_upto]
+                        } else {
+                            Vec::new()
+                        }
+                    }),
+            ),
             refers_to,
             port_map,
             interface_call_sites,
