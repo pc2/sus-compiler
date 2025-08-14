@@ -8,4 +8,6 @@
 **/*.dot
 sus-lsp/
 crash_dumps/
+dot_output/
+verilog_output/
 tinyTestFile.sus

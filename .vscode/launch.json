@@ -90,7 +90,9 @@
             "args": [
                 "/home/lennart/Desktop/Projects/mandelbrotFPGA/mandelbrot.sus",
                 "/home/lennart/Desktop/Projects/mandelbrotFPGA/float.sus",
-                "--debug-whitelist", "SlowIterator2",
+                "/home/lennart/Desktop/sus-compiler/platform/xilinx/xpm.sus",
+                "--debug-whitelist", "WholeMandelbrotComputer",
+                "--debug", "dot-latency-infer",
                 "--debug", "print-abstract-pre-typecheck",
                 "--debug", "print-abstract",
                 "--debug", "print-concrete",

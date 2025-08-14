@@ -238,43 +238,20 @@ impl LatencyCountingProblem {
         ports_per_domain
     }
 
-    fn remove_poison_edges(&mut self) {
-        self.edges.retain(|v| v.1.delta_latency.is_some());
-    }
-
     fn make_fanins(&self) -> ListOfLists<FanInOut> {
         ListOfLists::from_random_access_iterator(
             self.map_latency_node_to_wire.len(),
             self.edges.iter().copied(),
         )
     }
-
-    fn debug(
-        &self,
-        ctx: &ModuleTypingContext,
-        solution: Option<&[i64]>,
-        debug_flag: &'static str,
-        file_name: &str,
-    ) {
-        if crate::debug::is_enabled(debug_flag) {
-            display_latency_count_graph(
-                self,
-                &ctx.wires,
-                &ctx.submodules,
-                ctx.linker,
-                solution,
-                file_name,
-            );
-        }
-    }
 }
 
 pub struct LatencyInferenceProblem {
     pub latency_count_problem: LatencyCountingProblem,
-    pub algo_inference_problem: latency_algorithm::LatencyInferenceProblem,
+    pub algo_inference_problem: Option<latency_algorithm::LatencyInferenceProblem>,
 }
 impl LatencyInferenceProblem {
-    pub fn new(ctx: &ModuleTypingContext) -> Option<Self> {
+    pub fn new(ctx: &ModuleTypingContext) -> Self {
         let mut lc = LatencyCountingProblem::new(ctx);
 
         // Add poison edges
@@ -295,11 +272,11 @@ impl LatencyInferenceProblem {
             lc.make_fanins(),
             &lc.ports,
             &lc.specified_latencies,
-        )?;
-        Some(LatencyInferenceProblem {
+        );
+        LatencyInferenceProblem {
             algo_inference_problem,
             latency_count_problem: lc,
-        })
+        }
     }
     pub fn infer(
         &mut self,
@@ -308,7 +285,11 @@ impl LatencyInferenceProblem {
     ) -> Result<i64, latency_algorithm::InferenceFailure> {
         let from = self.latency_count_problem.map_wire_to_latency_node[from];
         let to = self.latency_count_problem.map_wire_to_latency_node[to];
-        self.algo_inference_problem.infer_max_edge_latency(from, to)
+        if let Some(inf_prob) = &mut self.algo_inference_problem {
+            inf_prob.infer_max_edge_latency(from, to)
+        } else {
+            Err(latency_algorithm::InferenceFailure::BadProblem)
+        }
     }
 }
 
@@ -373,16 +354,19 @@ impl ModuleTypingContext<'_> {
     // Returns a proper interface if all ports involved did not produce an error. If a port did produce an error then returns None.
     // Computes all latencies involved
     pub fn compute_latencies(&mut self) {
-        let mut problem = LatencyCountingProblem::new(self);
-        // Remove all poisoned edges as solve_latencies doesn't deal with them
-        problem.remove_poison_edges();
+        let problem = LatencyCountingProblem::new(self);
 
-        problem.debug(
-            self,
-            None,
-            "dot-latency-problem",
-            "solve_latencies_problem.dot",
-        );
+        if crate::debug::is_enabled("dot-latency-problem") {
+            display_latency_count_graph(
+                &problem,
+                &self.wires,
+                &self.submodules,
+                self.linker,
+                None,
+                &self.name,
+                "latencies_problem",
+            );
+        }
 
         let fanins = problem.make_fanins();
 
@@ -393,12 +377,17 @@ impl ModuleTypingContext<'_> {
             problem.make_ports_per_domain(self),
         ) {
             Ok(latencies) => {
-                problem.debug(
-                    self,
-                    Some(&latencies),
-                    "dot-latency-solution",
-                    "solve_latencies_solution.dot",
-                );
+                if crate::debug::is_enabled("dot-latency-solution") {
+                    display_latency_count_graph(
+                        &problem,
+                        &self.wires,
+                        &self.submodules,
+                        self.linker,
+                        Some(&latencies),
+                        &self.name,
+                        "latencies_solution",
+                    );
+                }
                 for (node, lat) in zip(problem.map_latency_node_to_wire.iter(), latencies.iter()) {
                     let wire = &mut self.wires[*node];
                     if is_valid(*lat) {

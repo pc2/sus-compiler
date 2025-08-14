@@ -1838,7 +1838,7 @@ Error: Out of bounds! The array is of size 20, but the index is 29
 Error: This instruction is part of a net-positive latency cycle of +5
 
 test'5
--> __4_i'0 (-5)
+-> _module_taking_time_i'0 (-5)
 -> test'10 (+10)
 
 Which conflicts with the starting latency
@@ -1849,7 +1849,7 @@ Which conflicts with the starting latency
      │                                  ╰─── This instruction is part of a net-positive latency cycle of +5
 
 test'5
--> __4_i'0 (-5)
+-> _module_taking_time_i'0 (-5)
 -> test'10 (+10)
 
 Which conflicts with the starting latency
@@ -1857,7 +1857,7 @@ Which conflicts with the starting latency
 Error: This instruction is part of a net-positive latency cycle of +5
 
 test'5
--> __4_i'0 (-5)
+-> _module_taking_time_i'0 (-5)
 -> test'10 (+10)
 
 Which conflicts with the starting latency
@@ -1868,7 +1868,7 @@ Which conflicts with the starting latency
      │                     ╰────────── This instruction is part of a net-positive latency cycle of +5
 
 test'5
--> __4_i'0 (-5)
+-> _module_taking_time_i'0 (-5)
 -> test'10 (+10)
 
 Which conflicts with the starting latency

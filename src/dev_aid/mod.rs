@@ -22,7 +22,8 @@ pub mod dot_graphs {
         >,
         _linker: &crate::linker::Linker,
         _solution: Option<&[i64]>,
-        _filename: &str,
+        _module_name: &str,
+        _dot_type: &str,
     ) {
         panic!("sus_compiler was not compiled with the 'dot' feature!");
     }
