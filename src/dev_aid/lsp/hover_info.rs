@@ -1,5 +1,5 @@
-use crate::latency::port_latency_inference::ValueInferStrategy;
 use crate::prelude::*;
+use crate::to_string::{display_all_infer_params, display_infer_param_info};
 use crate::typing::domain_type::DomainType;
 use crate::typing::template::TemplateKind;
 
@@ -12,7 +12,6 @@ use crate::linker::{Documentation, FileData, GlobalObj, GlobalUUID, LinkInfo};
 use crate::typing::template::{GenerativeParameterKind, TypeParameterKind};
 
 use super::tree_walk::{InGlobal, LocationInfo};
-use std::fmt::Write;
 
 struct HoverCollector<'l> {
     list: Vec<MarkedString>,
@@ -77,68 +76,7 @@ impl HoverCollector<'_> {
                 if sm.original_instruction == submodule_instr {
                     self.sus_code(sm.refers_to.display(self.linker).to_string());
                 }
-            }
-        }
-    }
-
-    fn hover_infer_info_for_params(
-        &mut self,
-        linker: &Linker,
-        obj_id: GlobalUUID,
-        template_id: TemplateID,
-    ) {
-        if let GlobalObj::Module(md) = linker.globals.get(obj_id) {
-            let arg_name = &md.link_info.parameters[template_id].name;
-            match &md.inference_info.parameter_inference_candidates[template_id] {
-                TemplateKind::Type(t_info) => {
-                    let mut total_text = String::new();
-                    if t_info.candidates.is_empty() {
-                        writeln!(total_text, "{arg_name} has no inference candidates").unwrap();
-                    } else {
-                        writeln!(total_text, "{arg_name} can be inferred from:").unwrap();
-                    }
-                    for (idx, c) in t_info.candidates.iter().enumerate() {
-                        let relation = if idx < t_info.num_inputs { "<:" } else { "=" };
-                        let path = c.display(md, linker);
-                        writeln!(total_text, "{{*}} {relation} {arg_name} in {path}").unwrap();
-                    }
-                    self.monospace(total_text);
-                }
-                TemplateKind::Value(v_info) => {
-                    let mut total_text = String::new();
-                    let (can_infer, cant_infer) =
-                        v_info.candidates.split_at(v_info.total_inference_upto);
-                    if can_infer.is_empty() {
-                        writeln!(
-                            total_text,
-                            "{arg_name} has no acceptable inference candidates"
-                        )
-                        .unwrap();
-                    } else {
-                        match v_info.total_inference_strategy {
-                            ValueInferStrategy::Unify | ValueInferStrategy::Exact => {
-                                writeln!(total_text, "{arg_name} can be inferred if at least one of the following constraint resolves:")
-                            }
-                            ValueInferStrategy::Min => {
-                                writeln!(total_text, "{arg_name} can be inferred as an integer value that is as high as possible, without violating any of the following constraints:")
-                            }
-                            ValueInferStrategy::Max => {
-                                writeln!(total_text, "{arg_name} can be inferred as an integer value that is as low as possible, without violating any of the following constraints:")
-                            }
-                        }
-                        .unwrap();
-                    }
-                    for c in can_infer {
-                        writeln!(total_text, "- {}", c.display(arg_name, md, linker)).unwrap();
-                    }
-                    if !cant_infer.is_empty() {
-                        writeln!(total_text, "The following constraints were found, but aren't used for inference here").unwrap();
-                        for c in cant_infer {
-                            writeln!(total_text, "- {}", c.display(arg_name, md, linker)).unwrap();
-                        }
-                    }
-                    self.monospace(total_text);
-                }
+                self.monospace(display_all_infer_params(self.linker, sm).to_string());
             }
         }
     }
@@ -183,8 +121,10 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.documentation(&decl.documentation);
             hover.sus_code(details_vec.join(" "));
 
-            if let DeclarationKind::TemplateParameter(param_id) = &decl.decl_kind {
-                hover.hover_infer_info_for_params(linker, obj_id, *param_id);
+            if let DeclarationKind::TemplateParameter(param_id) = &decl.decl_kind
+                && let GlobalObj::Module(md) = &linker.get(obj_id)
+            {
+                hover.monospace(display_infer_param_info(linker, md, *param_id, None).to_string());
             }
 
             hover.gather_hover_infos(obj_id, decl_id, decl.decl_kind.is_generative());

@@ -4,8 +4,10 @@ use sus_proc_macro::kw;
 
 use crate::alloc::zip_eq;
 use crate::flattening::typecheck::TyCell;
+use crate::instantiation::{InferenceResult, SubModule};
 use crate::latency::port_latency_inference::{
     InferenceCandidate, InferenceTarget, InferenceTargetPath, SubtypeInferencePathElem,
+    ValueInferStrategy,
 };
 use crate::prelude::*;
 
@@ -499,7 +501,7 @@ impl InferenceTargetPath {
             fn recurse_print(
                 f: &mut std::fmt::Formatter<'_>,
                 linker: &Linker,
-                md: &Module,
+                li: &LinkInfo,
                 typ: &WrittenType,
                 path: &[SubtypeInferencePathElem],
             ) -> std::fmt::Result {
@@ -508,13 +510,13 @@ impl InferenceTargetPath {
                         SubtypeInferencePathElem::DownArray => {
                             let_unwrap!(WrittenType::Array(_, arr_box), typ);
                             let (content, _sz, _) = arr_box.deref();
-                            recurse_print(f, linker, md, content, rest)?;
+                            recurse_print(f, linker, li, content, rest)?;
                             f.write_str("[]")
                         }
                         SubtypeInferencePathElem::ArraySize => {
                             let_unwrap!(WrittenType::Array(_, arr_box), typ);
                             let (content, _sz, _) = arr_box.deref();
-                            recurse_print(f, linker, md, content, rest)?;
+                            recurse_print(f, linker, li, content, rest)?;
                             f.write_str("[{*}]")
                         }
                         SubtypeInferencePathElem::InNamed(arg_id) => {
@@ -525,7 +527,7 @@ impl InferenceTargetPath {
 
                             write!(f, "{named_name} #({param_name}: ")?;
                             match &named.get_arg_for(*arg_id).unwrap().kind.as_ref().unwrap() {
-                                TemplateKind::Type(t) => recurse_print(f, linker, md, t, rest)?,
+                                TemplateKind::Type(t) => recurse_print(f, linker, li, t, rest)?,
                                 TemplateKind::Value(_) => {
                                     assert!(rest.is_empty());
                                     f.write_str("{*}")?
@@ -535,15 +537,11 @@ impl InferenceTargetPath {
                         }
                     }
                 } else {
-                    write!(
-                        f,
-                        "{}",
-                        typ.display(&linker.globals, &md.link_info.parameters)
-                    )
+                    write!(f, "{}", typ.display(&linker.globals, &li.parameters))
                 }
             }
 
-            recurse_print(f, linker, md, &port_decl.typ_expr, &self.path)?;
+            recurse_print(f, linker, &md.link_info, &port_decl.typ_expr, &self.path)?;
             write!(f, " {}", &port_decl.name)
         })
     }
@@ -580,15 +578,97 @@ impl InferenceCandidate {
                 InferenceTarget::PortLatency { from, to } => {
                     let from = &md.ports[*from];
                     let to = &md.ports[*to];
-                    write!(
-                        f,
-                        "{{t}} - {{f}} in {}'{{f}} and {}'{{t}}",
-                        from.name, to.name
-                    )
+                    write!(f, "{}'{{*}} - {}'{{*}}", from.name, to.name)
                 }
             }
         })
     }
+}
+
+impl Display for InferenceResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InferenceResult::PortNotUsed => f.write_str("N/C"),
+            InferenceResult::NotFound => f.write_str("?"),
+            InferenceResult::Found(v) => write!(f, "{v}"),
+        }
+    }
+}
+
+pub fn display_infer_param_info(
+    linker: &Linker,
+    md: &Module,
+    template_id: TemplateID,
+    final_values: Option<&Vec<InferenceResult>>,
+) -> impl Display {
+    FmtWrapper(move |f| {
+        let arg_name = &md.link_info.parameters[template_id].name;
+        match &md.inference_info.parameter_inference_candidates[template_id] {
+            TemplateKind::Type(t_info) => {
+                if t_info.candidates.is_empty() {
+                    writeln!(f, "{arg_name} has no inference candidates")?;
+                } else {
+                    writeln!(f, "{arg_name} can be inferred from:")?;
+                }
+                for (idx, c) in t_info.candidates.iter().enumerate() {
+                    let relation = if idx < t_info.num_inputs { "<:" } else { "=" };
+                    let path = c.display(md, linker);
+                    writeln!(f, "{{*}} {relation} {arg_name} in {path}")?;
+                }
+            }
+            TemplateKind::Value(v_info) => {
+                let (can_infer, cant_infer) =
+                    v_info.candidates.split_at(v_info.total_inference_upto);
+                if can_infer.is_empty() {
+                    writeln!(f, "{arg_name} has no acceptable inference candidates")?;
+                } else {
+                    match v_info.total_inference_strategy {
+                        ValueInferStrategy::Unify | ValueInferStrategy::Exact => writeln!(
+                            f,
+                            "{arg_name} can be inferred if at least one of the following constraint resolves:"
+                        )?,
+                        ValueInferStrategy::Min => writeln!(
+                            f,
+                            "{arg_name} can be inferred as an integer value that is as high as possible, without violating any of the following constraints:"
+                        )?,
+                        ValueInferStrategy::Max => writeln!(
+                            f,
+                            "{arg_name} can be inferred as an integer value that is as low as possible, without violating any of the following constraints:"
+                        )?,
+                    }
+                }
+                for (idx, c) in can_infer.iter().enumerate() {
+                    write!(f, "- {}", c.display(arg_name, md, linker))?;
+                    if let Some(values_list) = final_values
+                        && let Some(final_value) = values_list.get(idx)
+                    {
+                        write!(f, "  ({{*}} = {final_value})")?;
+                    }
+                    writeln!(f)?;
+                }
+                if !cant_infer.is_empty() {
+                    writeln!(
+                        f,
+                        "The following constraints were found, but aren't used for inference here"
+                    )?;
+                    for c in cant_infer {
+                        writeln!(f, "- {}", c.display(arg_name, md, linker))?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    })
+}
+
+pub fn display_all_infer_params(linker: &Linker, sm: &SubModule) -> impl Display {
+    FmtWrapper(|f| {
+        let md = &linker.modules[sm.refers_to.id];
+        for (template_id, known_values) in sm.last_infer_values.borrow().iter() {
+            display_infer_param_info(linker, md, template_id, Some(known_values)).fmt(f)?;
+        }
+        Ok(())
+    })
 }
 
 impl LinkInfo {

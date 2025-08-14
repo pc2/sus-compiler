@@ -48,7 +48,7 @@ extern module RawFIFO #(int WIDTH, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN
     
     domain read
     output bool may_pop'0
-    action pop'0 : -> bool[WIDTH] pop_data'0 {}
+    action pop'0 : -> bool[WIDTH] pop_data'2 {}
 }
 
 module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
@@ -60,14 +60,14 @@ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
 
     domain write
     output bool may_push'-MAY_PUSH_LATENCY = fifo.may_push
-    action push : T push_data {
+    action push'0 : T push_data'0 {
         bool[sizeof#(T)] as_bits = transmute_to_bits(push_data)
         fifo.push(as_bits)
     }
     
     domain read
-    output bool may_pop = fifo.may_pop
-    action pop : -> T pop_data {
+    output bool may_pop'0 = fifo.may_pop
+    action pop'0 : -> T pop_data'2 {
         bool[sizeof#(T)] pop_data_as_bits = fifo.pop()
         pop_data = transmute_from_bits(pop_data_as_bits)
     }
