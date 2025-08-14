@@ -578,7 +578,6 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         let mut lat_inf = LatencyInferenceProblem::new(self);
 
         if crate::debug::is_enabled("dot-latency-infer") {
-            __debug_breakpoint!();
             display_latency_count_graph(
                 &lat_inf.latency_count_problem,
                 &self.wires,

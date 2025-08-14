@@ -14,7 +14,11 @@ use crate::{
 };
 
 /// Ensures dot_output exists and returns a File in dot_output with a unique name based on `module_name`, `dot_type`, and `.dot` extension.
-fn unique_file_name(module_name: &str, dot_type: &str) -> std::io::Result<File> {
+/// Returns the file handle and the full path to the file.
+fn unique_file_name(
+    module_name: &str,
+    dot_type: &str,
+) -> std::io::Result<(File, std::path::PathBuf)> {
     let dir = "dot_output";
     fs::create_dir_all(dir)?;
     let mut path = std::path::PathBuf::from(dir);
@@ -26,12 +30,41 @@ fn unique_file_name(module_name: &str, dot_type: &str) -> std::io::Result<File> 
         path.set_file_name(&file_name);
         count += 1;
     }
-    File::create(path)
+    let file = File::create(&path)?;
+    Ok((file, path))
+}
+
+fn try_convert_dot_to_image(dot_path: &std::path::Path) {
+    let output_path = dot_path.with_extension("png");
+    match std::process::Command::new("dot")
+        .arg("-Tpng")
+        .arg(dot_path)
+        .arg("-o")
+        .arg(&output_path)
+        .output()
+    {
+        Ok(output) => {
+            if !output.status.success() {
+                eprintln!(
+                    "Failed to convert {:?} to image: {}",
+                    dot_path,
+                    String::from_utf8_lossy(&output.stderr)
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!(
+                "Could not run 'dot' to convert {:?} to image: {}",
+                dot_path, e
+            );
+        }
+    }
 }
 
 pub fn display_generated_hardware_structure(md_instance: &ModuleTypingContext<'_>) {
-    let mut file = unique_file_name(&md_instance.name, "hw_structure").unwrap();
+    let (mut file, path) = unique_file_name(&md_instance.name, "hw_structure").unwrap();
     render(md_instance, &mut file).unwrap();
+    try_convert_dot_to_image(&path);
 }
 
 #[derive(Clone, Copy)]
@@ -172,7 +205,7 @@ pub fn display_latency_count_graph(
         extra_node_info[spec.node].1 = Some(spec.latency);
     }
 
-    let mut file = unique_file_name(module_name, dot_type).unwrap();
+    let (mut file, path) = unique_file_name(module_name, dot_type).unwrap();
     render(
         &Problem {
             lc_problem,
@@ -185,6 +218,7 @@ pub fn display_latency_count_graph(
         &mut file,
     )
     .unwrap();
+    try_convert_dot_to_image(&path);
 }
 
 #[derive(Clone, Copy)]
