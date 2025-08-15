@@ -28,6 +28,7 @@
             "cargo": {
                 "args": [
                     "build",
+                    "--no-default-features",
                     "--bin=sus_compiler",
                     "--package=sus_compiler"
                 ],
@@ -56,6 +57,7 @@
             "cargo": {
                 "args": [
                     "build",
+                    "--no-default-features",
                     "--bin=sus_compiler",
                     "--package=sus_compiler"
                 ],
@@ -78,6 +80,7 @@
             "cargo": {
                 "args": [
                     "build",
+                    "--no-default-features",
                     "--bin=sus_compiler",
                     "--package=sus_compiler"
                 ],
@@ -107,6 +110,7 @@
             "cargo": {
                 "args": [
                     "build",
+                    "--no-default-features",
                     "--bin=sus_compiler",
                     "--package=sus_compiler"
                 ],
@@ -128,6 +132,7 @@
             "cargo": {
                 "args": [
                     "build",
+                    "--no-default-features",
                     "--bin=sus_compiler",
                     "--package=sus_compiler"
                 ],
@@ -148,6 +153,7 @@
                 "args": [
                     "test",
                     "--no-run",
+                    "--no-default-features",
                     "--bin=sus_compiler",
                     "--package=sus_compiler"
                 ],
