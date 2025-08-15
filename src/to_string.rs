@@ -28,7 +28,7 @@ use crate::flattening::{
     WireReferencePathElement, WireReferenceRoot, WriteModifiers, WriteTo, WrittenTemplateArg,
     WrittenType,
 };
-use crate::linker::{FileData, GlobalUUID, LinkInfo, LinkerGlobals};
+use crate::linker::{FileData, GlobalUUID, IsExtern, LinkInfo, LinkerGlobals};
 use crate::typing::{abstract_type::AbstractRankedType, concrete_type::ConcreteType};
 
 use std::fmt::{Display, Formatter};
@@ -355,6 +355,16 @@ impl DomainID {
                     self.get_hidden_value()
                 ))
             }
+        })
+    }
+}
+
+impl Display for IsExtern {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            IsExtern::Normal => "non-extern",
+            IsExtern::Extern => "extern",
+            IsExtern::Builtin => "__builtin__",
         })
     }
 }
