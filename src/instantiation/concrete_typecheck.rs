@@ -132,13 +132,11 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
             self.add_wire_subtype_constraints(wire, &mut unifier, &error_reporter);
         }
 
-        unifier.execute_ready_constraints();
-
         let mut all_submod_ids: Vec<SubModuleID> = self.submodules.id_range().iter().collect();
 
         loop {
-            self.try_infer_submodule_params(&mut unifier, &mut all_submod_ids);
-            if !unifier.execute_ready_constraints() {
+            unifier.execute_ready_constraints();
+            if !self.try_infer_submodule_params(&mut unifier, &mut all_submod_ids) {
                 break;
             }
         }
@@ -570,11 +568,13 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
             }
         }
     }
+
+    /// Returns true if any submodule was instantiated
     fn try_infer_submodule_params(
         &'inst self,
         unifier: &mut ValueUnifier<'inst>,
         sm_ids: &mut Vec<SubModuleID>,
-    ) {
+    ) -> bool {
         let mut lat_inf = LatencyInferenceProblem::new(self);
 
         if crate::debug::is_enabled("dot-latency-infer") {
@@ -706,6 +706,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
             }
         }
 
+        let mut any_success = false;
         // And now instantiate the modules we can
         sm_ids.retain(|id| {
             let sm = &self.submodules[*id];
@@ -716,11 +717,13 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 .can_fully_substitute(&unifier.store)
             {
                 self.try_instantiate_submodule(sm, unifier);
+                any_success = true;
                 false
             } else {
                 true
             }
         });
+        any_success
     }
     fn try_instantiate_submodule(&'inst self, sm: &SubModule, unifier: &mut ValueUnifier<'inst>) {
         let submod_instr = &self.link_info.instructions[sm.original_instruction];

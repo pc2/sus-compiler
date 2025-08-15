@@ -169,13 +169,11 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
             constraints_ready_for_unification: Vec::new(),
         }
     }
-    /// Executes all constraints (that become ready). Returns `false` if no constraints were ready
-    pub fn execute_ready_constraints(&mut self) -> bool {
-        let at_least_one = !self.constraints_ready_for_unification.is_empty();
+    /// Executes all constraints that are ready, and keeps executing constraints as they become ready in turn.
+    pub fn execute_ready_constraints(&mut self) {
         while let Some(cstr) = self.constraints_ready_for_unification.pop() {
             cstr(self);
         }
-        at_least_one
     }
 
     pub fn decomission(self) -> SetUnifierStore<T, IDMarker> {
