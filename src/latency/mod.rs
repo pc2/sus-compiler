@@ -246,7 +246,7 @@ impl LatencyCountingProblem {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InferenceFailure {
     NotReached,
     Poison,
