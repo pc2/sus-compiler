@@ -17,10 +17,8 @@
 use std::collections::VecDeque;
 
 use crate::{
-    alloc::FlatAlloc,
     flattening::Direction,
-    latency::{AbsLat, CALCULATE_LATENCY_LATER, InferenceFailure},
-    prelude::{InferenceVarIDMarker, LatencyCountInferenceVarID},
+    latency::{CALCULATE_LATENCY_LATER, InferenceFailure},
 };
 
 use super::list_of_lists::ListOfLists;
@@ -134,6 +132,7 @@ pub fn is_valid(latency: i64) -> bool {
     latency != UNSET && latency != POISON
 }
 
+#[derive(Debug)]
 struct SolutionMemory {
     solution: Vec<i64>,
     to_explore_queue: VecDeque<usize>,
@@ -567,57 +566,6 @@ fn print_latency_test_case(
     println!("==== END LATENCY TEST CASE ====");
 }
 
-#[allow(unused)]
-fn print_inference_test_case<ID>(
-    fanins: &ListOfLists<FanInOut>,
-    ports: &LatencyCountingPorts,
-    specified_latencies: &[SpecifiedLatency],
-    inference_edges: &[LatencyInferenceCandidate],
-    values_to_infer: &FlatAlloc<ValueToInfer<ID>, InferenceVarIDMarker>,
-) {
-    println!("==== BEGIN INFERENCE TEST CASE ====");
-    println!("#[test]");
-    println!("fn new_test_case() {{");
-    println!("    let fanins : [&[FanInOut]; {}] = [", fanins.len());
-    for (idx, fin) in fanins.iter().enumerate() {
-        print!("        /*{idx}*/&[");
-        for FanInOut {
-            to_node,
-            delta_latency,
-        } in fin
-        {
-            if let Some(delta_lat) = delta_latency {
-                print!("mk_fan({to_node}, {delta_lat}),")
-            } else {
-                print!("mk_poisoned({to_node}),")
-            }
-        }
-        println!("],");
-    }
-    println!("    ];");
-    println!("    let fanins = ListOfLists::from_slice_slice(&fanins);");
-    println!(
-        "    let ports = LatencyCountingPorts::from_inputs_outputs(&{:?}, &{:?});",
-        ports.inputs(),
-        ports.outputs()
-    );
-    println!("    let specified_latencies = {specified_latencies:?};");
-
-    println!("    let mut values_to_infer = FlatAlloc::new();");
-    for (id, _) in values_to_infer {
-        println!("    let {id:?} = values_to_infer.alloc(ValueToInfer::new(()));");
-    }
-    println!("    let inference_edges = vec!{inference_edges:?};");
-    println!(
-        "    let partial_submodule_info = PartialSubmoduleInfo {{inference_edges, extra_fanin: Vec::new()}};"
-    );
-    println!(
-        "    infer_unknown_latency_edges(fanins, &ports, &specified_latencies, partial_submodule_info, &mut values_to_infer).unwrap();"
-    );
-    println!("}}");
-    println!("==== END INFERENCE TEST CASE ====");
-}
-
 /// Guarantees that if `specified_latencies` is non-empty, it'll be the first element in the result vector,
 fn solve_port_latencies(
     fanouts: &ListOfLists<FanInOut>,
@@ -772,75 +720,7 @@ pub fn solve_latencies(
     Ok(final_solution)
 }
 
-/// A candidate for latency inference. Passed to [try_infer_value_for] as a list of possibilities.
-///
-/// When performing said inference, we return the smallest valid candidate. All candidates _must_ try to provide a value.
 #[derive(Debug)]
-pub struct LatencyInferenceCandidate {
-    pub multiply_var_by: i64,
-    pub from_node: usize,
-    pub to_node: usize,
-    pub offset: i64,
-    pub target_to_infer: LatencyCountInferenceVarID,
-}
-
-pub struct ValueToInfer<ID> {
-    /// Initially Some([i64::MAX]), decreasing. Set to None when a [LatencyInferenceCandidate] targets it, but cannot be resolved
-    inferred_value: Option<i64>,
-    /// Represents if the variable is being used in an edge with a positive coefficient ('0 -> 'V), or a negative coefficient ('V -> '0)
-    /// Used to see in what direction multiple inferences should be combined.
-    /// This is because the resulting value should be as lax as possible.
-    /// Example:
-    /// ```sus
-    /// module infer_me #(int V) {
-    ///     interface a : bool iA'0 -> bool oA'V
-    ///     interface b : bool iB'0 -> bool oB'V+3
-    /// }
-    /// module use_infer_me {
-    ///     interface i : bool i'0 -> bool o'5
-    ///
-    ///     infer_me iii
-    ///     o = iii.a(i) // Requires V <= 5
-    ///     o = iii.b(i) // Requires V <= 2 // V becomes 2
-    /// }
-    /// ```
-    /// If positive, then we take the max of the possible candidates, otherwise the min.
-    /// If the user specifies both a negative, and a positive offset, then we can't infer without possibly breaking things, and so we .spoil() immediately
-    pub linear_factor_is_positive: bool,
-    pub back_reference: ID,
-}
-
-impl<ID> ValueToInfer<ID> {
-    pub fn new(back_reference: ID, linear_factor_is_positive: bool) -> Self {
-        Self {
-            inferred_value: Some(if linear_factor_is_positive {
-                i64::MAX
-            } else {
-                i64::MIN
-            }),
-            linear_factor_is_positive,
-            back_reference,
-        }
-    }
-    pub fn get(&self) -> Option<i64> {
-        self.inferred_value
-            .and_then(|v| (v != i64::MAX && v != i64::MIN).then_some(v))
-    }
-    fn apply_candidate(&mut self, candidate_value: i64) {
-        let _ = AbsLat::new(candidate_value); // Trigger the "too close to AbsLat::UNKNOWN" assert
-        if let Some(v) = &mut self.inferred_value {
-            *v = if self.linear_factor_is_positive {
-                i64::min(*v, candidate_value)
-            } else {
-                i64::max(*v, candidate_value)
-            };
-        }
-    }
-    pub fn spoil(&mut self) {
-        self.inferred_value = None;
-    }
-}
-
 pub struct LatencyInferenceProblem {
     fanouts: ListOfLists<FanInOut>,
     mem: SolutionMemory,
@@ -886,70 +766,20 @@ impl LatencyInferenceProblem {
         let mut solution = self
             .mem
             .make_solution_with_initial_values(&[SpecifiedLatency {
-                node: from,
+                node: to,
                 latency: 0,
             }]);
 
         solution.latency_count_bellman_ford(&self.fanouts);
 
-        let found_target_latency = solution.solution[to];
+        let found_target_latency = solution.solution[from];
         if found_target_latency == CALCULATE_LATENCY_LATER {
             Err(InferenceFailure::NotReached)
         } else if found_target_latency == POISON {
             Err(InferenceFailure::Poison)
         } else {
-            Ok(found_target_latency)
+            Ok(-found_target_latency) // Invert, because we want to infer the max from-to latency that doesn't violate any constraints
         }
-    }
-}
-
-/// Tries to infer the inference edges given in [inference_candidates].
-///
-/// This method takes both the real ports of the module, as wel as inference pseudo-ports.
-///
-/// Every candidate in [inference_candidates] must start at an "output" port, and end at an "input" port, in [inference_ports]
-///
-/// We pass fanins by value, as this lets us more efficiently edit it in the implementation.
-///
-/// Requires fanins to have [ListOfLists::add_extra_fanin_and_specified_latencies] to have been run with `specified_latencies`
-pub fn infer_unknown_latency_edges<ID>(
-    fanins: ListOfLists<FanInOut>,
-    ports: &LatencyCountingPorts,
-    specified_latencies: &[SpecifiedLatency],
-    inference_edges: &[LatencyInferenceCandidate],
-    values_to_infer: &mut FlatAlloc<ValueToInfer<ID>, InferenceVarIDMarker>,
-) {
-    if crate::debug::is_enabled("print-infer_unknown_latency_edges-test-case") {
-        print_inference_test_case(
-            &fanins,
-            ports,
-            specified_latencies,
-            inference_edges,
-            values_to_infer,
-        );
-    }
-
-    if fanins.len() == 0 || inference_edges.is_empty() {
-        return; // Could not infer anything
-    }
-
-    let Some(mut inference_problem) =
-        LatencyInferenceProblem::new(fanins, ports, specified_latencies)
-    else {
-        return;
-    };
-
-    for candidate in inference_edges {
-        let infer_me = &mut values_to_infer[candidate.target_to_infer];
-
-        if let Ok(largest_latency) =
-            inference_problem.infer_max_edge_latency(candidate.to_node, candidate.from_node)
-        {
-            infer_me
-                .apply_candidate((-largest_latency - candidate.offset) / candidate.multiply_var_by);
-        } else {
-            infer_me.spoil();
-        };
     }
 }
 
@@ -992,28 +822,6 @@ mod tests {
             fanins.add_extra_fanin_and_specified_latencies(Vec::new(), specified_latencies);
 
         solve_latencies(fanins, &ports, specified_latencies, Vec::new())
-    }
-
-    pub fn infer_unknown_latency_edges_test_case<ID>(
-        fanins: ListOfLists<FanInOut>,
-        inputs: &[usize],
-        outputs: &[usize],
-        specified_latencies: &[SpecifiedLatency],
-        inference_edges: &[LatencyInferenceCandidate],
-        values_to_infer: &mut FlatAlloc<ValueToInfer<ID>, InferenceVarIDMarker>,
-    ) {
-        let ports = LatencyCountingPorts::from_inputs_outputs(inputs, outputs);
-
-        let fanins =
-            fanins.add_extra_fanin_and_specified_latencies(Vec::new(), specified_latencies);
-
-        infer_unknown_latency_edges(
-            fanins,
-            &ports,
-            specified_latencies,
-            inference_edges,
-            values_to_infer,
-        )
     }
 
     #[track_caller]
@@ -1838,15 +1646,75 @@ mod tests {
 
     #[test]
     /// Checks that poison values properly propagate
+    fn test_inference_backwards_loop() {
+        /*
+                2 -\?A
+               /      6
+              1-3 -/?B \
+             /          8 - 9 -?E 10
+            0 - 4 -\?C /|
+            | \       7 |
+            |   5 -/?D  |
+            -<----------|
+        */
+        let fanins: [&[FanInOut]; 11] = [
+            /*0*/ &[mk_fan(8, -10)],
+            /*1*/ &[mk_fan(0, 0)],
+            /*2*/ &[mk_fan(1, 1)],
+            /*3*/ &[mk_fan(1, 6)],
+            /*4*/ &[mk_fan(0, 2)],
+            /*5*/ &[mk_fan(0, 5)],
+            /*6*/ &[], // inference_edge(2), inference_edge(3)
+            /*7*/ &[], // inference_edge(4), inference_edge(5)
+            /*8*/ &[mk_fan(6, 3), mk_fan(7, 2)],
+            /*9*/ &[mk_fan(8, 0)],
+            /*10*/ &[], // inference_edge(9), disjoint so can't be inferred
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+
+        let inputs = [];
+        let outputs = [];
+        let specified_latencies = [];
+
+        let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
+
+        let fanins =
+            fanins.add_extra_fanin_and_specified_latencies(Vec::new(), &specified_latencies);
+
+        let mut problem =
+            LatencyInferenceProblem::new(fanins, &ports, &specified_latencies).unwrap();
+
+        let results = [
+            problem.infer_max_edge_latency(2, 6),
+            problem.infer_max_edge_latency(3, 6),
+            problem.infer_max_edge_latency(4, 7),
+            problem.infer_max_edge_latency(5, 7),
+            problem.infer_max_edge_latency(9, 10),
+        ];
+
+        assert_eq!(
+            &results,
+            &[
+                Ok(6),
+                Ok(1),
+                Ok(6),
+                Ok(3),
+                Err(InferenceFailure::NotReached)
+            ]
+        );
+    }
+
+    #[test]
+    /// Checks that poison values properly propagate
     fn test_inference_no_poison() {
         /*
                 2 -\?A
                /      6
               1-3 -/?B \
-             /          8 - 9 -?D 10
+             /          8 - 9 -?E 10
             0 - 4 -\?C /|
             | \       7 |
-            |   5 -/?B  |
+            |   5 -/?D  |
             ------------|
         */
         let fanins: [&[FanInOut]; 11] = [
@@ -1856,8 +1724,8 @@ mod tests {
             /*3*/ &[mk_fan(1, 6)],
             /*4*/ &[mk_fan(0, 2)],
             /*5*/ &[mk_fan(0, 5)],
-            /*6*/ &[], // inference_edge(2) for A, inference_edge(3) for B
-            /*7*/ &[], // inference_edge(4) for C, inference_edge(5) for B
+            /*6*/ &[], // inference_edge(2), inference_edge(3)
+            /*7*/ &[], // inference_edge(4), inference_edge(5)
             /*8*/ &[mk_fan(6, 3), mk_fan(7, 2), mk_fan(0, 10)],
             /*9*/ &[mk_fan(8, 0)],
             /*10*/ &[], // inference_edge(9), disjoint so can't be inferred
@@ -1868,65 +1736,32 @@ mod tests {
         let outputs = [8];
         let specified_latencies = [];
 
-        let mut values_to_infer = FlatAlloc::new();
-        let a = values_to_infer.alloc(ValueToInfer::new((), true));
-        let b = values_to_infer.alloc(ValueToInfer::new((), true)); // Shared by two inference candidates
-        let c = values_to_infer.alloc(ValueToInfer::new((), true));
-        let d = values_to_infer.alloc(ValueToInfer::new((), true)); // Cannot be inferred
+        let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
 
-        let inference_edges = vec![
-            LatencyInferenceCandidate {
-                multiply_var_by: 1,
-                from_node: 2,
-                to_node: 6,
-                offset: 0,
-                target_to_infer: a,
-            },
-            LatencyInferenceCandidate {
-                multiply_var_by: 1,
-                from_node: 3,
-                to_node: 6,
-                offset: 0,
-                target_to_infer: b,
-            },
-            LatencyInferenceCandidate {
-                multiply_var_by: 1,
-                from_node: 4,
-                to_node: 7,
-                offset: 0,
-                target_to_infer: c,
-            },
-            LatencyInferenceCandidate {
-                multiply_var_by: 1,
-                from_node: 5,
-                to_node: 7,
-                offset: 0,
-                target_to_infer: b,
-            },
-            LatencyInferenceCandidate {
-                multiply_var_by: 1,
-                from_node: 9,
-                to_node: 10,
-                offset: 0,
-                target_to_infer: d,
-            },
+        let fanins =
+            fanins.add_extra_fanin_and_specified_latencies(Vec::new(), &specified_latencies);
+
+        let mut problem =
+            LatencyInferenceProblem::new(fanins, &ports, &specified_latencies).unwrap();
+
+        let results = [
+            problem.infer_max_edge_latency(2, 6),
+            problem.infer_max_edge_latency(3, 6),
+            problem.infer_max_edge_latency(4, 7),
+            problem.infer_max_edge_latency(5, 7),
+            problem.infer_max_edge_latency(9, 10),
         ];
 
-        infer_unknown_latency_edges_test_case(
-            fanins,
-            &inputs,
-            &outputs,
-            &specified_latencies,
-            &inference_edges,
-            &mut values_to_infer,
+        assert_eq!(
+            results,
+            [
+                Ok(6),
+                Ok(1),
+                Ok(6),
+                Ok(3),
+                Err(InferenceFailure::NotReached)
+            ]
         );
-
-        let results: Vec<_> = values_to_infer
-            .iter()
-            .map(|(_, v)| v.inferred_value)
-            .collect();
-
-        assert_eq!(&results, &[Some(6), Some(1), Some(6), None]);
     }
 
     #[test]
@@ -1953,42 +1788,20 @@ mod tests {
         let outputs = [];
         let specified_latencies = [];
 
-        let mut values_to_infer = FlatAlloc::new();
-        let a = values_to_infer.alloc(ValueToInfer::new((), true));
-        let b = values_to_infer.alloc(ValueToInfer::new((), true));
+        let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
 
-        let inference_edges = vec![
-            LatencyInferenceCandidate {
-                multiply_var_by: 1,
-                from_node: 0,
-                to_node: 1,
-                offset: 0,
-                target_to_infer: a,
-            },
-            LatencyInferenceCandidate {
-                multiply_var_by: 1,
-                from_node: 3,
-                to_node: 4,
-                offset: 0,
-                target_to_infer: b,
-            },
+        let fanins =
+            fanins.add_extra_fanin_and_specified_latencies(Vec::new(), &specified_latencies);
+
+        let mut problem =
+            LatencyInferenceProblem::new(fanins, &ports, &specified_latencies).unwrap();
+
+        let results = [
+            problem.infer_max_edge_latency(0, 1),
+            problem.infer_max_edge_latency(3, 4),
         ];
 
-        infer_unknown_latency_edges_test_case(
-            fanins,
-            &inputs,
-            &outputs,
-            &specified_latencies,
-            &inference_edges,
-            &mut values_to_infer,
-        );
-
-        let results: Vec<_> = values_to_infer
-            .iter()
-            .map(|(_, v)| v.inferred_value)
-            .collect();
-
-        assert_eq!(&results, &[None, Some(3)]);
+        assert_eq!(results, [Err(InferenceFailure::Poison), Ok(3)]);
     }
 
     #[test]
@@ -2018,39 +1831,25 @@ mod tests {
         let outputs = [1];
         let specified_latencies = [];
 
-        let mut values_to_infer = FlatAlloc::new();
-        let a = values_to_infer.alloc(ValueToInfer::new((), true));
-        let b = values_to_infer.alloc(ValueToInfer::new((), true));
+        let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
 
-        let inference_edges = vec![
-            LatencyInferenceCandidate {
-                multiply_var_by: 1,
-                from_node: 2,
-                to_node: 3,
-                offset: 0,
-                target_to_infer: a,
-            },
-            LatencyInferenceCandidate {
-                multiply_var_by: 1,
-                from_node: 5,
-                to_node: 6,
-                offset: 0,
-                target_to_infer: b,
-            },
+        let fanins =
+            fanins.add_extra_fanin_and_specified_latencies(Vec::new(), &specified_latencies);
+
+        let mut problem =
+            LatencyInferenceProblem::new(fanins, &ports, &specified_latencies).unwrap();
+
+        let results = [
+            problem.infer_max_edge_latency(2, 3),
+            problem.infer_max_edge_latency(5, 6),
         ];
 
-        infer_unknown_latency_edges_test_case(
-            fanins,
-            &inputs,
-            &outputs,
-            &specified_latencies,
-            &inference_edges,
-            &mut values_to_infer,
-        );
         // TODO re-add this error
         /*let Err(LatencyCountingError::IndeterminablePortLatency { bad_ports: _ }) = err else {
             panic!("{err:?}")
         };*/
+        // This actually should result in an error, because now the total latency is 4. Well, I've frankly got no idea how to solve that
+        assert_eq!(results, [Ok(2), Ok(2)])
     }
 
     /*
@@ -2267,32 +2066,20 @@ mod tests {
             node: 0,
             latency: 0,
         }];
-        let mut values_to_infer = FlatAlloc::new();
-        let latency_0 = values_to_infer.alloc(ValueToInfer::new((), true));
-        let inference_edges = vec![
-            LatencyInferenceCandidate {
-                multiply_var_by: -1,
-                from_node: 5,
-                to_node: 2,
-                offset: 0,
-                target_to_infer: latency_0,
-            },
-            LatencyInferenceCandidate {
-                multiply_var_by: -1,
-                from_node: 6,
-                to_node: 2,
-                offset: 0,
-                target_to_infer: latency_0,
-            },
+
+        let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
+
+        let fanins =
+            fanins.add_extra_fanin_and_specified_latencies(Vec::new(), &specified_latencies);
+
+        let mut problem =
+            LatencyInferenceProblem::new(fanins, &ports, &specified_latencies).unwrap();
+
+        let results = [
+            problem.infer_max_edge_latency(5, 2),
+            problem.infer_max_edge_latency(6, 2),
         ];
 
-        infer_unknown_latency_edges_test_case(
-            fanins,
-            &inputs,
-            &outputs,
-            &specified_latencies,
-            &inference_edges,
-            &mut values_to_infer,
-        );
+        assert_eq!(results, [Ok(-5), Ok(-5)])
     }
 }
