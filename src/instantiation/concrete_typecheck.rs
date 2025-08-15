@@ -603,20 +603,33 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 else {
                     continue;
                 };
-                if !concrete_param.is_unknown() {
+                match infer_info.total_inference_strategy {
+                    ValueInferStrategy::Unify => continue,
+                    ValueInferStrategy::Exact
+                    | ValueInferStrategy::Min
+                    | ValueInferStrategy::Max => {
+                        for (info, stored) in crate::util::zip_eq(
+                            &infer_info.candidates[..infer_info.total_inference_upto],
+                            last_vals.iter_mut(),
+                        ) {
+                            *stored = self.get_infer_target_value(sm, info, unifier, &mut lat_inf);
+                        }
+                    }
+                }
+                if unifier.store.get_substitution(concrete_param).is_some() {
                     continue;
                 }
+                let value_iter = crate::util::zip_eq(
+                    &infer_info.candidates[..infer_info.total_inference_upto],
+                    last_vals,
+                );
                 let mut total = None;
                 match infer_info.total_inference_strategy {
                     ValueInferStrategy::Unify => {
                         continue; // Handled by [Self::add_submodule_subtype_constraints]
                     }
                     ValueInferStrategy::Exact => {
-                        for (info, last) in crate::util::zip_eq(
-                            &infer_info.candidates[..infer_info.total_inference_upto],
-                            last_vals.iter_mut(),
-                        ) {
-                            *last = self.get_infer_target_value(sm, info, unifier, &mut lat_inf);
+                        for (info, last) in value_iter {
                             match last {
                                 InferenceResult::PortNotUsed => continue,
                                 InferenceResult::NotFound | InferenceResult::LatencyError(_) => {
@@ -641,11 +654,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         // => Minimize Integer V such that
                         // V >= 1 / 3
                         // V >= 3 / -2 -> ceil-div
-                        for (info, last) in crate::util::zip_eq(
-                            &infer_info.candidates[..infer_info.total_inference_upto],
-                            last_vals.iter_mut(),
-                        ) {
-                            *last = self.get_infer_target_value(sm, info, unifier, &mut lat_inf);
+                        for (info, last) in value_iter {
                             match last {
                                 InferenceResult::PortNotUsed => continue, // Missing ports are okay, just skip their inference value
                                 InferenceResult::NotFound | InferenceResult::LatencyError(_) => {
@@ -671,11 +680,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         // => Maximize Integer V such that
                         // V <= 1 / 3
                         // V <= 3 / -2 -> floor-div
-                        for (info, last) in crate::util::zip_eq(
-                            &infer_info.candidates[..infer_info.total_inference_upto],
-                            last_vals.iter_mut(),
-                        ) {
-                            *last = self.get_infer_target_value(sm, info, unifier, &mut lat_inf);
+                        for (info, last) in value_iter {
                             match last {
                                 InferenceResult::PortNotUsed => continue, // Missing ports are okay, just skip their inference value
                                 InferenceResult::NotFound | InferenceResult::LatencyError(_) => {

@@ -7711,7 +7711,7 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
 A can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
-- A <= x'{*} - y'{*}  ({*} = ?)
+- A <= x'{*} - y'{*}  ({*} = ? not reached)
 
       ╭─[ test.sus:1149:12 ]
       │
@@ -7719,7 +7719,7 @@ A can be inferred as an integer value that is as high as possible, without viola
       │               ────┬───  
       │                   ╰───── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
 A can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
-- A <= x'{*} - y'{*}  ({*} = ?)
+- A <= x'{*} - y'{*}  ({*} = ? not reached)
 
 ──────╯
 Warning: Not Instantiating instantiate_fifo #() due to abstract typing errors
@@ -7769,7 +7769,7 @@ action pop'0:
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
 A can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
-- A <= x'{*} - y'{*}  ({*} = ?)
+- A <= x'{*} - y'{*}  ({*} = ? not reached)
 
       ╭─[ test.sus:1181:11 ]
       │
@@ -7777,12 +7777,12 @@ A can be inferred as an integer value that is as high as possible, without viola
       │              ┬  
       │              ╰── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
 A can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
-- A <= x'{*} - y'{*}  ({*} = ?)
+- A <= x'{*} - y'{*}  ({*} = ? not reached)
 
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
 A can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
-- A <= x'{*} - y'{*}  ({*} = ?)
+- A <= x'{*} - y'{*}  ({*} = ? not reached)
 
       ╭─[ test.sus:1182:11 ]
       │
@@ -7790,7 +7790,7 @@ A can be inferred as an integer value that is as high as possible, without viola
       │              ┬  
       │              ╰── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(A: ?)
 A can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
-- A <= x'{*} - y'{*}  ({*} = ?)
+- A <= x'{*} - y'{*}  ({*} = ? not reached)
 
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
@@ -8250,7 +8250,7 @@ Error: Could not finalize this type, some parameters were still unknown: int #(F
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_poison_output #(N: ?)
 N can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
-- N <= i'{*} - o'{*}  ({*} = ?)
+- N <= i'{*} - o'{*}  ({*} = ? not reached)
 
       ╭─[ test.sus:1223:19 ]
       │
@@ -8258,7 +8258,7 @@ N can be inferred as an integer value that is as high as possible, without viola
       │                      ─────────────┬─────────────  
       │                                   ╰─────────────── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_poison_output #(N: ?)
 N can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
-- N <= i'{*} - o'{*}  ({*} = ?)
+- N <= i'{*} - o'{*}  ({*} = ? not reached)
 
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
@@ -8540,10 +8540,10 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_delta #(V: ?)
 V can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
-- V + 30 <= x'{*} - q'{*}  ({*} = ?)
-- V <= p'{*} - y'{*}  ({*} = ?)
-- V + 30 <= p'{*} - q'{*}  ({*} = ?)
-- V <= x'{*} - y'{*}  ({*} = ?)
+- V + 30 <= x'{*} - q'{*}  ({*} = ? not reached)
+- V <= p'{*} - y'{*}  ({*} = ? not reached)
+- V + 30 <= p'{*} - q'{*}  ({*} = ? not reached)
+- V <= x'{*} - y'{*}  ({*} = ? not reached)
 
       ╭─[ test.sus:1311:22 ]
       │
@@ -8551,10 +8551,10 @@ V can be inferred as an integer value that is as high as possible, without viola
       │                         ─┬─  
       │                          ╰─── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_delta #(V: ?)
 V can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
-- V + 30 <= x'{*} - q'{*}  ({*} = ?)
-- V <= p'{*} - y'{*}  ({*} = ?)
-- V + 30 <= p'{*} - q'{*}  ({*} = ?)
-- V <= x'{*} - y'{*}  ({*} = ?)
+- V + 30 <= x'{*} - q'{*}  ({*} = ? not reached)
+- V <= p'{*} - y'{*}  ({*} = ? not reached)
+- V + 30 <= p'{*} - q'{*}  ({*} = ? not reached)
+- V <= x'{*} - y'{*}  ({*} = ? not reached)
 
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
@@ -8573,10 +8573,10 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_negative_delta #(V: ?)
 V can be inferred as an integer value that is as low as possible, without violating any of the following constraints:
-- V * -1 + 30 <= x'{*} - q'{*}  ({*} = ?)
-- V * -1 <= p'{*} - y'{*}  ({*} = ?)
-- V * -1 + 30 <= p'{*} - q'{*}  ({*} = ?)
-- V * -1 <= x'{*} - y'{*}  ({*} = ?)
+- V * -1 + 30 <= x'{*} - q'{*}  ({*} = ? not reached)
+- V * -1 <= p'{*} - y'{*}  ({*} = ? not reached)
+- V * -1 + 30 <= p'{*} - q'{*}  ({*} = ? not reached)
+- V * -1 <= x'{*} - y'{*}  ({*} = ? not reached)
 
       ╭─[ test.sus:1326:31 ]
       │
@@ -8584,10 +8584,10 @@ V can be inferred as an integer value that is as low as possible, without violat
       │                                  ─┬─  
       │                                   ╰─── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_negative_delta #(V: ?)
 V can be inferred as an integer value that is as low as possible, without violating any of the following constraints:
-- V * -1 + 30 <= x'{*} - q'{*}  ({*} = ?)
-- V * -1 <= p'{*} - y'{*}  ({*} = ?)
-- V * -1 + 30 <= p'{*} - q'{*}  ({*} = ?)
-- V * -1 <= x'{*} - y'{*}  ({*} = ?)
+- V * -1 + 30 <= x'{*} - q'{*}  ({*} = ? not reached)
+- V * -1 <= p'{*} - y'{*}  ({*} = ? not reached)
+- V * -1 + 30 <= p'{*} - q'{*}  ({*} = ? not reached)
+- V * -1 <= x'{*} - y'{*}  ({*} = ? not reached)
 
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
