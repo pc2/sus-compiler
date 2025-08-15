@@ -1315,9 +1315,9 @@ module use_infer_me_with_delta {
 }
 
 module infer_me_with_negative_delta #(int V) {
-	interface a: bool x'0 -> bool y'-V
+	interface a: bool x'V -> bool y'0
 
-	interface b: bool p'0 -> bool q'-V+30
+	interface b: bool p'V -> bool q'0+30
 }
 
 module use_infer_me_with_negative_delta {

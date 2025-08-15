@@ -1,6 +1,7 @@
 use std::fs::{self, File};
 use std::io::Write;
 
+use crate::alloc::UUID;
 use crate::to_string::{FmtWrapper, join_string_iter_formatter};
 use crate::{
     alloc::FlatAlloc,
@@ -222,6 +223,7 @@ fn custom_render_latency_count_graph(
             if let Some(specified) = wire.specified_latency.get() {
                 use std::fmt::Write as _;
                 write!(label, " specified {specified}").unwrap();
+                node_ids[idx].valid_parent = Some(UUID::PLACEHOLDER); // Use PLACEHOLDER to refer to the specified nodes of *this* submodule. That way their connection cycle gets omitted from the graph, for cleanlyness. 
             }
             write!(f, "    {id} [label=\"{label}\"")?;
             match wire.is_port {
@@ -390,8 +392,10 @@ fn custom_render_latency_count_graph(
                             let label = match (mul, add) {
                                 (1, 0) => param.to_string(),
                                 (-1, 0) => format!("-{param}"),
-                                (1, add) if add < 0 => format!("-{param} - {}", -add),
-                                (1, add) => format!("-{param} + {add}"),
+                                (1, add) if add < 0 => format!("{param} - {}", -add),
+                                (1, add) => format!("{param} + {add}"),
+                                (-1, add) if add < 0 => format!("-{param} - {}", -add),
+                                (-1, add) => format!("-{param} + {add}"),
                                 (mul, add) if add < 0 => format!("{mul} * {param} - {}", -add),
                                 (mul, add) => format!("{mul} * {param} + {add}"),
                             };
