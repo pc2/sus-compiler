@@ -805,7 +805,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     self.errors.error(
                         span,
                         format!(
-                            "Could not finalize this type, some parameters were still unknown: {}",
+                            "Some parameters were still unknown: {}",
                             w.typ.display(self.linker)
                         ),
                     );
@@ -850,10 +850,14 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
             let failed_to_substitute = !sm.refers_to.template_args.fully_substitute(substitutor);
             if !did_already_error {
                 if failed_to_substitute {
-                    self.errors.error(sm.get_span(self.link_info), format!("Could not infer the parameters of this submodule, some parameters were still unknown: {}\n{}", 
-                    sm.refers_to.display(self.linker),
-                    display_all_infer_params(self.linker, sm)
-                ));
+                    self.errors.error(
+                        sm.get_span(self.link_info),
+                        format!(
+                            "Some submodule parameters were still unknown: {}\n{}",
+                            sm.refers_to.display(self.linker),
+                            display_all_infer_params(self.linker, sm)
+                        ),
+                    );
                 } else if let Err(reason) = sm.refers_to.report_if_errors(
                     self.linker,
                     "Invalid arguments found in a submodule's template arguments.",
