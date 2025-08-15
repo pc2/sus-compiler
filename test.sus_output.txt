@@ -181,6 +181,7 @@ Flattening RawRAM
 Flattening RAM
 Flattening RawFIFO
 Flattening FIFO
+Flattening SameCycleReadFIFO
 Typechecking Iterator
 Typechecking FixedSizeIterator
 Typechecking LatencyOffset
@@ -348,6 +349,7 @@ Typechecking RawRAM
 Typechecking RAM
 Typechecking RawFIFO
 Typechecking FIFO
+Typechecking SameCycleReadFIFO
 Typechecking bool
 Typechecking int
 Typechecking float
@@ -531,6 +533,7 @@ Lints RawRAM
 Lints RAM
 Lints RawFIFO
 Lints FIFO
+Lints SameCycleReadFIFO
 Lints bool
 Lints int
 Lints float
@@ -564,7 +567,6 @@ Concrete Typechecking test_pow17 #()
 Instantiating pow17 #()
 Concrete Typechecking pow17 #()
 Checking array accesses pow17 #()
-Checking array accesses test_pow17 #()
 Instantiating fibonnaci #()
 Concrete Typechecking fibonnaci #()
 Checking array accesses fibonnaci #()
@@ -827,7 +829,6 @@ Concrete Typechecking use_trigger #()
 Checking array accesses use_trigger #()
 Instantiating use_use_trigger #()
 Concrete Typechecking use_use_trigger #()
-Checking array accesses use_use_trigger #()
 Instantiating testSlicing #()
 Concrete Typechecking testSlicing #()
 Instantiating wrong_slice_length #()

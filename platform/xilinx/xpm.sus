@@ -38,7 +38,7 @@ module RAM #(T, int DEPTH) {
     }
 }
 
-extern module RawFIFO #(int WIDTH, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
+extern module RawFIFO #(int WIDTH, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT, int READ_DATA_LATENCY) {
     domain clk
     action rst'0 {}
 
@@ -48,11 +48,11 @@ extern module RawFIFO #(int WIDTH, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN
     
     domain read
     output bool may_pop'0
-    action pop'0 : -> bool[WIDTH] pop_data'2 {}
+    action pop'0 : -> bool[WIDTH] pop_data'READ_DATA_LATENCY {}
 }
 
 module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
-    RawFIFO#(DEPTH, MAY_PUSH_LATENCY, EXTRA_IN_FLIGHT) fifo
+    RawFIFO#(DEPTH, MAY_PUSH_LATENCY, EXTRA_IN_FLIGHT, READ_DATA_LATENCY: 2) fifo
     domain clk
     action rst {
         fifo.rst()
@@ -68,6 +68,28 @@ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
     domain read
     output bool may_pop'0 = fifo.may_pop
     action pop'0 : -> T pop_data'2 {
+        bool[sizeof#(T)] pop_data_as_bits = fifo.pop()
+        pop_data = transmute_from_bits(pop_data_as_bits)
+    }
+}
+
+module SameCycleReadFIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
+    RawFIFO#(DEPTH, MAY_PUSH_LATENCY, EXTRA_IN_FLIGHT, READ_DATA_LATENCY: 0) fifo
+    domain clk
+    action rst {
+        fifo.rst()
+    }
+
+    domain write
+    output bool may_push'-MAY_PUSH_LATENCY = fifo.may_push
+    action push'0 : T push_data'0 {
+        bool[sizeof#(T)] as_bits = transmute_to_bits(push_data)
+        fifo.push(as_bits)
+    }
+    
+    domain read
+    output bool may_pop'0 = fifo.may_pop
+    action pop'0 : -> T pop_data'0 {
         bool[sizeof#(T)] pop_data_as_bits = fifo.pop()
         pop_data = transmute_from_bits(pop_data_as_bits)
     }
