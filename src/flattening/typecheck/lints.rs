@@ -24,7 +24,8 @@ pub fn perform_lints(
         globals,
         file_data: &files[working_on.get_span_file().1],
     };
-    ctx.extern_objects_may_not_have_type_template_args();
+    ctx.extern_may_not_have_type_template_args();
+    ctx.extern_must_declare_abs_lats();
     ctx.lint_instructions();
     ctx.find_unused_variables();
 }
@@ -224,15 +225,40 @@ impl LintContext<'_> {
         }
     }
 
-    fn extern_objects_may_not_have_type_template_args(&self) {
-        if self.working_on.is_extern == IsExtern::Extern {
-            for (_id, arg) in &self.working_on.parameters {
-                if let TemplateKind::Type(_) = &arg.kind {
-                    self.errors.error(
-                        arg.name_span,
-                        "'extern' modules may not have 'type' arguments. Convert to bool[] first",
-                    );
-                }
+    fn extern_may_not_have_type_template_args(&self) {
+        if self.working_on.is_extern != IsExtern::Extern {
+            return;
+        };
+
+        for (_id, arg) in &self.working_on.parameters {
+            if let TemplateKind::Type(_) = &arg.kind {
+                self.errors.error(
+                    arg.name_span,
+                    "'extern' modules may not have 'type' arguments. Convert to bool[] first",
+                );
+            }
+        }
+    }
+
+    fn extern_must_declare_abs_lats(&self) {
+        let GlobalObj::Module(md) = self.working_on else {
+            return;
+        };
+        match self.working_on.is_extern {
+            IsExtern::Normal => return,
+            IsExtern::Extern | IsExtern::Builtin => {}
+        }
+
+        for (_, p) in &md.ports {
+            let instr = &md.link_info.instructions[p.declaration_instruction];
+            if instr.get_latency_specifier().is_none() {
+                self.errors.error(
+                    instr.get_span(),
+                    format!(
+                        "In {} modules all ports must have a specified latency!",
+                        self.working_on.is_extern
+                    ),
+                );
             }
         }
     }

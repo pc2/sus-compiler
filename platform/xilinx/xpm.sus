@@ -2,7 +2,7 @@
 
 extern module RawROM #(int WIDTH, int DEPTH) {
     domain clk
-    action read : int #(FROM: 0, TO: DEPTH) index'0 -> bool[WIDTH] output_bits'2 {}
+    action read'0 : int #(FROM: 0, TO: DEPTH) index'0 -> bool[WIDTH] output_bits'2 {}
 }
 
 module ROM #(T, int DEPTH) {
