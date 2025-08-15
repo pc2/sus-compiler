@@ -147,9 +147,9 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
 
         error_reporter.report(&substitutor);
 
-        self.finalize(&substitutor);
-
         self.compute_latencies();
+
+        self.finalize(&substitutor);
     }
     /*fn peano_to_nested_array_of(
         &mut self,
@@ -793,17 +793,23 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
     /// Calls [FullySubstitutable::fully_substitute] on everything. From this point on the substitutor is unneccesary
     fn finalize(&mut self, substitutor: &ValueUnifierStore) {
         let mut selects_to_check = Vec::new();
+        // Don't report "could not figure out" errors if *any* other error has been reported before, because it confuses the user. Fixing the other error may resolve this one.
+        // This is mostly from my own experience chasing down "could not infer latency parameter" errors, that were due to a bad problem -_-
+        let did_already_error = self.errors.did_error();
+
         for (w_id, w) in &mut self.wires {
             if !w.typ.fully_substitute(substitutor) {
                 let span = w.get_span(self.link_info);
                 span.debug();
-                self.errors.error(
-                    span,
-                    format!(
-                        "Could not finalize this type, some parameters were still unknown: {}",
-                        w.typ.display(self.linker)
-                    ),
-                );
+                if !did_already_error {
+                    self.errors.error(
+                        span,
+                        format!(
+                            "Could not finalize this type, some parameters were still unknown: {}",
+                            w.typ.display(self.linker)
+                        ),
+                    );
+                }
             } else if !w.typ.is_valid() {
                 self.errors.error(
                     w.get_span(self.link_info),
@@ -841,16 +847,19 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         }
 
         for (_, sm) in &mut self.submodules {
-            if !sm.refers_to.template_args.fully_substitute(substitutor) {
-                self.errors.error(sm.get_span(self.link_info), format!("Could not infer the parameters of this submodule, some parameters were still unknown: {}\n{}", 
+            let failed_to_substitute = !sm.refers_to.template_args.fully_substitute(substitutor);
+            if !did_already_error {
+                if failed_to_substitute {
+                    self.errors.error(sm.get_span(self.link_info), format!("Could not infer the parameters of this submodule, some parameters were still unknown: {}\n{}", 
                     sm.refers_to.display(self.linker),
                     display_all_infer_params(self.linker, sm)
                 ));
-            } else if let Err(reason) = sm.refers_to.report_if_errors(
-                self.linker,
-                "Invalid arguments found in a submodule's template arguments.",
-            ) {
-                self.errors.error(sm.get_span(self.link_info), reason);
+                } else if let Err(reason) = sm.refers_to.report_if_errors(
+                    self.linker,
+                    "Invalid arguments found in a submodule's template arguments.",
+                ) {
+                    self.errors.error(sm.get_span(self.link_info), reason);
+                }
             }
             if let Some(instance) = sm.instance.get() {
                 for (_port_id, concrete_port, connecting_wire) in
