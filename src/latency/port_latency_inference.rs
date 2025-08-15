@@ -348,7 +348,9 @@ fn make_latency_inference_info(
                         multiply_var_by,
                         offset,
                     } => {
-                        if from.direction == Direction::Output || to.direction == Direction::Input {
+                        if !(from.direction == Direction::Input
+                            && to.direction == Direction::Output)
+                        {
                             continue; // No inference is possible between Input/Input or Output/Output
                         }
 

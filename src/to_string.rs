@@ -589,7 +589,7 @@ impl InferenceCandidate {
                 InferenceTarget::PortLatency { from, to } => {
                     let from = &md.ports[*from];
                     let to = &md.ports[*to];
-                    write!(f, "{}'{{*}} - {}'{{*}}", from.name, to.name)
+                    write!(f, "{}'{{*}} - {}'{{*}}", to.name, from.name)
                 }
             }
         })
@@ -656,7 +656,7 @@ pub fn display_infer_param_info(
                     }
                 }
                 for (idx, c) in can_infer.iter().enumerate() {
-                    write!(f, "- {}", c.display(arg_name, md, linker))?;
+                    write!(f, "    {}", c.display(arg_name, md, linker))?;
                     if let Some(values_list) = final_values
                         && let Some(final_value) = values_list.get(idx)
                     {
@@ -670,7 +670,7 @@ pub fn display_infer_param_info(
                         "The following constraints were found, but aren't used for inference here"
                     )?;
                     for c in cant_infer {
-                        writeln!(f, "- {}", c.display(arg_name, md, linker))?;
+                        writeln!(f, "    {}", c.display(arg_name, md, linker))?;
                     }
                 }
             }
