@@ -444,7 +444,10 @@ impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
     pub fn report_if_errors(&self, linker: &Linker, context: &str) -> Result<(), String> {
         let error_parameters = self.find_invalid_template_args();
         if !error_parameters.is_empty() {
-            let mut resulting_error = format!("{context} The arguments ");
+            let mut resulting_error = format!(
+                "{context}: {}. The arguments ",
+                self.display(&linker.globals)
+            );
             for id in error_parameters {
                 use std::fmt::Write;
                 write!(

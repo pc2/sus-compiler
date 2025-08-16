@@ -863,7 +863,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     );
                 } else if let Err(reason) = sm.refers_to.report_if_errors(
                     self.linker,
-                    "Invalid arguments found in a submodule's template arguments.",
+                    "Invalid arguments found in a submodule's template arguments",
                 ) {
                     self.errors.error(sm.get_span(self.link_info), reason);
                 }

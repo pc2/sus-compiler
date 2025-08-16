@@ -707,6 +707,10 @@ impl<'l> ExecutionContext<'l> {
                     INT_SCALAR.clone(),
                 ))
             }
+            get_builtin_const!("noinfer") => {
+                let [v] = cst_ref.template_args.cast_to_int_array();
+                Ok((Value::Integer(v.clone()), INT_SCALAR.clone()))
+            }
             get_builtin_const!("assert") => {
                 let [condition] = cst_ref.template_args.cast_to_array();
 
@@ -744,7 +748,7 @@ impl<'l> ExecutionContext<'l> {
         concrete_ref
             .report_if_errors(
                 self.linker,
-                "For executing compile-time constants, all arguments must be fully specified.",
+                "For executing compile-time constants, all arguments must be fully specified",
             )
             .map_err(|e| (cst_ref.get_total_span(), e))?;
 
