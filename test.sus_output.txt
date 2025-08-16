@@ -14,6 +14,7 @@ Flattening pow
 Flattening factorial
 Flattening falling_factorial
 Flattening comb
+Flattening noinfer
 Flattening LatencyOffset
 Flattening CrossDomain
 Flattening CrossAction
@@ -364,6 +365,7 @@ Typechecking pow
 Typechecking factorial
 Typechecking falling_factorial
 Typechecking comb
+Typechecking noinfer
 Typechecking SUM_UP
 Typechecking dont_care
 Lints Iterator
@@ -548,6 +550,7 @@ Lints pow
 Lints factorial
 Lints falling_factorial
 Lints comb
+Lints noinfer
 Lints SUM_UP
 Lints dont_care
 Instantiating CrossActionNoData #()

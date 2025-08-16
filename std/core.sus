@@ -55,6 +55,9 @@ __builtin__ const int falling_factorial #(int N, int K) {}
 /// Computes `N! / (K! * (N - K)!)`. for `0 <= K <= N`
 __builtin__ const int comb #(int N, int K) {}
 
+/// `Result == V`, but this prevents this from being included in the inference parameters. 
+__builtin__ const int noinfer #(int V) {}
+
 /// Unsafe builtin to circumvent the Latency Counting System. Connects `out` to `in` without adding the requisite latency
 /// Or: used for negative latencies, for instance to implement Almost-Full FIFOs, stateful for loops, etc. 
 __builtin__ module LatencyOffset #(T, int OFFSET) {
