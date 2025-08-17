@@ -822,8 +822,8 @@ impl<'g> CodeGenerationContext<'g> {
         }
     }
 
-    fn check_ports<const N: usize>(&self, ports: &[(Direction, &'static str)]) -> [&Port; N] {
-        let actual_ports: [&Port; N] = self.md.ports.cast_to_array();
+    fn check_ports<const N: usize>(&self, ports: &[(Direction, &'static str)]) -> &[Port; N] {
+        let actual_ports: &[Port; N] = self.md.ports.cast_to_array();
 
         for ((direction, name), port) in crate::util::zip_eq(ports, actual_ports) {
             assert_eq!(&port.name, *name);
