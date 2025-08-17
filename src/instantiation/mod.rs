@@ -368,23 +368,6 @@ struct Executed {
 }
 
 impl Executed {
-    fn make_interface(&self, md: &Module) -> FlatAlloc<Option<InstantiatedPort>, PortIDMarker> {
-        md.ports.map(|(_, port)| {
-            let port_decl_id = port.declaration_instruction;
-            let SubModuleOrWire::Wire(wire_id) = &self.generation_state[port_decl_id] else {
-                return None;
-            };
-            let wire = &self.wires[*wire_id];
-            Some(InstantiatedPort {
-                wire: *wire_id,
-                direction: port.direction,
-                absolute_latency: AbsLat::UNKNOWN,
-                typ: wire.typ.clone(),
-                domain: wire.domain,
-            })
-        })
-    }
-
     pub fn into_module_typing_context<'l>(
         self,
         linker: &'l Linker,
@@ -392,7 +375,6 @@ impl Executed {
         global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
         name: String,
     ) -> (ModuleTypingContext<'l>, ValueUnifierAlloc) {
-        let interface_ports = self.make_interface(md);
         let errors = ErrorCollector::new_empty(md.link_info.file, &linker.files);
         if let Err((position, reason)) = self.execution_status {
             errors.error(position, reason);
@@ -408,7 +390,6 @@ impl Executed {
             link_info: &md.link_info,
             linker,
             errors,
-            interface_ports,
         };
         (ctx, self.type_var_alloc)
     }
@@ -433,7 +414,6 @@ pub struct ModuleTypingContext<'l> {
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
     pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
     pub generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
-    pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     pub link_info: &'l LinkInfo,
     /// Yes I know it's redundant, but it's easier to both have link_info and md
     pub linker: &'l Linker,
@@ -447,12 +427,40 @@ impl<'l> ModuleTypingContext<'l> {
             crate::dev_aid::dot_graphs::display_generated_hardware_structure(&self);
         }
 
+        // A non-error instance must be fully valid!
+        if !self.errors.did_error() {
+            for (_, w) in &self.wires {
+                assert!(w.typ.is_valid());
+                assert!(w.absolute_latency.get().is_some());
+            }
+            for (_, sm) in &self.submodules {
+                assert!(sm.refers_to.find_invalid_template_args().is_empty());
+                assert!(sm.instance.get().is_some());
+            }
+        }
+
+        let interface_ports = self.md.ports.map(|(_, port)| {
+            let port_decl_id = port.declaration_instruction;
+            let SubModuleOrWire::Wire(wire_id) = &self.generation_state[port_decl_id] else {
+                return None;
+            };
+            let wire = &self.wires[*wire_id];
+            assert_eq!(wire.is_port.unwrap(), port.direction);
+            Some(InstantiatedPort {
+                wire: *wire_id,
+                direction: port.direction,
+                absolute_latency: wire.absolute_latency,
+                typ: wire.typ.clone(),
+                domain: wire.domain,
+            })
+        });
+
         InstantiatedModule {
             global_ref: self.global_ref,
             name: self.name,
             mangled_name: self.mangled_name,
             errors: self.errors.into_storage(),
-            interface_ports: self.interface_ports,
+            interface_ports,
             wires: self.wires,
             submodules: self.submodules,
             generation_state: self.generation_state,
@@ -746,16 +754,6 @@ impl ModuleTypingContext<'_> {
                 }
                 println!();
             }
-        }
-        println!("\nPorts: ");
-        for (port_id, p) in &self.interface_ports {
-            let direction = self.md.ports[port_id].direction.to_string().purple();
-            let name = if let Some(p) = p {
-                self.name(p.wire).to_string()
-            } else {
-                "N/C".to_owned()
-            };
-            println!("{port_id:?}: {direction} {name}")
         }
         println!();
         println!();

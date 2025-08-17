@@ -394,7 +394,7 @@ macro_rules! __debug_span {
 macro_rules! __debug_dbg {
     ($($arg:tt)*) => {
         if $crate::debug::debugging_enabled() {
-            dbg!($($arg)*)
+            dbg!($($arg)*);
         }
     };
 }
