@@ -96,6 +96,8 @@
                 "/home/lennart/Desktop/sus-compiler/platform/xilinx/xpm.sus",
                 "--debug-whitelist", "WholeMandelbrotComputer",
                 "--debug", "dot-latency-infer",
+                "--debug", "dot-latency-problem",
+                "--debug", "dot-latency-solution",
                 "--debug", "print-abstract-pre-typecheck",
                 "--debug", "print-abstract",
                 "--debug", "print-concrete",
