@@ -808,7 +808,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     self.errors.error(
                         span,
                         format!(
-                            "Some parameters were still unknown: {}",
+                            "Some parameters of '{}' were still unknown: {}",
+                            w.name,
                             w.typ.display(self.linker)
                         ),
                     );
@@ -817,7 +818,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 self.errors.error(
                     w.get_span(self.link_info),
                     format!(
-                        "The type of this wire is invalid! {}",
+                        "The type of '{}' is invalid! {}",
+                        w.name,
                         w.typ.display(self.linker)
                     ),
                 );

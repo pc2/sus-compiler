@@ -5,7 +5,7 @@ use crate::typing::template::TemplateKind;
 
 use lsp_types::{LanguageString, MarkedString};
 
-use crate::flattening::{DeclarationKind, InterfaceDeclKind, InterfaceToDomainMap};
+use crate::flattening::{DeclarationKind, InterfaceDeclKind};
 use crate::instantiation::SubModuleOrWire;
 use crate::linker::{Documentation, FileData, GlobalObj, GlobalUUID, LinkInfo};
 
@@ -74,7 +74,7 @@ impl HoverCollector<'_> {
         for (_template_args, inst) in self.linker.instantiator.borrow().iter_for_module(md_id) {
             for (_id, sm) in &inst.submodules {
                 if sm.original_instruction == submodule_instr {
-                    self.sus_code(sm.refers_to.display(self.linker).to_string());
+                    self.sus_code(sm.display_interface(self.linker).to_string());
                     self.monospace(display_all_infer_params(self.linker, sm).to_string());
                 }
             }
@@ -145,7 +145,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
         }
         LocationInfo::InGlobal(obj_id, _link_info, id, InGlobal::NamedSubmodule(submod)) => {
             let md_id = obj_id.unwrap_module();
-            let md = &linker.modules[md_id]; // Submodules can only exist within Modules
+            //let md = &linker.modules[md_id]; // Submodules can only exist within Modules
             let submodule = &linker.modules[submod.module_ref.id];
 
             hover.sus_code(format!(
