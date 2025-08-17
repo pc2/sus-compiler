@@ -181,7 +181,7 @@ impl<'l> TypeCheckingContext<'l> {
                         );
                     }
                     (false, true) => {
-                        self.errors.warn(
+                        self.errors.error(
                             if_statement.if_keyword_span,
                             "Used 'when' in a generative context, use 'if' instead",
                         );
