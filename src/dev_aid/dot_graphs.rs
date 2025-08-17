@@ -181,11 +181,11 @@ struct NodeId {
     print_separate: bool,
 }
 
-fn custom_render_latency_count_graph<'linker>(
+fn custom_render_latency_count_graph(
     lc_problem: &LatencyCountingProblem,
     wires: &FlatAlloc<RealWire, WireIDMarker>,
     submodules: &FlatAlloc<SubModule, SubModuleIDMarker>,
-    linker: &'linker Linker,
+    linker: &Linker,
     solution: Option<&[i64]>,
     graph_name: &str,
 ) -> impl std::fmt::Display {
