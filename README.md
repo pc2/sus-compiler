@@ -162,7 +162,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Generative Parameters
 - [x] Type Templates
 - [x] Full Template Inference
-- [ ] Actions, Triggers and Queries
+- [x] Actions, Triggers ~~and Queries~~
 
 ### Language Features
 - [x] Basic Tokenizer
