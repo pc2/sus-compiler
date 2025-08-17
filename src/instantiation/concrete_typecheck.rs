@@ -717,6 +717,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 .can_fully_substitute(&unifier.store)
             {
                 self.try_instantiate_submodule(sm, unifier);
+
                 any_success = true;
                 false
             } else {

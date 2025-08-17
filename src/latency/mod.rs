@@ -230,8 +230,12 @@ impl LatencyCountingProblem {
 
     fn make_ports_per_domain(&self, ctx: &ModuleTypingContext) -> Vec<Vec<usize>> {
         let mut ports_per_domain_flat = ctx.md.domains.map(|_| Vec::new());
-        for (_id, port) in ctx.interface_ports.iter_valids() {
-            ports_per_domain_flat[port.domain].push(self.map_wire_to_latency_node[port.wire]);
+        for (_id, port) in &ctx.md.ports {
+            if let SubModuleOrWire::Wire(port_w) =
+                ctx.generation_state[port.declaration_instruction]
+            {
+                ports_per_domain_flat[port.domain].push(self.map_wire_to_latency_node[port_w]);
+            }
         }
         let mut ports_per_domain = ports_per_domain_flat.into_vec();
         ports_per_domain.retain(|v| v.len() > 1);
@@ -412,13 +416,6 @@ impl ModuleTypingContext<'_> {
                 self.report_error(&problem.map_latency_node_to_wire, err);
             }
         };
-
-        // Finally update interface absolute latencies
-        for (_id, port) in self.interface_ports.iter_valids_mut() {
-            let port_wire = &self.wires[port.wire];
-            port.absolute_latency = port_wire.absolute_latency;
-            port.typ = port_wire.typ.clone();
-        }
     }
 
     fn gather_all_mux_inputs(
