@@ -121,19 +121,21 @@ pub type TVec<T> = FlatAlloc<T, TemplateIDMarker>;
 
 impl TVec<ConcreteTemplateArg> {
     pub fn cast_to_unifyable_array<const N: usize>(&self) -> [&UnifyableValue; N] {
-        self.cast_to_array().map(|v| v.unwrap_value())
+        self.cast_to_array().each_ref().map(|v| v.unwrap_value())
     }
     pub fn cast_to_unifyable_array_mut<const N: usize>(&mut self) -> [&mut UnifyableValue; N] {
-        self.cast_to_array_mut().map(|v| v.unwrap_value_mut())
+        self.cast_to_array_mut()
+            .each_mut()
+            .map(|v| v.unwrap_value_mut())
     }
     pub fn cast_to_int_array<const N: usize>(&self) -> [&IBig; N] {
-        self.cast_to_array().map(|v| {
+        self.cast_to_array().each_ref().map(|v| {
             let_unwrap!(TemplateKind::Value(Unifyable::Set(Value::Integer(i))), v);
             i
         })
     }
     pub fn cast_to_int_array_mut<const N: usize>(&mut self) -> [&mut IBig; N] {
-        self.cast_to_array_mut().map(|v| {
+        self.cast_to_array_mut().each_mut().map(|v| {
             let_unwrap!(TemplateKind::Value(Unifyable::Set(Value::Integer(i))), v);
             i
         })

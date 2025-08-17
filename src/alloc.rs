@@ -655,19 +655,19 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     pub fn iter_mut(&mut self) -> FlatAllocIterMut<'_, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn map<OT>(
-        &self,
-        f: impl FnMut((UUID<IndexMarker>, &T)) -> OT,
+    pub fn map<'slf, OT>(
+        &'slf self,
+        f: impl FnMut((UUID<IndexMarker>, &'slf T)) -> OT,
     ) -> FlatAlloc<OT, IndexMarker> {
         FlatAlloc {
             data: Vec::from_iter(self.iter().map(f)),
             _ph: PhantomData,
         }
     }
-    pub fn map2<T2, OT>(
-        &self,
-        second: &FlatAlloc<T2, IndexMarker>,
-        f: impl FnMut((UUID<IndexMarker>, &T, &T2)) -> OT,
+    pub fn map2<'s1, 's2, T2, OT>(
+        &'s1 self,
+        second: &'s2 FlatAlloc<T2, IndexMarker>,
+        f: impl FnMut((UUID<IndexMarker>, &'s1 T, &'s2 T2)) -> OT,
     ) -> FlatAlloc<OT, IndexMarker> {
         FlatAlloc {
             data: Vec::from_iter(zip_eq(self.iter(), second.iter()).map(f)),
@@ -716,17 +716,17 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
             _ph: PhantomData,
         })
     }
-    pub fn cast_to_array<const N: usize>(&self) -> [&T; N] {
-        assert_eq!(self.len(), N);
-        std::array::from_fn(|i| &self.data[i])
+    pub fn cast_to_array<const N: usize>(&self) -> &[T; N] {
+        self.data.as_slice().try_into().unwrap()
     }
-    pub fn cast_to_array_mut<const N: usize>(&mut self) -> [&mut T; N] {
-        assert_eq!(self.len(), N);
-        std::array::from_fn(|i| {
-            let ptr: *mut T = &mut self.data[i];
-            // SAFETY: Of course, the data[i] accesses are all disjoint
-            unsafe { &mut *ptr }
-        })
+    pub fn cast_to_array_mut<const N: usize>(&mut self) -> &mut [T; N] {
+        self.data.as_mut_slice().try_into().unwrap()
+    }
+    pub fn try_cast_to_array<const N: usize>(&self) -> Option<&[T; N]> {
+        self.data.as_slice().try_into().ok()
+    }
+    pub fn try_cast_to_array_mut<const N: usize>(&mut self) -> Option<&mut [T; N]> {
+        self.data.as_mut_slice().try_into().ok()
     }
     pub fn find(
         &self,

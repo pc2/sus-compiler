@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::fs::{self, File};
 use std::io::Write;
 
@@ -180,11 +181,11 @@ struct NodeId {
     print_separate: bool,
 }
 
-fn custom_render_latency_count_graph(
+fn custom_render_latency_count_graph<'linker>(
     lc_problem: &LatencyCountingProblem,
     wires: &FlatAlloc<RealWire, WireIDMarker>,
     submodules: &FlatAlloc<SubModule, SubModuleIDMarker>,
-    linker: &Linker,
+    linker: &'linker Linker,
     solution: Option<&[i64]>,
     graph_name: &str,
 ) -> impl std::fmt::Display {
@@ -244,52 +245,73 @@ fn custom_render_latency_count_graph(
             if let Some(inst) = sm.instance.get() {
                 let inst_name = &inst.name;
                 let sm_name = &sm.name;
-                let mut inputs = Vec::new();
-                let mut outputs = Vec::new();
-                for (_, p) in inst.interface_ports.iter_valids() {
-                    let p_wire = &inst.wires[p.wire];
+                let inputs_outputs_per_domain = sm_md.domains.map(|(domain_id, domain)| {
+                    let mut inputs = Vec::new();
+                    let mut outputs = Vec::new();
+                    for (_, p) in inst.interface_ports.iter_valids() {
+                        if p.domain != domain_id {
+                            continue;
+                        }
+                        let p_wire = &inst.wires[p.wire];
 
-                    match p.direction {
-                        Direction::Input => inputs.push(p_wire),
-                        Direction::Output => outputs.push(p_wire),
+                        match p.direction {
+                            Direction::Input => inputs.push(p_wire),
+                            Direction::Output => outputs.push(p_wire),
+                        }
                     }
+                    (inputs, outputs, &domain.name)
+                });
+
+                fn display_port_list<'l>(list: &'l [&'l RealWire]) -> impl Display + 'l {
+                    FmtWrapper(move |f| {
+                        write!(f, " {{ ")?;
+                        join_string_iter_formatter(" | ", f, list, |p_wire, f| {
+                            let name = &p_wire.name;
+                            let abs_lat = &p_wire.absolute_latency;
+                            write!(f, "<{name}> {name}'{abs_lat}")
+                        })?;
+                        write!(f, " }} ")
+                    })
                 }
 
-                write!(
-                    f,
-                    "    {sm_id:?}[shape=record,style=filled,fillcolor=bisque,label=\"{inst_name} | {{"
-                )?;
-                if !inputs.is_empty() {
-                    write!(f, " {{ ")?;
-                    join_string_iter_formatter(" | ", f, &inputs, |p_wire, f| {
-                        let name = &p_wire.name;
-                        let abs_lat = &p_wire.absolute_latency;
-                        write!(f, "<{name}> {name}'{abs_lat}")
-                    })?;
-                    write!(f, " }} |")?;
+                if let Some([(inputs, outputs, domain)]) =
+                    &inputs_outputs_per_domain.try_cast_to_array()
+                {
+                    // Just a single domain, simplify print
+                    let inputs = display_port_list(inputs);
+                    let outputs = display_port_list(outputs);
+                    write!(
+                        f,
+                        "    {sm_id:?}_{domain}[shape=record,style=filled,fillcolor=bisque,label=\"{inst_name} | {{ {inputs} | {sm_name}\\n{domain} | {outputs} }} }}\"];"
+                    )?;
+                } else {
+                    writeln!(f, "subgraph cluster_{sm_id:?} {{")?;
+                    writeln!(f, "    label=\"{inst_name}\";")?;
+                    writeln!(f, "    style=filled;")?;
+                    writeln!(f, "    color=lightgrey;")?;
+                    for (_, (inputs, outputs, domain)) in &inputs_outputs_per_domain {
+                        // Just a single domain, simplify print
+                        let inputs = display_port_list(inputs);
+                        let outputs = display_port_list(outputs);
+                        write!(
+                            f,
+                            "    {sm_id:?}_{domain}[shape=record,style=filled,fillcolor=bisque,label=\"{{ {inputs} | {sm_name}\\n{domain} | {outputs} }} }}\"];"
+                        )?;
+                    }
+                    writeln!(f, "}}")?;
                 }
-                write!(f, " {sm_name} ")?;
-                if !outputs.is_empty() {
-                    write!(f, "| {{ ")?;
-                    join_string_iter_formatter(" | ", f, &outputs, |p_wire, f| {
-                        let name = &p_wire.name;
-                        let abs_lat = &p_wire.absolute_latency;
-                        write!(f, "<{name}> {name}'{abs_lat}")
-                    })?;
-                    write!(f, " }} ")?;
-                }
-                writeln!(f, "}}\"];")?;
 
                 for (_, maps_to, port) in crate::alloc::zip_eq(&sm.port_map, &inst.interface_ports)
                 {
                     let (Some(maps_to), Some(port)) = (maps_to, port) else {
                         continue;
                     };
+                    let port_domain_name = &sm_md.domains[port.domain].name;
                     let p_name = &inst.wires[port.wire].name;
                     let node =
                         &mut node_ids[lc_problem.map_wire_to_latency_node[maps_to.maps_to_wire]];
                     node.print_separate = false;
-                    node.id = format!("{sm_id:?}:{p_name}");
+                    node.id = format!("{sm_id:?}_{port_domain_name}:{p_name}");
                     node.valid_parent = Some(sm_id);
                 }
             } else {

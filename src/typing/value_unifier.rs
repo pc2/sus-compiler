@@ -321,6 +321,7 @@ impl ConcreteType {
         assert_eq!(typ.id, expected);
         typ.template_args
             .cast_to_array::<N>()
+            .each_ref()
             .map(|v| v.unwrap_value())
     }
     pub fn display_substitute(&self, linker: &Linker, substitutor: &ValueUnifierStore) -> String {
