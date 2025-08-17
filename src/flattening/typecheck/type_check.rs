@@ -30,19 +30,18 @@ impl<'l> TypeCheckingContext<'l> {
 
         // This iteration has to split into two parts, because we first have to set all the type
         // parameters for use by creating the types to compare against the value parameters
-        let template_arg_types =
-            target_link_info
-                .parameters
-                .map(|(id, param)| match &param.kind {
-                    TemplateKind::Type(_) => TemplateKind::Type({
-                        if let Some(wr_typ) = global_ref.get_type_arg_for(id) {
-                            self.written_to_abstract_type(wr_typ)
-                        } else {
-                            self.type_checker.alloc_unknown()
-                        }
-                    }),
-                    TemplateKind::Value(_) => TemplateKind::Value(()),
-                });
+        let template_arg_types = target_link_info
+            .parameters
+            .map(|(id, param)| match &param.kind {
+                TemplateKind::Type(_) => TemplateKind::Type({
+                    if let Some(wr_typ) = global_ref.get_type_arg_for(id) {
+                        self.written_to_abstract_type(wr_typ)
+                    } else {
+                        self.type_checker.alloc_unknown()
+                    }
+                }),
+                TemplateKind::Value(_) => TemplateKind::Value(()),
+            });
 
         global_ref.template_arg_types.set(template_arg_types);
     }
@@ -837,31 +836,30 @@ impl AbstractTypeSubstitutor {
         let global_obj: GlobalUUID = global_ref.id.into();
         let target_link_info = &globals.get(global_obj).get_link_info();
 
-        let template_arg_types =
-            target_link_info
-                .parameters
-                .map(|(_, param)| match &param.kind {
-                    TemplateKind::Type(_) => TemplateKind::Type(
-                        global_ref
-                            .template_args
-                            .iter()
-                            .find_map(|arg| {
-                                if let (Some(TemplateKind::Type(typ)), true) =
-                                    (&arg.kind, arg.name == param.name)
-                                {
-                                    Some(self.written_to_abstract_type_substitute_templates(
-                                        typ,
-                                        globals,
-                                        template_args,
-                                    ))
-                                } else {
-                                    None
-                                }
-                            })
-                            .unwrap_or_else(|| self.alloc_unknown()),
-                    ),
-                    TemplateKind::Value(_) => TemplateKind::Value(()),
-                });
+        let template_arg_types = target_link_info
+            .parameters
+            .map(|(_, param)| match &param.kind {
+                TemplateKind::Type(_) => TemplateKind::Type(
+                    global_ref
+                        .template_args
+                        .iter()
+                        .find_map(|arg| {
+                            if let (Some(TemplateKind::Type(typ)), true) =
+                                (&arg.kind, arg.name == param.name)
+                            {
+                                Some(self.written_to_abstract_type_substitute_templates(
+                                    typ,
+                                    globals,
+                                    template_args,
+                                ))
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_else(|| self.alloc_unknown()),
+                ),
+                TemplateKind::Value(_) => TemplateKind::Value(()),
+            });
 
         AbstractGlobalReference {
             id: global_ref.id,
