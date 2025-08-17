@@ -75,8 +75,8 @@ impl HoverCollector<'_> {
             for (_id, sm) in &inst.submodules {
                 if sm.original_instruction == submodule_instr {
                     self.sus_code(sm.refers_to.display(self.linker).to_string());
+                    self.monospace(display_all_infer_params(self.linker, sm).to_string());
                 }
-                self.monospace(display_all_infer_params(self.linker, sm).to_string());
             }
         }
     }
@@ -148,25 +148,22 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             let md = &linker.modules[md_id]; // Submodules can only exist within Modules
             let submodule = &linker.modules[submod.module_ref.id];
 
-            // Declaration's documentation
-            hover.documentation(&submod.documentation);
-
             hover.sus_code(format!(
                 "{} {}",
                 submodule.link_info.get_full_name(),
                 submod.name
             ));
 
-            hover.sus_code(submodule.make_all_ports_info_string(
+            /*hover.sus_code(submodule.make_all_ports_info_string(
                 &linker.files[submodule.link_info.file].file_text,
                 Some(InterfaceToDomainMap {
                     local_domain_map: submod.local_domain_map.get().unwrap(),
                     domains: &md.domains,
                 }),
-            ));
+            ));*/
 
             // Module documentation
-            hover.documentation_link_info(&submodule.link_info);
+            //hover.documentation_link_info(&submodule.link_info);
             hover.gather_submodule_hover_infos(md_id, id);
         }
         LocationInfo::InGlobal(obj_id, link_info, id, InGlobal::Temporary(expr)) => {
