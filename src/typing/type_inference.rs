@@ -358,7 +358,15 @@ impl HindleyMilner for AbstractInnerType {
 
                 UnifyResult::Success
             } // Already covered by get_hm_info
-            (_, _) => unreachable!("All others should have been eliminated by get_hm_info check"),
+            (AbstractInnerType::Interface(..), AbstractInnerType::Interface(..))
+            | (AbstractInnerType::LocalInterface(_), AbstractInnerType::LocalInterface(_)) => {
+                // No nested unification, I'm actually thinking we should get rid of interfaces as types...
+                // TODO: Is this okay?
+                UnifyResult::Success
+            }
+            (a, b) => unreachable!(
+                "All others should have been eliminated by get_hm_info check, but found {a:?}, {b:?}"
+            ),
         }
     }
 

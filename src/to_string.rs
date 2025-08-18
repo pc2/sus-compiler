@@ -1116,7 +1116,7 @@ impl SubModule {
             } else {
                 write!(
                     f,
-                    "module {}: /* Some parameters unknown */",
+                    "module {}: /* Could not instantiate */",
                     self.refers_to.display(globals)
                 )
             }
