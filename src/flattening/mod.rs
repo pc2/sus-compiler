@@ -90,6 +90,15 @@ impl Module {
         );
         (port_id, direction)
     }
+
+    pub fn assert_valid(&self) {
+        assert_eq!(
+            self.link_info.parameters.len(),
+            self.inference_info.parameter_inference_candidates.len(),
+            "{}",
+            self.link_info.name
+        );
+    }
 }
 
 /// Represents an opaque type in the compiler, like `int` or `bool`.

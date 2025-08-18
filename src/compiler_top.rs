@@ -257,6 +257,10 @@ impl Linker {
         }
         self.checkpoint(&global_ids, AFTER_TYPE_CHECK_CP);
 
+        for (_, md) in &self.modules {
+            md.assert_valid();
+        }
+
         if config.early_exit == EarlyExitUpTo::AbstractTypecheck {
             return;
         }

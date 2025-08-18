@@ -140,17 +140,16 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
     }
 
     // Skip printing not fully figured out types of there are type errors to reduce visual overhead.
-    if errors.did_error() {
-        return;
-    }
-    for (typ, span) in finalize_ctx.substitution_failures {
-        errors.error(
-            span,
-            format!(
-                "Could not fully figure out the type of this object. {}",
-                typ.display(globals.globals, link_info)
-            ),
-        );
+    if !errors.did_error() {
+        for (typ, span) in finalize_ctx.substitution_failures {
+            errors.error(
+                span,
+                format!(
+                    "Could not fully figure out the type of this object. {}",
+                    typ.display(globals.globals, link_info)
+                ),
+            );
+        }
     }
 
     if let GlobalObj::Module(md) = pass.get_mut() {
