@@ -6,6 +6,7 @@ use ibig::IBig;
 use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::zip_eq;
+use crate::config::config;
 use crate::latency::AbsLat;
 use crate::linker::{IsExtern, LinkInfo};
 use crate::prelude::*;
@@ -93,7 +94,10 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
                     }
                 }
                 get_builtin_type!("bool") => return format!(" {var_name}{array_string}"),
-                get_builtin_type!("float") => return format!("[31:0] {var_name}{array_string}"),
+                get_builtin_type!("float") => {
+                    let float_msb = config().float_size - 1;
+                    return format!("[{float_msb}:0] {var_name}{array_string}");
+                }
                 _ => todo!("Structs"),
             },
             ConcreteType::Array(arr) => {
@@ -214,9 +218,8 @@ impl<'g> CodeGenerationContext<'g> {
                         matches!(cst, Value::Unset),
                         "TODO: Generative non-Unset floats"
                     );
-                    result
-                        .write_str("32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
-                        .unwrap();
+                    let float_size = config().float_size;
+                    write!(result, "{float_size}'x").unwrap();
                 }
                 _ => todo!("Structs"),
             },

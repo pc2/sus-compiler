@@ -2,6 +2,7 @@ use ibig::IBig;
 use ibig::UBig;
 use sus_proc_macro::get_builtin_type;
 
+use crate::config;
 use crate::linker::GlobalUUID;
 use crate::prelude::*;
 use crate::to_string::join_string_iter_formatter;
@@ -287,7 +288,7 @@ impl ConcreteType {
                 bounds.bitwidth()
             }
             get_builtin_type!("bool") => 1,
-            get_builtin_type!("float") => 32,
+            get_builtin_type!("float") => config().float_size as u64,
             _other => todo!("Other Named Structs are not implemented yet"),
         }
     }
