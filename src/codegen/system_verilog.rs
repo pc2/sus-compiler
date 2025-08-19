@@ -218,8 +218,7 @@ impl<'g> CodeGenerationContext<'g> {
                         matches!(cst, Value::Unset),
                         "TODO: Generative non-Unset floats"
                     );
-                    let float_size = config().float_size;
-                    write!(result, "{float_size}'x").unwrap();
+                    write!(result, "'x").unwrap();
                 }
                 _ => todo!("Structs"),
             },
