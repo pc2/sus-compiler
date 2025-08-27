@@ -176,6 +176,7 @@ Flattening wrong_slice_length
 Flattening negative_slice
 Flattening multi_slice
 Flattening multi_slice_reverse
+Flattening duplicate_port_names
 Flattening RawROM
 Flattening ROM
 Flattening RawRAM
@@ -344,6 +345,7 @@ Typechecking wrong_slice_length
 Typechecking negative_slice
 Typechecking multi_slice
 Typechecking multi_slice_reverse
+Typechecking duplicate_port_names
 Typechecking RawROM
 Typechecking ROM
 Typechecking RawRAM
@@ -529,6 +531,7 @@ Lints wrong_slice_length
 Lints negative_slice
 Lints multi_slice
 Lints multi_slice_reverse
+Lints duplicate_port_names
 Lints RawROM
 Lints ROM
 Lints RawRAM

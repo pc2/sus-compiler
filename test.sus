@@ -1496,3 +1496,25 @@ module multi_slice_reverse {
 	matrix[3 +: 9][7 -: 5] = gen_partselect
 	matrix[a +: 3][b -: 2] = partselect
 }
+
+/// See Issue #94
+module duplicate_port_names {
+	if true {
+		output bool port_a
+	} else {
+		input bool port_a
+	}
+
+	if true {
+		interface interf
+	} else {
+		interface interf
+	}
+
+	interface port_interf: bool port_interf
+	if true {
+		interface proooot: bool preeee
+	} else {
+		interface preeee
+	}
+}

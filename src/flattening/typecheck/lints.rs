@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
+
 use sus_proc_macro::get_builtin_const;
 
 use crate::alloc::ArenaAllocator;
@@ -28,6 +31,7 @@ pub fn perform_lints(
     ctx.extern_must_declare_abs_lats();
     ctx.lint_instructions();
     ctx.find_unused_variables();
+    ctx.no_duplicate_ports();
 }
 
 struct LintContext<'l> {
@@ -445,5 +449,52 @@ impl LintContext<'_> {
             }
         }
         instruction_fanins
+    }
+
+    /// #94 - Ports and Interfaces must not have identical names
+    fn no_duplicate_ports(&self) {
+        let GlobalObj::Module(md) = &self.working_on else {
+            return;
+        };
+
+        let mut seen_names = HashMap::new();
+
+        for (name, span, kind) in md
+            .ports
+            .iter()
+            .map(|(_, port)| (&port.name, port.name_span, "port"))
+            .chain(md.interfaces.iter().filter_map(|(_, interf)| {
+                match interf.declaration_instruction? {
+                    InterfaceDeclKind::Interface(interf_id) => {
+                        let_unwrap!(
+                            Instruction::Interface(interface_declaration),
+                            &md.link_info.instructions[interf_id]
+                        );
+                        match interface_declaration.interface_kind {
+                            InterfaceKind::RegularInterface => {
+                                Some((&interf.name, interf.name_span, "interface"))
+                            }
+                            InterfaceKind::Action(_) | InterfaceKind::Trigger(_) => None, // Covered by ports
+                        }
+                    }
+                    InterfaceDeclKind::SinglePort(_) => None, // Covered by ports
+                }
+            }))
+        {
+            match seen_names.entry(name) {
+                Entry::Occupied(occupied_entry) => {
+                    let (existing_span, existing_kind) = occupied_entry.get();
+                    self.errors
+                        .error(span, format!("Duplicate {kind} '{name}' declaration"))
+                        .info_same_file(
+                            *existing_span,
+                            format!("{existing_kind} '{name}' declared here"),
+                        );
+                }
+                Entry::Vacant(vacant_entry) => {
+                    vacant_entry.insert((span, kind));
+                }
+            }
+        }
     }
 }

@@ -2010,6 +2010,15 @@ Warning: Not Instantiating dual_port_mem #() due to abstract typing errors
      │        ──────┬──────  
      │              ╰──────── Not Instantiating dual_port_mem #() due to abstract typing errors
 ─────╯
+Error: Duplicate interface 'write' declaration
+     ╭─[ test.sus:632:12 ]
+     │
+ 632 │     interface write : bool write, bool[20] wr_data, int#(FROM:0, TO: 511) wr_addr
+     │               ──┬──        ──┬──  
+     │                 ╰───────────────── Duplicate interface 'write' declaration
+     │                              │    
+     │                              ╰──── port 'write' declared here
+─────╯
 Error: This declaration conflicts with a previous declaration in the same scope
      ╭─[ test.sus:632:25 ]
      │
@@ -2025,6 +2034,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  632 │     interface write : bool write, bool[20] wr_data, int#(FROM:0, TO: 511) wr_addr
      │                            ──┬──  
      │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Duplicate interface 'read' declaration
+     ╭─[ test.sus:634:12 ]
+     │
+ 634 │     interface read : bool read, int#(FROM:0, TO: 511) rd_addr -> bool[20] rd_data
+     │               ──┬─        ──┬─  
+     │                 ╰─────────────── Duplicate interface 'read' declaration
+     │                             │   
+     │                             ╰─── port 'read' declared here
 ─────╯
 Error: This declaration conflicts with a previous declaration in the same scope
      ╭─[ test.sus:634:24 ]
@@ -2377,6 +2395,15 @@ Warning: Not Instantiating sequenceDownFrom #() due to abstract typing errors
  720 │ module sequenceDownFrom {
      │        ────────┬───────  
      │                ╰───────── Not Instantiating sequenceDownFrom #() due to abstract typing errors
+─────╯
+Error: Duplicate interface 'start' declaration
+     ╭─[ test.sus:723:12 ]
+     │
+ 723 │     interface start : bool start'0, int#(FROM: 0, TO: 100) upTo'0
+     │               ──┬──        ──┬──  
+     │                 ╰───────────────── Duplicate interface 'start' declaration
+     │                              │    
+     │                              ╰──── port 'start' declared here
 ─────╯
 Error: This declaration conflicts with a previous declaration in the same scope
      ╭─[ test.sus:723:25 ]
@@ -4888,4 +4915,83 @@ Error: Slice 4:3 has a negative length.
  1479 │     int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4:3]
       │                                                     ─┬─  
       │                                                      ╰─── Slice 4:3 has a negative length.
+──────╯
+Warning: Not Instantiating duplicate_port_names #() due to abstract typing errors
+      ╭─[ test.sus:1501:8 ]
+      │
+ 1501 │ module duplicate_port_names {
+      │        ──────────┬─────────  
+      │                  ╰─────────── Not Instantiating duplicate_port_names #() due to abstract typing errors
+──────╯
+Error: Duplicate port 'port_a' declaration
+      ╭─[ test.sus:1505:14 ]
+      │
+ 1503 │        output bool port_a
+      │                    ───┬──  
+      │                       ╰──── port 'port_a' declared here
+      │ 
+ 1505 │        input bool port_a
+      │                   ───┬──  
+      │                      ╰──── Duplicate port 'port_a' declaration
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1505:14 ]
+      │
+ 1505 │        input bool port_a
+      │                   ───┬──  
+      │                      ╰──── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Duplicate interface 'interf' declaration
+      ╭─[ test.sus:1511:13 ]
+      │
+ 1509 │        interface interf
+      │                  ───┬──  
+      │                     ╰──── interface 'interf' declared here
+      │ 
+ 1511 │        interface interf
+      │                  ───┬──  
+      │                     ╰──── Duplicate interface 'interf' declaration
+──────╯
+Error: Duplicate interface 'port_interf' declaration
+      ╭─[ test.sus:1514:12 ]
+      │
+ 1514 │     interface port_interf: bool port_interf
+      │               ─────┬─────       ─────┬─────  
+      │                    ╰───────────────────────── Duplicate interface 'port_interf' declaration
+      │                                      │       
+      │                                      ╰─────── port 'port_interf' declared here
+──────╯
+Error: This declaration conflicts with a previous declaration in the same scope
+      ╭─[ test.sus:1514:30 ]
+      │
+ 1514 │     interface port_interf: bool port_interf
+      │               ─────┬─────       ─────┬─────  
+      │                    ╰───────────────────────── 'port_interf' declared here
+      │                                      │       
+      │                                      ╰─────── This declaration conflicts with a previous declaration in the same scope
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1514:30 ]
+      │
+ 1514 │     interface port_interf: bool port_interf
+      │                                 ─────┬─────  
+      │                                      ╰─────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1516:27 ]
+      │
+ 1516 │        interface proooot: bool preeee
+      │                                ───┬──  
+      │                                   ╰──── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Duplicate interface 'preeee' declaration
+      ╭─[ test.sus:1518:13 ]
+      │
+ 1516 │        interface proooot: bool preeee
+      │                                ───┬──  
+      │                                   ╰──── port 'preeee' declared here
+      │ 
+ 1518 │        interface preeee
+      │                  ───┬──  
+      │                     ╰──── Duplicate interface 'preeee' declaration
 ──────╯
