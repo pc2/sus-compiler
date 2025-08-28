@@ -216,7 +216,7 @@ impl<'l> TypeCheckingContext<'l> {
                                     &mut field_names,
                                     ", ",
                                     obj.interfaces.iter(),
-                                    |f, (_, v)| f.write_fmt(format_args!("'{}'", v.name)).unwrap(),
+                                    |f, (_, v)| f.write_fmt(format_args!("'{}'", v.name)),
                                 );
                                 self.errors
                                     .error(

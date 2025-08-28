@@ -1128,14 +1128,14 @@ pub fn join_string_iter<T>(
     result: &mut String,
     sep: &'static str,
     iter: impl IntoIterator<Item = T>,
-    mut f: impl FnMut(&mut String, T),
+    mut f: impl FnMut(&mut String, T) -> std::fmt::Result,
 ) {
     let mut iter = iter.into_iter();
     if let Some(first) = iter.next() {
-        f(result, first);
+        f(result, first).unwrap();
         for item in iter {
             result.write_str(sep).unwrap();
-            f(result, item);
+            f(result, item).unwrap();
         }
     }
 }

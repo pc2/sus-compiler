@@ -10,6 +10,7 @@ use crate::alloc::zip_eq;
 use crate::dev_aid::dot_graphs::display_latency_count_graph;
 use crate::errors::ErrorInfoObject;
 use crate::prelude::*;
+use crate::to_string::join_string_iter;
 
 use latency_algorithm::{
     FanInOut, LatencyCountingError, LatencyCountingPorts, SpecifiedLatency,
@@ -377,11 +378,13 @@ impl ModuleTypingContext<'_> {
 
         let fanins = problem.make_fanins();
 
+        let ports_per_domain = problem.make_ports_per_domain(self);
+
         match solve_latencies(
             fanins,
             &problem.ports,
             &problem.specified_latencies,
-            problem.make_ports_per_domain(self),
+            &ports_per_domain,
         ) {
             Ok(latencies) => {
                 if crate::debug::is_enabled("dot-latency-solution") {
@@ -539,24 +542,26 @@ impl ModuleTypingContext<'_> {
                     );
                 }
             }
-            LatencyCountingError::UnreachablePortInThisDomain { hit_and_not_hit } => {
-                for (num_hit, all_nodes) in hit_and_not_hit {
+            LatencyCountingError::PortsNotStronglyConnected { port_partitions } => {
+                for (num_hit, all_nodes) in port_partitions {
                     let all_port_instrs: Vec<_> = all_nodes
                         .iter()
                         .map(|node| self.wires[latency_node_meanings[*node]].original_instruction)
                         .collect();
 
-                    let hit_instrs = &all_port_instrs[..num_hit];
-                    let non_hit_instrs = &all_port_instrs[num_hit..];
+                    let (connected_ports, ports_not_in_group) = all_port_instrs.split_at(num_hit);
 
-                    let hit_names: Vec<_> = hit_instrs
-                        .iter()
-                        .map(|instr| {
+                    let mut strongly_connected_port_list = String::new();
+                    join_string_iter(
+                        &mut strongly_connected_port_list,
+                        ", ",
+                        connected_ports,
+                        |f, instr| {
                             let name = self.md.link_info.instructions[*instr].get_name();
-                            format!("'{name}'")
-                        })
-                        .collect();
-                    let hit_names_error_infos: Vec<_> = hit_instrs
+                            write!(f, "'{name}'")
+                        },
+                    );
+                    let hit_names_error_infos: Vec<_> = connected_ports
                         .iter()
                         .map(|instr| {
                             self.md.link_info.instructions[*instr]
@@ -564,12 +569,12 @@ impl ModuleTypingContext<'_> {
                                 .unwrap()
                         })
                         .collect();
-                    let strongly_connected_port_list = hit_names.join(", ");
 
-                    for non_hit in non_hit_instrs {
+                    for non_hit in ports_not_in_group {
                         let node_instr_span = self.md.link_info.instructions[*non_hit].get_span();
 
-                        error(node_instr_span, format!("This port is not strongly connected to the strongly connected port cluster {strongly_connected_port_list}.\nAn input and output port are strongly connected if there is a direct dependency path from the input port to the output port.\nStrongly connected ports are also transitive.\nIf you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.")).add_info_list(hit_names_error_infos.clone());
+                        error(node_instr_span, format!("This port is not strongly connected to the strongly connected port cluster {strongly_connected_port_list}.\nAn input and output port are strongly connected if there is a direct dependency path from the input port to the output port.\nStrongly connected ports are also transitive.\nIf you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency."))
+                            .add_info_list(hit_names_error_infos.clone());
                     }
                 }
             }

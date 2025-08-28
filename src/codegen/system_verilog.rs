@@ -259,10 +259,12 @@ impl<'g> CodeGenerationContext<'g> {
                             assert_eq!(values.len(), size);
                             join_string_iter(result, ", ", values.iter(), |result, v| {
                                 Self::constant_to_str(result, content, v);
+                                Ok(())
                             })
                         }
                         Value::Unset => join_string_iter(result, ", ", 0..size, |result, _| {
                             Self::constant_to_str(result, content, &Value::Unset);
+                            Ok(())
                         }),
                         _ => unreachable!(),
                     }
@@ -749,11 +751,9 @@ impl<'g> CodeGenerationContext<'g> {
                         );
                     }
                     TemplateKind::Value(value) => {
-                        result
-                            .write_fmt(format_args!(".{arg_name}({value})"))
-                            .unwrap();
+                        result.write_fmt(format_args!(".{arg_name}({value})"))
                     }
-                };
+                }
             },
         );
         self.program_text.write_char(')').unwrap();

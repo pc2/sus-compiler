@@ -705,7 +705,7 @@ impl ModuleTypingContext<'_> {
                 RealWireDataSource::ConstructArray { array_wires } => {
                     let mut s = String::new();
                     join_string_iter(&mut s, ", ", array_wires.iter(), |s, item| {
-                        s.write_fmt(format_args!("{}", self.name(*item))).unwrap()
+                        s.write_fmt(format_args!("{}", self.name(*item)))
                     });
                     print!(" = [{s}]");
                 }

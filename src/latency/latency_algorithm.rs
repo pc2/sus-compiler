@@ -19,6 +19,7 @@ use std::collections::VecDeque;
 use crate::{
     flattening::Direction,
     latency::{CALCULATE_LATENCY_LATER, InferenceFailure},
+    util::partition_in_place,
 };
 
 use super::list_of_lists::ListOfLists;
@@ -50,9 +51,11 @@ pub enum LatencyCountingError {
     IndeterminablePortLatency {
         bad_ports: Vec<(usize, i64, i64)>,
     },
-    UnreachablePortInThisDomain {
-        /// Result is partitioned. The first tuple elem represents the number of hit ports, which come first in the list
-        hit_and_not_hit: Vec<(usize, Vec<usize>)>,
+    /// Result is a partitioning of all ports in this domain.
+    /// The ports before the partition are all strongly connected,
+    /// and the ports after it are not strongly connected to this first cluster.
+    PortsNotStronglyConnected {
+        port_partitions: Vec<(usize, Vec<usize>)>,
     },
 }
 
@@ -609,6 +612,72 @@ fn solve_port_latencies(
     }
 }
 
+/// Checks that for every set of ports within a domain, all ports are part of the same solution seed.
+///
+/// If a seed with a partial number of ports is found, then it reports it as a [LatencyCountingError::PortNotStronglyConnected]
+fn check_for_unconnected_ports(
+    ports_per_domain: &[Vec<usize>],
+    solution_seeds: &[Vec<SpecifiedLatency>],
+    num_nodes: usize,
+) -> Result<(), LatencyCountingError> {
+    let mut cur_ports_set = vec![false; num_nodes];
+
+    let mut port_partitions = Vec::new();
+
+    for domain_ports in ports_per_domain {
+        for p in domain_ports {
+            cur_ports_set[*p] = true;
+        }
+
+        let mut best_count = 0;
+        let mut best_solution_idx = None;
+        for seed in solution_seeds {
+            let mut num_in_current_domain = 0;
+            for s in seed {
+                if cur_ports_set[s.node] {
+                    num_in_current_domain += 1;
+                }
+            }
+
+            if num_in_current_domain > best_count {
+                best_count = num_in_current_domain;
+                best_solution_idx = Some(seed);
+            }
+        }
+
+        for p in domain_ports {
+            cur_ports_set[*p] = false;
+        }
+
+        if best_count != domain_ports.len() {
+            assert!(best_count != 0);
+
+            let sol = best_solution_idx.unwrap();
+
+            let mut partition_list = domain_ports.clone();
+
+            for p in sol {
+                cur_ports_set[p.node] = true;
+            }
+
+            let connected_group_end =
+                partition_in_place(&mut partition_list, |p| cur_ports_set[*p]);
+
+            port_partitions.push((connected_group_end, partition_list));
+
+            for p in sol {
+                cur_ports_set[p.node] = false;
+            }
+        }
+    }
+
+    if !port_partitions.is_empty() {
+        Err(LatencyCountingError::PortsNotStronglyConnected { port_partitions })
+    } else {
+        Ok(())
+    }
+}
+
 /// Solves the whole latency counting problem. No inference
 ///
 /// Requires fanins to have [ListOfLists::add_extra_fanin_and_specified_latencies] to have been run with `specified_latencies`
@@ -620,7 +689,7 @@ pub fn solve_latencies(
     fanins: ListOfLists<FanInOut>,
     ports: &LatencyCountingPorts,
     specified_latencies: &[SpecifiedLatency],
-    mut ports_per_domain: Vec<Vec<usize>>,
+    ports_per_domain: &[Vec<usize>],
 ) -> Result<Vec<i64>, LatencyCountingError> {
     if fanins.len() == 0 {
         return Ok(Vec::new());
@@ -650,9 +719,9 @@ pub fn solve_latencies(
         );
     }
 
-    let mut final_solution = vec![UNSET; fanouts.len()];
+    check_for_unconnected_ports(ports_per_domain, &solution_seeds, fanouts.len())?;
 
-    let mut hit_and_not_hit: Vec<(usize, Vec<usize>)> = Vec::new();
+    let mut final_solution = vec![UNSET; fanouts.len()];
 
     let mut seed_start: i64 = if specified_latencies.is_empty() {
         0
@@ -676,17 +745,6 @@ pub fn solve_latencies(
         seed_start += SEPARATE_SEED_OFFSET;
 
         let mut solution = mem.make_solution_with_initial_values(&seed);
-
-        ports_per_domain.retain_mut(|cur_node_set| {
-            let num_hit = cur_node_set.partition_point(|n| solution.solution[*n] != i64::MIN);
-
-            if num_hit != 0 && num_hit != cur_node_set.len() {
-                hit_and_not_hit.push((num_hit, std::mem::take(cur_node_set)));
-            }
-
-            num_hit == 0
-        });
-
         solution.explore_all_connected_nodes(&fanins, &fanouts);
 
         // Of course, all other specified latencies are in the exact same solution
@@ -698,10 +756,6 @@ pub fn solve_latencies(
         }
 
         solution.copy_to(&mut final_solution);
-    }
-
-    if !hit_and_not_hit.is_empty() {
-        return Err(LatencyCountingError::UnreachablePortInThisDomain { hit_and_not_hit });
     }
 
     for potential_start in 0..fanins.len() {
@@ -792,6 +846,8 @@ pub fn mk_fan(to_node: usize, delta_latency: i64) -> FanInOut {
 }
 #[cfg(test)]
 mod tests {
+    use crate::let_unwrap;
+
     use super::*;
 
     pub fn mk_poisoned(to_node: usize) -> FanInOut {
@@ -821,7 +877,12 @@ mod tests {
         let fanins =
             fanins.add_extra_fanin_and_specified_latencies(Vec::new(), specified_latencies);
 
-        solve_latencies(fanins, &ports, specified_latencies, Vec::new())
+        solve_latencies(
+            fanins,
+            &ports,
+            specified_latencies,
+            std::slice::from_ref(&ports.port_nodes),
+        )
     }
 
     #[track_caller]
@@ -1061,6 +1122,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Don't support only inputs anymore"]
     fn test_inputs_only() {
         let fanins: [&[FanInOut]; 7] = [
             /*0*/ &[],
@@ -1079,6 +1141,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Don't support only outputs anymore"]
     fn test_outputs_only() {
         let fanins: [&[FanInOut]; 7] = [
             /*0*/ &[],
@@ -1391,8 +1454,7 @@ mod tests {
             latency: 0,
         }];
 
-        let result =
-            solve_latencies_test_case(fanins, &[0, 4], &[3, 6], &specified_latencies).unwrap();
+        let result = solve_latencies_test_case(fanins, &[0], &[3], &specified_latencies).unwrap();
 
         let correct_latencies = [
             0,
@@ -1404,6 +1466,30 @@ mod tests {
             SEPARATE_SEED_OFFSET,
         ];
         assert_latency_nodes_match_exactly(&result, &correct_latencies)
+    }
+
+    #[test]
+    fn ports_not_strongly_connected_error_info() {
+        {
+            let fanins: [&[FanInOut]; 4] = [
+                /*0*/ &[],
+                /*1*/ &[],
+                /*2*/ &[mk_fan(0, 0), mk_fan(3, 0)],
+                /*3*/ &[],
+            ];
+            let fanins = ListOfLists::from_slice_slice(&fanins);
+            let specified_latencies = [];
+
+            let result = solve_latencies_test_case(fanins, &[0, 1, 3], &[2], &specified_latencies)
+                .unwrap_err();
+
+            let_unwrap!(
+                LatencyCountingError::PortsNotStronglyConnected { port_partitions },
+                result
+            );
+            // 1 is not connected to 0, 2 and 3
+            assert_eq!(port_partitions, vec![(3, vec![0, 2, 3, 1])]);
+        }
     }
 
     /*
