@@ -35,10 +35,10 @@ fn unique_file_name(
     Ok((file, path))
 }
 
-fn try_convert_dot_to_image(dot_path: &std::path::Path) {
-    let output_path = dot_path.with_extension("svg");
+fn dot_command(dot_path: &std::path::Path, file_name: &str) {
+    let output_path = dot_path.with_extension(file_name);
     match std::process::Command::new("dot")
-        .arg("-Tsvg")
+        .arg(format!("-T{file_name}"))
         .arg(dot_path)
         .arg("-o")
         .arg(&output_path)
@@ -59,6 +59,15 @@ fn try_convert_dot_to_image(dot_path: &std::path::Path) {
                 dot_path, e
             );
         }
+    }
+}
+
+fn try_convert_dot_to_image(dot_path: &std::path::Path) {
+    if crate::debug::is_enabled("dot-svg") {
+        dot_command(dot_path, "svg");
+    }
+    if crate::debug::is_enabled("dot-png") {
+        dot_command(dot_path, "png");
     }
 }
 

@@ -24,6 +24,8 @@ These are optional paths that can be enabled at commandline. They allow for a mo
 | `--debug dot-latency-problem` | Dot debug the problem graph for latency counting in `solve_latencies_problem.dot` |
 | `--debug dot-latency-solution` | Dot debug the solution graph for latency counting in `solve_latencies_solution.dot` |
 | `--debug dot-latency-infer` | Dot debug the problem graph for latency inference in `latency_inference_problem.dot` |
+| `--debug dot-png` | Use `dot -Tpng` to create a png file from generated dot files (Can be surprisingly slow, prefer svg) |
+| `--debug dot-svg` | Use `dot -Tsvg` to create a svg file from generated dot files |
 | `--debug lsp-debug` | Instead of regular LSP hover info, provide raw debug info |
 | `--debug TEST` | Temporary marker for debugging |
 
