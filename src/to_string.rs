@@ -1036,7 +1036,7 @@ impl InstantiatedModule {
         FmtWrapper(|f| {
             let md = &globals.modules[self.global_ref.id];
 
-            write!(f, "module {}:", self.global_ref.display(globals))?;
+            writeln!(f, "module {}:", self.global_ref.display(globals))?;
             for (_, interf) in &md.interfaces {
                 match interf.declaration_instruction {
                     Some(InterfaceDeclKind::Interface(interf_id)) => {
