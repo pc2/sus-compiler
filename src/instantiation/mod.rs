@@ -119,6 +119,13 @@ pub enum RealWireDataSource {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IsPort {
+    PlainWire,
+    Port(PortID, Direction),
+    SubmodulePort(SubModuleID, PortID, Direction),
+}
+
 /// An actual instantiated wire of an [InstantiatedModule] (See [InstantiatedModule::wires])
 ///
 /// It can have a latency count and domain. All wires have a name, either the name they were given by the user, or a generated name like _1, _13
@@ -136,7 +143,7 @@ pub struct RealWire {
     pub specified_latency: AbsLat,
     /// The computed latencies after latency counting
     pub absolute_latency: AbsLat,
-    pub is_port: Option<Direction>,
+    pub is_port: IsPort,
 }
 impl RealWire {
     fn get_span(&self, link_info: &LinkInfo) -> Span {
@@ -401,8 +408,18 @@ pub enum InferenceResult {
     PortNotUsed,
     /// Means the port is valid, but the target couldn't be computed. Invalidates [ValueInferStrategy::Min] and [ValueInferStrategy::Max]
     NotFound,
-    /// Latency Error
-    LatencyError(InferenceFailure),
+    /// See [InferenceFailure::BadProblem]
+    LatencyBadProblem,
+    /// See [InferenceFailure::NotReached]
+    LatencyNotReached,
+    /// See [InferenceFailure::Poison]
+    LatencyPoison {
+        submod: SubModuleID,
+        /// Input port
+        port_from: PortID,
+        /// Output port
+        port_to: PortID,
+    },
     /// Valid value! Can be used for inferring
     Found(IBig),
 }
@@ -439,13 +456,13 @@ impl<'l> ModuleTypingContext<'l> {
             }
         }
 
-        let interface_ports = self.md.ports.map(|(_, port)| {
+        let interface_ports = self.md.ports.map(|(port_id, port)| {
             let port_decl_id = port.declaration_instruction;
             let SubModuleOrWire::Wire(wire_id) = &self.generation_state[port_decl_id] else {
                 return None;
             };
             let wire = &self.wires[*wire_id];
-            assert_eq!(wire.is_port.unwrap(), port.direction);
+            assert_eq!(wire.is_port, IsPort::Port(port_id, port.direction));
             Some(InstantiatedPort {
                 wire: *wire_id,
                 direction: port.direction,
@@ -634,7 +651,7 @@ impl ModuleTypingContext<'_> {
             },
         ) in &self.wires
         {
-            let is_port_str = if let Some(direction) = is_port {
+            let is_port_str = if let IsPort::Port(_, direction) = is_port {
                 format!("{direction} ").purple()
             } else {
                 "".purple()

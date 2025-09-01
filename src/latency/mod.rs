@@ -156,7 +156,7 @@ impl LatencyCountingProblem {
         // Ports
         let mut ports = LatencyCountingPorts::default();
         for (wire_id, w) in &ctx.wires {
-            if let Some(direction) = w.is_port {
+            if let IsPort::Port(_, direction) = w.is_port {
                 let node = map_wire_to_latency_node[wire_id];
                 ports.push(node, direction);
             }
@@ -254,7 +254,13 @@ impl LatencyCountingProblem {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InferenceFailure {
     NotReached,
-    Poison,
+    /// Points to the first poison edge that poisoned the target node.
+    /// Because poison edges only exist in unresolved submodules,
+    /// this is guaranteed to go from a submodule input to a submodule output
+    Poison {
+        edge_from: usize,
+        edge_to: usize,
+    },
     BadProblem,
 }
 

@@ -75,7 +75,9 @@ impl HoverCollector<'_> {
             for (_id, sm) in &inst.submodules {
                 if sm.original_instruction == submodule_instr {
                     self.sus_code(sm.display_interface(self.linker).to_string());
-                    self.monospace(display_all_infer_params(self.linker, sm).to_string());
+                    self.monospace(
+                        display_all_infer_params(self.linker, &inst.submodules, sm).to_string(),
+                    );
                 }
             }
         }

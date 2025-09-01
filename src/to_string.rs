@@ -5,7 +5,7 @@ use sus_proc_macro::kw;
 use crate::alloc::zip_eq;
 use crate::flattening::typecheck::TyCell;
 use crate::instantiation::{
-    InferenceResult, InstantiatedModule, RealWire, SubModule, SubModuleOrWire,
+    InferenceResult, InstantiatedModule, IsPort, RealWire, SubModule, SubModuleOrWire,
 };
 use crate::latency::InferenceFailure;
 use crate::latency::port_latency_inference::{
@@ -598,20 +598,36 @@ impl InferenceCandidate {
     }
 }
 
-impl Display for InferenceResult {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
+impl InferenceResult {
+    fn display(
+        &self,
+        submodules: &FlatAlloc<SubModule, SubModuleIDMarker>,
+        linker: &Linker,
+    ) -> impl Display {
+        FmtWrapper(move |f| match self {
             InferenceResult::PortNotUsed => f.write_str("N/C"),
             InferenceResult::NotFound => f.write_str("?"),
-            InferenceResult::LatencyError(InferenceFailure::BadProblem) => {
-                f.write_str("? bad problem")
+            InferenceResult::LatencyBadProblem => f.write_str("? bad problem"),
+            InferenceResult::LatencyNotReached => f.write_str("? not reached"),
+            InferenceResult::LatencyPoison {
+                submod,
+                port_from,
+                port_to,
+            } => {
+                let poison_sm = &submodules[*submod];
+                let poison_submod_md = &linker.modules[poison_sm.refers_to.id];
+
+                let poison_sm_name = &poison_sm.name;
+                let from_port_name = &poison_submod_md.ports[*port_from].name;
+                let to_port_name = &poison_submod_md.ports[*port_to].name;
+
+                write!(
+                    f,
+                    "? poisoned by unknown latency {poison_sm_name}.{from_port_name} to {poison_sm_name}.{to_port_name}"
+                )
             }
-            InferenceResult::LatencyError(InferenceFailure::NotReached) => {
-                f.write_str("? not reached")
-            }
-            InferenceResult::LatencyError(InferenceFailure::Poison) => f.write_str("? poisoned"),
             InferenceResult::Found(v) => write!(f, "{v}"),
-        }
+        })
     }
 }
 
@@ -619,7 +635,10 @@ pub fn display_infer_param_info(
     linker: &Linker,
     md: &Module,
     template_id: TemplateID,
-    final_values: Option<&Vec<InferenceResult>>,
+    final_values: Option<(
+        &Vec<InferenceResult>,
+        &FlatAlloc<SubModule, SubModuleIDMarker>,
+    )>,
 ) -> impl Display {
     FmtWrapper(move |f| {
         let arg_name = &md.link_info.parameters[template_id].name;
@@ -659,10 +678,10 @@ pub fn display_infer_param_info(
                 }
                 for (idx, c) in can_infer.iter().enumerate() {
                     write!(f, "    {}", c.display(arg_name, md, linker))?;
-                    if let Some(values_list) = final_values
+                    if let Some((values_list, submodules)) = final_values
                         && let Some(final_value) = values_list.get(idx)
                     {
-                        write!(f, "  ({{*}} = {final_value})")?;
+                        write!(f, "  ({{*}} = {})", final_value.display(submodules, linker))?;
                     }
                     writeln!(f)?;
                 }
@@ -681,11 +700,16 @@ pub fn display_infer_param_info(
     })
 }
 
-pub fn display_all_infer_params(linker: &Linker, sm: &SubModule) -> impl Display {
+pub fn display_all_infer_params(
+    linker: &Linker,
+    submodules: &FlatAlloc<SubModule, SubModuleIDMarker>,
+    sm: &SubModule,
+) -> impl Display {
     FmtWrapper(|f| {
         let md = &linker.modules[sm.refers_to.id];
         for (template_id, known_values) in sm.last_infer_values.borrow().iter() {
-            display_infer_param_info(linker, md, template_id, Some(known_values)).fmt(f)?;
+            display_infer_param_info(linker, md, template_id, Some((known_values, submodules)))
+                .fmt(f)?;
         }
         Ok(())
     })
@@ -1095,7 +1119,7 @@ impl InstantiatedModule {
                     Some(InterfaceDeclKind::SinglePort(port)) => {
                         if let SubModuleOrWire::Wire(w) = &self.generation_state[port] {
                             let port_w = &self.wires[*w];
-                            let port_dir = port_w.is_port.unwrap();
+                            let_unwrap!(IsPort::Port(_, port_dir), port_w.is_port);
 
                             writeln!(f, "    {port_dir} {}", port_w.display_decl(globals))?;
                         }

@@ -13,7 +13,7 @@ use crate::prelude::*;
 
 use crate::flattening::{Direction, Module, PartSelectDirection, Port};
 use crate::instantiation::{
-    InstantiatedModule, MultiplexerSource, RealWire, RealWireDataSource, RealWirePathElem,
+    InstantiatedModule, IsPort, MultiplexerSource, RealWire, RealWireDataSource, RealWirePathElem,
 };
 use crate::to_string::{join_string_iter, trim_known_prefix};
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg, IntBounds};
@@ -387,7 +387,7 @@ impl<'g> CodeGenerationContext<'g> {
         )
         .unwrap();
         for (_id, port_wire) in &self.instance.wires {
-            let Some(direction) = port_wire.is_port else {
+            let IsPort::Port(_, direction) = port_wire.is_port else {
                 continue;
             };
             let wire_doc = port_wire.source.wire_or_reg();
@@ -400,7 +400,7 @@ impl<'g> CodeGenerationContext<'g> {
         // Add latency registers for the interface declarations
         // Should not appear in the program text for extern modules
         for (port_wire_id, port_wire) in &self.instance.wires {
-            if port_wire.is_port.is_some() {
+            if matches!(port_wire.is_port, IsPort::Port(_, _)) {
                 self.add_latency_registers(port_wire_id, port_wire).unwrap();
             }
         }
@@ -582,7 +582,7 @@ impl<'g> CodeGenerationContext<'g> {
                 continue;
             }
 
-            if w.is_port.is_some() {
+            if matches!(w.is_port, IsPort::Port(_, _)) {
                 continue;
             }
             let wire_or_reg = w.source.wire_or_reg();

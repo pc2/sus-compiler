@@ -3,6 +3,7 @@ use std::fs::{self, File};
 use std::io::Write;
 
 use crate::alloc::UUID;
+use crate::instantiation::IsPort;
 use crate::to_string::{FmtWrapper, join_string_iter_formatter};
 use crate::{
     alloc::FlatAlloc,
@@ -91,9 +92,9 @@ fn custom_render_hardware_structure<'a>(
             let abs_lat = wire.absolute_latency;
             let label = format!("{}'{}", name, abs_lat);
             let (style, color) = match wire.is_port {
-                Some(Direction::Input) => ("bold", "red"),
-                Some(Direction::Output) => ("bold", "blue"),
-                None => ("", "black"),
+                IsPort::Port(_, Direction::Input) => ("bold", "red"),
+                IsPort::Port(_, Direction::Output) => ("bold", "blue"),
+                _ => ("", "black"),
             };
             writeln!(
                 f,
@@ -237,16 +238,16 @@ fn custom_render_latency_count_graph(
             }
             write!(f, "    {id} [label=\"{label}\"")?;
             match wire.is_port {
-                Some(Direction::Input) => {
+                IsPort::Port(_, Direction::Input) => {
                     node_ids[idx].id = format!("{id}:e");
                     // Makes the nice rightwards arrow-ey shape
                     writeln!(f, ",shape=cds,style=filled,fillcolor=darkolivegreen3];")
                 }
-                Some(Direction::Output) => {
+                IsPort::Port(_, Direction::Output) => {
                     node_ids[idx].id = format!("{id}:w");
                     writeln!(f, ",shape=cds,style=filled,fillcolor=skyblue];")
                 }
-                None => writeln!(f, ",style=filled,fillcolor=bisque];"),
+                _ => writeln!(f, ",style=filled,fillcolor=bisque];"),
             }
         };
         for (sm_id, sm) in submodules {

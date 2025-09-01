@@ -26,6 +26,7 @@ use super::list_of_lists::ListOfLists;
 
 const UNSET: i64 = i64::MIN;
 const POISON: i64 = i64::MAX;
+const NO_STOP_AT_NODE: usize = usize::MAX;
 /// Arbitrary recognisable offset. Partial solutions are offset by this value, such that the user can distinguish them better
 const SEPARATE_SEED_OFFSET: i64 = 1000;
 
@@ -186,40 +187,64 @@ impl<'mem> Solution<'mem> {
         }
     }
 
-    fn dfs_fill_poison(&mut self, fanouts: &ListOfLists<FanInOut>, node: usize) {
+    /// Returns true when stop_when_poison was poisoned. Otherwise returns false.
+    fn dfs_fill_poison(
+        &mut self,
+        fanouts: &ListOfLists<FanInOut>,
+        node: usize,
+        stop_when_poison: usize,
+    ) -> bool {
+        let cur_node = &mut self.solution[node];
+        if *cur_node == POISON {
+            return false; // Don't duplicate work on reconvergent paths, return false because stop_when_poison would have already been detected when it was set
+        }
+        *cur_node = POISON;
+        if stop_when_poison == node {
+            return true;
+        }
         for edge in &fanouts[node] {
-            let target_node = &mut self.solution[edge.to_node];
-            if *target_node != POISON {
-                *target_node = POISON;
-                self.dfs_fill_poison(fanouts, edge.to_node);
+            if self.dfs_fill_poison(fanouts, edge.to_node, stop_when_poison) {
+                return true;
             }
         }
+        false
     }
 
     /// The graph given to this function must be solveable. (IE pass [check_if_unsolveable]), otherwise this will loop forever
     /// Worst-case Complexity O(V*E), but about O(E) for average case
-    fn latency_count_bellman_ford(&mut self, fanouts: &ListOfLists<FanInOut>) {
+    fn latency_count_bellman_ford(
+        &mut self,
+        fanouts: &ListOfLists<FanInOut>,
+        stop_when_poison: usize,
+    ) -> Result<(), InferenceFailure> {
         while let Some(from_idx) = self.to_explore_queue.pop_front() {
             let from_latency = self.solution[from_idx];
             if from_latency == POISON {
-                // If this node is poisoned, then poison everything in its fanout immediately. That simplifies downstream logic
-                self.dfs_fill_poison(fanouts, from_idx);
-            } else {
-                for edge in &fanouts[from_idx] {
+                // Target node got overwritten with poison before we came back to it
+                // Then all its fanout will be POISON too.
+                continue;
+            }
+            for edge in &fanouts[from_idx] {
+                if let Some(delta) = edge.delta_latency {
+                    let new_value = from_latency + delta;
                     let target_node = &mut self.solution[edge.to_node];
-                    let new_value = if let Some(delta) = edge.delta_latency {
-                        from_latency + delta
-                    } else {
-                        POISON
-                    };
-
                     if new_value > *target_node {
                         *target_node = new_value;
                         self.to_explore_queue.push_back(edge.to_node);
                     }
+                } else {
+                    let reached_stop_when_poison =
+                        self.dfs_fill_poison(fanouts, edge.to_node, stop_when_poison);
+                    if reached_stop_when_poison {
+                        return Err(InferenceFailure::Poison {
+                            edge_from: from_idx,
+                            edge_to: edge.to_node,
+                        });
+                    }
                 }
             }
         }
+        Ok(())
     }
 
     fn explore_all_connected_nodes(
@@ -228,10 +253,12 @@ impl<'mem> Solution<'mem> {
         fanouts: &ListOfLists<FanInOut>,
     ) {
         loop {
-            self.latency_count_bellman_ford(fanouts);
+            self.latency_count_bellman_ford(fanouts, NO_STOP_AT_NODE)
+                .unwrap();
             self.invert_and_generate_queue();
             let original_num_valid = self.to_explore_queue.len();
-            self.latency_count_bellman_ford(fanins);
+            self.latency_count_bellman_ford(fanins, NO_STOP_AT_NODE)
+                .unwrap();
             self.invert_and_generate_queue();
             let final_num_valid = self.to_explore_queue.len();
             if final_num_valid == original_num_valid {
@@ -592,7 +619,9 @@ fn solve_port_latencies(
 
         let mut working_latencies =
             solution_memory.make_solution_with_initial_values(&[start_node]);
-        working_latencies.latency_count_bellman_ford(fanouts);
+        working_latencies
+            .latency_count_bellman_ford(fanouts, NO_STOP_AT_NODE)
+            .unwrap();
 
         // We have to now remove all other inputs from the solution
         // (inputs that happened to be in the fanout of this input)
@@ -824,13 +853,12 @@ impl LatencyInferenceProblem {
                 latency: 0,
             }]);
 
-        solution.latency_count_bellman_ford(&self.fanouts);
+        solution.latency_count_bellman_ford(&self.fanouts, from)?;
 
         let found_target_latency = solution.solution[from];
+        assert!(found_target_latency != POISON);
         if found_target_latency == CALCULATE_LATENCY_LATER {
             Err(InferenceFailure::NotReached)
-        } else if found_target_latency == POISON {
-            Err(InferenceFailure::Poison)
         } else {
             Ok(-found_target_latency) // Invert, because we want to infer the max from-to latency that doesn't violate any constraints
         }
@@ -1887,7 +1915,16 @@ mod tests {
             problem.infer_max_edge_latency(3, 4),
         ];
 
-        assert_eq!(results, [Err(InferenceFailure::Poison), Ok(3)]);
+        assert_eq!(
+            results,
+            [
+                Err(InferenceFailure::Poison {
+                    edge_from: 1,
+                    edge_to: 1
+                }),
+                Ok(3)
+            ]
+        );
     }
 
     #[test]

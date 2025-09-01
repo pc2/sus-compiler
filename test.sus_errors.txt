@@ -2837,7 +2837,7 @@ Error: Error instantiating submodule
      │                             ─┬  
      │                              ╰── Error instantiating submodule
 ─────╯
-Error: Some submodule parameters were still unknown: replicate #(T: type int #(FROM: ?, TO: ?)[30], NUM_REPLS: 20)
+Error: Some submodule parameters of b were still unknown: replicate #(T: type int #(FROM: ?, TO: ?)[30], NUM_REPLS: 20)
 T can be inferred from:
 {*} <: T in T data
 {*} = T in T[] result
@@ -2848,7 +2848,7 @@ NUM_REPLS can be inferred if at least one of the following constraint resolves:
      │
  851 │     replicate #(NUM_REPLS: 20, T: type int[30]) b
      │                                                 ┬  
-     │                                                 ╰── Some submodule parameters were still unknown: replicate #(T: type int #(FROM: ?, TO: ?)[30], NUM_REPLS: 20)
+     │                                                 ╰── Some submodule parameters of b were still unknown: replicate #(T: type int #(FROM: ?, TO: ?)[30], NUM_REPLS: 20)
 T can be inferred from:
 {*} <: T in T data
 {*} = T in T[] result
@@ -3228,7 +3228,7 @@ Error: Some parameters of '_cr_out' were still unknown: int #(FROM: ?, TO: ?)[5]
      │                 ─┬  
      │                  ╰── Some parameters of '_cr_out' were still unknown: int #(FROM: ?, TO: ?)[5]
 ─────╯
-Error: Some submodule parameters were still unknown: CrossDomain #(T: type int #(FROM: ?, TO: ?)[5])
+Error: Some submodule parameters of cr were still unknown: CrossDomain #(T: type int #(FROM: ?, TO: ?)[5])
 T can be inferred from:
 {*} <: T in T in
 {*} = T in T out
@@ -3237,7 +3237,7 @@ T can be inferred from:
      │
  958 │     CrossDomain cr
      │                 ─┬  
-     │                  ╰── Some submodule parameters were still unknown: CrossDomain #(T: type int #(FROM: ?, TO: ?)[5])
+     │                  ╰── Some submodule parameters of cr were still unknown: CrossDomain #(T: type int #(FROM: ?, TO: ?)[5])
 T can be inferred from:
 {*} <: T in T in
 {*} = T in T out
@@ -4160,7 +4160,7 @@ Error: Some parameters of '_9' were still unknown: int #(FROM: ?, TO: ?)
       │                          ───────┬───────  
       │                                 ╰───────── Some parameters of '_9' were still unknown: int #(FROM: ?, TO: ?)
 ──────╯
-Error: Some submodule parameters were still unknown: infer_me_with_poison_output #(N: ?)
+Error: Some submodule parameters of infer_me_with_poison_output were still unknown: infer_me_with_poison_output #(N: ?)
 N can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
     N <= o'{*} - i'{*}  ({*} = ? not reached)
 
@@ -4168,7 +4168,7 @@ N can be inferred as an integer value that is as high as possible, without viola
       │
  1223 │     bool x, bool y = infer_me_with_poison_output(i)
       │                      ─────────────┬─────────────  
-      │                                   ╰─────────────── Some submodule parameters were still unknown: infer_me_with_poison_output #(N: ?)
+      │                                   ╰─────────────── Some submodule parameters of infer_me_with_poison_output were still unknown: infer_me_with_poison_output #(N: ?)
 N can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
     N <= o'{*} - i'{*}  ({*} = ? not reached)
 
@@ -4390,14 +4390,14 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                             ┬  
       │                             ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Some submodule parameters were still unknown: unknownLatency #(V: ?)
+Error: Some submodule parameters of ulat were still unknown: unknownLatency #(V: ?)
 V has no acceptable inference candidates
 
       ╭─[ test.sus:1282:17 ]
       │
  1282 │     unknownLatency ulat
       │                    ──┬─  
-      │                      ╰─── Some submodule parameters were still unknown: unknownLatency #(V: ?)
+      │                      ╰─── Some submodule parameters of ulat were still unknown: unknownLatency #(V: ?)
 V has no acceptable inference candidates
 
 ──────╯
@@ -4415,7 +4415,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                       ┬  
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Some submodule parameters were still unknown: infer_me_conflicting_directions #(V: ?)
+Error: Some submodule parameters of inf were still unknown: infer_me_conflicting_directions #(V: ?)
 V has no acceptable inference candidates
 The following constraints were found, but aren't used for inference here
     V * -1 <= q'{*} - x'{*}
@@ -4427,7 +4427,7 @@ The following constraints were found, but aren't used for inference here
       │
  1296 │     infer_me_conflicting_directions inf
       │                                     ─┬─  
-      │                                      ╰─── Some submodule parameters were still unknown: infer_me_conflicting_directions #(V: ?)
+      │                                      ╰─── Some submodule parameters of inf were still unknown: infer_me_conflicting_directions #(V: ?)
 V has no acceptable inference candidates
 The following constraints were found, but aren't used for inference here
     V * -1 <= q'{*} - x'{*}
@@ -4506,14 +4506,14 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                      ┬  
       │                      ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Some submodule parameters were still unknown: infer_me_inputs_only #(V: ?)
+Error: Some submodule parameters of infer_me_inputs_only were still unknown: infer_me_inputs_only #(V: ?)
 V has no acceptable inference candidates
 
       ╭─[ test.sus:1342:2 ]
       │
  1342 │     infer_me_inputs_only(x, y)
       │     ──────────┬─────────  
-      │               ╰─────────── Some submodule parameters were still unknown: infer_me_inputs_only #(V: ?)
+      │               ╰─────────── Some submodule parameters of infer_me_inputs_only were still unknown: infer_me_inputs_only #(V: ?)
 V has no acceptable inference candidates
 
 ──────╯
@@ -4651,7 +4651,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │             ─────┬────  
       │                  ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Some submodule parameters were still unknown: transmute_from_bits #(T: type int #(FROM: ?, TO: ?)[30])
+Error: Some submodule parameters of a were still unknown: transmute_from_bits #(T: type int #(FROM: ?, TO: ?)[30])
 T can be inferred from:
 {*} = T in T value
 
@@ -4659,7 +4659,7 @@ T can be inferred from:
       │
  1388 │     transmute_from_bits #(T: type int[30]) a
       │                                            ┬  
-      │                                            ╰── Some submodule parameters were still unknown: transmute_from_bits #(T: type int #(FROM: ?, TO: ?)[30])
+      │                                            ╰── Some submodule parameters of a were still unknown: transmute_from_bits #(T: type int #(FROM: ?, TO: ?)[30])
 T can be inferred from:
 {*} = T in T value
 
@@ -4694,7 +4694,7 @@ Warning: Unused port 'value'
       │                                     ──┬──  
       │                                       ╰──── Port 'value' declared here
 ──────╯
-Error: Some submodule parameters were still unknown: transmute_to_bits #(T: type int #(FROM: ?, TO: ?)[3][3][5])
+Error: Some submodule parameters of c were still unknown: transmute_to_bits #(T: type int #(FROM: ?, TO: ?)[3][3][5])
 T can be inferred from:
 {*} <: T in T value
 
@@ -4702,7 +4702,7 @@ T can be inferred from:
       │
  1390 │     transmute_to_bits #(T: type int[3][3][5]) c
       │                                               ┬  
-      │                                               ╰── Some submodule parameters were still unknown: transmute_to_bits #(T: type int #(FROM: ?, TO: ?)[3][3][5])
+      │                                               ╰── Some submodule parameters of c were still unknown: transmute_to_bits #(T: type int #(FROM: ?, TO: ?)[3][3][5])
 T can be inferred from:
 {*} <: T in T value
 

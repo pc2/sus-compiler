@@ -1016,7 +1016,7 @@ impl<'l> ExecutionContext<'l> {
             name: self.unique_name_producer.get_unique_name(""),
             specified_latency: AbsLat::UNKNOWN,
             absolute_latency: AbsLat::UNKNOWN,
-            is_port: None,
+            is_port: IsPort::PlainWire,
         }))
     }
     fn alloc_bool(&mut self, v: bool, original_instruction: FlatID, domain: DomainID) -> WireID {
@@ -1030,7 +1030,7 @@ impl<'l> ExecutionContext<'l> {
             name: self.unique_name_producer.get_unique_name(""),
             specified_latency: AbsLat::UNKNOWN,
             absolute_latency: AbsLat::UNKNOWN,
-            is_port: None,
+            is_port: IsPort::PlainWire,
         })
     }
 
@@ -1126,7 +1126,7 @@ impl<'l> ExecutionContext<'l> {
                 name,
                 specified_latency: AbsLat::UNKNOWN,
                 absolute_latency: AbsLat::UNKNOWN,
-                is_port: None,
+                is_port: IsPort::SubmodulePort(sub_module_id, port_id, port_data.direction),
             });
 
             if is_condition && port_data.direction == Direction::Input {
@@ -1378,7 +1378,7 @@ impl<'l> ExecutionContext<'l> {
             source,
             specified_latency: AbsLat::UNKNOWN,
             absolute_latency: AbsLat::UNKNOWN,
-            is_port: None,
+            is_port: IsPort::PlainWire,
         })])
     }
 
@@ -1427,10 +1427,13 @@ impl<'l> ExecutionContext<'l> {
 
             let specified_latency = self.get_specified_latency(wire_decl.latency_specifier)?;
 
-            let is_port = if let DeclarationKind::Port { direction, .. } = &wire_decl.decl_kind {
-                Some(*direction)
+            let is_port = if let DeclarationKind::Port {
+                direction, port_id, ..
+            } = &wire_decl.decl_kind
+            {
+                IsPort::Port(*port_id, *direction)
             } else {
-                None
+                IsPort::PlainWire
             };
 
             let wire_id = self.wires.alloc(RealWire {
@@ -1769,16 +1772,21 @@ impl<'l> ExecutionContext<'l> {
 
                         let is_port = match interface.interface_kind {
                             InterfaceKind::RegularInterface => unreachable!(),
-                            InterfaceKind::Action(_) => Some(Direction::Input),
-                            InterfaceKind::Trigger(_) => Some(Direction::Output),
+                            InterfaceKind::Action(port_id) => {
+                                IsPort::Port(port_id, Direction::Input)
+                            }
+                            InterfaceKind::Trigger(port_id) => {
+                                IsPort::Port(port_id, Direction::Output)
+                            }
                         };
 
                         let source = match is_port {
-                            Some(Direction::Input) => RealWireDataSource::ReadOnly,
-                            Some(Direction::Output) | None => RealWireDataSource::Multiplexer {
+                            IsPort::Port(_, Direction::Input) => RealWireDataSource::ReadOnly,
+                            IsPort::Port(_, Direction::Output) => RealWireDataSource::Multiplexer {
                                 is_state: None,
                                 sources: Vec::new(),
                             },
+                            _ => unreachable!(),
                         };
                         let domain = interface.domain.unwrap_physical();
                         let condition_wire = self.wires.alloc(RealWire {

@@ -14,7 +14,7 @@ use crate::typing::set_unifier::{DelayedErrorCollector, FullySubstitutable, Unif
 use crate::typing::template::TemplateKind;
 use crate::typing::value_unifier::{ValueErrorReporter, ValueUnifierStore};
 use crate::typing::{concrete_type::ConcreteType, value_unifier::ValueUnifier};
-use crate::util::{ceil_div, floor_div};
+use crate::util::{all_equal, ceil_div, floor_div};
 
 use super::*;
 
@@ -563,7 +563,37 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 };
                 match latency_infer_problem.infer(from.maps_to_wire, to.maps_to_wire) {
                     Ok(result) => InferenceResult::Found(IBig::from(result)),
-                    Err(err) => InferenceResult::LatencyError(err),
+                    Err(InferenceFailure::BadProblem) => InferenceResult::LatencyBadProblem,
+                    Err(InferenceFailure::NotReached) => InferenceResult::LatencyNotReached,
+                    Err(InferenceFailure::Poison { edge_from, edge_to }) => {
+                        let from_wire_id = latency_infer_problem
+                            .latency_count_problem
+                            .map_latency_node_to_wire[edge_from];
+                        let to_wire_id = latency_infer_problem
+                            .latency_count_problem
+                            .map_latency_node_to_wire[edge_to];
+
+                        let w_from = &self.wires[from_wire_id];
+                        let w_to = &self.wires[to_wire_id];
+
+                        let_unwrap!(
+                            IsPort::SubmodulePort(in_submod_id, port_from, Direction::Input),
+                            w_from.is_port
+                        );
+                        let_unwrap!(
+                            IsPort::SubmodulePort(out_submod_id, port_to, Direction::Output),
+                            w_to.is_port
+                        );
+                        let submod = all_equal([in_submod_id, out_submod_id]);
+
+                        //w_from.is_port
+
+                        InferenceResult::LatencyPoison {
+                            submod,
+                            port_from,
+                            port_to,
+                        }
+                    }
                 }
             }
         }
@@ -632,7 +662,10 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         for (info, last) in value_iter {
                             match last {
                                 InferenceResult::PortNotUsed => continue,
-                                InferenceResult::NotFound | InferenceResult::LatencyError(_) => {
+                                InferenceResult::NotFound
+                                | InferenceResult::LatencyBadProblem
+                                | InferenceResult::LatencyNotReached
+                                | InferenceResult::LatencyPoison { .. } => {
                                     continue;
                                 }
                                 InferenceResult::Found(v) => {
@@ -657,7 +690,10 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         for (info, last) in value_iter {
                             match last {
                                 InferenceResult::PortNotUsed => continue, // Missing ports are okay, just skip their inference value
-                                InferenceResult::NotFound | InferenceResult::LatencyError(_) => {
+                                InferenceResult::NotFound
+                                | InferenceResult::LatencyBadProblem
+                                | InferenceResult::LatencyNotReached
+                                | InferenceResult::LatencyPoison { .. } => {
                                     total = None;
                                     break; // Missing value means failed inference
                                 }
@@ -683,7 +719,10 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         for (info, last) in value_iter {
                             match last {
                                 InferenceResult::PortNotUsed => continue, // Missing ports are okay, just skip their inference value
-                                InferenceResult::NotFound | InferenceResult::LatencyError(_) => {
+                                InferenceResult::NotFound
+                                | InferenceResult::LatencyBadProblem
+                                | InferenceResult::LatencyNotReached
+                                | InferenceResult::LatencyPoison { .. } => {
                                     total = None;
                                     break; // Missing value means failed inference
                                 }
@@ -852,18 +891,56 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
             Self::finalize_partial_bounds(path, &root.typ);
         }
 
-        for (_, sm) in &mut self.submodules {
+        for sm_id in self.submodules.id_range() {
+            let sm = &mut self.submodules[sm_id];
             let failed_to_substitute = !sm.refers_to.template_args.fully_substitute(substitutor);
+            let sm = &self.submodules[sm_id]; // Immutable reborrow so we can use self.submodules
             if !did_already_error {
                 if failed_to_substitute {
-                    self.errors.error(
+                    let sm_name = &sm.name;
+                    let mut err = self.errors.error(
                         sm.get_span(self.link_info),
                         format!(
-                            "Some submodule parameters were still unknown: {}\n{}",
+                            "Some submodule parameters of {sm_name} were still unknown: {}\n{}",
                             sm.refers_to.display(self.linker),
-                            display_all_infer_params(self.linker, sm)
+                            display_all_infer_params(self.linker, &self.submodules, sm)
                         ),
                     );
+                    for (template_id, known_values) in sm.last_infer_values.borrow().iter() {
+                        for known_v in known_values {
+                            match known_v {
+                                InferenceResult::LatencyPoison {
+                                    submod,
+                                    port_from,
+                                    port_to,
+                                } => {
+                                    let sm_md = &self.linker.modules[sm.refers_to.id];
+                                    let template_name =
+                                        &sm_md.link_info.parameters[template_id].name;
+
+                                    let poison_sm = &self.submodules[*submod];
+                                    let poison_submod_md =
+                                        &self.linker.modules[poison_sm.refers_to.id];
+
+                                    let sm_name = &sm.name;
+                                    let poison_sm_name = &poison_sm.name;
+                                    let poison_sm_refer_to =
+                                        poison_sm.refers_to.display(&self.linker.globals);
+                                    let from_port_name = &poison_submod_md.ports[*port_from].name;
+                                    let to_port_name = &poison_submod_md.ports[*port_to].name;
+                                    err = err.info_same_file(
+                                        poison_sm.get_span(self.link_info),
+                                        format!("{poison_sm_refer_to} {poison_sm_name} isn't resolved, in turn the unknown latency from {from_port_name} to {to_port_name} prevented {sm_name}.{template_name} from resolving"),
+                                    );
+                                }
+                                InferenceResult::PortNotUsed
+                                | InferenceResult::NotFound
+                                | InferenceResult::LatencyBadProblem
+                                | InferenceResult::LatencyNotReached
+                                | InferenceResult::Found(_) => {}
+                            }
+                        }
+                    }
                 } else if let Err(reason) = sm.refers_to.report_if_errors(
                     self.linker,
                     "Invalid arguments found in a submodule's template arguments",
