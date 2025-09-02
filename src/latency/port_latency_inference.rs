@@ -331,7 +331,8 @@ fn make_latency_inference_info(
         })
         .collect();
 
-    let mut extra_poison: Vec<(PortID, PortID)> = Vec::new();
+    let mut not_poison_edges: FlatAlloc<Vec<PortID>, PortIDMarker> =
+        port_latency_linearities.map(|_| Vec::new());
 
     for (from_id, from) in port_latency_linearities {
         for (to_id, to) in port_latency_linearities {
@@ -368,13 +369,11 @@ fn make_latency_inference_info(
                                     to: to_id,
                                 },
                             });
+
+                        not_poison_edges[from_id].push(to_id);
                     }
                     EdgeInfo::Poison => {
-                        if from.direction == Direction::Output || to.direction == Direction::Input {
-                            continue; // No inference is possible between Input/Input or Output/Output
-                        }
-
-                        extra_poison.push((from_id, to_id));
+                        // Poison edges are created from inverse of transitive closure over inference and constant edges.
                     }
                     EdgeInfo::ConstantOffset(_) => {
                         let from_group_idx = port_groups
@@ -397,11 +396,53 @@ fn make_latency_inference_info(
                         }
                     }
                 }
-            } else {
-                if from.direction == Direction::Output || to.direction == Direction::Input {
-                    continue; // No inference is possible between Input/Input or Output/Output
-                }
+            }
+        }
+    }
 
+    for pg in &port_groups {
+        if pg.len() <= 1 {
+            continue;
+        }
+        let mut prev = pg.last().unwrap().0;
+        for (port_id, _) in pg {
+            not_poison_edges[*port_id].push(prev);
+            prev = *port_id;
+        }
+    }
+
+    fn dfs_fanout(
+        not_poison_edges: &FlatAlloc<Vec<PortID>, PortIDMarker>,
+        from: PortID,
+        was_seen: &mut FlatAlloc<bool, PortIDMarker>,
+    ) {
+        if was_seen[from] {
+            return;
+        }
+        was_seen[from] = true;
+
+        for fanout in &not_poison_edges[from] {
+            dfs_fanout(not_poison_edges, *fanout, was_seen);
+        }
+    }
+
+    // We only mark poison edges that the parent can't know.
+    // Known edges of course aren't poison,
+    // inference edges aren't poison because they're inferred to not affect surrounding latency,
+    // but also the transitive closure of both kills poison edges,
+    // because transitive inference edges behave as a single inference edge.
+    let mut extra_poison: Vec<(PortID, PortID)> = Vec::new();
+    let mut reachable_from_from = not_poison_edges.map(|_| false);
+    for (from_id, from) in port_latency_linearities {
+        reachable_from_from.fill(false);
+        dfs_fanout(&not_poison_edges, from_id, &mut reachable_from_from);
+
+        for (to_id, to) in port_latency_linearities {
+            if from.domain == to.domain
+                && !reachable_from_from[to_id]
+                && from.direction == Direction::Input
+                && to.direction == Direction::Output
+            {
                 extra_poison.push((from_id, to_id));
             }
         }

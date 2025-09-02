@@ -1920,7 +1920,7 @@ mod tests {
             [
                 Err(InferenceFailure::Poison {
                     edge_from: 1,
-                    edge_to: 1
+                    edge_to: 2
                 }),
                 Ok(3)
             ]

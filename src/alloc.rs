@@ -739,6 +739,14 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     pub fn range_since(&self, id: UUID<IndexMarker>) -> UUIDRange<IndexMarker> {
         UUIDRange(id, UUID(self.data.len(), PhantomData))
     }
+    pub fn fill(&mut self, v: T)
+    where
+        T: Clone,
+    {
+        for (_, vv) in self {
+            *vv = v.clone();
+        }
+    }
 
     #[track_caller]
     pub fn get_disjoint_mut<const N: usize>(
