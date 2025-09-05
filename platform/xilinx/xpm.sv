@@ -23,7 +23,8 @@ module RawROM #(parameter int WIDTH = 0, parameter int DEPTH = 0, parameter stri
        .MEMORY_PRIMITIVE("auto"),     // String
        .MEMORY_SIZE(DEPTH * WIDTH),            // DECIMAL
        .MESSAGE_CONTROL(0),           // DECIMAL
-       .RAM_DECOMP("auto"),           // String
+       // Not supported by Vivado 2023
+       // .RAM_DECOMP("auto"),           // String
        .READ_DATA_WIDTH_A(WIDTH),        // DECIMAL
        .READ_LATENCY_A(2),            // DECIMAL
        .READ_RESET_VALUE_A("0"),      // String
@@ -84,7 +85,8 @@ xpm_memory_sdpram #(
    .MEMORY_PRIMITIVE("auto"),      // String
    .MEMORY_SIZE(WIDTH * DEPTH),             // DECIMAL
    .MESSAGE_CONTROL(0),            // DECIMAL
-   .RAM_DECOMP("auto"),            // String
+   // Not supported by Vivado 2023
+   // .RAM_DECOMP("auto"),            // String
    .READ_DATA_WIDTH_B(WIDTH),         // DECIMAL
    .READ_LATENCY_B(2),             // DECIMAL
    .READ_RESET_VALUE_B("0"),       // String
@@ -127,7 +129,7 @@ xpm_memory_sdpram_inst (
                                     // doutb to the value specified by parameter READ_RESET_VALUE_B.
 
    .sleep(1'b0),                   // 1-bit input: sleep signal to enable the dynamic power saving feature.
-   .wea()                        // WRITE_DATA_WIDTH_A/BYTE_WRITE_WIDTH_A-bit input: Write enable vector for port A input data port dina. 1 bit
+   .wea(write)                        // WRITE_DATA_WIDTH_A/BYTE_WRITE_WIDTH_A-bit input: Write enable vector for port A input data port dina. 1 bit
                                     // wide when word-wide writes are used. In byte-wide write configurations, each bit controls the writing one
                                     // byte of dina to address addra. For example, to synchronously write only bits [15-8] of dina when
                                     // WRITE_DATA_WIDTH_A is 32, wea would be 4'b0010.
@@ -166,7 +168,8 @@ xpm_fifo_sync #(
    .CASCADE_HEIGHT(0),            // DECIMAL
    .DOUT_RESET_VALUE("0"),        // String
    .ECC_MODE("no_ecc"),           // String
-   .EN_SIM_ASSERT_ERR("error"), // String
+   // Not supported by Vivado 2023
+   //.EN_SIM_ASSERT_ERR("error"), // String
    .FIFO_MEMORY_TYPE("auto"),     // String
    .FIFO_READ_LATENCY(READ_DATA_LATENCY),         // DECIMAL
    .FIFO_WRITE_DEPTH(DEPTH),       // DECIMAL

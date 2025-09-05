@@ -1,6 +1,9 @@
 
 
 extern module RawROM #(int WIDTH, int DEPTH) {
+    assert#(C: WIDTH >= 0)
+    assert#(C: DEPTH >= 0)
+
     domain clk
     action read'0 : int #(FROM: 0, TO: DEPTH) index'0 -> bool[WIDTH] output_bits'2 {}
 }
@@ -15,9 +18,14 @@ module ROM #(T, int DEPTH) {
 }
 
 extern module RawRAM #(int WIDTH, int DEPTH) {
+    assert#(C: WIDTH >= 0)
+    assert#(C: DEPTH >= 0)
+
     domain clk
 
+    domain write_dom
     action write'0 : int#(FROM: 0, TO: DEPTH) addra'0, bool[WIDTH] dina'0 {}
+    domain read_dom
     action read'0 : int#(FROM: 0, TO: DEPTH) addrb'0 -> bool[WIDTH] doutb'2 {}
 }
 
@@ -28,10 +36,12 @@ module RAM #(T, int DEPTH) {
 
     RawRAM#(WIDTH, DEPTH) ram
 
-    action write : int#(FROM: 0, TO: DEPTH) addra, T dina {
+    domain write_dom
+    action write'0 : int#(FROM: 0, TO: DEPTH) addra'0, T dina'0 {
         bool[WIDTH] din = transmute_to_bits(dina)
         ram.write(addra, din)
     }
+    domain read_dom
     action read : int#(FROM: 0, TO: DEPTH) addrb -> T doutb {
         bool[WIDTH] dout = ram.read(addrb)
         doutb = transmute_from_bits(dout)
@@ -39,6 +49,13 @@ module RAM #(T, int DEPTH) {
 }
 
 extern module RawFIFO #(int WIDTH, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT, int READ_DATA_LATENCY) {
+    assert#(C: WIDTH >= 0)
+    assert#(C: DEPTH >= 0)
+    assert#(C: MAY_PUSH_LATENCY >= 0)
+    assert#(C: EXTRA_IN_FLIGHT >= 0)
+    assert#(C: READ_DATA_LATENCY >= 0)
+    assert#(C: MAY_PUSH_LATENCY + EXTRA_IN_FLIGHT <= DEPTH - 2)
+
     domain clk
     action rst'0 {}
 
