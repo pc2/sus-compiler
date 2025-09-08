@@ -2157,9 +2157,9 @@ Error: Excess output targets. Function returns 1 results, but 2 targets were giv
      │                 ───────┬──────  
      │                        ╰──────── Excess output targets. Function returns 1 results, but 2 targets were given.
      │
-     ├─[ xpm.sus:70:12 ]
+     ├─[ xpm.sus:87:12 ]
      │
-  70 │     action pop'0 : -> T pop_data'2 {
+  87 │     action pop'0 : -> T pop_data'2 {
      │            ─┬─  
      │             ╰─── Interface 'pop' defined here
 ─────╯
@@ -2177,9 +2177,9 @@ Error: Excess argument. Function takes 0 args, but 1 were passed.
      │                                           ──┬─  
      │                                             ╰─── Excess argument. Function takes 0 args, but 1 were passed.
      │
-     ├─[ xpm.sus:70:12 ]
+     ├─[ xpm.sus:87:12 ]
      │
-  70 │     action pop'0 : -> T pop_data'2 {
+  87 │     action pop'0 : -> T pop_data'2 {
      │            ─┬─  
      │             ╰─── Interface 'pop' defined here
 ─────╯
@@ -2652,9 +2652,9 @@ Error: 'BITWIDTH' is not a valid template argument of FIFO
      │            ────┬───  
      │                ╰───── 'BITWIDTH' is not a valid template argument of FIFO
      │
-     ├─[ xpm.sus:54:8 ]
+     ├─[ xpm.sus:71:8 ]
      │
-  54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
+  71 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
      │        ──┬─  
      │          ╰─── 'FIFO' defined here
 ─────╯
@@ -3415,9 +3415,9 @@ Error: 'READY_SLACK' is not a valid template argument of FIFO
       │                      ─────┬─────  
       │                           ╰─────── 'READY_SLACK' is not a valid template argument of FIFO
       │
-      ├─[ xpm.sus:54:8 ]
+      ├─[ xpm.sus:71:8 ]
       │
-   54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
+   71 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
       │        ──┬─  
       │          ╰─── 'FIFO' defined here
 ──────╯
@@ -3663,9 +3663,9 @@ Error: No such field 'ready' on FIFO #(T: type ?[...], DEPTH: _, MAY_PUSH_LATENC
       │               ──┬──  
       │                 ╰──── No such field 'ready' on FIFO #(T: type ?[...], DEPTH: _, MAY_PUSH_LATENCY: _, EXTRA_IN_FLIGHT: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
       │
-      ├─[ xpm.sus:54:8 ]
+      ├─[ xpm.sus:71:8 ]
       │
-   54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
+   71 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
       │        ──┬─  
       │          ╰─── Module 'FIFO' defined here. module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT):
 domain clk:
@@ -4580,9 +4580,9 @@ Error: 'READY_SLACK' is not a valid template argument of FIFO
       │                       ─────┬─────  
       │                            ╰─────── 'READY_SLACK' is not a valid template argument of FIFO
       │
-      ├─[ xpm.sus:54:8 ]
+      ├─[ xpm.sus:71:8 ]
       │
-   54 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
+   71 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
       │        ──┬─  
       │          ╰─── 'FIFO' defined here
 ──────╯
@@ -4593,9 +4593,9 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │                  ┬  
       │                  ╰── Excess argument. Function takes 1 args, but 2 were passed.
       │
-      ├─[ xpm.sus:63:12 ]
+      ├─[ xpm.sus:80:12 ]
       │
-   63 │     action push'0 : T push_data'0 {
+   80 │     action push'0 : T push_data'0 {
       │            ──┬─  
       │              ╰─── Interface 'push' defined here
 ──────╯

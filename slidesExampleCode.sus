@@ -128,3 +128,170 @@ module BRAMShiftReg #(T, int LATENCY) {
 module use_bram {
     BRAMShiftReg #(T: type bool[3], LATENCY: 10) b
 }
+
+
+
+module for_loop {
+    input float[4] as
+    input float[4] bs 
+    output float[4] rs
+
+    for int i in 0..4 {
+        rs[i] = fp_mul(as[i], bs[i])
+    }
+}
+
+
+module from_bool {
+    input bool b
+    output int i
+    
+    when b {
+        i = 1
+    } else {
+        i = 0
+    }
+}
+
+module axis #(T) {
+    action send_single : T data{}
+    action send_burst : T data2{}
+}
+
+module axi_send #(T) {
+    input T data
+    
+    axis axis
+    if sizeof#(T) <= 32 {
+        axis.send_single(data)
+    } else {
+        axis.send_burst(data)
+    }
+}
+
+module bounded_ints {
+    input int#(FROM: 0, TO: 5) v
+    int v_2
+
+    when v == 3 {
+        v_2 = 10
+    } else {
+        v_2 = v
+    }
+
+
+    output int x = v_2
+}
+
+module memory#(T, int DEPTH) {
+    T[DEPTH] mem
+
+    action write: int#(FROM: 0, TO: DEPTH) addr, T data {
+        mem[addr] = data
+    }
+    action read: int#(FROM: 0, TO: DEPTH) addrb -> T datab {
+        datab = mem[addrb]
+    }
+}
+
+module use_memory {
+    memory#(T: type bool[20], DEPTH: 5) mem
+
+    state int cur_idx
+    action get_next : -> bool[20] d {
+        d = mem.read(cur_idx)
+        cur_idx = (cur_idx + 1) % 5
+    }
+}
+
+module raw_ddr_memory #(T) {
+    domain user_side
+    action read : int#(FROM: 0, TO: 1000) addr {
+        //...
+    }
+    trigger read_ready : -> T data {
+        //...
+    }
+
+    domain ddr_side
+    // ... god knows this'll be a mess
+}
+
+module instruction_decode {
+    action decode : bool[16] instr_bits {
+        //...
+
+        trigger add : 
+            int#(FROM: 0, TO: 8) reg_a,
+            int#(FROM: 0, TO: 8) reg_b,
+            int#(FROM: 0, TO: 8) reg_tgt {
+            // ...
+        }
+        trigger load_imm8 : 
+            bool[8] data,
+            int#(FROM: 0, TO: 8) reg_tgt {
+            // ...
+        }
+        trigger jump :
+            int#(FROM: 0, TO: 256) target {
+            // ...
+        }
+
+        when instr_bits[0] && instr_bits[1] {
+            add(3, 4, 5)//...
+        }
+    }
+}
+
+module use_decode {
+    input bool[16] instr
+
+    instruction_decode decoder
+
+    decoder.decode(instr)
+
+    when decoder.add : int a, int b, int r {
+        // execute add
+    }
+    when decoder.load_imm8 : bool[8] v, int r {
+        // execute add
+    }
+    when decoder.jump : int tgt {
+        // execute add
+    }
+}
+
+module iterator#(int MAX) {
+    state int cur
+
+    action start {
+        cur = 0
+    }
+    trigger iter : int v, bool last
+
+    when cur != MAX {
+        iter(cur, cur == MAX - 1)
+        cur = (cur + 1) % MAX
+    }
+}
+
+module use_iter {
+    int[6] terms = [5, 7, -9, 6, 5, 2]
+    state int total
+
+    iterator#(MAX: 6) iter
+    action sum_up {
+        total = 0
+        iter.start()
+    }
+    trigger done : int sum
+    when iter.iter : int idx, bool last {
+        int new_total = (total + terms[idx]) % 256
+        when last {
+            done(new_total)
+        }
+        total = new_total
+    }
+}
+
+
