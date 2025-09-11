@@ -10,7 +10,7 @@ readme = "README.md"
 keywords = ["sus", "fpga", "vlsi", "hdl", "verilog"]
 categories = ["compilers", "text-processing"]
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.88"
 
 include = ["/src", "/std/*", "/README.md", "/LICENSE", "/CHANGELOG.md", "/build.rs", "/rustfmt.toml"]
 
@@ -35,9 +35,9 @@ replace_with = "0.1.8"
 
 # Tree sitter
 tree-sitter = "0.25"
-tree-sitter-sus = {version = "~0.3.0", path = "./tree-sitter-sus"}
+tree-sitter-sus = {version = "~0.3.1-devel", path = "./tree-sitter-sus"}
 
-sus-proc-macro = {version = "~0.3.0", path = "./sus-proc-macro"}
+sus-proc-macro = {version = "~0.3.1-devel", path = "./sus-proc-macro"}
 
 # calyx-ir = {version = "0.6.1", optional = true}
 # calyx-opt = {version = "0.6.1", optional = true}
