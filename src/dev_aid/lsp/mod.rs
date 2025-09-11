@@ -626,6 +626,7 @@ fn main_loop(
 }
 
 pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
+    let cfg = config();
     unsafe {
         std::env::set_var("RUST_BACKTRACE", "1");
     } // Enable backtrace because I can't set it in Env vars
@@ -634,9 +635,15 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     // Create the transport. Includes the stdio (stdin and stdout) versions but this could
     // also be implemented to use sockets or HTTP.
-    println!("Connecting on port {}...", config().lsp_port);
-    let (connection, io_threads) =
-        lsp_server::Connection::connect(SocketAddr::from(([127, 0, 0, 1], config().lsp_port)))?;
+    let addr = SocketAddr::from(([127, 0, 0, 1], cfg.lsp_port));
+    let (connection, io_threads) = if cfg.lsp_listen {
+        println!("Listening on {addr}");
+        lsp_server::Connection::listen(addr)?
+    } else {
+        println!("Attempting to connect on {addr}");
+        lsp_server::Connection::connect(addr)?
+    };
+
     println!("connection established");
 
     // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).

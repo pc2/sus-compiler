@@ -40,6 +40,8 @@ pub struct ConfigStruct {
     pub use_lsp: bool,
     #[allow(unused)]
     pub lsp_port: u16,
+    #[allow(unused)]
+    pub lsp_listen: bool,
     pub codegen: bool,
     pub standalone: Option<StandaloneCodegenSettings>,
     pub use_color: bool,
@@ -93,6 +95,11 @@ fn command_builder() -> Command {
             .long("lsp")
             .help("Enable LSP mode")
             .action(clap::ArgAction::SetTrue))
+        .arg(Arg::new("lsp-listen")
+            .long("lsp-listen")
+            .help("Instead of the LSP Server connecting to you, this makes the LSP server listen for incoming connections")
+            .action(clap::ArgAction::SetTrue)
+            .requires("lsp"))
         .arg(Arg::new("codegen")
             .long("codegen")
             .help("Enable code generation for all modules. This creates a file named [ModuleName].sv per module.")
@@ -240,6 +247,7 @@ where
     Ok(ConfigStruct {
         use_lsp: matches.get_flag("lsp"),
         lsp_port: *matches.get_one("socket").unwrap(),
+        lsp_listen: matches.get_flag("lsp-listen"),
         codegen,
         debug_whitelist,
         enabled_debug_paths,

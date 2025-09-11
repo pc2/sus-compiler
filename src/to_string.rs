@@ -7,7 +7,6 @@ use crate::flattening::typecheck::TyCell;
 use crate::instantiation::{
     InferenceResult, InstantiatedModule, IsPort, RealWire, SubModule, SubModuleOrWire,
 };
-use crate::latency::InferenceFailure;
 use crate::latency::port_latency_inference::{
     InferenceCandidate, InferenceTarget, InferenceTargetPath, SubtypeInferencePathElem,
     ValueInferStrategy,
