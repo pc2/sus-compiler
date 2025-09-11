@@ -81,7 +81,7 @@ fn command_builder() -> Command {
         .author(env!("CARGO_PKG_AUTHORS"))
         .about("The compiler for the SUS Hardware Design Language. This compiler takes in .sus files, and produces equivalent SystemVerilog files")
         .arg(Arg::new("socket")
-            .long("socket")
+            .long("socket") // DO NOT RENAME: VSCode's LSP-server extension adds a hardcoded "--socket {port_id}" flag
             .default_value("25000")
             .help("Set the LSP TCP socket port")
             .value_parser(|socket_int : &str| {

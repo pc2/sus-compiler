@@ -24,6 +24,8 @@ To use the accompanying VSCode Extension for Syntax Highlighting and Code Sugges
 ext install LennartVanHirtum.sus-lsp
 ```
 
+We've also got shaky VIM support. To use it copy over [.vimrc_example](.vimrc_example) to `~/.vimrc`. You'll also need to install [vim-lsp](https://github.com/prabirshrestha/vim-lsp). 
+
 ## Learning SUS
 
 To get started with learning SUS, have a look at [this talk](https://www.youtube.com/watch?v=jJvtZvcimyM). In 40 minutes it goes over most language features through examples. Because further development will make this outdated rather quickly, a changelog is provided below to keep track. 

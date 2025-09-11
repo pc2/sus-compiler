@@ -1,0 +1,35 @@
+set relativenumber
+set autoindent
+set tabstop=4
+set smarttab
+
+call plug#begin()
+
+Plug 'prabirshrestha/vim-lsp'
+call plug#end()
+
+augroup sus_lsp
+  autocmd!
+  autocmd User lsp_setup call s:start_sus_compiler()
+augroup END
+
+function! s:start_sus_compiler()
+    call system('sus_compiler --lsp --socket 25000 --lsp-listen >/dev/null 2>&1 &')
+endfunction
+
+au User lsp_setup call lsp#register_server({
+      \ 'name': 'sus_compiler',
+      \ 'tcp': {server_info->'localhost:25000'},
+      \ 'allowlist': ['sus'],
+      \ })
+
+
+au BufRead,BufNewFile *.sus set filetype=sus
+
+call plug#end()
+
+
+let g:lsp_log_verbose = 1
+let g:lsp_log_file = expand('~/vim-lsp.log')
+
+
