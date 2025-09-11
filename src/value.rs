@@ -102,7 +102,7 @@ impl Value {
     #[track_caller]
     pub fn unwrap_integer(&self) -> &IBig {
         let Self::Integer(i) = self else {
-            panic!("{:?} is not an integer!", self)
+            panic!("{self:?} is not an integer!")
         };
         i
     }
@@ -110,7 +110,7 @@ impl Value {
     #[track_caller]
     pub fn unwrap_int<IntT: for<'i> TryFrom<&'i IBig>>(&self) -> IntT {
         let Self::Integer(i) = self else {
-            panic!("{:?} is not an integer!", self)
+            panic!("{self:?} is not an integer!")
         };
         IntT::try_from(i).ok().unwrap()
     }
@@ -118,14 +118,14 @@ impl Value {
     #[track_caller]
     pub fn unwrap_bool(&self) -> bool {
         let Self::Bool(b) = self else {
-            panic!("{:?} is not a bool!", self)
+            panic!("{self:?} is not a bool!")
         };
         *b
     }
 
     pub fn unwrap_array(&self) -> &[Value] {
         let Self::Array(arr) = self else {
-            panic!("{:?} is not an array!", self)
+            panic!("{self:?} is not an array!")
         };
         arr
     }

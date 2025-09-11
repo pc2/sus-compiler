@@ -55,10 +55,7 @@ fn dot_command(dot_path: &std::path::Path, file_name: &str) {
             }
         }
         Err(e) => {
-            eprintln!(
-                "Could not run 'dot' to convert {:?} to image: {}",
-                dot_path, e
-            );
+            eprintln!("Could not run 'dot' to convert {dot_path:?} to image: {e}");
         }
     }
 }
@@ -90,7 +87,7 @@ fn custom_render_hardware_structure<'a>(
         for (_, wire) in &md_instance.wires {
             let name = &wire.name;
             let abs_lat = wire.absolute_latency;
-            let label = format!("{}'{}", name, abs_lat);
+            let label = format!("{name}'{abs_lat}");
             let (style, color) = match wire.is_port {
                 IsPort::Port(_, Direction::Input) => ("bold", "red"),
                 IsPort::Port(_, Direction::Output) => ("bold", "blue"),
@@ -98,8 +95,7 @@ fn custom_render_hardware_structure<'a>(
             };
             writeln!(
                 f,
-                "    \"{}\" [label=\"{}\" style={} color={}];",
-                name, label, style, color
+                "    \"{name}\" [label=\"{label}\" style={style} color={color}];"
             )?;
         }
 
@@ -117,7 +113,7 @@ fn custom_render_hardware_structure<'a>(
             w.source.for_each_wire(&mut |v| {
                 let from = &md_instance.wires[v].name;
                 let to = &md_instance.wires[id].name;
-                writeln!(f, "    \"{}\" -> \"{}\";", from, to).ok();
+                writeln!(f, "    \"{from}\" -> \"{to}\";").ok();
             });
         }
 
@@ -130,10 +126,10 @@ fn custom_render_hardware_structure<'a>(
                 let w_name = &md_instance.wires[w_id].name;
                 match s_md.ports[port_id].direction {
                     Direction::Input => {
-                        writeln!(f, "    \"{}\" -> \"{}\";", w_name, sm_name)?;
+                        writeln!(f, "    \"{w_name}\" -> \"{sm_name}\";")?;
                     }
                     Direction::Output => {
-                        writeln!(f, "    \"{}\" -> \"{}\";", sm_name, w_name)?;
+                        writeln!(f, "    \"{sm_name}\" -> \"{w_name}\";")?;
                     }
                 }
             }
@@ -209,7 +205,7 @@ fn custom_render_latency_count_graph(
         // Generate all node ids and labels first
         let mut node_ids: Vec<NodeId> = (0..lc_problem.map_latency_node_to_wire.len())
             .map(|n| NodeId {
-                id: format!("n{}", n),
+                id: format!("n{n}"),
                 valid_parent: None,
                 print_separate: true,
             })

@@ -92,8 +92,7 @@ impl<Stream: std::fmt::Write> CodeGenerationContext<'_, '_, Stream> {
         let clk_name = self.md.get_clock_name();
         write!(
             self.program_text,
-            "{comment_text}entity {} is (\n{comment_text}    port (\n        {clk_name} : in std_logic{end}\n",
-            instance_name
+            "{comment_text}entity {instance_name} is (\n{comment_text}    port (\n        {clk_name} : in std_logic{end}\n"
         )
         .unwrap();
 

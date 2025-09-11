@@ -51,7 +51,7 @@ impl HoverCollector<'_> {
                         SubModuleOrWire::SubModule(_) | SubModuleOrWire::Wire(_) => {
                             unreachable!()
                         }
-                        SubModuleOrWire::CompileTimeValue(v) => format!(" = {}", v),
+                        SubModuleOrWire::CompileTimeValue(v) => format!(" = {v}"),
                         SubModuleOrWire::Unassigned => "never assigned to".to_string(),
                     };
                     self.monospace(value_str);

@@ -134,16 +134,12 @@ fn test_floor_and_ceil_div() {
             assert_eq!(
                 floor_result,
                 IBig::from(expected_floor),
-                "floor_div failed for a={}, b={}",
-                ai,
-                bi
+                "floor_div failed for a={ai}, b={bi}"
             );
             assert_eq!(
                 ceil_result,
                 IBig::from(expected_ceil),
-                "ceil_div failed for a={}, b={}",
-                ai,
-                bi
+                "ceil_div failed for a={ai}, b={bi}"
             );
         }
     }
