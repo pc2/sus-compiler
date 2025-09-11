@@ -166,7 +166,7 @@ impl Value {
                 self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |v| {
                     match v {
                         Value::Bool(_) => {}
-                        Value::Integer(_) => {
+                        Value::Integer(_) | Value::Float(_) => {
                             unreachable!("Caught by abstract typecheck");
                         }
                         Value::Array(_) => {
@@ -180,6 +180,30 @@ impl Value {
                 })?;
                 ConcreteType::Named(ConcreteGlobalReference {
                     id: get_builtin_type!("bool"),
+                    template_args: FlatAlloc::new(),
+                })
+            }
+            AbstractInnerType::Named(AbstractGlobalReference {
+                id: get_builtin_type!("float"),
+                ..
+            }) => {
+                self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |v| {
+                    match v {
+                        Value::Float(_) => {}
+                        Value::Integer(_) | Value::Bool(_) => {
+                            unreachable!("Caught by abstract typecheck");
+                        }
+                        Value::Array(_) => {
+                            unreachable!("All arrays handled by get_tensor_size_recursive");
+                        }
+                        Value::Unset => {
+                            return Err("This compile-time constant contains Unset".into());
+                        }
+                    }
+                    Ok(())
+                })?;
+                ConcreteType::Named(ConcreteGlobalReference {
+                    id: get_builtin_type!("float"),
                     template_args: FlatAlloc::new(),
                 })
             }
@@ -203,7 +227,7 @@ impl Value {
                                 min_max = Some((v, v))
                             }
                         }
-                        Value::Bool(_) => {
+                        Value::Bool(_) | Value::Float(_) => {
                             unreachable!("Caught by abstract typecheck");
                         }
                         Value::Array(_) => {

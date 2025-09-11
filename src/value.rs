@@ -1,6 +1,8 @@
 use std::ops::Deref;
 
 use ibig::IBig;
+use ordered_float::NotNan;
+
 use sus_proc_macro::get_builtin_type;
 
 use crate::flattening::{BinaryOperator, UnaryOperator};
@@ -15,6 +17,8 @@ use crate::typing::set_unifier::Unifyable;
 pub enum Value {
     Bool(bool),
     Integer(IBig),
+    /// Temporary, one day we'll have Rationals here instead
+    Float(NotNan<f32>),
     Array(Vec<Value>),
     /// The initial [Value] a variable has, before it's been set. (translates to `'x` don't care)
     Unset,
@@ -86,7 +90,7 @@ pub enum Value {
 impl Value {
     pub fn contains_unset(&self) -> bool {
         match self {
-            Value::Bool(_) | Value::Integer(_) => false,
+            Value::Bool(_) | Value::Integer(_) | Value::Float(_) => false,
             Value::Array(values) => values.iter().any(|v| v.contains_unset()),
             Value::Unset => true,
         }
@@ -95,7 +99,7 @@ impl Value {
         match self {
             Value::Unset => true,
             Value::Array(values) => values.iter().all(|v| v.is_unset()),
-            Value::Bool(_) | Value::Integer(_) => false,
+            Value::Bool(_) | Value::Integer(_) | Value::Float(_) => false,
         }
     }
 
@@ -136,6 +140,7 @@ impl Value {
     pub fn is_of_type(&self, typ: &ConcreteType) -> bool {
         match self {
             Value::Bool(_) => typ.unwrap_named().id == get_builtin_type!("bool"),
+            Value::Float(_) => typ.unwrap_named().id == get_builtin_type!("float"),
             Value::Integer(v) => {
                 let bounds = typ.unwrap_int_bounds();
                 v >= bounds.from && v < bounds.to

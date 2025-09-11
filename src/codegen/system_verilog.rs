@@ -213,13 +213,14 @@ impl<'g> CodeGenerationContext<'g> {
                             .unwrap()
                     }
                 }
-                get_builtin_type!("float") => {
-                    assert!(
-                        matches!(cst, Value::Unset),
-                        "TODO: Generative non-Unset floats"
-                    );
-                    write!(result, "'x").unwrap();
-                }
+                get_builtin_type!("float") => match cst {
+                    Value::Float(f) => {
+                        let as_bits = f.to_bits();
+                        write!(result, "32'h{as_bits:08x} /* {cst} */").unwrap()
+                    }
+                    Value::Unset => write!(result, "'x").unwrap(),
+                    _ => unreachable!(),
+                },
                 _ => todo!("Structs"),
             },
             ConcreteType::Array(arr_box) => {

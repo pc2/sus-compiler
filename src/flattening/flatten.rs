@@ -6,7 +6,8 @@ use crate::alloc::{ArenaAllocator, UUID, UUIDRange};
 use crate::linker::passes::{GlobalResolver, LinkerPass};
 use crate::prelude::*;
 
-use ibig::IBig;
+use ibig::{IBig, UBig};
+use ordered_float::NotNan;
 use sus_proc_macro::{field, get_builtin_const, kind, kw};
 
 use crate::linker::{FileData, GlobalObj, GlobalUUID};
@@ -844,23 +845,42 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     fn flatten_expr_source(&mut self, cursor: &mut Cursor<'c>) -> (ExpressionSource, Span) {
         let (kind, expr_span) = cursor.kind_span();
 
+        use std::str::FromStr;
         let source = match kind {
             kind!("number") => {
                 let text = &cursor.file_data.file_text[expr_span];
-                use std::str::FromStr;
-                ExpressionSource::Literal(Value::Integer(IBig::from_str(text).unwrap()))
+                ExpressionSource::Literal(Value::Integer(UBig::from_str(text).unwrap().into()))
+            }
+            kind!("float") => {
+                let text = &cursor.file_data.file_text[expr_span];
+                ExpressionSource::Literal(Value::Float(NotNan::from_str(text).unwrap()))
             }
             kind!("unary_op") => cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("operator"));
                 let op = UnaryOperator::from_kind_id(cursor.kind());
 
                 cursor.field(field!("right"));
-                let right = self.flatten_subexpr(cursor);
+                // Special case to parse negative literals
+                match (op, cursor.kind()) {
+                    (UnaryOperator::Negate, kind!("number")) => {
+                        let text = &cursor.file_data.file_text[cursor.span()];
+                        ExpressionSource::Literal(Value::Integer(-IBig::from(
+                            UBig::from_str(text).unwrap(),
+                        )))
+                    }
+                    (UnaryOperator::Negate, kind!("float")) => {
+                        let text = &cursor.file_data.file_text[cursor.span()];
+                        ExpressionSource::Literal(Value::Float(-NotNan::from_str(text).unwrap()))
+                    }
+                    _ => {
+                        let right = self.flatten_subexpr(cursor);
 
-                ExpressionSource::UnaryOp {
-                    op,
-                    rank: TyCell::new(),
-                    right,
+                        ExpressionSource::UnaryOp {
+                            op,
+                            rank: TyCell::new(),
+                            right,
+                        }
+                    }
                 }
             }),
             kind!("binary_op") => cursor.go_down_no_check(|cursor| {
@@ -1032,7 +1052,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
                 wire_ref
             }),
-            kind!("number") => {
+            kind!("number") | kind!("float") => {
                 self.errors
                     .error(expr_span, "A constant is not a wire reference");
                 self.new_error(expr_span)

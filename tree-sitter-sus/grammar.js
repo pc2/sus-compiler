@@ -234,6 +234,7 @@ module.exports = grammar({
             $.template_global,
             $.array_op,
             $.number,
+            $.float,
             $.parenthesis_expression,
             $.unary_op,
             $.binary_op,
@@ -351,7 +352,10 @@ module.exports = grammar({
         ),
 
         identifier: $ => /[\p{Alphabetic}_][\p{Alphabetic}_\p{Decimal_Number}]*/,
+        // Negative ints are instead handled by detecting a (unary_op "-" (number))
         number: $ => /\d[\d_]*/,
+        // Negative floats are instead handled by detecting a (unary_op "-" (float))
+        float: $ => /[0-9]*\.[0-9]+([eE][-+]?\d+)?/,
 
         _comma: $ => seq(
             ',',

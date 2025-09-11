@@ -1083,6 +1083,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "float"
+        },
+        {
+          "type": "SYMBOL",
           "name": "parenthesis_expression"
         },
         {
@@ -1993,6 +1997,10 @@
     "number": {
       "type": "PATTERN",
       "value": "\\d[\\d_]*"
+    },
+    "float": {
+      "type": "PATTERN",
+      "value": "[0-9]*\\.[0-9]+([eE][-+]?\\d+)?"
     },
     "_comma": {
       "type": "SEQ",

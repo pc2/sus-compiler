@@ -41,6 +41,10 @@ pub const BOOL_INNER: AbstractInnerType = AbstractInnerType::Named(AbstractGloba
     id: get_builtin_type!("bool"),
     template_arg_types: TVec::new(),
 });
+pub const FLOAT_INNER: AbstractInnerType = AbstractInnerType::Named(AbstractGlobalReference {
+    id: get_builtin_type!("float"),
+    template_arg_types: TVec::new(),
+});
 pub static INT_INNER: LazyLock<AbstractInnerType> = LazyLock::new(|| {
     AbstractInnerType::Named(AbstractGlobalReference {
         id: get_builtin_type!("int"),
@@ -76,6 +80,10 @@ pub struct AbstractRankedType {
 
 pub const BOOL_SCALAR: AbstractRankedType = AbstractRankedType {
     inner: BOOL_INNER,
+    rank: PeanoType::Zero,
+};
+pub const FLOAT_SCALAR: AbstractRankedType = AbstractRankedType {
+    inner: FLOAT_INNER,
     rank: PeanoType::Zero,
 };
 pub static INT_SCALAR: LazyLock<AbstractRankedType> = LazyLock::new(|| AbstractRankedType {

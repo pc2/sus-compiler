@@ -1518,3 +1518,13 @@ module duplicate_port_names {
 		interface preeee
 	}
 }
+
+module float_literal {
+	gen float f = 1.0E+8
+    gen float nf = -1.3
+
+    float ff = f
+    float fff = 0.0625
+
+    float[5] many_floats = [0.7, 0.9, -0.7, -0.9, 0.1]
+}

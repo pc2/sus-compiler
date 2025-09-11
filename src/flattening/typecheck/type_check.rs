@@ -6,7 +6,8 @@ use crate::linker::passes::{LocalOrRemoteParentModule, RemoteDeclaration, Remote
 use crate::prelude::*;
 use crate::to_string::join_string_iter;
 use crate::typing::abstract_type::{
-    AbstractInnerType, AbstractRankedType, BOOL_INNER, BOOL_SCALAR, INT_INNER, INT_SCALAR,
+    AbstractInnerType, AbstractRankedType, BOOL_INNER, BOOL_SCALAR, FLOAT_SCALAR, INT_INNER,
+    INT_SCALAR,
 };
 use crate::typing::template::TVec;
 use crate::typing::type_inference::{AbstractTypeSubstitutor, TypeUnifier, UnifyErrorReport};
@@ -597,6 +598,7 @@ impl<'l> TypeCheckingContext<'l> {
             }
             ExpressionSource::Literal(value) => match value {
                 Value::Bool(_) => BOOL_SCALAR,
+                Value::Float(_) => FLOAT_SCALAR,
                 Value::Integer(_) => INT_SCALAR.clone(),
                 Value::Array(_) => unreachable!(
                     "Value::get_type_abs is only ever used for terminal Values, because any array instantiations would be Expression::ArrayConstruct"

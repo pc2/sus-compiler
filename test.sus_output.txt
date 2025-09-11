@@ -177,6 +177,7 @@ Flattening negative_slice
 Flattening multi_slice
 Flattening multi_slice_reverse
 Flattening duplicate_port_names
+Flattening float_literal
 Flattening RawROM
 Flattening ROM
 Flattening RawRAM
@@ -346,6 +347,7 @@ Typechecking negative_slice
 Typechecking multi_slice
 Typechecking multi_slice_reverse
 Typechecking duplicate_port_names
+Typechecking float_literal
 Typechecking RawROM
 Typechecking ROM
 Typechecking RawRAM
@@ -532,6 +534,7 @@ Lints negative_slice
 Lints multi_slice
 Lints multi_slice_reverse
 Lints duplicate_port_names
+Lints float_literal
 Lints RawROM
 Lints ROM
 Lints RawRAM
@@ -847,3 +850,6 @@ Checking array accesses multi_slice #()
 Instantiating multi_slice_reverse #()
 Concrete Typechecking multi_slice_reverse #()
 Checking array accesses multi_slice_reverse #()
+Instantiating float_literal #()
+Concrete Typechecking float_literal #()
+Checking array accesses float_literal #()

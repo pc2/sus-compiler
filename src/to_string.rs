@@ -332,6 +332,10 @@ impl Display for Value {
         match self {
             Value::Bool(b) => b.fmt(f),
             Value::Integer(i) => i.fmt(f),
+            Value::Float(fl) => {
+                let mut buf = dtoa::Buffer::new();
+                write!(f, "{}", buf.format(f32::from(*fl)))
+            }
             Value::Array(arr_box) => {
                 f.write_str("[")?;
                 join_string_iter_formatter(", ", f, arr_box.iter(), |v, f| v.fmt(f))?;
