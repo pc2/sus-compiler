@@ -254,7 +254,7 @@ impl<'g> CodeGenerationContext<'g> {
                         _ => unreachable!(),
                     }
                 } else {
-                    result.write_str("{").unwrap();
+                    result.write_str("'{").unwrap();
                     match cst {
                         Value::Array(values) => {
                             assert_eq!(values.len(), size);
