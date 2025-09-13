@@ -24,7 +24,16 @@ To use the accompanying VSCode Extension for Syntax Highlighting and Code Sugges
 ext install LennartVanHirtum.sus-lsp
 ```
 
-We've also got shaky VIM support. To use it copy over [.vimrc_example](.vimrc_example) to `~/.vimrc`. You'll also need to install [vim-lsp](https://github.com/prabirshrestha/vim-lsp). 
+There is also an experimental vim plugin [sus.vim](https://github.com/papeg/sus.vim). It supports vim and neovim and brings in syntax highlighting and lsp support. For vim it depends on [vim-lsp](https://github.com/prabirshrestha/vim-lsp). Install with your favorite plugin manager, like vim-plug:
+
+```
+call plug#begin()
+  if !has('nvim')
+      Plug 'prabirshrestha/vim-lsp'
+  endif
+  Plug 'papeg/sus.vim'
+call plug#end()
+```
 
 ## Learning SUS
 
