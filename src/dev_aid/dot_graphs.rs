@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::fs::{self, File};
 use std::io::Write;
+use std::path::{Path, PathBuf};
 
 use crate::alloc::UUID;
 use crate::instantiation::IsPort;
@@ -17,26 +18,20 @@ use crate::{
 
 /// Ensures dot_output exists and returns a File in dot_output with a unique name based on `module_name`, `dot_type`, and `.dot` extension.
 /// Returns the file handle and the full path to the file.
-fn unique_file_name(
-    module_name: &str,
-    dot_type: &str,
-) -> std::io::Result<(File, std::path::PathBuf)> {
-    let dir = "dot_output";
-    fs::create_dir_all(dir)?;
-    let mut path = std::path::PathBuf::from(dir);
-    let mut file_name = format!("{module_name}_{dot_type}.dot");
-    path.push(&file_name);
+fn unique_file_name(module_name: &str, dot_type: &str) -> std::io::Result<(File, PathBuf)> {
+    let mut path = PathBuf::from("dot_output");
+    fs::create_dir_all(&path)?;
+    path.push(format!("{module_name}_{dot_type}.dot"));
     let mut count = 1;
     while path.exists() {
-        file_name = format!("{module_name}_{dot_type}_{count}.dot");
-        path.set_file_name(&file_name);
+        path.set_file_name(format!("{module_name}_{dot_type}_{count}.dot"));
         count += 1;
     }
     let file = File::create(&path)?;
     Ok((file, path))
 }
 
-fn dot_command(dot_path: &std::path::Path, file_name: &str) {
+fn dot_command(dot_path: &Path, file_name: &str) {
     let output_path = dot_path.with_extension(file_name);
     match std::process::Command::new("dot")
         .arg(format!("-T{file_name}"))
@@ -60,7 +55,7 @@ fn dot_command(dot_path: &std::path::Path, file_name: &str) {
     }
 }
 
-fn try_convert_dot_to_image(dot_path: &std::path::Path) {
+fn try_convert_dot_to_image(dot_path: &Path) {
     if crate::debug::is_enabled("dot-svg") {
         dot_command(dot_path, "svg");
     }

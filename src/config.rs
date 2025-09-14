@@ -31,7 +31,7 @@ pub enum TargetLanguage {
 #[derive(Debug)]
 pub struct StandaloneCodegenSettings {
     pub top_module: String,
-    pub file_path: PathBuf,
+    pub file_path: Option<PathBuf>,
 }
 
 /// All command-line flags are converted to this struct, of which the singleton instance can be acquired using [crate::config::config]
@@ -234,12 +234,7 @@ where
             .get_one("standalone")
             .map(|top_module: &String| StandaloneCodegenSettings {
                 top_module: top_module.to_string(),
-                file_path: matches
-                    .get_one::<PathBuf>("standalone-file")
-                    .cloned()
-                    .unwrap_or_else(|| {
-                        PathBuf::from(format!("verilog_output/{top_module}_standalone.sv"))
-                    }),
+                file_path: matches.get_one::<PathBuf>("standalone-file").cloned(),
             });
 
     let sus_home_override = matches.get_one::<PathBuf>("sus-home").cloned();

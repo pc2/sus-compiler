@@ -23,8 +23,8 @@ mod linker;
 
 mod compiler_top;
 
-use std::error::Error;
 use std::io::Write;
+use std::{error::Error, path::PathBuf};
 
 use prelude::*;
 
@@ -74,7 +74,15 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
                 std::process::exit(1);
             };
 
-            codegen_backend.codegen_with_dependencies(&linker, md.0, &standalone.file_path);
+            if let Some(codegen_file) = &standalone.file_path {
+                codegen_backend.codegen_with_dependencies(&linker, md.0, codegen_file);
+            } else {
+                let mut standalone_codegen_file = PathBuf::from("verilog_output");
+                std::fs::create_dir_all(&standalone_codegen_file).unwrap();
+                standalone_codegen_file.push(format!("{top_md_name}_standalone.sv"));
+
+                codegen_backend.codegen_with_dependencies(&linker, md.0, &standalone_codegen_file);
+            }
         } else {
             for (id, md) in &linker.modules {
                 codegen_backend.codegen_to_file(id, md, &linker);
