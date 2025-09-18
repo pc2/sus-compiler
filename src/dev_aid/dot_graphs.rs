@@ -266,7 +266,7 @@ fn custom_render_latency_count_graph(
                 fn display_port_list<'l>(list: &'l [&'l RealWire]) -> impl Display + 'l {
                     FmtWrapper(move |f| {
                         write!(f, " {{ ")?;
-                        join_string_iter_formatter(" | ", f, list, |p_wire, f| {
+                        join_string_iter_formatter(f, " | ", list, |f, p_wire| {
                             let name = &p_wire.name;
                             let abs_lat = &p_wire.absolute_latency;
                             write!(f, "<{name}> {name}'{abs_lat}")

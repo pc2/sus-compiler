@@ -1,5 +1,5 @@
 use crate::{
-    flattening::{Instruction, NamedConstant},
+    flattening::{ExpressionSource, Instruction, NamedConstant, WireReferenceRoot},
     instantiation::instantiation_cache::Instantiator,
     linker::passes::ResolvedGlobals,
     prelude::*,
@@ -141,14 +141,37 @@ impl LinkInfo {
             }
         }
     }
-    pub fn get_instruction_name(&self, instr_id: FlatID) -> Option<&str> {
+    pub fn get_instruction_name_best_effort<'s>(
+        &'s self,
+        globals: &'s LinkerGlobals,
+        instr_id: FlatID,
+    ) -> &'s str {
         match &self.instructions[instr_id] {
-            Instruction::SubModule(sm) => Some(&sm.name),
-            Instruction::Declaration(decl) => Some(&decl.name),
-            Instruction::Interface(interface) => Some(&interface.name),
-            Instruction::Expression(_)
-            | Instruction::IfStatement(_)
-            | Instruction::ForStatement(_) => None,
+            Instruction::SubModule(sm) => &sm.name,
+            Instruction::Declaration(decl) => &decl.name,
+            Instruction::Interface(interface) => &interface.name,
+            Instruction::Expression(expr) => match &expr.source {
+                ExpressionSource::WireRef(wr) => match &wr.root {
+                    WireReferenceRoot::LocalDecl(decl_id) => {
+                        &self.instructions[*decl_id].unwrap_declaration().name
+                    }
+                    WireReferenceRoot::LocalSubmodule(submod_id) => {
+                        &self.instructions[*submod_id].unwrap_submodule().name
+                    }
+                    WireReferenceRoot::LocalInterface(interface_id) => {
+                        &self.instructions[*interface_id].unwrap_interface().name
+                    }
+                    WireReferenceRoot::NamedConstant(global_reference) => {
+                        &globals.constants[global_reference.id].link_info.name
+                    }
+                    WireReferenceRoot::NamedModule(global_reference) => {
+                        &globals.modules[global_reference.id].link_info.name
+                    }
+                    WireReferenceRoot::Error => "",
+                },
+                _ => "",
+            },
+            Instruction::IfStatement(_) | Instruction::ForStatement(_) => "",
         }
     }
     pub fn get_instruction_domain(&self, instr_id: FlatID) -> Option<DomainType> {

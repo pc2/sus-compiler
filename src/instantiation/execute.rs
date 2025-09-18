@@ -1001,6 +1001,10 @@ impl<'l> ExecutionContext<'l> {
                 ),
             ));
         }
+        let name_hint = self
+            .link_info
+            .get_instruction_name_best_effort(&self.linker.globals, original_instruction);
+
         Ok(self.wires.alloc(RealWire {
             typ: value
                 .concretize_type(
@@ -1013,7 +1017,7 @@ impl<'l> ExecutionContext<'l> {
             source: RealWireDataSource::Constant { value },
             original_instruction,
             domain,
-            name: self.unique_name_producer.get_unique_name(""),
+            name: self.unique_name_producer.get_unique_name(name_hint),
             specified_latency: AbsLat::UNKNOWN,
             absolute_latency: AbsLat::UNKNOWN,
             is_port: IsPort::PlainWire,

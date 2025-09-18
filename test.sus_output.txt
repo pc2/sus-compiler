@@ -37,6 +37,7 @@ Flattening Repeat
 Flattening BitSelect
 Flattening PopCount
 Flattening TreeAdd
+Flattening PopCount_native
 Flattening example_md
 Flattening multiply_add
 Flattening test_pow17
@@ -178,6 +179,7 @@ Flattening multi_slice
 Flattening multi_slice_reverse
 Flattening duplicate_port_names
 Flattening float_literal
+Flattening check_non_inlineds
 Flattening RawROM
 Flattening ROM
 Flattening RawRAM
@@ -209,6 +211,7 @@ Typechecking Repeat
 Typechecking BitSelect
 Typechecking PopCount
 Typechecking TreeAdd
+Typechecking PopCount_native
 Typechecking example_md
 Typechecking multiply_add
 Typechecking test_pow17
@@ -348,6 +351,7 @@ Typechecking multi_slice
 Typechecking multi_slice_reverse
 Typechecking duplicate_port_names
 Typechecking float_literal
+Typechecking check_non_inlineds
 Typechecking RawROM
 Typechecking ROM
 Typechecking RawRAM
@@ -396,6 +400,7 @@ Lints Repeat
 Lints BitSelect
 Lints PopCount
 Lints TreeAdd
+Lints PopCount_native
 Lints example_md
 Lints multiply_add
 Lints test_pow17
@@ -535,6 +540,7 @@ Lints multi_slice
 Lints multi_slice_reverse
 Lints duplicate_port_names
 Lints float_literal
+Lints check_non_inlineds
 Lints RawROM
 Lints ROM
 Lints RawRAM
@@ -853,3 +859,6 @@ Checking array accesses multi_slice_reverse #()
 Instantiating float_literal #()
 Concrete Typechecking float_literal #()
 Checking array accesses float_literal #()
+Instantiating check_non_inlineds #()
+Concrete Typechecking check_non_inlineds #()
+Checking array accesses check_non_inlineds #()

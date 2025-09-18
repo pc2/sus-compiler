@@ -15,7 +15,9 @@ use crate::flattening::{Direction, Module, PartSelectDirection, Port};
 use crate::instantiation::{
     InstantiatedModule, IsPort, MultiplexerSource, RealWire, RealWireDataSource, RealWirePathElem,
 };
-use crate::to_string::{join_string_iter, trim_known_prefix};
+use crate::to_string::{
+    FmtWrapper, join_string_iter, join_string_iter_formatter, trim_known_prefix,
+};
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg, IntBounds};
 use crate::typing::template::{TVec, TemplateKind};
 use crate::{typing::concrete_type::ConcreteType, value::Value};
@@ -181,8 +183,8 @@ impl ForEachPath<'_, '_> {
 }
 
 impl<'g> CodeGenerationContext<'g> {
-    fn constant_to_str(result: &mut String, typ: &ConcreteType, cst: &Value) {
-        match typ {
+    fn display_constant(typ: &ConcreteType, cst: &Value) -> impl Display {
+        FmtWrapper(move |f| match typ {
             ConcreteType::Named(global_ref) => match global_ref.id {
                 get_builtin_type!("bool") => {
                     let b = match cst {
@@ -191,7 +193,7 @@ impl<'g> CodeGenerationContext<'g> {
                         Value::Unset => "1'bx",
                         _ => unreachable!(),
                     };
-                    result.write_str(b).unwrap();
+                    f.write_str(b)
                 }
                 get_builtin_type!("int") => {
                     let bounds = global_ref.unwrap_int_bounds();
@@ -204,21 +206,17 @@ impl<'g> CodeGenerationContext<'g> {
                         _ => unreachable!(),
                     };
                     if bounds.from < &IBig::from(0) {
-                        result
-                            .write_fmt(format_args!("{bitwidth}'sd{cst_str}"))
-                            .unwrap()
+                        f.write_fmt(format_args!("{bitwidth}'sd{cst_str}"))
                     } else {
-                        result
-                            .write_fmt(format_args!("{bitwidth}'d{cst_str}"))
-                            .unwrap()
+                        f.write_fmt(format_args!("{bitwidth}'d{cst_str}"))
                     }
                 }
                 get_builtin_type!("float") => match cst {
-                    Value::Float(f) => {
-                        let as_bits = f.to_bits();
-                        write!(result, "32'h{as_bits:08x} /* {cst} */").unwrap()
+                    Value::Float(fl) => {
+                        let as_bits = fl.to_bits();
+                        write!(f, "32'h{as_bits:08x} /* {cst} */")
                     }
-                    Value::Unset => write!(result, "'x").unwrap(),
+                    Value::Unset => write!(f, "'x"),
                     _ => unreachable!(),
                 },
                 _ => todo!("Structs"),
@@ -232,7 +230,7 @@ impl<'g> CodeGenerationContext<'g> {
                     ..
                 }) = content
                 {
-                    result.write_fmt(format_args!("{size}'b")).unwrap();
+                    f.write_fmt(format_args!("{size}'b"))?;
                     match cst {
                         Value::Array(values) => {
                             assert_eq!(values.len(), size);
@@ -243,41 +241,51 @@ impl<'g> CodeGenerationContext<'g> {
                                     Value::Unset => 'x',
                                     _ => unreachable!(),
                                 };
-                                result.write_char(b).unwrap();
+                                f.write_char(b)?;
                             }
                         }
                         Value::Unset => {
                             for _ in 0..size {
-                                result.write_char('x').unwrap();
+                                f.write_char('x')?;
                             }
                         }
                         _ => unreachable!(),
                     }
+                    Ok(())
                 } else {
-                    result.write_str("'{").unwrap();
+                    f.write_str("'{")?;
                     match cst {
                         Value::Array(values) => {
                             assert_eq!(values.len(), size);
-                            join_string_iter(result, ", ", values.iter(), |result, v| {
-                                Self::constant_to_str(result, content, v);
-                                Ok(())
-                            })
+                            join_string_iter_formatter(f, ", ", values.iter(), |f, v| {
+                                Self::display_constant(content, v).fmt(f)
+                            })?;
                         }
-                        Value::Unset => join_string_iter(result, ", ", 0..size, |result, _| {
-                            Self::constant_to_str(result, content, &Value::Unset);
-                            Ok(())
-                        }),
+                        Value::Unset => join_string_iter_formatter(f, ", ", 0..size, |f, _| {
+                            Self::display_constant(content, &Value::Unset).fmt(f)
+                        })?,
                         _ => unreachable!(),
                     }
-                    result.write_str("}").unwrap();
+                    f.write_str("}")
                 }
             }
-        }
+        })
     }
     /// This is for making the resulting Verilog a little nicer to read
     fn can_inline(&self, wire: &RealWire) -> bool {
         match &wire.source {
-            RealWireDataSource::Constant { .. } => true,
+            RealWireDataSource::Constant { .. } => {
+                if let ConcreteType::Named(r) = &wire.typ {
+                    matches!(
+                        r.id,
+                        get_builtin_type!("int")
+                            | get_builtin_type!("bool")
+                            | get_builtin_type!("float")
+                    )
+                } else {
+                    false
+                }
+            }
             RealWireDataSource::Select { root: _, path } if path.is_empty() => true,
             _other => false,
         }
@@ -286,10 +294,8 @@ impl<'g> CodeGenerationContext<'g> {
     fn wire_name(&self, wire: WireID, requested_latency: AbsLat) -> Cow<'g, str> {
         let wire = &self.instance.wires[wire];
         match &wire.source {
-            RealWireDataSource::Constant { value } => {
-                let mut result = String::new();
-                Self::constant_to_str(&mut result, &wire.typ, value);
-                Cow::Owned(result)
+            RealWireDataSource::Constant { value } if self.can_inline(wire) => {
+                Cow::Owned(Self::display_constant(&wire.typ, value).to_string())
             }
             RealWireDataSource::Select { root, path } if path.is_empty() => wire_name_with_latency(
                 &self.instance.wires[*root],
@@ -652,8 +658,9 @@ impl<'g> CodeGenerationContext<'g> {
                         })
                     });
                 }
-                RealWireDataSource::Constant { .. } => {
-                    unreachable!("All constants are inlined!");
+                RealWireDataSource::Constant { value } => {
+                    let const_str = Self::display_constant(&w.typ, value);
+                    writeln!(self.program_text, "{wire_or_reg}{wire_decl} = {const_str};").unwrap();
                 }
                 RealWireDataSource::ReadOnly => {
                     writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
@@ -681,8 +688,8 @@ impl<'g> CodeGenerationContext<'g> {
                     write!(self.program_text, "{wire_or_reg}{wire_decl}").unwrap();
                     match is_state {
                         Some(initial_val) if !initial_val.is_unset() => {
-                            self.program_text.write_str(" = ").unwrap();
-                            Self::constant_to_str(&mut self.program_text, &w.typ, initial_val);
+                            let cst_str = Self::display_constant(&w.typ, initial_val);
+                            write!(self.program_text, " = {cst_str}",).unwrap();
                         }
                         _ => {}
                     }
@@ -804,9 +811,8 @@ impl<'g> CodeGenerationContext<'g> {
                         "<="
                     } else {
                         writeln!(self.program_text, "always_comb begin\n\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches").unwrap();
-                        write!(self.program_text, "\t{output_name} = ").unwrap();
-                        Self::constant_to_str(&mut self.program_text, &w.typ, &Value::Unset);
-                        self.program_text.write_str(";\n").unwrap();
+                        let cst_str = Self::display_constant(&w.typ, &Value::Unset);
+                        writeln!(self.program_text, "\t{output_name} = {cst_str};").unwrap();
                         "="
                     };
 
@@ -945,6 +951,7 @@ impl RealWireDataSource {
                 is_state: None,
                 sources: _,
             } => "/*mux_wire*/ logic",
+            RealWireDataSource::Constant { .. } => "localparam",
             _ => "wire", // Has to be "wire", because `logic[5:0] v = other_wire;` would *initialize* v to other_wire, so we need to use `wire`
         }
     }

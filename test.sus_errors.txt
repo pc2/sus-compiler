@@ -4822,12 +4822,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                            ─────┬────  
       │                                 ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Some parameters of '_11' were still unknown: int #(FROM: ?, TO: ?)[0]
+Error: Some parameters of 'INTS_3' were still unknown: int #(FROM: ?, TO: ?)[0]
       ╭─[ test.sus:1453:38 ]
       │
  1453 │     int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4:4]
       │                                         ──────┬─────  
-      │                                               ╰─────── Some parameters of '_11' were still unknown: int #(FROM: ?, TO: ?)[0]
+      │                                               ╰─────── Some parameters of 'INTS_3' were still unknown: int #(FROM: ?, TO: ?)[0]
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1458:18 ]
@@ -5005,4 +5005,32 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1529 │     float[5] many_floats = [0.7, 0.9, -0.7, -0.9, 0.1]
       │              ─────┬─────  
       │                   ╰─────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1533:18 ]
+      │
+ 1533 │     gen float[5] floats = [0.3, 0.4, 0.2, 0.3, 0.5]
+      │                  ───┬──  
+      │                     ╰──── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1536:14 ]
+      │
+ 1536 │     float[5] fs = floats
+      │              ─┬  
+      │               ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1538:9 ]
+      │
+ 1538 │     int y = 3
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1539:11 ]
+      │
+ 1539 │     float x = floats[y]
+      │           ┬  
+      │           ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯

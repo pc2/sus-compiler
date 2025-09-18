@@ -66,10 +66,10 @@ impl std::fmt::Debug for ConcreteType {
                 let name = global_ref.id;
                 f.write_fmt(format_args!("{name:?} #("))?;
                 join_string_iter_formatter(
-                    ", ",
                     f,
+                    ", ",
                     global_ref.template_args.iter(),
-                    |(arg_id, arg), f| {
+                    |f, (arg_id, arg)| {
                         f.write_fmt(format_args!("{arg_id:?}: "))?;
                         match arg {
                             TemplateKind::Type(t) => {

@@ -144,7 +144,7 @@ impl<ID: Into<GlobalUUID> + Copy> AbstractGlobalReference<ID> {
             }
             f.write_str(" #(")?;
             let args_iter = zip_eq(&self.template_arg_types, &target_link_info.parameters);
-            join_string_iter_formatter(", ", f, args_iter, |(_, typ, param), f| {
+            join_string_iter_formatter(f, ", ", args_iter, |f, (_, typ, param)| {
                 write!(f, "{}: ", &param.name)?;
                 match typ {
                     TemplateKind::Type(typ) => {
@@ -169,16 +169,16 @@ impl<ID: Into<GlobalUUID> + Copy> GlobalReference<ID> {
             f.write_str(&target_link_info.name)?;
             f.write_str(" #(")?;
             join_string_iter_formatter(
-                ", ",
                 f,
+                ", ",
                 &self.template_args,
-                |WrittenTemplateArg {
+                |f,
+                 WrittenTemplateArg {
                      name,
                      refers_to,
                      kind,
                      ..
-                 },
-                 f| {
+                 }| {
                     write!(f, "{name} -> ")?;
                     if let Some(found) = refers_to.get() {
                         write!(f, "{}: ", &target_link_info.parameters[*found].name)?;
@@ -210,7 +210,7 @@ impl WireReference {
                 WireReferenceRoot::LocalDecl(decl_id)
                 | WireReferenceRoot::LocalSubmodule(decl_id)
                 | WireReferenceRoot::LocalInterface(decl_id) => {
-                    let decl_name = link_info.debug_name(*decl_id);
+                    let decl_name = link_info.debug_name(globals, *decl_id);
                     write!(f, "{decl_name}")?
                 }
                 WireReferenceRoot::NamedConstant(global_reference) => {
@@ -338,7 +338,7 @@ impl Display for Value {
             }
             Value::Array(arr_box) => {
                 f.write_str("[")?;
-                join_string_iter_formatter(", ", f, arr_box.iter(), |v, f| v.fmt(f))?;
+                join_string_iter_formatter(f, ", ", arr_box.iter(), |f, v| v.fmt(f))?;
                 f.write_str("]")
             }
             Value::Unset => f.write_str("{value_unset}"),
@@ -719,8 +719,8 @@ pub fn display_all_infer_params(
 }
 
 impl LinkInfo {
-    fn debug_name(&self, instr_id: FlatID) -> impl Display + '_ {
-        let name = self.get_instruction_name(instr_id).unwrap();
+    fn debug_name<'s>(&'s self, globals: &'s LinkerGlobals, instr_id: FlatID) -> impl Display + 's {
+        let name = self.get_instruction_name_best_effort(globals, instr_id);
         FmtWrapper(move |f| write!(f, "{instr_id:?}={name}"))
     }
     fn display_domain_of<'s>(
@@ -909,7 +909,7 @@ impl LinkInfo {
                     loop_body,
                     ..
                 }) => {
-                    let loop_var_decl_name = self.debug_name(*loop_var_decl);
+                    let loop_var_decl_name = self.debug_name(globals, *loop_var_decl);
                     print!("for {loop_var_decl_name} in {start:?}..{end:?} {{{loop_body:?}}}")
                 }
             }
@@ -1101,7 +1101,7 @@ impl InstantiatedModule {
                         }
                         if !interf.inputs.is_empty() {
                             write!(f, ": ")?;
-                            join_string_iter_formatter(", ", f, &interf.inputs, |i, f| {
+                            join_string_iter_formatter(f, ", ", &interf.inputs, |f, i| {
                                 let i_wire = self.generation_state[*i].unwrap_wire(); // Safely unwrap due to earlier check
                                 let w = &self.wires[i_wire];
 
@@ -1110,7 +1110,7 @@ impl InstantiatedModule {
                         }
                         if !interf.outputs.is_empty() {
                             write!(f, " -> ")?;
-                            join_string_iter_formatter(", ", f, &interf.outputs, |i, f| {
+                            join_string_iter_formatter(f, ", ", &interf.outputs, |f, i| {
                                 let i_wire = self.generation_state[*i].unwrap_wire(); // Safely unwrap due to earlier check
                                 let w = &self.wires[i_wire];
 
@@ -1168,17 +1168,17 @@ pub fn join_string_iter<T>(
 }
 
 pub fn join_string_iter_formatter<'fmt, T>(
-    sep: &str,
     f: &mut Formatter<'fmt>,
+    sep: &str,
     iter: impl IntoIterator<Item = T>,
-    mut func: impl FnMut(T, &mut Formatter<'fmt>) -> std::fmt::Result,
+    mut func: impl FnMut(&mut Formatter<'fmt>, T) -> std::fmt::Result,
 ) -> std::fmt::Result {
     let mut iter = iter.into_iter();
     if let Some(first) = iter.next() {
-        func(first, f)?;
+        func(f, first)?;
         for item in iter {
             f.write_str(sep)?;
-            func(item, f)?;
+            func(f, item)?;
         }
     }
     Ok(())

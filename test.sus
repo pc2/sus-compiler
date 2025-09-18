@@ -1528,3 +1528,13 @@ module float_literal {
 
     float[5] many_floats = [0.7, 0.9, -0.7, -0.9, 0.1]
 }
+
+module check_non_inlineds {
+    gen float[5] floats = [0.3, 0.4, 0.2, 0.3, 0.5]
+
+
+    float[5] fs = floats
+
+    int y = 3
+    float x = floats[y]
+}
