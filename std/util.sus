@@ -114,3 +114,9 @@ module TreeAdd #(int WIDTH, int FROM, int TO) {
 		reg total = left_total + right_total
 	}
 }
+
+extern module PopCount_native #(int WIDTH) {
+	interface PopCount_native : 
+		bool[WIDTH] bits'0 ->
+		int#(FROM: 0, TO: WIDTH + 1) count'0
+}
