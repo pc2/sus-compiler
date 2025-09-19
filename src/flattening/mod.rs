@@ -895,6 +895,14 @@ pub struct IfStatement {
     pub bindings_writable: Vec<FlatID>,
     pub conditional_bindings_span: Option<Span>,
 }
+impl IfStatement {
+    pub fn iter_all_bindings(&self) -> impl Iterator<Item = FlatID> {
+        self.bindings_read_only
+            .iter()
+            .chain(self.bindings_writable.iter())
+            .copied()
+    }
+}
 
 /// A control-flow altering [Instruction] to represent compiletime looping on a generative index
 #[derive(Debug)]

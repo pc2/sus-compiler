@@ -1538,3 +1538,21 @@ module check_non_inlineds {
     int y = 3
     float x = floats[y]
 }
+
+module make_when {
+	input bool x
+	trigger t : bool b
+}
+
+module use_make_when {
+	make_when w
+
+	input bool xx
+	output bool b
+	w.x = xx
+	// c should be attached to same domain as w.t
+	when w.t : bool c {
+		b = true
+	}
+}
+

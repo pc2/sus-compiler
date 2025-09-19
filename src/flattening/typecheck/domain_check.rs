@@ -43,6 +43,31 @@ impl FinalizationContext {
 }
 
 impl<'l> TypeCheckingContext<'l> {
+    pub fn init_domains(&mut self) {
+        for (_, instr) in self.instructions {
+            match instr {
+                Instruction::Declaration(declaration) => {
+                    match declaration.decl_kind {
+                        DeclarationKind::Port { .. } => {} // Domain is already set by flatten
+                        DeclarationKind::StructField(..)
+                        | DeclarationKind::RegularWire { .. }
+                        | DeclarationKind::ConditionalBinding { .. } => {
+                            declaration.domain.set(self.domain_checker.alloc_unknown());
+                        }
+                        DeclarationKind::RegularGenerative { .. }
+                        | DeclarationKind::TemplateParameter { .. } => {
+                            declaration.domain.set(DomainType::Generative);
+                        }
+                    }
+                }
+                Instruction::SubModule(_)
+                | Instruction::Interface(_)
+                | Instruction::Expression(_)
+                | Instruction::IfStatement(_)
+                | Instruction::ForStatement(_) => {}
+            }
+        }
+    }
     pub fn domain_check_instr(&mut self, instr: &Instruction) {
         match instr {
             Instruction::SubModule(sub_module_instance) => {
@@ -58,18 +83,6 @@ impl<'l> TypeCheckingContext<'l> {
             }
             Instruction::Declaration(declaration) => {
                 self.written_type_must_be_generative(&declaration.typ_expr);
-                match declaration.decl_kind {
-                    DeclarationKind::Port { .. } => {} // Domain is already set by flatten
-                    DeclarationKind::StructField(..)
-                    | DeclarationKind::RegularWire { .. }
-                    | DeclarationKind::ConditionalBinding { .. } => {
-                        declaration.domain.set(self.domain_checker.alloc_unknown())
-                    }
-                    DeclarationKind::RegularGenerative { .. }
-                    | DeclarationKind::TemplateParameter { .. } => {
-                        declaration.domain.set(DomainType::Generative)
-                    }
-                }
                 if let Some(latency_spec) = declaration.latency_specifier {
                     self.must_be_generative(latency_spec, "Latency Specifier");
                 }
@@ -187,6 +200,18 @@ impl<'l> TypeCheckingContext<'l> {
                         );
                     }
                     (_, _) => (),
+                }
+
+                // Ensure all bindings are in the condition's domain
+                if condition.domain != DomainType::Generative {
+                    for b in if_statement.iter_all_bindings() {
+                        let binding_decl = self.link_info.instructions[b].unwrap_declaration();
+                        self.unify_physicals(
+                            (condition.domain, condition.span),
+                            (binding_decl.domain.get(), binding_decl.decl_span),
+                            "conditional binding",
+                        );
+                    }
                 }
             }
             Instruction::ForStatement(for_statement) => {

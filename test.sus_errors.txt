@@ -5034,3 +5034,71 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │           ┬  
       │           ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Error: This port is not strongly connected to the strongly connected port cluster 't'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      ╭─[ test.sus:1543:13 ]
+      │
+ 1543 │     input bool x
+      │                ┬  
+      │                ╰── This port is not strongly connected to the strongly connected port cluster 't'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+ 1544 │     trigger t : bool b
+      │             ┬  
+      │             ╰── 't' declared here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1543:13 ]
+      │
+ 1543 │     input bool x
+      │                ┬  
+      │                ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: This port is not strongly connected to the strongly connected port cluster 't'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      ╭─[ test.sus:1544:19 ]
+      │
+ 1544 │     trigger t : bool b
+      │             ┬        ┬  
+      │             ╰─────────── 't' declared here
+      │                      │  
+      │                      ╰── This port is not strongly connected to the strongly connected port cluster 't'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+──────╯
+Error: Error instantiating submodule
+      ╭─[ test.sus:1548:12 ]
+      │
+ 1548 │     make_when w
+      │               ┬  
+      │               ╰── Error instantiating submodule
+──────╯
+Error: This port is not strongly connected to the strongly connected port cluster 'b'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      ╭─[ test.sus:1550:13 ]
+      │
+ 1550 │     input bool xx
+      │                ─┬  
+      │                 ╰── This port is not strongly connected to the strongly connected port cluster 'b'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+ 1551 │     output bool b
+      │                 ┬  
+      │                 ╰── 'b' declared here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1554:18 ]
+      │
+ 1554 │     when w.t : bool c {
+      │                     ┬  
+      │                     ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
