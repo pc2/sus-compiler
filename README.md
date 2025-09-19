@@ -37,14 +37,9 @@ call plug#end()
 
 ## Learning SUS
 
-To get started with learning SUS, have a look at [this talk](https://www.youtube.com/watch?v=jJvtZvcimyM). In 40 minutes it goes over most language features through examples. Because further development will make this outdated rather quickly, a changelog is provided below to keep track. 
+To get started with learning SUS, have a look at [this (mildly outdated) talk](https://www.youtube.com/watch?v=jJvtZvcimyM). In 40 minutes it goes over most language features through examples. For the changes, please look at the [Changelog](CHANGELOG.md). 
 
-For an example project to tinker with, see [VonTum/BitSerialMatrixMultiply](https://github.com/VonTum/BitSerialMatrixMultiply). 
-
-#### Changelog since Talk
-- Template syntax has changed to `#(NameA: 3, TypeB: type int[3], ValueC: true)`
-- Standard Library is delivered with SUS Compiler
-- Hindley-Milner for Concrete Typing
+For an example project to tinker with, see [VonTum/mandelbrotFPGA](https://github.com/VonTum/mandelbrotFPGA). 
 
 ## Core philosophy
 
@@ -281,7 +276,8 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [ ] Clock Tracking for SubModules
 
 ### Fun projects to do in SUS
-- [x] Bit-Serial Matrix Multiply
+- [x] [Bit-Serial Matrix Multiply](https://github.com/VonTum/BitSerialMatrixMultiply)
+- [x] [Mandelbrot Generator](https://github.com/VonTum/mandelbrotFPGA)
 - [ ] Dedekind Kernel Port
 - [ ] Sparse Matrix Multiply
 - [ ] RISC-V CPU

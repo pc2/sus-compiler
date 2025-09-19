@@ -16,8 +16,9 @@ if [ ! -d "$SUS_HOME/crash_dumps" ]; then
     exit 1
 fi
 
-for dump in "$SUS_HOME"/crash_dumps/*; do
-    [ -d "$dump" ] || continue
+echo "Directory is $SUS_HOME/crash_dumps/*"
+for dump in "$SUS_HOME"/crash_dumps/*
+do
     echo "Checking $dump..."
 
     
@@ -29,7 +30,7 @@ for dump in "$SUS_HOME"/crash_dumps/*; do
     echo "Return code: $status"
     if [ $status -eq 0 ]; then
         echo "No crash in $dump, deleting..."
-        rm -rf "$dump"
+        rm -r "$dump"
     else
         echo "Crash or error (code $status) in $dump, keeping."
     fi
