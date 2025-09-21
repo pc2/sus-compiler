@@ -283,7 +283,7 @@ fn custom_render_latency_count_graph(
                     let outputs = display_port_list(outputs);
                     write!(
                         f,
-                        "    {sm_id:?}_{domain}[shape=record,style=filled,fillcolor=bisque,label=\"{inst_name} | {{ {inputs} | {sm_name}\\n{domain} | {outputs} }} }}\"];"
+                        "    {sm_id:?}_{domain}[shape=record,style=filled,fillcolor=bisque,label=\"{inst_name} | {{ {inputs} | {sm_name}\\n{domain} | {outputs} }}\"];"
                     )?;
                 } else {
                     writeln!(f, "subgraph cluster_{sm_id:?} {{")?;
