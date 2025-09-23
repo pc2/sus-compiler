@@ -265,13 +265,14 @@ fn custom_render_latency_count_graph(
 
                 fn display_port_list<'l>(list: &'l [&'l RealWire]) -> impl Display + 'l {
                     FmtWrapper(move |f| {
-                        write!(f, " {{ ")?;
-                        join_string_iter_formatter(f, " | ", list, |f, p_wire| {
+                        write!(f, "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\">")?;
+                        for p_wire in list.iter() {
                             let name = &p_wire.name;
                             let abs_lat = &p_wire.absolute_latency;
-                            write!(f, "<{name}> {name}'{abs_lat}")
-                        })?;
-                        write!(f, " }} ")
+                            write!(f, "<TR><TD PORT=\"{name}\">{name}'{abs_lat}</TD></TR>")?;
+                        }
+                        write!(f, "</TABLE>")?;
+                        Ok(())
                     })
                 }
 
@@ -283,7 +284,12 @@ fn custom_render_latency_count_graph(
                     let outputs = display_port_list(outputs);
                     write!(
                         f,
-                        "    {sm_id:?}_{domain}[shape=record,style=filled,fillcolor=bisque,label=\"{inst_name} | {{ {inputs} | {sm_name}\\n{domain} | {outputs} }}\"];"
+                        "    {sm_id:?}_{domain}[shape=plain,style=filled,fillcolor=bisque,label=<
+                            <TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" BGCOLOR=\"bisque\">
+                                <TR><TD COLSPAN=\"3\"><B>{inst_name}</B></TD></TR>
+                                <TR><TD CELLPADDING=\"0\" BORDER=\"0\">{inputs}</TD><TD>{sm_name}<BR/>{domain}</TD><TD CELLPADDING=\"0\" BORDER=\"0\">{outputs}</TD></TR>
+                            </TABLE>
+                        >];"
                     )?;
                 } else {
                     writeln!(f, "subgraph cluster_{sm_id:?} {{")?;
@@ -296,7 +302,11 @@ fn custom_render_latency_count_graph(
                         let outputs = display_port_list(outputs);
                         write!(
                             f,
-                            "    {sm_id:?}_{domain}[shape=record,style=filled,fillcolor=bisque,label=\"{{ {inputs} | {sm_name}\\n{domain} | {outputs} }} }}\"];"
+                            "    {sm_id:?}_{domain}[shape=plain,style=filled,fillcolor=bisque,label=<
+                                <TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" BGCOLOR=\"bisque\">
+                                    <TR><TD CELLPADDING=\"0\" BORDER=\"0\">{inputs}</TD><TD>{sm_name}<BR/>{domain}</TD><TD CELLPADDING=\"0\" BORDER=\"0\">{outputs}</TD></TR>
+                                </TABLE>
+                            >];"
                         )?;
                     }
                     writeln!(f, "}}")?;
