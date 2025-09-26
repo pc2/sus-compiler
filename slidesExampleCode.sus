@@ -1,4 +1,242 @@
 
+
+module from_bool {
+    input bool b
+    output int i
+    
+    when b {
+        i = 1
+    } else {
+        i = 0
+    }
+}
+
+module axis #(T) {
+    action send_single : T data{}
+    action send_burst : T data2{}
+}
+
+module axi_send #(T) {
+    input T data
+    
+    axis axis
+    if sizeof#(T) <= 32 {
+        axis.send_single(data)
+    } else {
+        axis.send_burst(data)
+    }
+}
+
+
+
+module fp_mul {
+    interface fp_mul : float a, float b -> float result
+
+    fp_mul_impl impl
+
+    result = impl.c
+    impl.a = a
+    impl.b = b
+}
+extern module fp_mul_impl {
+    input float a'0
+    input float b'0
+    output float c'8
+}
+
+
+module for_loop {
+    input float[4] as
+    input float[4] bs
+    output float[4] rs
+
+    for int i in 0..4 {
+        rs[i] = fp_mul(as[i], bs[i])
+    }
+}
+
+module fizz_buzz_gen {
+    gen int TABLE_SIZE = 256
+    interface fizz_buzz_gen : int#(FROM: 0, TO: TABLE_SIZE) v -> int fb 
+    gen int FIZZ = 15
+    gen int BUZZ = 11
+    gen int FIZZ_BUZZ = 1511
+
+    gen int[TABLE_SIZE] lut
+    
+    for int i in 0..TABLE_SIZE {
+        gen bool fizz = i % 3 == 0
+        gen bool buzz = i % 5 == 0
+        
+        gen int tbl_fb
+        if fizz & buzz {
+            tbl_fb = FIZZ_BUZZ
+        } else if fizz {
+            tbl_fb = FIZZ
+        } else if buzz {
+            tbl_fb = BUZZ
+        } else {
+            tbl_fb = i
+        }
+
+        lut[i] = tbl_fb
+    }
+
+    fb = lut[v]
+}
+
+module bounded_ints {
+    input int#(FROM: 0, TO: 5) v
+    int v_2
+
+    when v == 3 {
+        v_2 = 10
+    } else {
+        v_2 = v
+    }
+}
+
+
+/// Declaration of Actions
+module memory#(T, int DEPTH) {
+    T[DEPTH] mem
+
+    action write: int#(FROM: 0, TO: DEPTH) addr, T data {
+        mem[addr] = data
+    }
+    action read: int#(FROM: 0, TO: DEPTH) addrb -> T datab {
+        datab = mem[addrb]
+    }
+}
+/// Calling of Actions
+module use_memory {
+    memory#(T: type bool[20], DEPTH: 5) mem
+
+    state int cur_idx
+    action get_next : -> bool[20] d {
+        d = mem.read(cur_idx)
+        cur_idx = (cur_idx + 1) % 5
+    }
+}
+
+
+/// Declaration of triggers
+module iterator#(int MAX) {
+    state int cur
+
+    action start {
+        cur = 0
+    }
+    trigger iter : int v, bool last
+
+    when cur != MAX {
+        iter(cur, cur == MAX - 1)
+        cur = (cur + 1) % MAX
+    }
+}
+/// Use of triggers and conditional bindings
+module use_iter {
+    int[6] terms = [5, 7, -9, 6, 5, 2]
+    state int total
+
+    iterator#(MAX: 6) iter
+    action sum_up {
+        total = 0
+        iter.start()
+    }
+    trigger done : int sum
+    when iter.iter : int idx, bool last {
+        int new_total = (total + terms[idx]) % 256
+        when last {
+            done(new_total)
+        }
+        total = new_total
+    }
+}
+
+module fibonnaci {
+    output int num
+    
+    state int cur
+    initial cur = 1
+    state int prev = 0
+    initial prev = 1
+
+    num = (cur + prev) % pow2#(E: 32)
+    prev = cur
+    cur = num
+}
+
+module pow17 {
+    interface pow17 : int#(FROM: 0, TO: 100) i -> int o 
+        int i2  = i * i
+    reg int i4  = i2 * i2
+        int i8  = i4 * i4
+    reg int i16 = i8 * i8
+            o   = i16 * i
+}
+
+module example_md {
+    interface example_md :
+        int#(FROM: 0, TO: 5)[4] factors,
+        int#(FROM: 0, TO: 5) add_to ->
+        int product, 
+        int total
+
+	reg int mul0 = factors[0] * factors[1]
+	reg int mul1 = factors[2] * factors[3]
+
+	reg product = mul0 * mul1
+	reg total = product + add_to
+}
+
+module module_taking_time {
+    interface module_taking_time: bool i'0 -> bool o'5
+
+    o = i
+}
+
+
+module BRAMShiftReg #(T, int LATENCY) {
+    interface BRAMShiftReg: T d_in'0 -> T d_out'LATENCY
+
+    state T[LATENCY] memory
+    state int idx = 0
+
+    T out_data = memory[idx]
+    memory[idx] = d_in
+
+    idx = (idx + 1) % LATENCY
+
+    d_out = LatencyOffset #(OFFSET: LATENCY)(out_data)
+}
+
+
+module FIFO_ #(T, int MAY_PUSH_LATENCY) {
+    assert #(C: MAY_PUSH_LATENCY >= 0)
+
+    domain clk
+    action rst'0 {}
+
+    domain write
+    trigger may_push'-MAY_PUSH_LATENCY
+    action push'0 : T push_data'0 {}
+
+    domain read
+    trigger may_pop'0
+    action pop'0 : -> T pop_data'0 {}
+}
+
+module FIFOExample {
+    FIFO_ fifo
+
+    input float f
+    when fifo.may_push {
+        fifo.push(fp_mul(f, f))
+    }
+}
+
+
 // Recursive Tree Add module recurses smaller copies of itself. 
 module TreeAdder #(int WIDTH) {
 	interface TreeAdder : int[WIDTH] values'0 -> int total
@@ -130,80 +368,6 @@ module use_bram {
 }
 
 
-
-module for_loop {
-    input float[4] as
-    input float[4] bs 
-    output float[4] rs
-
-    for int i in 0..4 {
-        rs[i] = fp_mul(as[i], bs[i])
-    }
-}
-
-
-module from_bool {
-    input bool b
-    output int i
-    
-    when b {
-        i = 1
-    } else {
-        i = 0
-    }
-}
-
-module axis #(T) {
-    action send_single : T data{}
-    action send_burst : T data2{}
-}
-
-module axi_send #(T) {
-    input T data
-    
-    axis axis
-    if sizeof#(T) <= 32 {
-        axis.send_single(data)
-    } else {
-        axis.send_burst(data)
-    }
-}
-
-module bounded_ints {
-    input int#(FROM: 0, TO: 5) v
-    int v_2
-
-    when v == 3 {
-        v_2 = 10
-    } else {
-        v_2 = v
-    }
-
-
-    output int x = v_2
-}
-
-module memory#(T, int DEPTH) {
-    T[DEPTH] mem
-
-    action write: int#(FROM: 0, TO: DEPTH) addr, T data {
-        mem[addr] = data
-    }
-    action read: int#(FROM: 0, TO: DEPTH) addrb -> T datab {
-        datab = mem[addrb]
-    }
-}
-
-module use_memory {
-    memory#(T: type bool[20], DEPTH: 5) mem
-
-    state int cur_idx
-    action get_next : -> bool[20] d {
-        d = mem.read(cur_idx)
-        cur_idx = (cur_idx + 1) % 5
-    }
-}
-
 module raw_ddr_memory #(T) {
     domain user_side
     action read : int#(FROM: 0, TO: 1000) addr {
@@ -293,5 +457,20 @@ module use_iter {
         total = new_total
     }
 }
+
+module FIFO #(T, int ALMOST_FULL) {
+    trigger may_push'-ALMOST_FULL
+    action push'0 : T push_data'0 {}
+}
+
+module fifo_infer {
+    FIFO fifo
+
+    input float f
+    when fifo.may_push {
+        fifo.push(fp_mul(f, f))
+    }
+}
+
 
 

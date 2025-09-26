@@ -39,6 +39,9 @@ call plug#end()
 
 To get started with learning SUS, have a look at [this (mildly outdated) talk](https://www.youtube.com/watch?v=jJvtZvcimyM). In 40 minutes it goes over most language features through examples. For the changes, please look at the [Changelog](CHANGELOG.md). 
 
+A full language reference can be found here:    
+[<img alt="sus-lang.org/language_reference.pdf" width="300px" src="philosophy/images/language_reference_thumbnail.png" />](https://sus-lang.org/language_reference.pdf)
+
 For an example project to tinker with, see [VonTum/mandelbrotFPGA](https://github.com/VonTum/mandelbrotFPGA). 
 
 ## Core philosophy
@@ -60,22 +63,15 @@ Finally, an important consideration of SUS is the user interface. SUS comes with
 - A built-in syntax for pipelining that does not impose structural constraints
 - In-IDE compilation errors & warnings
 - Metaprogramming for hardware generation
+- Type safety with Bounded Integers
+- Syntactic sugar for common constructs like valid signals, resets and submodule communication
 
 ##### Planned
-- Type safety with Bounded Integers
 - Multi-Clock modules
 - Formal Verification Integration
-- Syntactic sugar for common constructs like valid signals, resets and submodule communication
 - Moving some[^timing] timing constraints to the source file
 
 [^timing]: Some timing constraints affect the cycle-by-cycle functioning of the design, such as the relative speeds of synchronous clocks and False/Multi-Cycle Path constraints. Because they affect the cycle-wise behaviour of the design, they should be provided as part of the language and incorporated in simulation. Of course, timing constraints like real clock speeds, edge patterns and external component timings still rightfully belong in the Timing Constraints file. It should not be possible to express SUS code that behaves differently between Simulation and Synthesis. 
-
-#### What SUS does not do
-- Provide abstractions for handshake protocols (Like AXI)
-- Runtime Iteration Constructs
-- Automatic Pipelining & Retiming
-
-Of course, while the language does not support such protocols directly in the syntax, as this would put unneccesary extra constraints on the output hardware, modules for handling them will be provided in the standard library. 
 
 #### Example of some SUS code in the SUS VSCode Language Server. 
 ![SUS LSP Example](philosophy/images/susLSPExample.png)
