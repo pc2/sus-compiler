@@ -200,15 +200,26 @@ impl<'g> CodeGenerationContext<'g> {
 
                     let bitwidth = bounds.bitwidth();
 
-                    let cst_str = match cst {
-                        Value::Integer(ibig) => ibig.to_string(),
-                        Value::Unset => "x".to_string(),
+                    match cst {
+                        Value::Integer(v) => {
+                            if bounds.from < &IBig::from(0) {
+                                if v < &IBig::from(0) {
+                                    write!(f, "{bitwidth}'({v})")
+                                } else {
+                                    write!(f, "{bitwidth}'sd{v}")
+                                }
+                            } else {
+                                write!(f, "{bitwidth}'d{v}")
+                            }
+                        }
+                        Value::Unset => {
+                            if bounds.from < &IBig::from(0) {
+                                write!(f, "{bitwidth}'sdx")
+                            } else {
+                                write!(f, "{bitwidth}'dx")
+                            }
+                        }
                         _ => unreachable!(),
-                    };
-                    if bounds.from < &IBig::from(0) {
-                        f.write_fmt(format_args!("{bitwidth}'sd{cst_str}"))
-                    } else {
-                        f.write_fmt(format_args!("{bitwidth}'d{cst_str}"))
                     }
                 }
                 get_builtin_type!("float") => match cst {

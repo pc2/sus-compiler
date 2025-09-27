@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use crate::alloc::UUID;
 use crate::instantiation::IsPort;
-use crate::to_string::{FmtWrapper, join_string_iter_formatter};
+use crate::to_string::FmtWrapper;
 use crate::{
     alloc::FlatAlloc,
     flattening::Direction,
