@@ -19,6 +19,7 @@ use std::collections::VecDeque;
 use crate::{
     flattening::Direction,
     latency::{CALCULATE_LATENCY_LATER, InferenceFailure},
+    to_string::FmtWrapper,
     util::partition_in_place,
 };
 
@@ -565,35 +566,44 @@ fn print_latency_test_case(
     ports: &LatencyCountingPorts,
     specified_latencies: &[SpecifiedLatency],
 ) {
-    println!("==== BEGIN LATENCY TEST CASE ====");
-    println!("#[test]");
-    println!("fn new_test_case() {{");
-    println!("    let fanins : [&[FanInOut]; {}] = [", fanins.len());
-    for (idx, fin) in fanins.iter().enumerate() {
-        print!("        /*{idx}*/&[");
-        for FanInOut {
-            to_node,
-            delta_latency,
-        } in fin
-        {
-            if let Some(delta_lat) = delta_latency {
-                print!("mk_fan({to_node}, {delta_lat}),")
-            } else {
-                print!("mk_poisoned({to_node}),")
-            }
-        }
-        println!("],");
-    }
-    println!("    ];");
-    println!("    let fanins = ListOfLists::from_slice_slice(&fanins);");
-    println!("    let inputs = {:?};", ports.inputs());
-    println!("    let outputs = {:?};", ports.outputs());
-    println!("    let specified_latencies = {specified_latencies:?};");
     println!(
-        "    let _found_latencies = solve_latencies_test_case(&fanins, &inputs, &outputs, &specified_latencies).unwrap();"
+        "{}",
+        FmtWrapper(|f| {
+            writeln!(f, "==== BEGIN LATENCY TEST CASE ====")?;
+            writeln!(f, "#[test]")?;
+            writeln!(f, "fn new_test_case() {{")?;
+            writeln!(f, "    let fanins : [&[FanInOut]; {}] = [", fanins.len())?;
+            for (idx, fin) in fanins.iter().enumerate() {
+                write!(f, "        /*{idx}*/&[")?;
+                for FanInOut {
+                    to_node,
+                    delta_latency,
+                } in fin
+                {
+                    if let Some(delta_lat) = delta_latency {
+                        write!(f, "mk_fan({to_node}, {delta_lat}),")?
+                    } else {
+                        write!(f, "mk_poisoned({to_node}),")?
+                    }
+                }
+                writeln!(f, "],")?;
+            }
+            writeln!(f, "    ];")?;
+            writeln!(
+                f,
+                "    let fanins = ListOfLists::from_slice_slice(&fanins);"
+            )?;
+            writeln!(f, "    let inputs = {:?};", ports.inputs())?;
+            writeln!(f, "    let outputs = {:?};", ports.outputs())?;
+            writeln!(f, "    let specified_latencies = {specified_latencies:?};")?;
+            writeln!(
+                f,
+                "    let _found_latencies = solve_latencies_test_case(&fanins, &inputs, &outputs, &specified_latencies).unwrap();"
+            )?;
+            writeln!(f, "}}")?;
+            writeln!(f, "==== END LATENCY TEST CASE ====")
+        })
     );
-    println!("}}");
-    println!("==== END LATENCY TEST CASE ====");
 }
 
 /// Guarantees that if `specified_latencies` is non-empty, it'll be the first element in the result vector,

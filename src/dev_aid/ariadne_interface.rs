@@ -176,7 +176,7 @@ pub fn pretty_print_spans_in_reverse_order(file_data: &FileData, spans: Vec<Rang
     for span in spans.into_iter().rev() {
         // If span not in file, just don't print it. This happens.
         if span.end > text_len {
-            println!(
+            eprintln!(
                 "Span({}, {}) certainly does not correspond to this file. ",
                 span.start, span.end
             );
@@ -208,7 +208,7 @@ pub fn pretty_print_span(file_data: &FileData, span: Span, label: impl ToString)
 
     // If span not in file, just don't print it. This happens.
     if span.end > text_len {
-        println!(
+        eprintln!(
             "Span({}, {}) certainly does not correspond to this file. ",
             span.start, span.end
         );
@@ -248,7 +248,7 @@ pub fn pretty_print_many_spans(file_data: &FileData, spans: &[(String, Span)]) {
         let span = span.as_range();
         // If span not in file, just don't print it. This happens.
         if span.end > text_len {
-            println!(
+            eprintln!(
                 "Span({}, {}) certainly does not correspond to this file. ",
                 span.start, span.end
             );
