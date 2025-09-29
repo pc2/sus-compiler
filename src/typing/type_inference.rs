@@ -218,7 +218,7 @@ impl<MyType: HindleyMilner> TypeSubstitutor<MyType> {
                 }
 
                 if is_infinite_loop {
-                    eprintln!("{unknown_id:?} => {substitutes_to:?}");
+                    error!("Infinite Loop in TypeSustitutor! {unknown_id:?} => {substitutes_to:?}");
                 }
             }
             node_in_path[unknown_id].is_not_part_of_loop = true;

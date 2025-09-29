@@ -103,6 +103,12 @@ impl Instantiator {
                 perform_instantiation(linker, global_ref.clone())
             });
 
+            if result.errors.did_error {
+                error!("Failed to instantiate {}", result.name);
+            } else {
+                info!("Instantiated {}", result.name);
+            }
+
             let result_ref = Rc::new(result);
             let mut cache_borrow = self.cache.borrow_mut();
             assert!(

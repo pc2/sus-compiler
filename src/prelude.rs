@@ -20,6 +20,8 @@ pub use crate::__debug_dbg;
 #[allow(unused_imports)]
 pub use crate::__debug_span;
 #[allow(unused_imports)]
+pub use log::{debug, error, info, trace, warn};
+#[allow(unused_imports)]
 pub use sus_proc_macro::__debug_breakpoint;
 #[allow(unused_imports)]
 pub use sus_proc_macro::__debug_breakpoint_if;

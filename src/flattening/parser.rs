@@ -24,9 +24,9 @@ fn print_current_node_indented<'ft>(file_text: &'ft FileText, cursor: &TreeCurso
     let cursor_span = Span::from(n.byte_range());
     let node_name = get_readable_node_name(file_text, kind, cursor_span);
     if let Some(field_name) = cursor.field_name() {
-        println!("{indent} {field_name}: {node_name} [{cursor_span:?}]");
+        error!("{indent} {field_name}: {node_name} [{cursor_span:?}]");
     } else {
-        println!("{indent} {node_name} [{cursor_span:?}]");
+        error!("{indent} {node_name} [{cursor_span:?}]");
     }
     node_name
 }
@@ -81,14 +81,14 @@ impl<'t> Cursor<'t> {
     pub fn print_stack(&mut self) {
         let this_node_kind = self.cursor.node().kind();
         let this_node_span = self.span();
-        println!("Stack:");
+        error!("Stack:");
         loop {
             print_current_node_indented(&self.file_data.file_text, &self.cursor);
             if !self.cursor.goto_parent() {
                 break;
             }
         }
-        println!("Current node: {this_node_kind}, {this_node_span:?}");
+        error!("Current node: {this_node_kind}, {this_node_span:?}");
     }
 
     #[track_caller]
@@ -116,7 +116,7 @@ impl<'t> Cursor<'t> {
                     return true;
                 } else {
                     self.current_field_was_already_consumed = false;
-                    //println!("Optional field '{}' not found. Found '{}' instead", tree_sitter_sus::language().field_name_for_id(field_id.get()).unwrap(), tree_sitter_sus::language().field_name_for_id(found.get()).unwrap());
+                    //error!("Optional field '{}' not found. Found '{}' instead", tree_sitter_sus::language().field_name_for_id(field_id.get()).unwrap(), tree_sitter_sus::language().field_name_for_id(found.get()).unwrap());
                     return false; // Field found, but it's not this one. Stop here, because we've passed the possibly optional field
                 }
             } else {

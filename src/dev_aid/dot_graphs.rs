@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 use std::fmt::Display;
 use std::fs::{self, File};
 use std::io::Write;
@@ -42,7 +44,7 @@ fn dot_command(dot_path: &Path, file_name: &str) {
     {
         Ok(output) => {
             if !output.status.success() {
-                eprintln!(
+                error!(
                     "Failed to convert {:?} to image: {}",
                     dot_path,
                     String::from_utf8_lossy(&output.stderr)
@@ -50,7 +52,7 @@ fn dot_command(dot_path: &Path, file_name: &str) {
             }
         }
         Err(e) => {
-            eprintln!("Could not run 'dot' to convert {dot_path:?} to image: {e}");
+            error!("Could not run 'dot' to convert {dot_path:?} to image: {e}");
         }
     }
 }

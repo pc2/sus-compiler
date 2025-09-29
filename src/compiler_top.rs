@@ -44,7 +44,7 @@ impl Linker {
         assert!(self.constants.is_empty());
         let std_lib_path = get_std_dir();
         if !config().ci {
-            println!(
+            info!(
                 "Standard Library Directory: {}",
                 std_lib_path.to_string_lossy()
             );

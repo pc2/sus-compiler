@@ -62,12 +62,9 @@ pub trait CodeGenBackend {
         linker: &Linker,
         out_file: &mut File,
     ) {
-        let inst_name = &inst.name;
         if inst.errors.did_error {
-            println!("Instantiating error: {inst_name}");
             return; // Continue
         }
-        println!("Instantiating success: {inst_name}");
         let code = self.codegen(md, inst, linker, true); // hardcode use_latency = true for now. Maybe forever, we'll see
         write!(out_file, "{code}").unwrap();
     }
@@ -87,12 +84,12 @@ pub trait CodeGenBackend {
     }
 
     fn codegen_with_dependencies(&self, linker: &Linker, md_id: ModuleUUID, path: &Path) {
-        println!("Codegen to {}", path.to_string_lossy());
+        info!("Codegen to {}", path.to_string_lossy());
         let mut out_file = self.make_output_file(path);
         let mut to_process_queue: Vec<Rc<InstantiatedModule>> = Vec::new();
         for (_template_args, inst) in linker.instantiator.borrow().iter_for_module(md_id) {
             if inst.errors.did_error {
-                eprintln!("Cannot codegen {}, due to errors!", inst.name);
+                error!("Cannot codegen {}, due to errors!", inst.name);
             } else {
                 to_process_queue.push(inst.clone());
             }
@@ -121,7 +118,7 @@ pub trait CodeGenBackend {
                 to_process_queue.push(new_inst);
             }
 
-            println!("Codegen instance {}", cur_instance.name);
+            info!("Codegen instance {}", cur_instance.name);
             self.codegen_instance(
                 cur_instance,
                 &linker.modules[cur_instance.global_ref.id],

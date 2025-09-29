@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 use std::{
     cell::RefCell,
     ops::Range,
@@ -69,7 +71,7 @@ fn print_most_recent_spans(file_data: &FileData, history: &SpanDebuggerStackElem
         }
     }
 
-    println!(
+    info!(
         "Panic unwinding. Printing the last {} spans. BEWARE: These spans may not correspond to this file, thus incorrect spans are possible!",
         spans_to_print.len()
     );
@@ -81,7 +83,7 @@ pub fn debug_print_span(span: Span, label: String) {
     MOST_RECENT_FILE_DATA.with(|ptr| {
         let ptr = ptr.load(std::sync::atomic::Ordering::SeqCst);
         if ptr.is_null() {
-            eprintln!("No FileData registered!");
+            error!("No FileData registered!");
         } else {
             let fd: &FileData = unsafe { &*ptr };
             pretty_print_span(fd, span, label);
@@ -100,14 +102,14 @@ fn print_stack_top(enter_exit: &str) {
             } else {
                 ""
             };
-            println!(
+            trace!(
                 "{enter_exit}SpanDebugger (x{}) {} for {}{debug_enabled}",
                 stack.debug_stack.len(),
                 top.stage,
                 top.global_obj_name
             );
         } else {
-            println!("SpanDebugger (x0)")
+            trace!("SpanDebugger (x0)")
         }
     })
 }
@@ -202,7 +204,7 @@ pub fn setup_panic_handler() {
 
         DEBUG_STACK.with_borrow(|history| {
             if let Some(last_stack_elem) = history.debug_stack.last() {
-                eprintln!(
+                info!(
                     "Panic happened in Span-guarded context {} in {}",
                     last_stack_elem.stage.red(),
                     last_stack_elem.global_obj_name.red()
@@ -211,12 +213,12 @@ pub fn setup_panic_handler() {
                 //pretty_print_span(file_data, span, label);
                 print_most_recent_spans(file_data, last_stack_elem);
             }
-            println!("Most recent available debug paths:");
+            info!("Most recent available debug paths:");
             for (ctx, d) in &history.recent_debug_options {
                 if let Some(ctx) = ctx {
-                    println!("--debug-whitelist {ctx} --debug {d}");
+                    info!("--debug-whitelist {ctx} --debug {d}");
                 } else {
-                    println!("(no SpanDebugger Context) --debug {d}");
+                    info!("(no SpanDebugger Context) --debug {d}");
                 }
             }
         })
@@ -258,7 +260,7 @@ pub fn create_dump_on_panic(linker: &mut Linker, f: impl FnOnce(&mut Linker)) {
 
         let dump_dir = get_crash_dumps_dir().join(failure_name);
         if let Err(err) = fs::create_dir_all(&dump_dir) {
-            eprintln!("Could not create {}: {err}", dump_dir.to_string_lossy());
+            error!("Could not create {}: {err}", dump_dir.to_string_lossy());
             std::panic::resume_unwind(panic_info);
         }
 
@@ -285,7 +287,7 @@ pub fn create_dump_on_panic(linker: &mut Linker, f: impl FnOnce(&mut Linker)) {
                 let _ = f.write_all(file_data.file_text.file_text.as_bytes());
             }
         }
-        eprintln!("Internal compiler error! All files dumped to {dump_dir:?}");
+        error!("Internal compiler error! All files dumped to {dump_dir:?}");
         std::panic::resume_unwind(panic_info);
     }
 }
@@ -316,13 +318,13 @@ fn spawn_watchdog_thread() {
             timers.retain(|entry| {
             let deadline = entry.started_at + duration;
             if deadline <= now && entry.alive.load(std::sync::atomic::Ordering::SeqCst) {
-                println!("⏰⏰⏰⏰⏰⏰⏰⏰⏰"); // To show in stdout when this happens too
-                eprintln!(
+                error!("⏰⏰⏰⏰⏰⏰⏰⏰⏰"); // To show in stdout when this happens too
+                error!(
                     "⏰ OutOfTimeKiller triggered in {} after it took more than {:.2} seconds to execute ⏰",
                     entry.info,
                     (now - entry.started_at).as_secs_f64()
                 );
-                eprintln!("Process will now be terminated.");
+                error!("Process will now be terminated.");
                 std::process::exit(1);
             } else {
                 deadline > now
@@ -363,7 +365,7 @@ macro_rules! __debug_span {
     ($span:expr) => {
         if $crate::debug::debugging_enabled() {
             let tmp = $span;
-            std::eprintln!(
+            log::debug!(
                 "[{}:{}:{}] {}:",
                 std::file!(),
                 std::line!(),
@@ -377,7 +379,7 @@ macro_rules! __debug_span {
     ($span:expr, $($arg:tt)*) => {
         if $crate::debug::debugging_enabled() {
             let tmp = $span;
-            std::eprintln!(
+            log::debug!(
                 "[{}:{}:{}] {}:",
                 std::file!(),
                 std::line!(),
@@ -392,9 +394,25 @@ macro_rules! __debug_span {
 
 #[macro_export]
 macro_rules! __debug_dbg {
-    ($($arg:tt)*) => {
+    () => {
         if $crate::debug::debugging_enabled() {
-            dbg!($($arg)*);
+            log::debug!("[{}:{}]", std::file!(), std::line!());
         }
+    };
+    ($val:expr $(,)?) => {
+        if $crate::debug::debugging_enabled() {
+            let value = &$val;
+            log::debug!(
+                "[{}:{}] {} = {:#?}",
+                std::file!(),
+                std::line!(),
+                std::stringify!($val),
+                value
+            );
+            value
+        }
+    };
+    ($val:expr, $($rest:expr),+ $(,)?) => {
+        ($crate::__debug_dbg!($val), $($crate::__debug_dbg!($rest)),+)
     };
 }

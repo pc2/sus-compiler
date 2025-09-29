@@ -401,7 +401,7 @@ fn handle_request(
         request::HoverRequest::METHOD => {
             let params: HoverParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
-            println!("HoverRequest");
+            info!("HoverRequest");
 
             let (file_uuid, pos) =
                 linker.location_in_file(&params.text_document_position_params, manager);
@@ -427,7 +427,7 @@ fn handle_request(
         request::GotoDefinition::METHOD => {
             let params: GotoDefinitionParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
-            println!("GotoDefinition");
+            info!("GotoDefinition");
 
             let (file_uuid, pos) =
                 linker.location_in_file(&params.text_document_position_params, manager);
@@ -440,7 +440,7 @@ fn handle_request(
             )))
         }
         request::SemanticTokensFullRequest::METHOD => {
-            println!("SemanticTokensFullRequest: {params}");
+            info!("SemanticTokensFullRequest: {params}");
             let params: SemanticTokensParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
 
@@ -453,7 +453,7 @@ fn handle_request(
         request::DocumentHighlightRequest::METHOD => {
             let params: DocumentHighlightParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
-            println!("DocumentHighlight");
+            info!("DocumentHighlight");
 
             let (file_id, pos) =
                 linker.location_in_file(&params.text_document_position_params, manager);
@@ -473,7 +473,7 @@ fn handle_request(
         request::References::METHOD => {
             let params: ReferenceParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
-            println!("FindAllReferences");
+            info!("FindAllReferences");
 
             let (file_id, pos) = linker.location_in_file(&params.text_document_position, manager);
 
@@ -484,7 +484,7 @@ fn handle_request(
         request::Rename::METHOD => {
             let params: RenameParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
-            println!("Rename");
+            info!("Rename");
 
             let (file_id, pos) = linker.location_in_file(&params.text_document_position, manager);
 
@@ -507,7 +507,7 @@ fn handle_request(
                 })
                 .collect();
 
-            println!("{changes:?}");
+            debug!("{changes:?}");
 
             serde_json::to_value(WorkspaceEdit {
                 changes: Some(changes),
@@ -518,7 +518,7 @@ fn handle_request(
         request::Completion::METHOD => {
             let params: CompletionParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
-            println!("Completion");
+            info!("Completion");
 
             let (file_uuid, position) =
                 linker.location_in_file(&params.text_document_position, manager);
@@ -528,7 +528,7 @@ fn handle_request(
             )))
         }
         req => {
-            println!("Other request: {req:?}");
+            info!("Other request: {req:?}");
             Ok(serde_json::Value::Null)
         }
     }
@@ -543,7 +543,7 @@ fn handle_notification(
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
     match notification.method.as_str() {
         notification::DidChangeTextDocument::METHOD => {
-            println!("DidChangeTextDocument");
+            info!("DidChangeTextDocument");
             let params: DidChangeTextDocumentParams = serde_json::from_value(notification.params)
                 .expect("JSON Encoding Error while parsing params");
 
@@ -556,13 +556,13 @@ fn handle_notification(
             push_all_errors(connection, linker)?;
         }
         notification::DidChangeWatchedFiles::METHOD => {
-            println!("Workspace Files modified");
+            info!("Workspace Files modified");
             (*linker, *manager) = initialize_all_files(initialize_params);
 
             push_all_errors(connection, linker)?;
         }
         other => {
-            println!("got other notification: {other:?}");
+            info!("got other notification: {other:?}");
         }
     }
     Ok(())
@@ -572,8 +572,8 @@ fn main_loop(
     connection: lsp_server::Connection,
     initialize_params: serde_json::Value,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
-    println!("initialize_params: ");
-    println!("{initialize_params}");
+    info!("initialize_params: ");
+    info!("{initialize_params}");
 
     let initialize_params: InitializeParams = serde_json::from_value(initialize_params).unwrap();
 
@@ -581,12 +581,12 @@ fn main_loop(
 
     push_all_errors(&connection, &linker)?;
 
-    println!("starting LSP main loop");
+    info!("starting LSP main loop");
     for msg in &connection.receiver {
         match msg {
             lsp_server::Message::Request(req) => {
                 if connection.handle_shutdown(&req)? {
-                    println!("Shutdown request");
+                    info!("Shutdown request");
                     return Ok(());
                 }
 
@@ -604,7 +604,7 @@ fn main_loop(
                     .send(lsp_server::Message::Response(response))?;
             }
             lsp_server::Message::Response(resp) => {
-                println!("got response: {resp:?}");
+                info!("got response: {resp:?}");
             }
             lsp_server::Message::Notification(notification) => {
                 handle_notification(
@@ -617,9 +617,9 @@ fn main_loop(
             }
         }
 
-        println!("All loaded files:");
+        info!("All loaded files:");
         for (_id, file) in &linker.files {
-            println!("File: {}", &file.file_identifier);
+            info!("File: {}", &file.file_identifier);
         }
     }
     Ok(())
@@ -631,20 +631,20 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
         std::env::set_var("RUST_BACKTRACE", "1");
     } // Enable backtrace because I can't set it in Env vars
 
-    println!("starting LSP server");
+    info!("starting LSP server");
 
     // Create the transport. Includes the stdio (stdin and stdout) versions but this could
     // also be implemented to use sockets or HTTP.
     let addr = SocketAddr::from(([127, 0, 0, 1], cfg.lsp_port));
     let (connection, io_threads) = if cfg.lsp_listen {
-        println!("Listening on {addr}");
+        info!("Listening on {addr}");
         lsp_server::Connection::listen(addr)?
     } else {
-        println!("Attempting to connect on {addr}");
+        info!("Attempting to connect on {addr}");
         lsp_server::Connection::connect(addr)?
     };
 
-    println!("connection established");
+    info!("connection established");
 
     // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
@@ -667,6 +667,6 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
     io_threads.join()?;
 
     // Shut down gracefully.
-    println!("shutting down server");
+    info!("shutting down server");
     Ok(())
 }

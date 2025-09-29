@@ -1059,7 +1059,7 @@ impl Module {
                 .fmt_instructions(f, &self.domains, file_data, globals)
         });
 
-        println!("{disp}");
+        debug!("{disp}");
     }
 }
 
@@ -1336,7 +1336,7 @@ impl ModuleTypingContext<'_> {
     }
 
     pub fn print_instantiated_module(&self) {
-        println!("{}", FmtWrapper(|f| { self.fmt_instantiated_module(f) }))
+        debug!("{}", FmtWrapper(|f| { self.fmt_instantiated_module(f) }))
     }
 }
 

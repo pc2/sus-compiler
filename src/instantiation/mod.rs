@@ -4,21 +4,18 @@ mod final_checks;
 pub mod instantiation_cache;
 mod unique_names;
 
-use colored::Colorize;
 use ibig::IBig;
 use unique_names::UniqueNames;
 
-use crate::alloc::zip_eq;
 use crate::latency::{AbsLat, InferenceFailure};
 use crate::linker::LinkInfo;
 use crate::prelude::*;
-use crate::to_string::join_string_iter;
 use crate::typing::template::TVec;
 use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
 
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashSet;
-use std::fmt::{Display, Write};
+use std::fmt::Write;
 use std::rc::Rc;
 
 use crate::flattening::{
@@ -565,7 +562,7 @@ fn perform_instantiation(
         };
     }
 
-    println!("Instantiating {name}");
+    debug!("Executing {name}");
     let exec = execute::execute(&md.link_info, linker, &global_ref.template_args);
 
     let (mut typed, type_var_alloc) =
@@ -576,15 +573,15 @@ fn perform_instantiation(
     }
 
     if crate::debug::is_enabled("print-concrete-pre-typecheck") {
-        println!("[[Executed {name}]]");
+        debug!("[[Executed {name}]]");
         typed.print_instantiated_module();
     }
 
-    println!("Concrete Typechecking {name}");
+    debug!("Concrete Typechecking {name}");
     typed.typecheck(type_var_alloc);
 
     if crate::debug::is_enabled("print-concrete") {
-        println!("[[Instantiated {name}]]");
+        debug!("[[Instantiated {name}]]");
         typed.print_instantiated_module();
     }
 
@@ -592,7 +589,7 @@ fn perform_instantiation(
         return typed.into_instantiated_module();
     }
 
-    println!("Checking array accesses {name}");
+    debug!("Checking array accesses {name}");
     typed.check_subtypes();
 
     typed.into_instantiated_module()

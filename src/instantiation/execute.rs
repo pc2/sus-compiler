@@ -12,6 +12,7 @@ use crate::let_unwrap;
 use crate::linker::IsExtern;
 use crate::linker::{GlobalUUID, LinkInfo};
 use crate::prelude::*;
+use crate::to_string::FmtWrapper;
 use crate::typing::abstract_type::{
     AbstractInnerType, AbstractRankedType, BOOL_SCALAR, INT_SCALAR, PeanoType,
 };
@@ -1878,10 +1879,15 @@ impl<'l> ExecutionContext<'l> {
             self.generation_state[original_instruction] = instance_to_add;
 
             if crate::debug::is_enabled("print-execution-state") {
-                println!("After running {original_instruction:?}");
-                for (id, g) in &self.generation_state.generation_state {
-                    println!("{id:?}: {g:?}");
-                }
+                debug!(
+                    "After running {original_instruction:?}:\n{}",
+                    FmtWrapper(|f| {
+                        for (id, g) in &self.generation_state.generation_state {
+                            writeln!(f, "{id:?}: {g:?}")?;
+                        }
+                        Ok(())
+                    })
+                );
             }
         }
         Ok(())

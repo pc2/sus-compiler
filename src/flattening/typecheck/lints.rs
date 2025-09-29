@@ -8,6 +8,7 @@ use crate::dev_aid::ariadne_interface::pretty_print_many_spans;
 use crate::flattening::WriteModifiers;
 use crate::linker::{FileData, GlobalRef, IsExtern};
 use crate::prelude::*;
+use crate::to_string::FmtWrapper;
 use crate::typing::abstract_type::AbstractInnerType;
 use crate::typing::template::TemplateKind;
 
@@ -303,15 +304,20 @@ impl LintContext<'_> {
         }
 
         if crate::debug::is_enabled("print-unused-vars-map") {
-            println!("Find Unused Variables Fanins:");
-            for (to, fanins) in &instruction_fanins {
-                let is_target = if is_instance_used_map[to] {
-                    " target"
-                } else {
-                    ""
-                };
-                println!("{to:?}{is_target} <- {:?}", fanins.as_slice());
-            }
+            debug!(
+                "Find Unused Variables Fanins:\n{}",
+                FmtWrapper(|f| {
+                    for (to, fanins) in &instruction_fanins {
+                        let is_target = if is_instance_used_map[to] {
+                            " target"
+                        } else {
+                            ""
+                        };
+                        writeln!(f, "{to:?}{is_target} <- {:?}", fanins.as_slice())?;
+                    }
+                    Ok(())
+                })
+            );
             let spans: Vec<_> = self
                 .working_on
                 .instructions

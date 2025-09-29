@@ -35,6 +35,8 @@ use flattening::Module;
 use instantiation::InstantiatedModule;
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
+    env_logger::init();
+
     initialize_config_from_cli_args();
 
     let config = config();
