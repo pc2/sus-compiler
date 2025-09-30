@@ -34,14 +34,21 @@ pub struct StandaloneCodegenSettings {
     pub file_path: Option<PathBuf>,
 }
 
+#[derive(Debug)]
+pub struct LSPSettings {
+    pub connection_method: ConnectionMethod,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConnectionMethod {
+    Stdio,
+    Tcp { port: u16, should_listen: bool },
+}
+
 /// All command-line flags are converted to this struct, of which the singleton instance can be acquired using [crate::config::config]
 #[derive(Debug)]
 pub struct ConfigStruct {
-    pub use_lsp: bool,
-    #[allow(unused)]
-    pub lsp_port: u16,
-    #[allow(unused)]
-    pub lsp_listen: bool,
+    pub lsp_settings: Option<LSPSettings>,
     pub codegen: bool,
     pub standalone: Option<StandaloneCodegenSettings>,
     pub use_color: bool,
@@ -80,10 +87,13 @@ fn command_builder() -> Command {
         .version(VERSION_INFO)
         .author(env!("CARGO_PKG_AUTHORS"))
         .about("The compiler for the SUS Hardware Design Language. This compiler takes in .sus files, and produces equivalent SystemVerilog files")
+        .arg(Arg::new("lsp")
+            .long("lsp")
+            .help("Enable LSP mode")
+            .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("socket")
             .long("socket") // DO NOT RENAME: VSCode's LSP-server extension adds a hardcoded "--socket {port_id}" flag
-            .default_value("25000")
-            .help("Set the LSP TCP socket port")
+            .help("Enables LSP over TCP, and sets the LSP TCP socket port")
             .value_parser(|socket_int : &str| {
                 match socket_int.parse::<u16>() {
                     Ok(port) => Ok(port),
@@ -91,15 +101,17 @@ fn command_builder() -> Command {
                 }
             })
             .requires("lsp"))
-        .arg(Arg::new("lsp")
-            .long("lsp")
-            .help("Enable LSP mode")
+        .arg(Arg::new("stdio")
+            .long("stdio") // DO NOT RENAME: VSCode's LSP-server extension adds a hardcoded "--stdio" flag for stdio LSP comms
+            .help("Enables LSP over STDIO")
+            .requires("lsp")
             .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("lsp-listen")
             .long("lsp-listen")
-            .help("Instead of the LSP Server connecting to you, this makes the LSP server listen for incoming connections")
+            .help("Instead of the LSP Server connecting to an open socket provided by the parent process, this makes the LSP server open a socket and listen for incoming connections")
             .action(clap::ArgAction::SetTrue)
-            .requires("lsp"))
+            .requires("lsp")
+            .requires("socket"))
         .arg(Arg::new("codegen")
             .long("codegen")
             .help("Enable code generation for all modules. This creates a file named [ModuleName].sv per module.")
@@ -239,10 +251,27 @@ where
 
     let sus_home_override = matches.get_one::<PathBuf>("sus-home").cloned();
 
+    let lsp_settings = if matches.get_flag("lsp") {
+        Some(LSPSettings {
+            connection_method: if let Some(port) = matches.get_one("socket") {
+                ConnectionMethod::Tcp {
+                    port: *port,
+                    should_listen: matches.get_flag("lsp-listen"),
+                }
+            } else if matches.get_flag("stdio") {
+                ConnectionMethod::Stdio
+            } else {
+                panic!(
+                    "When passing --lsp, must either pass --stdio for STDIO communication, or --socket {{port}} for TCP connection",
+                );
+            },
+        })
+    } else {
+        None
+    };
+
     Ok(ConfigStruct {
-        use_lsp: matches.get_flag("lsp"),
-        lsp_port: *matches.get_one("socket").unwrap(),
-        lsp_listen: matches.get_flag("lsp-listen"),
+        lsp_settings,
         codegen,
         debug_whitelist,
         enabled_debug_paths,
@@ -271,6 +300,11 @@ pub fn initialize_config_from_cli_args() {
 /// Access the singleton [ConfigStruct] representing the CLI arguments passed to `sus_compiler`
 pub fn config() -> &'static ConfigStruct {
     CONFIG.get().unwrap()
+}
+
+/// Access the singleton [ConfigStruct] representing the CLI arguments passed to `sus_compiler`
+pub fn lsp_config() -> &'static LSPSettings {
+    config().lsp_settings.as_ref().unwrap()
 }
 
 /// Returns the SUS_HOME directory, using the override if set, otherwise the env variable

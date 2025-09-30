@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         config::TargetLanguage::Vhdl => Box::new(VHDLCodegenBackend) as Box<dyn CodeGenBackend>,
     };
 
-    if config.use_lsp {
+    if config.lsp_settings.is_some() {
         return dev_aid::lsp::lsp_main();
     }
 

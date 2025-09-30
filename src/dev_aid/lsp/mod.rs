@@ -5,6 +5,7 @@ mod tree_walk;
 use crate::{
     alloc::zip_eq,
     compiler_top::LinkerExtraFileInfoManager,
+    config::{ConnectionMethod, lsp_config},
     dev_aid::ariadne_interface::{pretty_print_many_spans, pretty_print_span},
     linker::GlobalUUID,
     prelude::*,
@@ -626,28 +627,39 @@ fn main_loop(
 }
 
 pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
-    let cfg = config();
+    let cfg = lsp_config();
     unsafe {
         std::env::set_var("RUST_BACKTRACE", "1");
-    } // Enable backtrace because I can't set it in Env vars
+    } // Enable backtrace because I can't set it in VSCode Env vars
 
     info!("starting LSP server");
 
-    // Create the transport. Includes the stdio (stdin and stdout) versions but this could
-    // also be implemented to use sockets or HTTP.
-    let addr = SocketAddr::from(([127, 0, 0, 1], cfg.lsp_port));
-    let (connection, io_threads) = if cfg.lsp_listen {
-        info!("Listening on {addr}");
-        lsp_server::Connection::listen(addr)?
-    } else {
-        info!("Attempting to connect on {addr}");
-        lsp_server::Connection::connect(addr)?
+    // Create the transport.
+    let (connection, io_threads) = match cfg.connection_method {
+        ConnectionMethod::Stdio => {
+            info!("LSP communicating over stdio");
+            lsp_server::Connection::stdio()
+        }
+        ConnectionMethod::Tcp {
+            port,
+            should_listen,
+        } => {
+            let addr = SocketAddr::from(([127, 0, 0, 1], port));
+            let result = if should_listen {
+                info!("LSP Listening on {addr}");
+                lsp_server::Connection::listen(addr)?
+            } else {
+                info!("LSP Attempting to connect on {addr}");
+                lsp_server::Connection::connect(addr)?
+            };
+
+            info!("LSP socket connection established");
+            result
+        }
     };
 
-    info!("connection established");
-
     // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
-    let server_capabilities = serde_json::to_value(&ServerCapabilities {
+    let server_capabilities = serde_json::to_value(ServerCapabilities {
         definition_provider: Some(OneOf::Left(true)),
         document_highlight_provider: Some(OneOf::Left(true)),
         references_provider: Some(OneOf::Left(true)),
