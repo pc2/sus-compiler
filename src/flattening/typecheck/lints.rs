@@ -304,7 +304,7 @@ impl LintContext<'_> {
         }
 
         if crate::debug::is_enabled("print-unused-vars-map") {
-            debug!(
+            eprintln!(
                 "Find Unused Variables Fanins:\n{}",
                 FmtWrapper(|f| {
                     for (to, fanins) in &instruction_fanins {

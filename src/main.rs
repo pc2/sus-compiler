@@ -1,5 +1,7 @@
 #![doc = include_str!("../README.md")]
 
+use prelude::*;
+
 mod alloc;
 mod append_only_vec;
 
@@ -26,8 +28,6 @@ mod compiler_top;
 use std::io::Write;
 use std::{error::Error, path::PathBuf};
 
-use prelude::*;
-
 use codegen::{CodeGenBackend, VHDLCodegenBackend, VerilogCodegenBackend};
 use config::{EarlyExitUpTo, config, initialize_config_from_cli_args};
 use dev_aid::ariadne_interface::*;
@@ -35,7 +35,9 @@ use flattening::Module;
 use instantiation::InstantiatedModule;
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
-    env_logger::init();
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .init();
 
     initialize_config_from_cli_args();
 

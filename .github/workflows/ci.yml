@@ -20,7 +20,7 @@ jobs:
         submodules: recursive
     - uses: actions-rs/toolchain@v1
       with:
-        toolchain: 1.89
+        toolchain: 1.88
         override: true
         components: rustfmt, clippy
     - name: Build
@@ -28,7 +28,7 @@ jobs:
     - name: Run tests
       run: cargo test --verbose --all-features
     - name: Run regression test
-      run: RUST_LOG=info ./target/debug/sus_compiler test.sus platform/xilinx/xpm.sus --ci --nocolor 1> test.sus_output_ci.txt 2> test.sus_errors_ci.txt || true && diff test.sus_output_ci.txt test.sus_output.txt && diff test.sus_errors_ci.txt test.sus_errors.txt
+      run: ./target/debug/sus_compiler test.sus platform/xilinx/xpm.sus --ci --nocolor 1> test.sus_output_ci.txt 2> test.sus_errors_ci.txt || true && diff test.sus_output_ci.txt /dev/null && diff test.sus_errors_ci.txt test.sus_errors.txt
       
   lint:
     runs-on: ubuntu-latest

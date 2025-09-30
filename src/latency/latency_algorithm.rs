@@ -423,7 +423,7 @@ fn find_positive_latency_cycle(
         spec_node.value = -spec.latency; // Negate because we work with fanins not fanouts
         queue.push_back(spec.node);
         nodes_ever_seen.push(spec.node);
-        //println!("Init node {} to: {spec_node:?}", spec.node);
+        //eprintln!("Init node {} to: {spec_node:?}", spec.node);
     }
 
     /// Returns either a node with no parent, or a node in an infinite cycle
@@ -485,7 +485,7 @@ fn find_positive_latency_cycle(
                     to_node.value = target_latency;
                     queue.push_back(f.to_node);
 
-                    //println!("Set node {} to: {to_node:?}", f.to_node);
+                    //eprintln!("Set node {} to: {to_node:?}", f.to_node);
 
                     // Occasionally try to walk backwards, to see if we find an infinite cycle.
                     //
@@ -523,7 +523,7 @@ fn find_positive_latency_cycle(
         nodes_ever_seen.push(next_start);
         nodes[next_start].value = 0;
         queue.push_back(next_start);
-        //println!("Init node {next_start} to: {:?}", nodes[next_start]);
+        //eprintln!("Init node {next_start} to: {:?}", nodes[next_start]);
     }
 }
 
@@ -566,7 +566,7 @@ fn print_latency_test_case(
     ports: &LatencyCountingPorts,
     specified_latencies: &[SpecifiedLatency],
 ) {
-    println!(
+    eprintln!(
         "{}",
         FmtWrapper(|f| {
             writeln!(f, "==== BEGIN LATENCY TEST CASE ====")?;
@@ -1051,7 +1051,7 @@ mod tests {
         let outputs = [3, 6];
 
         for starting_node in 0..7 {
-            println!("starting_node: {starting_node}");
+            eprintln!("starting_node: {starting_node}");
 
             // Apparently this edge case was fixed by including the specified latencies in future port traversals. Who could've predicted that???
             /*if starting_node == 5 {
@@ -1217,7 +1217,7 @@ mod tests {
         let fanins = ListOfLists::from_slice_slice(&fanins);
 
         for starting_node in 0..7 {
-            println!("starting_node: {starting_node}");
+            eprintln!("starting_node: {starting_node}");
             solve_latencies_test_case(
                 fanins.clone(),
                 &[0, 4],
@@ -1278,7 +1278,7 @@ mod tests {
 
         let should_be_err = solve_latencies_test_case(fanins, &[], &[], &[]);
 
-        println!("{should_be_err:?}");
+        eprintln!("{should_be_err:?}");
         let Err(LatencyCountingError::NetPositiveLatencyCycle {
             conflict_path,
             net_roundtrip_latency,
@@ -1340,7 +1340,7 @@ mod tests {
         let should_be_err =
             solve_latencies_test_case(fanins, &[0, 4], &[3, 6], &specified_latencies);
 
-        println!("{should_be_err:?}");
+        eprintln!("{should_be_err:?}");
         let Err(LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path }) =
             should_be_err
         else {
@@ -1445,7 +1445,7 @@ mod tests {
         ];
 
         let should_be_err = solve_latencies_test_case(fanins, &[0], &[1], &specified_latencies);
-        println!("{should_be_err:?}");
+        eprintln!("{should_be_err:?}");
 
         let Err(LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path }) =
             should_be_err

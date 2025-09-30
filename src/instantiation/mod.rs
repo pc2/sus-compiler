@@ -573,7 +573,7 @@ fn perform_instantiation(
     }
 
     if crate::debug::is_enabled("print-concrete-pre-typecheck") {
-        debug!("[[Executed {name}]]");
+        eprintln!("[[Executed {name}]]");
         typed.print_instantiated_module();
     }
 
@@ -581,7 +581,7 @@ fn perform_instantiation(
     typed.typecheck(type_var_alloc);
 
     if crate::debug::is_enabled("print-concrete") {
-        debug!("[[Instantiated {name}]]");
+        eprintln!("[[Instantiated {name}]]");
         typed.print_instantiated_module();
     }
 

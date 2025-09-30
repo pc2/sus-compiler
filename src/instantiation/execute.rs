@@ -1879,7 +1879,7 @@ impl<'l> ExecutionContext<'l> {
             self.generation_state[original_instruction] = instance_to_add;
 
             if crate::debug::is_enabled("print-execution-state") {
-                debug!(
+                eprintln!(
                     "After running {original_instruction:?}:\n{}",
                     FmtWrapper(|f| {
                         for (id, g) in &self.generation_state.generation_state {

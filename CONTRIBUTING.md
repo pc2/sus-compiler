@@ -44,3 +44,8 @@ Afterwards, inspect the changes to [test.sus_output.txt](./test.sus_output.txt) 
 
 ## Debugging
 See [docs/debug.md](docs/debug.md).
+
+## Logging
+Rust's builtin `print!` and `println!` macros are banned. That is because other processes, like the LSP, need to access stdout. General prints are done using the `log` crate. (The `trace`, `debug`, `info`, `warn`, `error` macros are imported in prelude). 
+
+Any code within a `crate::debug::is_enabled` block MUST use eprintln, such that we get no confusion from prints not showing up when `--debug` flags are enabled

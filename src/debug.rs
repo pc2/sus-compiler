@@ -365,7 +365,7 @@ macro_rules! __debug_span {
     ($span:expr) => {
         if $crate::debug::debugging_enabled() {
             let tmp = $span;
-            log::debug!(
+            eprintln!(
                 "[{}:{}:{}] {}:",
                 std::file!(),
                 std::line!(),
@@ -379,7 +379,7 @@ macro_rules! __debug_span {
     ($span:expr, $($arg:tt)*) => {
         if $crate::debug::debugging_enabled() {
             let tmp = $span;
-            log::debug!(
+            eprintln!(
                 "[{}:{}:{}] {}:",
                 std::file!(),
                 std::line!(),
@@ -394,25 +394,9 @@ macro_rules! __debug_span {
 
 #[macro_export]
 macro_rules! __debug_dbg {
-    () => {
+    ($($arg:tt)*) => {
         if $crate::debug::debugging_enabled() {
-            log::debug!("[{}:{}]", std::file!(), std::line!());
+            dbg!($($arg)*);
         }
-    };
-    ($val:expr $(,)?) => {
-        if $crate::debug::debugging_enabled() {
-            let value = &$val;
-            log::debug!(
-                "[{}:{}] {} = {:#?}",
-                std::file!(),
-                std::line!(),
-                std::stringify!($val),
-                value
-            );
-            value
-        }
-    };
-    ($val:expr, $($rest:expr),+ $(,)?) => {
-        ($crate::__debug_dbg!($val), $($crate::__debug_dbg!($rest)),+)
     };
 }
