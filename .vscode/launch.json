@@ -177,8 +177,7 @@
 			"request": "launch",
 			"name": "Launch SUS LSP",
 			"runtimeExecutable": "${execPath}",
-			"args": ["--extensionDevelopmentPath=${workspaceRoot}"],
-			"outFiles": ["${workspaceRoot}/client/out/**/*.js"],
+			"args": ["--extensionDevelopmentPath=${workspaceRoot}/sus-lsp"],
 			"preLaunchTask": {
 				"type": "npm",
 				"script": "watch"
@@ -205,6 +204,13 @@
                 // By default it'll grab all .sus files in this directory. Doesn't use ./reproduce.sh though...
             ],
             "cwd": "${input:pickDumpFile}",
+        },
+        {
+            "name": "(lldb) Attach to sus_compiler --lsp",
+            "type": "lldb",
+            "request": "attach",
+            "program": "${workspaceFolder}/target/debug/sus_compiler",
+            "pid": "${input:find_LSP_PID}"
         }
     ],
     "inputs": [
@@ -224,6 +230,16 @@
                 },
                 "showDirs": true,
             } 
-        } 
+        },
+        {
+          "id": "find_LSP_PID",
+          "type": "command",
+          "command": "shellCommand.execute",
+          "args": {
+            "command": "pgrep -f 'sus_compiler'",
+            "description": "Select your SUS Compiler LSP PID",
+            "useFirstResult": true,
+          }
+        }
     ] 
 }

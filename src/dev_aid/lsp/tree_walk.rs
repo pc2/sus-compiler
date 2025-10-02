@@ -452,11 +452,15 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
             GlobalUUID::Module(md_id) => {
                 let md = &self.linker.modules[md_id];
                 for (interface_id, interface) in &md.interfaces {
-                    if interface.declaration_instruction.is_some() {
-                        self.visit(
-                            interface.name_span,
-                            LocationInfo::Interface(md_id, md, interface_id, interface),
-                        );
+                    match interface.declaration_instruction {
+                        Some(InterfaceDeclKind::Interface(_)) => {
+                            self.visit(
+                                interface.name_span,
+                                LocationInfo::Interface(md_id, md, interface_id, interface),
+                            );
+                        }
+                        Some(InterfaceDeclKind::SinglePort(_)) => {} // Ports have been covered by their respective declarations
+                        None => {}
                     }
                 }
             }
