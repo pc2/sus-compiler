@@ -210,7 +210,9 @@ fn initialize_all_files(init_params: &InitializeParams) -> (Linker, LSPFileManag
     let files = &config().files;
     if !files.is_empty() {
         for f in files {
-            let path = f.canonicalize().unwrap();
+            let Ok(path) = f.canonicalize() else {
+                continue;
+            };
             linker.add_file(&path, &mut manager);
         }
     } else if let Some(workspace_folder) = &init_params.workspace_folders {
