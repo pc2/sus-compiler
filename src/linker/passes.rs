@@ -3,7 +3,10 @@ use crate::{
     errors::{ErrorInfoObject, FileKnowingErrorInfoObject},
     flattening::{Declaration, GlobalReference, InterfaceDeclaration, Port, SubModuleInstance},
     linker::checkpoint::ResolvedGlobalsCheckpoint,
-    typing::abstract_type::{AbstractGlobalReference, AbstractInnerType, AbstractRankedType},
+    typing::{
+        abstract_type::{AbstractGlobalReference, AbstractInnerType, AbstractRankedType},
+        template::TemplateKind,
+    },
 };
 
 impl Linker {
@@ -132,7 +135,7 @@ impl<'linker, 'from> GlobalResolver<'linker, 'from> {
         let link_info = self.get(global).get_link_info();
         LinkingErrorLocation {
             named_type,
-            full_name: link_info.get_full_name(),
+            full_name: link_info.display_full_name().to_string(),
             location: link_info.get_span_file(),
         }
     }

@@ -222,13 +222,6 @@ impl InterfaceKind {
             InterfaceKind::Action(_) | InterfaceKind::Trigger(_) => true,
         }
     }
-    pub fn as_string(&self) -> &'static str {
-        match self {
-            InterfaceKind::RegularInterface => "interface",
-            InterfaceKind::Action(_) => "action",
-            InterfaceKind::Trigger(_) => "trigger",
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -775,7 +768,7 @@ impl<ID: Copy> GlobalReference<ID> {
     }
 
     pub fn resolve_template_args(&self, errors: &ErrorCollector, target: &LinkInfo) {
-        let full_object_name = target.get_full_name();
+        let full_object_name = target.display_full_name();
 
         let mut previous_uses: TVec<Option<Span>> = target.parameters.map(|_| None);
 

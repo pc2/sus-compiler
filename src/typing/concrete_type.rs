@@ -5,9 +5,8 @@ use sus_proc_macro::get_builtin_type;
 use crate::config;
 use crate::linker::GlobalUUID;
 use crate::prelude::*;
-use crate::to_string::join_string_iter_formatter;
+use crate::to_string::display_join;
 use crate::util::all_equal;
-use std::fmt::Write;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::sync::LazyLock;
@@ -64,29 +63,24 @@ impl std::fmt::Debug for ConcreteType {
         match self {
             Self::Named(global_ref) => {
                 let name = global_ref.id;
-                f.write_fmt(format_args!("{name:?} #("))?;
-                join_string_iter_formatter(
-                    f,
-                    ", ",
-                    global_ref.template_args.iter(),
-                    |f, (arg_id, arg)| {
-                        f.write_fmt(format_args!("{arg_id:?}: "))?;
+                let template_args =
+                    display_join(", ", global_ref.template_args.iter(), |f, (arg_id, arg)| {
+                        write!(f, "{arg_id:?}: ")?;
                         match arg {
                             TemplateKind::Type(t) => {
-                                f.write_fmt(format_args!("type {t:?}"))?;
+                                write!(f, "type {t:?}")?;
                             }
                             TemplateKind::Value(v) => {
-                                f.write_fmt(format_args!("{v:?}"))?;
+                                write!(f, "{v:?}")?;
                             }
                         }
                         Ok(())
-                    },
-                )?;
-                f.write_char(')')
+                    });
+                write!(f, "{name:?} #({template_args})")
             }
             Self::Array(arr_box) => {
                 let (content, sz) = arr_box.deref();
-                f.write_fmt(format_args!("{content:?}[{sz:?}]"))
+                write!(f, "{content:?}[{sz:?}]")
             }
         }
     }

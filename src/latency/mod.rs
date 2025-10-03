@@ -10,7 +10,7 @@ use crate::alloc::zip_eq;
 use crate::dev_aid::dot_graphs::display_latency_count_graph;
 use crate::errors::ErrorInfoObject;
 use crate::prelude::*;
-use crate::to_string::join_string_iter;
+use crate::to_string::display_join;
 
 use latency_algorithm::{
     FanInOut, LatencyCountingError, LatencyCountingPorts, SpecifiedLatency,
@@ -557,16 +557,11 @@ impl ModuleTypingContext<'_> {
 
                     let (connected_ports, ports_not_in_group) = all_port_instrs.split_at(num_hit);
 
-                    let mut strongly_connected_port_list = String::new();
-                    join_string_iter(
-                        &mut strongly_connected_port_list,
-                        ", ",
-                        connected_ports,
-                        |f, instr| {
+                    let strongly_connected_port_list =
+                        display_join(", ", connected_ports, |f, instr| {
                             let name = self.md.link_info.instructions[*instr].get_name();
                             write!(f, "'{name}'")
-                        },
-                    );
+                        });
                     let hit_names_error_infos: Vec<_> = connected_ports
                         .iter()
                         .map(|instr| {

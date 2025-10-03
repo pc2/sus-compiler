@@ -15,9 +15,7 @@ use crate::flattening::{Direction, Module, PartSelectDirection, Port};
 use crate::instantiation::{
     InstantiatedModule, IsPort, MultiplexerSource, RealWire, RealWireDataSource, RealWirePathElem,
 };
-use crate::to_string::{
-    FmtWrapper, join_string_iter, join_string_iter_formatter, trim_known_prefix,
-};
+use crate::to_string::{FmtWrapper, display_join, trim_known_prefix};
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg, IntBounds};
 use crate::typing::template::{TVec, TemplateKind};
 use crate::{typing::concrete_type::ConcreteType, value::Value};
@@ -233,15 +231,15 @@ impl<'g> CodeGenerationContext<'g> {
                 _ => todo!("Structs"),
             },
             ConcreteType::Array(arr_box) => {
-                let (content, size) = arr_box.deref();
+                let (content_typ, size) = arr_box.deref();
 
                 let size: usize = size.unwrap_int();
                 if let ConcreteType::Named(ConcreteGlobalReference {
                     id: get_builtin_type!("bool"),
                     ..
-                }) = content
+                }) = content_typ
                 {
-                    f.write_fmt(format_args!("{size}'b"))?;
+                    write!(f, "{size}'b")?;
                     match cst {
                         Value::Array(values) => {
                             assert_eq!(values.len(), size);
@@ -264,20 +262,22 @@ impl<'g> CodeGenerationContext<'g> {
                     }
                     Ok(())
                 } else {
-                    f.write_str("'{")?;
                     match cst {
                         Value::Array(values) => {
                             assert_eq!(values.len(), size);
-                            join_string_iter_formatter(f, ", ", values.iter(), |f, v| {
-                                Self::display_constant(content, v).fmt(f)
-                            })?;
+                            let content = display_join(", ", values.iter(), |f, v| {
+                                Self::display_constant(content_typ, v).fmt(f)
+                            });
+                            write!(f, "'{{{content}}}")
                         }
-                        Value::Unset => join_string_iter_formatter(f, ", ", 0..size, |f, _| {
-                            Self::display_constant(content, &Value::Unset).fmt(f)
-                        })?,
+                        Value::Unset => {
+                            let content = display_join(", ", 0..size, |f, _| {
+                                Self::display_constant(content_typ, &Value::Unset).fmt(f)
+                            });
+                            write!(f, "'{{{content}}}")
+                        }
                         _ => unreachable!(),
                     }
-                    f.write_str("}")
                 }
             }
         })
@@ -755,13 +755,11 @@ impl<'g> CodeGenerationContext<'g> {
         link_info: &LinkInfo,
         concrete_template_args: &TVec<ConcreteTemplateArg>,
     ) {
-        self.program_text.write_str(&link_info.name).unwrap();
-        self.program_text.write_str(" #(").unwrap();
-        join_string_iter(
-            &mut self.program_text,
+        let extern_name = &link_info.name;
+        let args = display_join(
             ", ",
             zip_eq(concrete_template_args, &link_info.parameters),
-            |result, (_, arg, arg_name)| {
+            |f, (_, arg, arg_name)| {
                 let arg_name = &arg_name.name;
                 match arg {
                     TemplateKind::Type(_) => {
@@ -770,12 +768,12 @@ impl<'g> CodeGenerationContext<'g> {
                         );
                     }
                     TemplateKind::Value(value) => {
-                        result.write_fmt(format_args!(".{arg_name}({value})"))
+                        write!(f, ".{arg_name}({value})")
                     }
                 }
             },
         );
-        self.program_text.write_char(')').unwrap();
+        write!(self.program_text, "{extern_name} #({args})").unwrap();
     }
 
     fn write_assign(

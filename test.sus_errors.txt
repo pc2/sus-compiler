@@ -406,12 +406,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                                                        ──┬──  
      │                                                                          ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Typing Error: writing the output of this expression expects 'bool[]' but was given 'int'
+Error: Typing Error: writing the output of this expression expects 'bool #()[]' but was given 'int #(FROM: _, TO: _)'
      ╭─[ test.sus:250:2 ]
      │
  250 │     state bool[24] stored_valid_permutes = 000000000000000000000000
      │     ──────────────────┬─────────────────  
-     │                       ╰─────────────────── Typing Error: writing the output of this expression expects 'bool[]' but was given 'int'
+     │                       ╰─────────────────── Typing Error: writing the output of this expression expects 'bool #()[]' but was given 'int #(FROM: _, TO: _)'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:252:10 ]
@@ -2023,7 +2023,7 @@ Warning: Not Instantiating use_submodule_named_ports #() due to abstract typing 
      │        ────────────┬────────────  
      │                    ╰────────────── Not Instantiating use_submodule_named_ports #() due to abstract typing errors
 ─────╯
-Error: No such field 'port_a' on submodule_named_ports. Available fields are 'submodule_named_ports'
+Error: No such field 'port_a' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
      ╭─[ test.sus:590:5 ]
      │
  576 │ module submodule_named_ports {
@@ -2038,9 +2038,9 @@ interface submodule_named_ports:
      │ 
  590 │     sm.port_a = i
      │        ───┬──  
-     │           ╰──── No such field 'port_a' on submodule_named_ports. Available fields are 'submodule_named_ports'
+     │           ╰──── No such field 'port_a' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
 ─────╯
-Error: No such field 'port_b' on submodule_named_ports. Available fields are 'submodule_named_ports'
+Error: No such field 'port_b' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
      ╭─[ test.sus:592:5 ]
      │
  576 │ module submodule_named_ports {
@@ -2055,9 +2055,9 @@ interface submodule_named_ports:
      │ 
  592 │     sm.port_b = i
      │        ───┬──  
-     │           ╰──── No such field 'port_b' on submodule_named_ports. Available fields are 'submodule_named_ports'
+     │           ╰──── No such field 'port_b' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
 ─────╯
-Error: No such field 'port_c' on submodule_named_ports. Available fields are 'submodule_named_ports'
+Error: No such field 'port_c' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
      ╭─[ test.sus:594:9 ]
      │
  576 │ module submodule_named_ports {
@@ -2072,7 +2072,7 @@ interface submodule_named_ports:
      │ 
  594 │     o = sm.port_c
      │            ───┬──  
-     │               ╰──── No such field 'port_c' on submodule_named_ports. Available fields are 'submodule_named_ports'
+     │               ╰──── No such field 'port_c' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
 ─────╯
 Error: 'contains_submodule_submodule' conflicts with other declarations:
      ╭─[ test.sus:597:8 ]
@@ -2210,7 +2210,7 @@ Error: Too few bindings. This interface provides 3 read-only bindings, but 0 wer
      │          ──┬──  
      │            ╰──── Too few bindings. This interface provides 3 read-only bindings, but 0 were provided.
 ─────╯
-Error: No such field 'i' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
+Error: No such field 'i' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
      ╭─[ test.sus:641:7 ]
      │
  618 │ module cross_memory {
@@ -2225,7 +2225,7 @@ interface out:
      │ 
  641 │     cr_m.i = mem
      │          ┬  
-     │          ╰── No such field 'i' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
+     │          ╰── No such field 'i' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
 ─────╯
 Error: Can only use conditional bindings on triggers. 'read' is an interface
      ╭─[ test.sus:642:7 ]
@@ -2260,7 +2260,7 @@ Error: Too few bindings. This interface provides 2 read-only bindings, but 0 wer
      │          ──┬─  
      │            ╰─── Too few bindings. This interface provides 2 read-only bindings, but 0 were provided.
 ─────╯
-Error: No such field 'o' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
+Error: No such field 'o' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
      ╭─[ test.sus:643:18 ]
      │
  618 │ module cross_memory {
@@ -2275,7 +2275,7 @@ interface out:
      │ 
  643 │        rd_data = cr_m.o[rd_addr]
      │                       ┬  
-     │                       ╰── No such field 'o' on cross_memory. Available fields are 'cross_memory', 'in', 'out'
+     │                       ╰── No such field 'o' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
 ─────╯
 Warning: Not Instantiating use_fifo #() due to abstract typing errors
      ╭─[ test.sus:647:8 ]
@@ -2366,7 +2366,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │          ───┬───  
      │             ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
+Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:667:5 ]
      │
  607 │ module cross_bool {
@@ -2381,9 +2381,9 @@ interface out:
      │ 
  667 │     ci.i = domain3
      │        ┬  
-     │        ╰── No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
+     │        ╰── No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
 ─────╯
-Error: No such field 'o' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
+Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:668:15 ]
      │
  607 │ module cross_bool {
@@ -2398,7 +2398,7 @@ interface out:
      │ 
  668 │     domain4 = ci.o
      │                  ┬  
-     │                  ╰── No such field 'o' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
+     │                  ╰── No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:670:7 ]
@@ -2501,7 +2501,7 @@ Warning: The result of this expression is not used. Only function calls can retu
      │     ──┬─  
      │       ╰─── The result of this expression is not used. Only function calls can return nothing. 
 ─────╯
-Error: No such field 'a' on mod_with_unused_interface. Available fields are 'mod_with_unused_interface', 'v'
+Error: No such field 'a' on mod_with_unused_interface #(). Available fields are 'mod_with_unused_interface', 'v'
      ╭─[ test.sus:707:5 ]
      │
  684 │ module mod_with_unused_interface {
@@ -2515,7 +2515,7 @@ interface v:
      │ 
  707 │     mm.a
      │        ┬  
-     │        ╰── No such field 'a' on mod_with_unused_interface. Available fields are 'mod_with_unused_interface', 'v'
+     │        ╰── No such field 'a' on mod_with_unused_interface #(). Available fields are 'mod_with_unused_interface', 'v'
 ─────╯
 Warning: Not Instantiating sequenceDownFrom #() due to abstract typing errors
      ╭─[ test.sus:720:8 ]
@@ -2556,7 +2556,7 @@ Error: Can't write to an interface. Use a function call or interface connector i
      │     ─────┬────  
      │          ╰────── Can't write to an interface. Use a function call or interface connector instead
 ─────╯
-Error: No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
+Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:730:11 ]
      │
  607 │ module cross_bool {
@@ -2571,9 +2571,9 @@ interface out:
      │ 
  730 │     start_cr.i = start
      │              ┬  
-     │              ╰── No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
+     │              ╰── No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
 ─────╯
-Error: No such field 'i' on cross_int. Available fields are 'cross_int', 'in', 'out'
+Error: No such field 'i' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
      ╭─[ test.sus:733:10 ]
      │
  612 │ module cross_int {
@@ -2588,9 +2588,9 @@ interface out:
      │ 
  733 │     upTo_cr.i = upTo
      │             ┬  
-     │             ╰── No such field 'i' on cross_int. Available fields are 'cross_int', 'in', 'out'
+     │             ╰── No such field 'i' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
 ─────╯
-Error: No such field 'o' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
+Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:736:19 ]
      │
  607 │ module cross_bool {
@@ -2605,9 +2605,9 @@ interface out:
      │ 
  736 │     ready = ready_cr.o
      │                      ┬  
-     │                      ╰── No such field 'o' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
+     │                      ╰── No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
 ─────╯
-Error: No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
+Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:739:11 ]
      │
  607 │ module cross_bool {
@@ -2622,9 +2622,9 @@ interface out:
      │ 
  739 │     ready_cr.i = !valid
      │              ┬  
-     │              ╰── No such field 'i' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
+     │              ╰── No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
 ─────╯
-Error: No such field 'o' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
+Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:744:16 ]
      │
  607 │ module cross_bool {
@@ -2639,9 +2639,9 @@ interface out:
      │ 
  744 │     when start_cr.o {
      │                   ┬  
-     │                   ╰── No such field 'o' on cross_bool. Available fields are 'cross_bool', 'in', 'out'
+     │                   ╰── No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
 ─────╯
-Error: No such field 'o' on cross_int. Available fields are 'cross_int', 'in', 'out'
+Error: No such field 'o' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
      ╭─[ test.sus:745:19 ]
      │
  612 │ module cross_int {
@@ -2656,7 +2656,7 @@ interface out:
      │ 
  745 │        index = upTo_cr.o
      │                        ┬  
-     │                        ╰── No such field 'o' on cross_int. Available fields are 'cross_int', 'in', 'out'
+     │                        ╰── No such field 'o' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
 ─────╯
 Warning: Not Instantiating sumUpTo #() due to abstract typing errors of submodules:
 - sequenceDownFrom
@@ -3213,12 +3213,12 @@ Warning: Not Instantiating moduleWithBadDeclaration #() due to abstract typing e
      │        ────────────┬───────────  
      │                    ╰───────────── Not Instantiating moduleWithBadDeclaration #() due to abstract typing errors
 ─────╯
-Error: Typing Error: array size expects 'int' but was given 'bool'
+Error: Typing Error: array size expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
      ╭─[ test.sus:918:6 ]
      │
  918 │     int[true] a
      │         ──┬─  
-     │           ╰─── Typing Error: array size expects 'int' but was given 'bool'
+     │           ╰─── Typing Error: array size expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:918:12 ]
@@ -3234,12 +3234,12 @@ Warning: Not Instantiating moduleWithBadInterface #() due to abstract typing err
      │        ───────────┬──────────  
      │                   ╰──────────── Not Instantiating moduleWithBadInterface #() due to abstract typing errors
 ─────╯
-Error: Typing Error: array size expects 'int' but was given 'bool'
+Error: Typing Error: array size expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
      ╭─[ test.sus:922:41 ]
      │
  922 │     interface moduleWithBadInterface : int[true] a
      │                                            ──┬─  
-     │                                              ╰─── Typing Error: array size expects 'int' but was given 'bool'
+     │                                              ╰─── Typing Error: array size expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:922:47 ]
@@ -3262,12 +3262,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │            ─┬─  
      │             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Typing Error: writing the output of this expression expects 'int' but was given 'bool'
+Error: Typing Error: writing the output of this expression expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
      ╭─[ test.sus:929:2 ]
      │
  929 │     xyz[3] = true
      │     ───┬──  
-     │        ╰──── Typing Error: writing the output of this expression expects 'int' but was given 'bool'
+     │        ╰──── Typing Error: writing the output of this expression expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
 ─────╯
 Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
      ╭─[ test.sus:935:2 ]
@@ -3576,12 +3576,12 @@ Warning: Not Instantiating use_Iterator #() due to abstract typing errors
       │        ──────┬─────  
       │              ╰─────── Not Instantiating use_Iterator #() due to abstract typing errors
 ──────╯
-Error: Typing Error: function argument expects 'int' but was given 'bool'
+Error: Typing Error: function argument expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
       ╭─[ test.sus:1061:20 ]
       │
  1061 │     arrayStream.start(do_start, 10)
       │                       ────┬───  
-      │                           ╰───── Typing Error: function argument expects 'int' but was given 'bool'
+      │                           ╰───── Typing Error: function argument expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
       │
       ├─[ control_flow.sus:11:47 ]
       │
@@ -3609,12 +3609,12 @@ Error: A function call expects this to be an interface, but found a regular wire
       │                                  ────────┬───────  
       │                                          ╰───────── A function call expects this to be an interface, but found a regular wire
 ──────╯
-Error: No such field 'iter' on Iterator. Available fields are 'Iterator', 'may_next', 'start', 'next'
+Error: No such field 'iter' on Iterator #(MAX: _). Available fields are 'Iterator', 'may_next', 'start', 'next'
       ╭─[ test.sus:1064:43 ]
       │
  1064 │     bool iter_valid, int value = arrayStream.iter()
       │                                              ──┬─  
-      │                                                ╰─── No such field 'iter' on Iterator. Available fields are 'Iterator', 'may_next', 'start', 'next'
+      │                                                ╰─── No such field 'iter' on Iterator #(MAX: _). Available fields are 'Iterator', 'may_next', 'start', 'next'
       │
       ├─[ control_flow.sus:2:8 ]
       │
@@ -4450,12 +4450,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                               ────┬────  
       │                                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Typing Error: writing the output of this expression expects 'float' but was given 'int'
+Error: Typing Error: writing the output of this expression expects 'float #()' but was given 'int #(FROM: _, TO: _)'
       ╭─[ test.sus:1258:3 ]
       │
  1258 │        float next_state = cur_state * cur_state
       │        ────────┬───────  
-      │                ╰───────── Typing Error: writing the output of this expression expects 'float' but was given 'int'
+      │                ╰───────── Typing Error: writing the output of this expression expects 'float #()' but was given 'int #(FROM: _, TO: _)'
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1258:9 ]
@@ -4464,33 +4464,33 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │              ─────┬────  
       │                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Typing Error: binop left side expects 'int' but was given 'float'
+Error: Typing Error: binop left side expects 'int #(FROM: _, TO: _)' but was given 'float #()'
       ╭─[ test.sus:1258:22 ]
       │
  1258 │        float next_state = cur_state * cur_state
       │                           ────┬────  
-      │                               ╰────── Typing Error: binop left side expects 'int' but was given 'float'
+      │                               ╰────── Typing Error: binop left side expects 'int #(FROM: _, TO: _)' but was given 'float #()'
 ──────╯
-Error: Typing Error: binop right side expects 'int' but was given 'float'
+Error: Typing Error: binop right side expects 'int #(FROM: _, TO: _)' but was given 'float #()'
       ╭─[ test.sus:1258:34 ]
       │
  1258 │        float next_state = cur_state * cur_state
       │                                       ────┬────  
-      │                                           ╰────── Typing Error: binop right side expects 'int' but was given 'float'
+      │                                           ╰────── Typing Error: binop right side expects 'int #(FROM: _, TO: _)' but was given 'float #()'
 ──────╯
-Error: Typing Error: binop left side expects 'int' but was given 'float'
+Error: Typing Error: binop left side expects 'int #(FROM: _, TO: _)' but was given 'float #()'
       ╭─[ test.sus:1259:8 ]
       │
  1259 │        when cur_state >= 2.0 {
       │             ────┬────  
-      │                 ╰────── Typing Error: binop left side expects 'int' but was given 'float'
+      │                 ╰────── Typing Error: binop left side expects 'int #(FROM: _, TO: _)' but was given 'float #()'
 ──────╯
-Error: Typing Error: binop right side expects 'int' but was given 'float'
+Error: Typing Error: binop right side expects 'int #(FROM: _, TO: _)' but was given 'float #()'
       ╭─[ test.sus:1259:21 ]
       │
  1259 │        when cur_state >= 2.0 {
       │                          ─┬─  
-      │                           ╰─── Typing Error: binop right side expects 'int' but was given 'float'
+      │                           ╰─── Typing Error: binop right side expects 'int #(FROM: _, TO: _)' but was given 'float #()'
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1266:6 ]

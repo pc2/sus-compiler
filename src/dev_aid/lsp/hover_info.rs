@@ -137,10 +137,10 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             if let GlobalUUID::Module(md_id) = obj_id {
                 let md = &linker.modules[md_id];
 
-                let mut result = String::new();
-                md.make_interface_info_fmt(interface, &file_data.file_text, true, &mut result);
-
-                hover.sus_code(result);
+                hover.sus_code(
+                    md.display_interface_info(interface, &file_data.file_text, true)
+                        .to_string(),
+                );
             }
 
             hover.gather_hover_infos(obj_id, decl_id, false);
@@ -152,7 +152,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
 
             hover.sus_code(format!(
                 "{} {}",
-                submodule.link_info.get_full_name(),
+                submodule.link_info.display_full_name(),
                 submod.name
             ));
 
@@ -207,16 +207,16 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             let file = &linker.files[link_info.file];
             hover.sus_code(
                 link_info
-                    .get_full_name_and_template_args(&file.file_text)
+                    .display_full_name_and_args(&file.file_text)
                     .to_string(),
             );
             match global {
                 GlobalUUID::Module(md_uuid) => {
                     let md = &linker.modules[md_uuid];
-                    hover.sus_code(md.make_all_ports_info_string(
-                        &linker.files[md.link_info.file].file_text,
-                        None,
-                    ));
+                    hover.sus_code(
+                        md.display_all_ports_info(&linker.files[md.link_info.file].file_text, None)
+                            .to_string(),
+                    );
                 }
                 GlobalUUID::Type(_) => {}
                 GlobalUUID::Constant(_) => {}
@@ -227,25 +227,22 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 InterfaceDeclKind::Interface(decl_id) => {
                     let interface_decl = md.link_info.instructions[decl_id].unwrap_interface();
 
-                    let mut result = String::new();
-                    md.make_interface_info_fmt(
-                        interface_decl,
-                        &linker.files[md.link_info.file].file_text,
-                        true,
-                        &mut result,
+                    hover.sus_code(
+                        md.display_interface_info(
+                            interface_decl,
+                            &linker.files[md.link_info.file].file_text,
+                            true,
+                        )
+                        .to_string(),
                     );
-                    hover.sus_code(result);
                 }
                 InterfaceDeclKind::SinglePort(decl_id) => {
                     let port_decl = md.link_info.instructions[decl_id].unwrap_declaration();
 
-                    let mut result = String::new();
-                    md.make_port_info_fmt(
-                        port_decl,
-                        &linker.files[md.link_info.file].file_text,
-                        &mut result,
+                    hover.sus_code(
+                        md.display_port_info(port_decl, &linker.files[md.link_info.file].file_text)
+                            .to_string(),
                     );
-                    hover.sus_code(result);
                 }
             }
         }

@@ -18,7 +18,9 @@ use crate::typing::abstract_type::{AbstractGlobalReference, AbstractInnerType};
 use crate::typing::concrete_type::{ConcreteGlobalReference, SubtypeRelation};
 use crate::typing::domain_type::DomainType;
 use crate::typing::set_unifier::Unifyable;
-use crate::typing::template::{Parameter, TVec, TemplateKind};
+use crate::typing::template::{
+    GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind,
+};
 use crate::typing::value_unifier::UnifyableValue;
 use crate::value::Value;
 use crate::{file_position::FileText, pretty_print_many_spans};
@@ -36,7 +38,6 @@ use crate::typing::{abstract_type::AbstractRankedType, concrete_type::ConcreteTy
 
 use std::fmt::{Display, Formatter};
 
-use std::fmt::Write;
 use std::ops::Deref;
 
 impl WrittenType {
@@ -48,9 +49,10 @@ impl WrittenType {
         FmtWrapper(move |f| match self {
             WrittenType::Error(_) => f.write_str("{error}"),
             WrittenType::TemplateVariable(_, id) => f.write_str(&template_names[*id].name),
-            WrittenType::Named(named_type) => {
-                f.write_str(&globals.types[named_type.id].link_info.get_full_name())
-            }
+            WrittenType::Named(named_type) => globals.types[named_type.id]
+                .link_info
+                .display_full_name()
+                .fmt(f),
             WrittenType::Array(_, sub) => {
                 write!(f, "{}[]", sub.deref().0.display(globals, template_names))
             }
@@ -69,22 +71,24 @@ impl AbstractRankedType {
                 AbstractInnerType::Unknown(_) => write!(f, "?"),
                 AbstractInnerType::Template(id) => f.write_str(&link_info.parameters[*id].name),
                 AbstractInnerType::Named(name) => {
-                    f.write_fmt(format_args!("{}", name.display(globals, link_info)))
+                    write!(f, "{}", name.display(globals, link_info))
                 }
                 AbstractInnerType::Interface(md_id, interface_id) => {
                     let md = &globals.modules[md_id.id];
-                    f.write_fmt(format_args!(
+                    write!(
+                        f,
                         "Interface {} of {}",
                         md.interfaces[*interface_id].name,
                         md_id.display(globals, link_info)
-                    ))
+                    )
                 }
-                AbstractInnerType::LocalInterface(local_interface) => f.write_fmt(format_args!(
+                AbstractInnerType::LocalInterface(local_interface) => write!(
+                    f,
                     "Local Interface '{}'",
                     link_info.instructions[*local_interface]
                         .unwrap_interface()
                         .name,
-                )),
+                ),
             };
             res?;
             // Print PeanoType rank using its custom Display impl
@@ -129,33 +133,31 @@ impl<'a> std::fmt::Display for PeanoTypeDisplay<'a> {
     }
 }
 
-impl<ID: Into<GlobalUUID> + Copy> AbstractGlobalReference<ID> {
-    pub fn display<'a>(
-        &'a self,
-        globals: &'a LinkerGlobals,
-        link_info: &'a LinkInfo,
-    ) -> impl Display + 'a {
+impl LinkInfo {
+    pub fn display_full_name(&self) -> impl Display {
+        // Feelin iffy about namespaces, so just return self.name
+        &self.name
+        // format!("::{}", self.name)
+    }
+    pub fn display_full_name_and_args<'s>(&'s self, file_text: &'s FileText) -> impl Display + 's {
+        self.display_with_template_args(&self.parameters, |f, (_, t)| match &t.kind {
+            TemplateKind::Type(TypeParameterKind {}) => f.write_str(&t.name),
+            TemplateKind::Value(GenerativeParameterKind {
+                decl_span,
+                declaration_instruction: _,
+            }) => f.write_str(&file_text[*decl_span]),
+        })
+    }
+    pub fn display_with_template_args<'s, T: 's, Iter: Iterator<Item = T> + Clone + 's>(
+        &'s self,
+        iter: impl IntoIterator<Item = T, IntoIter = Iter> + 's,
+        func: impl Fn(&mut Formatter<'_>, T) -> std::fmt::Result + 's,
+    ) -> impl Display + 's {
+        let template_args = display_join(", ", iter, func);
         FmtWrapper(move |f| {
-            let target_link_info: &LinkInfo = &globals[self.id.into()];
-            f.write_str(&target_link_info.name)?;
-            if !self.template_arg_types.iter().any(|(_, t)| match t {
-                TemplateKind::Type(_) => true,
-                TemplateKind::Value(_) => false,
-            }) {
-                return Ok(());
-            }
-            f.write_str(" #(")?;
-            let args_iter = zip_eq(&self.template_arg_types, &target_link_info.parameters);
-            join_string_iter_formatter(f, ", ", args_iter, |f, (_, typ, param)| {
-                write!(f, "{}: ", &param.name)?;
-                match typ {
-                    TemplateKind::Type(typ) => {
-                        f.write_fmt(format_args!("type {}", typ.display(globals, link_info)))
-                    }
-                    TemplateKind::Value(()) => f.write_char('_'),
-                }
-            })?;
-            f.write_str(")")
+            let full_name = self.display_full_name();
+
+            write!(f, "{full_name} #({template_args})")
         })
     }
 }
@@ -166,38 +168,73 @@ impl<ID: Into<GlobalUUID> + Copy> GlobalReference<ID> {
         globals: &'a LinkerGlobals,
         link_info: &'a LinkInfo,
     ) -> impl Display + 'a {
-        FmtWrapper(move |f| {
-            let target_link_info: &LinkInfo = &globals[self.id.into()];
-            f.write_str(&target_link_info.name)?;
-            f.write_str(" #(")?;
-            join_string_iter_formatter(
-                f,
-                ", ",
-                &self.template_args,
-                |f,
-                 WrittenTemplateArg {
-                     name,
-                     refers_to,
-                     kind,
-                     ..
-                 }| {
-                    write!(f, "{name} -> ")?;
-                    if let Some(found) = refers_to.get() {
-                        write!(f, "{}: ", &target_link_info.parameters[*found].name)?;
-                    } else {
-                        f.write_str("?: ")?;
+        let target_link_info: &LinkInfo = &globals[self.id.into()];
+        target_link_info.display_with_template_args(
+            &self.template_args,
+            |f,
+             WrittenTemplateArg {
+                 name,
+                 refers_to,
+                 kind,
+                 ..
+             }| {
+                write!(f, "{name} -> ")?;
+                if let Some(found) = refers_to.get() {
+                    write!(f, "{}: ", &target_link_info.parameters[*found].name)?;
+                } else {
+                    write!(f, "?: ")?;
+                }
+                match kind {
+                    Some(TemplateKind::Type(wr_typ)) => {
+                        write!(f, "type {}", wr_typ.display(globals, &link_info.parameters))
                     }
-                    match kind {
-                        Some(TemplateKind::Type(wr_typ)) => {
-                            write!(f, "type {}", wr_typ.display(globals, &link_info.parameters))
-                        }
-                        Some(TemplateKind::Value(v_id)) => write!(f, "{v_id:?}"),
-                        None => f.write_str("INVALID"),
+                    Some(TemplateKind::Value(v_id)) => write!(f, "{v_id:?}"),
+                    None => write!(f, "INVALID"),
+                }
+            },
+        )
+    }
+}
+impl<ID: Into<GlobalUUID> + Copy> AbstractGlobalReference<ID> {
+    pub fn display<'a>(
+        &'a self,
+        globals: &'a LinkerGlobals,
+        link_info: &'a LinkInfo,
+    ) -> impl Display + 'a {
+        let target_link_info: &LinkInfo = &globals[self.id.into()];
+
+        target_link_info.display_with_template_args(
+            zip_eq(&self.template_arg_types, &target_link_info.parameters),
+            |f, (_, typ, param)| {
+                write!(f, "{}: ", &param.name)?;
+                match typ {
+                    TemplateKind::Type(typ) => {
+                        write!(f, "type {}", typ.display(globals, link_info))
                     }
-                },
-            )?;
-            f.write_str(")")
-        })
+                    TemplateKind::Value(()) => write!(f, "_"),
+                }
+            },
+        )
+    }
+}
+impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
+    pub fn display<'v>(&'v self, globals: &'v LinkerGlobals) -> impl Display + 'v {
+        let target_link_info: &LinkInfo = &globals[self.id.into()];
+        assert!(self.template_args.len() == target_link_info.parameters.len());
+
+        target_link_info.display_with_template_args(
+            zip_eq(&self.template_args, &target_link_info.parameters),
+            |f, (_id, arg, arg_in_target)| {
+                write!(f, "{}: ", &arg_in_target.name)?;
+                match arg {
+                    TemplateKind::Type(typ_arg) => {
+                        write!(f, "type {}", typ_arg.display(globals))
+                    }
+                    TemplateKind::Value(Unifyable::Set(value)) => write!(f, "{value}"),
+                    TemplateKind::Value(Unifyable::Unknown(_)) => write!(f, "?"),
+                }
+            },
+        )
     }
 }
 
@@ -232,7 +269,7 @@ impl WireReference {
                         match refers_to.get() {
                             Some(PathElemRefersTo::Interface(md_id, interface)) => {
                                 let md = &globals[*md_id];
-                                let md_name = md.link_info.get_full_name();
+                                let md_name = md.link_info.display_full_name();
                                 if let Some(interface) = interface {
                                     let interf_name = &md.interfaces[*interface].name;
                                     write!(f, "({md_name}:{interf_name})")?;
@@ -293,42 +330,6 @@ impl ConcreteType {
     }
 }
 
-impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
-    pub fn display<'v>(&'v self, globals: &'v LinkerGlobals) -> impl Display + 'v {
-        let target_link_info = &globals[self.id.into()];
-        FmtWrapper(move |f| {
-            assert!(self.template_args.len() == target_link_info.parameters.len());
-            let object_full_name = target_link_info.get_full_name();
-            f.write_str(&object_full_name)?;
-            if self.template_args.is_empty() {
-                return f.write_str(" #()");
-            } else {
-                f.write_str(" #(")?;
-            }
-            let mut is_first = true;
-            for (_id, arg, arg_in_target) in
-                zip_eq(&self.template_args, &target_link_info.parameters)
-            {
-                if !is_first {
-                    f.write_str(", ")?;
-                }
-                is_first = false;
-                f.write_fmt(format_args!("{}: ", arg_in_target.name))?;
-                match arg {
-                    TemplateKind::Type(typ_arg) => {
-                        f.write_fmt(format_args!("type {}", typ_arg.display(globals)))?;
-                    }
-                    TemplateKind::Value(v) => match v {
-                        Unifyable::Set(value) => write!(f, "{value}")?,
-                        Unifyable::Unknown(_) => f.write_char('?')?,
-                    },
-                }
-            }
-            f.write_char(')')
-        })
-    }
-}
-
 impl Display for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -339,9 +340,8 @@ impl Display for Value {
                 write!(f, "{}", buf.format(f32::from(*fl)))
             }
             Value::Array(arr_box) => {
-                f.write_str("[")?;
-                join_string_iter_formatter(f, ", ", arr_box.iter(), |f, v| v.fmt(f))?;
-                f.write_str("]")
+                let content = display_join(", ", arr_box.iter(), |f, v| v.fmt(f));
+                write!(f, "[{content}]")
             }
             Value::Unset => f.write_str("{value_unset}"),
         }
@@ -355,12 +355,9 @@ impl DomainID {
     ) -> impl Display + 'd {
         FmtWrapper(move |f| {
             if let Some(physical_domain) = domains.get(*self) {
-                f.write_fmt(format_args!("{{{}}}", physical_domain.name))
+                write!(f, "{{{}}}", physical_domain.name)
             } else {
-                f.write_fmt(format_args!(
-                    "{{unnamed domain {}}}",
-                    self.get_hidden_value()
-                ))
+                write!(f, "{{unnamed domain {}}}", self.get_hidden_value())
             }
         })
     }
@@ -504,6 +501,15 @@ impl Display for SliceType {
             SliceType::Normal => ":",
             SliceType::PartSelect(PartSelectDirection::Up) => "+:",
             SliceType::PartSelect(PartSelectDirection::Down) => "-:",
+        })
+    }
+}
+impl Display for InterfaceKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            InterfaceKind::RegularInterface => "interface",
+            InterfaceKind::Action(_) => "action",
+            InterfaceKind::Trigger(_) => "trigger",
         })
     }
 }
@@ -776,9 +782,7 @@ impl LinkInfo {
                     write!(f, "{disp_md_ref} {name}")?;
                     let submod_domains = &globals[module_ref.id].domains;
                     if let Some(local_domain_map) = local_domain_map.get() {
-                        write!(f, "[")?;
-                        join_string_iter_formatter(
-                            f,
+                        let domain_map = display_join(
                             ", ",
                             local_domain_map,
                             |f, (submod_domain, domain_here)| {
@@ -787,8 +791,8 @@ impl LinkInfo {
                                 let domain_here = domain_here.display(domains);
                                 write!(f, ".{submod_domain} = {domain_here}")
                             },
-                        )?;
-                        write!(f, "]")?;
+                        );
+                        write!(f, "[{domain_map}]")?;
                     }
                 }
                 Instruction::Declaration(Declaration {
@@ -814,9 +818,7 @@ impl LinkInfo {
                             write!(f, "({typ})")?;
                         }
                         ExpressionOutput::MultiWrite(write_tos) => {
-                            write!(f, "(")?;
-                            join_string_iter_formatter(
-                                f,
+                            let write_tos = display_join(
                                 ", ",
                                 write_tos,
                                 |f,
@@ -831,8 +833,8 @@ impl LinkInfo {
                                     let to = to.display(globals, self);
                                     write!(f, "{target_domain} {write_modifiers} {to}")
                                 },
-                            )?;
-                            write!(f, ") = ")?;
+                            );
+                            write!(f, "({write_tos}) = ")?;
                         }
                     }
                     match source {
@@ -844,11 +846,8 @@ impl LinkInfo {
                             arguments,
                             ..
                         }) => {
-                            write!(f, "{func_wire_ref:?}(")?;
-                            join_string_iter_formatter(f, ", ", arguments, |f, arg| {
-                                write!(f, "{arg:?}")
-                            })?;
-                            write!(f, ")")?;
+                            let args = display_join(", ", arguments, |f, arg| write!(f, "{arg:?}"));
+                            write!(f, "{func_wire_ref:?}({args})")?;
                         }
                         ExpressionSource::UnaryOp { op, right, rank: _ } => {
                             write!(f, "{op}{right:?}")?;
@@ -860,11 +859,9 @@ impl LinkInfo {
                             rank: _,
                         } => write!(f, "{left:?} {op} {right:?}")?,
                         ExpressionSource::ArrayConstruct(elements) => {
-                            write!(f, "[")?;
-                            join_string_iter_formatter(f, ", ", elements, |f, elem| {
-                                write!(f, "{elem:?}")
-                            })?;
-                            write!(f, "]")?;
+                            let arr_elems =
+                                display_join(", ", elements, |f, elem| write!(f, "{elem:?}"));
+                            write!(f, "[{arr_elems}]")?;
                         }
                         ExpressionSource::Literal(value) => {
                             write!(f, "literal {value}")?;
@@ -934,12 +931,14 @@ impl LinkInfo {
 }
 
 impl Module {
-    pub fn make_port_info_fmt(
-        &self,
-        decl: &Declaration,
-        file_text: &FileText,
-        result: &mut String,
-    ) {
+    fn display_latency(&self, lat_spec: &Option<FlatID>, file_text: &FileText) -> impl Display {
+        display_maybe(lat_spec.as_ref(), |f, lat_spec| {
+            let lat_spec_expr = self.link_info.instructions[*lat_spec].unwrap_expression();
+            let lat_spec_text = &file_text[lat_spec_expr.span];
+            write!(f, "'{lat_spec_text}")
+        })
+    }
+    pub fn display_port_info(&self, decl: &Declaration, file_text: &FileText) -> impl Display {
         let_unwrap!(
             DeclarationKind::Port {
                 direction,
@@ -948,101 +947,95 @@ impl Module {
             },
             decl.decl_kind
         );
-        result.write_fmt(format_args!("{direction} ")).unwrap();
-        if is_state {
-            result.write_str("state ").unwrap();
-        }
 
-        result
-            .write_str(&file_text[decl.typ_expr.get_span()])
-            .unwrap();
+        let state_kw = if is_state { "state " } else { "" };
 
-        result.write_char(' ').unwrap();
+        let written_typ = &file_text[decl.typ_expr.get_span()];
+        let name = &decl.name;
 
-        result.write_str(&decl.name).unwrap();
-
-        if let Some(lat_spec) = decl.latency_specifier {
-            result.write_char('\'').unwrap();
-
-            let lat_spec_expr = self.link_info.instructions[lat_spec].unwrap_expression();
-            result.write_str(&file_text[lat_spec_expr.span]).unwrap();
-        }
-        result.write_char('\n').unwrap();
+        let lat_spec = self.display_latency(&decl.latency_specifier, file_text);
+        FmtWrapper(move |f| write!(f, "{direction} {state_kw}{written_typ} {name}{lat_spec}"))
     }
 
-    pub fn make_interface_info_fmt(
+    pub fn display_interface_info(
         &self,
         interface: &InterfaceDeclaration,
         file_text: &FileText,
         may_print_domain: bool,
-        result: &mut String,
-    ) {
-        if may_print_domain {
-            result
-                .write_fmt(format_args!(
-                    "{{{}}} ",
-                    self.domains[interface.domain.unwrap_physical()].name
-                ))
-                .unwrap();
-        }
-        result.write_str(&file_text[interface.decl_span]).unwrap();
-        result.write_str(":\n").unwrap();
-        for decl_id in &interface.inputs {
-            let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
-            result.write_str("\t").unwrap();
-            self.make_port_info_fmt(port_decl, file_text, result);
-        }
-        if !interface.outputs.is_empty() {
-            result.write_str("\t->\n").unwrap();
-            for decl_id in &interface.outputs {
+    ) -> impl Display {
+        let domain = display_if(may_print_domain, |f| {
+            write!(
+                f,
+                "{{{}}} ",
+                self.domains[interface.domain.unwrap_physical()].name
+            )
+        });
+        let interface_kind = interface.interface_kind;
+        let name = &file_text[interface.name_span];
+        let lat_spec = self.display_latency(&interface.latency_specifier, file_text);
+        FmtWrapper(move |f| {
+            write!(f, "{domain}{interface_kind} {name}{lat_spec}:")?;
+            for decl_id in &interface.inputs {
                 let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
-                result.write_str("\t").unwrap();
-                self.make_port_info_fmt(port_decl, file_text, result);
+                let port_info = self.display_port_info(port_decl, file_text);
+                write!(f, "\n\t{port_info}")?;
             }
-        }
-    }
-
-    pub fn make_all_ports_info_string(
-        &self,
-        file_text: &FileText,
-        local_domains_used_in_parent_module: Option<InterfaceToDomainMap>,
-    ) -> String {
-        let full_name_with_args = self.link_info.get_full_name_and_template_args(file_text);
-        let mut result = format!("module {full_name_with_args}:\n");
-
-        for (domain_id, domain) in &self.domains {
-            let name = &domain.name;
-            if let Some(domain_map) = &local_domains_used_in_parent_module {
-                let submod_name = &self.link_info.name;
-                let name_in_parent =
-                    domain_map.local_domain_map[domain_id].debug(domain_map.domains);
-                writeln!(result, "domain {submod_name}.{name} = {name_in_parent}").unwrap();
-            } else {
-                writeln!(result, "domain {name}:").unwrap();
-            }
-
-            for (_, interface) in &self.interfaces {
-                match interface.declaration_instruction {
-                    Some(InterfaceDeclKind::Interface(decl_id)) => {
-                        let interface = self.link_info.instructions[decl_id].unwrap_interface();
-                        if interface.domain.unwrap_physical() == domain_id {
-                            self.make_interface_info_fmt(interface, file_text, false, &mut result);
-                        }
-                    }
-                    Some(InterfaceDeclKind::SinglePort(decl_id)) => {
-                        let single_port = self.link_info.instructions[decl_id].unwrap_declaration();
-                        if single_port.domain.get().unwrap_physical() == domain_id {
-                            self.make_port_info_fmt(single_port, file_text, &mut result);
-                        }
-                    }
-                    None => {}
+            if !interface.outputs.is_empty() {
+                write!(f, "\n\t->")?;
+                for decl_id in &interface.outputs {
+                    let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
+                    let port_info = self.display_port_info(port_decl, file_text);
+                    write!(f, "\n\t{port_info}")?;
                 }
             }
-        }
+            Ok(())
+        })
+    }
 
-        result.pop().unwrap();
+    pub fn display_all_ports_info<'s>(
+        &'s self,
+        file_text: &'s FileText,
+        local_domains_used_in_parent_module: Option<InterfaceToDomainMap>,
+    ) -> impl Display {
+        let full_name_with_args = self.link_info.display_full_name_and_args(file_text);
 
-        result
+        FmtWrapper(move |f| {
+            write!(f, "module {full_name_with_args}:")?;
+
+            for (domain_id, domain) in &self.domains {
+                let name = &domain.name;
+                if let Some(domain_map) = &local_domains_used_in_parent_module {
+                    let submod_name = &self.link_info.name;
+                    let name_in_parent =
+                        domain_map.local_domain_map[domain_id].debug(domain_map.domains);
+                    write!(f, "\ndomain {submod_name}.{name} = {name_in_parent}:")?;
+                } else {
+                    write!(f, "\ndomain {name}:")?;
+                }
+
+                for (_, interface) in &self.interfaces {
+                    match interface.declaration_instruction {
+                        Some(InterfaceDeclKind::Interface(decl_id)) => {
+                            let interface = self.link_info.instructions[decl_id].unwrap_interface();
+                            if interface.domain.unwrap_physical() == domain_id {
+                                let info = self.display_interface_info(interface, file_text, false);
+                                write!(f, "\n{info}")?;
+                            }
+                        }
+                        Some(InterfaceDeclKind::SinglePort(decl_id)) => {
+                            let single_port =
+                                self.link_info.instructions[decl_id].unwrap_declaration();
+                            if single_port.domain.get().unwrap_physical() == domain_id {
+                                let info = self.display_port_info(single_port, file_text);
+                                write!(f, "\n{info}")?;
+                            }
+                        }
+                        None => {}
+                    }
+                }
+            }
+            Ok(())
+        })
     }
 
     pub fn print_flattened_module(&self, file_data: &FileData, globals: &LinkerGlobals) {
@@ -1052,7 +1045,7 @@ impl Module {
             writeln!(
                 f,
                 "{}",
-                self.make_all_ports_info_string(&file_data.file_text, None)
+                self.display_all_ports_info(&file_data.file_text, None)
             )?;
             writeln!(f, "Instructions:")?;
             self.link_info
@@ -1117,22 +1110,22 @@ impl InstantiatedModule {
                             }
                         }
                         if !interf.inputs.is_empty() {
-                            write!(f, ": ")?;
-                            join_string_iter_formatter(f, ", ", &interf.inputs, |f, i| {
+                            let inputs = display_join(", ", &interf.inputs, |f, i| {
                                 let i_wire = self.generation_state[*i].unwrap_wire(); // Safely unwrap due to earlier check
                                 let w = &self.wires[i_wire];
 
                                 write!(f, "{}", w.display_decl(globals))
-                            })?;
+                            });
+                            write!(f, ": {inputs}")?;
                         }
                         if !interf.outputs.is_empty() {
-                            write!(f, " -> ")?;
-                            join_string_iter_formatter(f, ", ", &interf.outputs, |f, i| {
+                            let outputs = display_join(", ", &interf.outputs, |f, i| {
                                 let i_wire = self.generation_state[*i].unwrap_wire(); // Safely unwrap due to earlier check
                                 let w = &self.wires[i_wire];
 
                                 write!(f, "{}", w.display_decl(globals))
-                            })?;
+                            });
+                            write!(f, " -> {outputs}")?;
                         }
                         writeln!(f)?;
                     }
@@ -1277,9 +1270,8 @@ impl ModuleTypingContext<'_> {
                     writeln!(f)?;
                 }
                 RealWireDataSource::ConstructArray { array_wires } => {
-                    let mut s = String::new();
-                    join_string_iter(&mut s, ", ", array_wires.iter(), |s, item| {
-                        s.write_fmt(format_args!("{}", self.name(*item)))
+                    let s = display_join(", ", array_wires.iter(), |f, item| {
+                        write!(f, "{}", self.name(*item))
                     });
                     write!(f, " = [{s}]")?;
                 }
@@ -1356,37 +1348,52 @@ impl SubModule {
     }
 }
 
-pub fn join_string_iter<T>(
-    result: &mut String,
+struct JoinDisplay<
+    T,
+    Iter: Iterator<Item = T> + Clone,
+    F: Fn(&mut Formatter<'_>, T) -> std::fmt::Result,
+> {
     sep: &'static str,
-    iter: impl IntoIterator<Item = T>,
-    mut f: impl FnMut(&mut String, T) -> std::fmt::Result,
-) {
-    let mut iter = iter.into_iter();
-    if let Some(first) = iter.next() {
-        f(result, first).unwrap();
-        for item in iter {
-            result.write_str(sep).unwrap();
-            f(result, item).unwrap();
+    iter: Iter,
+    func: F,
+}
+impl<T, Iter: Iterator<Item = T> + Clone, F: Fn(&mut Formatter<'_>, T) -> std::fmt::Result> Display
+    for JoinDisplay<T, Iter, F>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut iter_copy = self.iter.clone();
+        if let Some(first) = iter_copy.next() {
+            (self.func)(f, first)?;
+            for item in iter_copy {
+                f.write_str(self.sep)?;
+                (self.func)(f, item)?;
+            }
         }
+        Ok(())
+    }
+}
+/// Iterator should be clonable. This is usually the case for simple iterators
+pub fn display_join<T, Iter: Iterator<Item = T> + Clone>(
+    sep: &'static str,
+    iter: impl IntoIterator<Item = T, IntoIter = Iter>,
+    func: impl Fn(&mut Formatter<'_>, T) -> std::fmt::Result,
+) -> impl Display {
+    JoinDisplay {
+        sep,
+        iter: iter.into_iter(),
+        func,
     }
 }
 
-pub fn join_string_iter_formatter<'fmt, T>(
-    f: &mut Formatter<'fmt>,
-    sep: &str,
-    iter: impl IntoIterator<Item = T>,
-    mut func: impl FnMut(&mut Formatter<'fmt>, T) -> std::fmt::Result,
-) -> std::fmt::Result {
-    let mut iter = iter.into_iter();
-    if let Some(first) = iter.next() {
-        func(f, first)?;
-        for item in iter {
-            f.write_str(sep)?;
-            func(f, item)?;
-        }
-    }
-    Ok(())
+pub fn display_maybe<T>(
+    v: Option<&T>,
+    func: impl Fn(&mut Formatter<'_>, &T) -> std::fmt::Result,
+) -> impl Display {
+    FmtWrapper(move |f| if let Some(v) = v { func(f, v) } else { Ok(()) })
+}
+
+pub fn display_if(b: bool, func: impl Fn(&mut Formatter<'_>) -> std::fmt::Result) -> impl Display {
+    FmtWrapper(move |f| if b { func(f) } else { Ok(()) })
 }
 
 pub fn trim_known_prefix<'a>(in_str: &'a str, prefix: &str) -> &'a str {

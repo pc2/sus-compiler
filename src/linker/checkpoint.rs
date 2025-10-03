@@ -52,7 +52,7 @@ impl LinkInfo {
         assert!(
             checkpoint_id < self.checkpoints.len(),
             "Checkpoint in {}. Selected checkpoint is {} but the last checkpoint is {} which comes before",
-            self.get_full_name(),
+            self.display_full_name(),
             CHECKPOINT_NAMES[checkpoint_id],
             CHECKPOINT_NAMES[self.checkpoints.len() - 1],
         );
@@ -72,7 +72,7 @@ impl Linker {
             assert!(
                 expected_checkpoint == checkpoint_id,
                 "In {}: The new checkpoint is not what was expected. The new checkpoint was {}, whereas the expected next checkpoint is {}",
-                link_info.get_full_name(),
+                link_info.display_full_name(),
                 CHECKPOINT_NAMES[checkpoint_id],
                 CHECKPOINT_NAMES[expected_checkpoint],
             );

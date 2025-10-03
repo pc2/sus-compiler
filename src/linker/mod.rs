@@ -5,7 +5,7 @@ use crate::{
     prelude::*,
     typing::{
         domain_type::DomainType,
-        template::{GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind},
+        template::{Parameter, TVec},
     },
 };
 
@@ -107,27 +107,8 @@ pub struct LinkInfo {
 }
 
 impl LinkInfo {
-    pub fn get_full_name(&self) -> String {
-        // Feelin iffy about namespaces, so just return self.name
-        self.name.clone()
-        // format!("::{}", self.name)
-    }
     pub fn get_span_file(&self) -> SpanFile {
         (self.name_span, self.file)
-    }
-    pub fn get_full_name_and_template_args(&self, file_text: &FileText) -> String {
-        let mut template_args: Vec<&str> = Vec::new();
-        for (_id, t) in &self.parameters {
-            match &t.kind {
-                TemplateKind::Type(TypeParameterKind {}) => template_args.push(&t.name),
-                TemplateKind::Value(GenerativeParameterKind {
-                    decl_span,
-                    declaration_instruction: _,
-                }) => template_args.push(&file_text[*decl_span]),
-            }
-        }
-
-        format!("{} #({})", self.get_full_name(), template_args.join(", "))
     }
     pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
         match &self.instructions[instr_id] {

@@ -75,7 +75,7 @@ impl<T: Display, IDMarker: UUIDMarker> Display for Unifyable<T, IDMarker> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Unifyable::Set(v) => v.fmt(f),
-            Unifyable::Unknown(id) => f.write_fmt(format_args!("{id:?}")),
+            Unifyable::Unknown(id) => write!(f, "{id:?}"),
         }
     }
 }
@@ -84,7 +84,7 @@ impl<T: Debug, IDMarker: UUIDMarker> Debug for Unifyable<T, IDMarker> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Unifyable::Set(v) => v.fmt(f),
-            Unifyable::Unknown(id) => f.write_fmt(format_args!("{id:?}")),
+            Unifyable::Unknown(id) => write!(f, "{id:?}"),
         }
     }
 }

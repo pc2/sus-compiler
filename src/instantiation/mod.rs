@@ -533,7 +533,7 @@ fn perform_instantiation(
             found_link_info
                 .errors
                 .did_error
-                .then(|| found_link_info.get_full_name())
+                .then(|| found_link_info.display_full_name().to_string())
         })
         .collect();
 

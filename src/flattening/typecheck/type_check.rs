@@ -1,10 +1,9 @@
-use std::fmt::Write;
 use std::ops::Deref;
 
 use crate::errors::ErrorInfo;
 use crate::linker::passes::{LocalOrRemoteParentModule, RemoteDeclaration, RemoteFn};
 use crate::prelude::*;
-use crate::to_string::join_string_iter;
+use crate::to_string::display_join;
 use crate::typing::abstract_type::{
     AbstractInnerType, AbstractRankedType, BOOL_INNER, BOOL_SCALAR, FLOAT_SCALAR, INT_INNER,
     INT_SCALAR,
@@ -212,13 +211,10 @@ impl<'l> TypeCheckingContext<'l> {
                             } else {
                                 let obj = self.globals.get_module(md_ref.id);
                                 let obj_name = md_ref.display(self.globals.globals, self.link_info);
-                                let mut field_names = String::new();
-                                join_string_iter(
-                                    &mut field_names,
-                                    ", ",
-                                    obj.interfaces.iter(),
-                                    |f, (_, v)| f.write_fmt(format_args!("'{}'", v.name)),
-                                );
+                                let field_names =
+                                    display_join(", ", obj.interfaces.iter(), |f, (_, v)| {
+                                        write!(f, "'{}'", v.name)
+                                    });
                                 self.errors
                                     .error(
                                         *name_span,
@@ -775,7 +771,7 @@ impl<'l> TypeCheckingContext<'l> {
         let f = &trig.fn_decl;
         if !matches!(&f.interface_kind, InterfaceKind::Trigger(_)) {
             let interface_name = &f.name;
-            let kind_str = f.interface_kind.as_string();
+            let kind_str = f.interface_kind;
             let err = format!(
                 "Can only use conditional bindings on triggers. '{interface_name}' is an {kind_str}"
             );

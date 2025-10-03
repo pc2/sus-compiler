@@ -833,6 +833,15 @@ pub struct FlatAllocIter<'a, T, IndexMarker> {
     _ph: PhantomData<IndexMarker>,
 }
 
+impl<'a, T, IndexMarker> Clone for FlatAllocIter<'a, T, IndexMarker> {
+    fn clone(&self) -> Self {
+        Self {
+            iter: self.iter.clone(),
+            _ph: PhantomData,
+        }
+    }
+}
+
 impl<'a, T, IndexMarker> Iterator for FlatAllocIter<'a, T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a T);
 
@@ -948,6 +957,22 @@ impl<
     IDMarker,
     OA,
     OB,
+    IterA: Iterator<Item = (UUID<IDMarker>, OA)> + Clone,
+    IterB: Iterator<Item = (UUID<IDMarker>, OB)> + Clone,
+> Clone for ZippedIterator<IDMarker, OA, OB, IterA, IterB>
+{
+    fn clone(&self) -> Self {
+        Self {
+            iter_a: self.iter_a.clone(),
+            iter_b: self.iter_b.clone(),
+        }
+    }
+}
+
+impl<
+    IDMarker,
+    OA,
+    OB,
     IterA: Iterator<Item = (UUID<IDMarker>, OA)>,
     IterB: Iterator<Item = (UUID<IDMarker>, OB)>,
 > Iterator for ZippedIterator<IDMarker, OA, OB, IterA, IterB>
@@ -967,10 +992,16 @@ impl<
     }
 }
 
-pub fn zip_eq<IDMarker, OA, OB>(
-    iter_a: impl IntoIterator<Item = (UUID<IDMarker>, OA)>,
-    iter_b: impl IntoIterator<Item = (UUID<IDMarker>, OB)>,
-) -> impl Iterator<Item = (UUID<IDMarker>, OA, OB)> {
+pub fn zip_eq<
+    IDMarker,
+    OA,
+    OB,
+    IterA: Iterator<Item = (UUID<IDMarker>, OA)>,
+    IterB: Iterator<Item = (UUID<IDMarker>, OB)>,
+>(
+    iter_a: impl IntoIterator<Item = (UUID<IDMarker>, OA), IntoIter = IterA>,
+    iter_b: impl IntoIterator<Item = (UUID<IDMarker>, OB), IntoIter = IterB>,
+) -> ZippedIterator<IDMarker, OA, OB, IterA, IterB> {
     ZippedIterator {
         iter_a: iter_a.into_iter(),
         iter_b: iter_b.into_iter(),
@@ -990,6 +1021,25 @@ pub struct ZippedIterator3<
     iter_a: IterA,
     iter_b: IterB,
     iter_c: IterC,
+}
+
+impl<
+    IDMarker,
+    OA,
+    OB,
+    OC,
+    IterA: Iterator<Item = (UUID<IDMarker>, OA)> + Clone,
+    IterB: Iterator<Item = (UUID<IDMarker>, OB)> + Clone,
+    IterC: Iterator<Item = (UUID<IDMarker>, OC)> + Clone,
+> Clone for ZippedIterator3<IDMarker, OA, OB, OC, IterA, IterB, IterC>
+{
+    fn clone(&self) -> Self {
+        Self {
+            iter_a: self.iter_a.clone(),
+            iter_b: self.iter_b.clone(),
+            iter_c: self.iter_c.clone(),
+        }
+    }
 }
 
 impl<
@@ -1018,11 +1068,19 @@ impl<
     }
 }
 
-pub fn zip_eq3<IDMarker, OA, OB, OC>(
-    iter_a: impl IntoIterator<Item = (UUID<IDMarker>, OA)>,
-    iter_b: impl IntoIterator<Item = (UUID<IDMarker>, OB)>,
-    iter_c: impl IntoIterator<Item = (UUID<IDMarker>, OC)>,
-) -> impl Iterator<Item = (UUID<IDMarker>, OA, OB, OC)> {
+pub fn zip_eq3<
+    IDMarker,
+    OA,
+    OB,
+    OC,
+    IterA: Iterator<Item = (UUID<IDMarker>, OA)>,
+    IterB: Iterator<Item = (UUID<IDMarker>, OB)>,
+    IterC: Iterator<Item = (UUID<IDMarker>, OC)>,
+>(
+    iter_a: impl IntoIterator<Item = (UUID<IDMarker>, OA), IntoIter = IterA>,
+    iter_b: impl IntoIterator<Item = (UUID<IDMarker>, OB), IntoIter = IterB>,
+    iter_c: impl IntoIterator<Item = (UUID<IDMarker>, OC), IntoIter = IterC>,
+) -> ZippedIterator3<IDMarker, OA, OB, OC, IterA, IterB, IterC> {
     ZippedIterator3 {
         iter_a: iter_a.into_iter(),
         iter_b: iter_b.into_iter(),

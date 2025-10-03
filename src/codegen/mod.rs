@@ -47,9 +47,9 @@ pub trait CodeGenBackend {
 
         let generation_time =
             chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
-        file.write_fmt(format_args!(
+        write!(file, 
             "// THIS IS A GENERATED FILE (Generated at {generation_time})\n// This file was generated with SUS Compiler {VERSION_INFO}\n"
-        ))
+        )
         .unwrap();
 
         file
