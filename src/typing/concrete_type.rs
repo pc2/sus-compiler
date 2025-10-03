@@ -439,25 +439,13 @@ impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
     pub fn report_if_errors(&self, linker: &Linker, context: &str) -> Result<(), String> {
         let error_parameters = self.find_invalid_template_args();
         if !error_parameters.is_empty() {
-            let mut resulting_error = format!(
-                "{context}: {}. The arguments ",
-                self.display(&linker.globals)
-            );
-            for id in error_parameters {
-                use std::fmt::Write;
-                write!(
-                    resulting_error,
-                    "'{}', ",
-                    &linker.globals[self.id.into()].parameters[id].name
-                )
-                .unwrap();
-            }
-
-            resulting_error.pop();
-            resulting_error.pop();
-            resulting_error.push_str(" were not valid");
-
-            Err(resulting_error)
+            let error_params_disp = display_join(", ", &error_parameters, |f, id| {
+                let param_name = &linker.globals[self.id.into()].parameters[*id].name;
+                write!(f, "'{param_name}'")
+            });
+            Err(format!(
+                "{context}. The arguments {error_params_disp} were not valid",
+            ))
         } else {
             Ok(())
         }

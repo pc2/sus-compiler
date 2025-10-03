@@ -487,25 +487,46 @@ fn add_to_small_set<T: Eq>(set_vec: &mut Vec<T>, elem: T) {
     }
 }
 
-fn must_be_positive(v: &IBig, subject: &str) -> Result<UBig, String> {
+fn must_be_positive(v: &IBig, subject: &'static str) -> Result<UBig, String> {
     UBig::try_from(v).map_err(|_| format!("{subject} must be positive! Found {v}"))
 }
+fn must_be_small_uint<'a, UT: TryFrom<&'a IBig> + Ord + std::fmt::Display>(
+    v: &'a IBig,
+    subject: &'static str,
+    max: UT,
+) -> Result<UT, String> {
+    match UT::try_from(v) {
+        Err(_) => {
+            if v < &IBig::from(0) {
+                Err(format!("{subject} must be positive!"))
+            } else {
+                Err(format!("{subject} is too large! It may be max {max}"))
+            }
+        }
+        Ok(v) => {
+            if v <= max {
+                Ok(v)
+            } else {
+                Err(format!("{subject} is too large! It may be max {max}"))
+            }
+        }
+    }
+}
 /// n! / (n - k)!
-fn falling_factorial(mut n: UBig, k: &UBig) -> UBig {
-    let num_terms = u64::try_from(k).unwrap();
+fn falling_factorial(mut n: UBig, num_terms: u64) -> UBig {
     let mut result = ibig::ubig!(1);
     for _ in 0..num_terms {
         result *= &n;
-        n -= 1usize;
+        n -= 1;
     }
     result
 }
-fn factorial(mut n: UBig) -> UBig {
-    let as_usize = usize::try_from(&n).unwrap();
-    for v in 2..as_usize {
-        n *= v;
+fn factorial(n: u64) -> UBig {
+    let mut total = UBig::from(n);
+    for v in 2..n {
+        total *= v;
     }
-    n
+    total
 }
 
 struct InterfaceWires {
@@ -651,60 +672,52 @@ impl<'l> ExecutionContext<'l> {
                         INT_SCALAR.clone(),
                     ))
                 } else {
-                    Err(format!(
-                        "clog2 argument must be strictly positive! Found {val}"
-                    ))
+                    Err("V must be >= 1!".to_string())
                 }
             }
             get_builtin_const!("pow2") => {
                 let [exponent] = cst_ref.template_args.cast_to_int_array();
-                if let Ok(exp) = usize::try_from(exponent) {
-                    let mut result = ibig::ubig!(0);
-                    result.set_bit(exp);
-                    Ok((Value::Integer(result.into()), INT_SCALAR.clone()))
-                } else {
-                    Err(format!("pow2 exponent must be >= 0, found {exponent}"))
-                }
+                let exponent = must_be_small_uint::<usize>(exponent, "E", usize::MAX)?;
+                let mut result = ibig::ubig!(0);
+                result.set_bit(exponent);
+                Ok((Value::Integer(result.into()), INT_SCALAR.clone()))
             }
             get_builtin_const!("pow") => {
                 let [base, exponent] = cst_ref.template_args.cast_to_int_array();
-                if let Ok(exp) = usize::try_from(exponent) {
-                    Ok((Value::Integer(base.pow(exp)), INT_SCALAR.clone()))
-                } else {
-                    Err(format!("pow exponent must be >= 0, found {exponent}"))
-                }
+                let exponent = must_be_small_uint::<usize>(exponent, "E", usize::MAX)?;
+                Ok((Value::Integer(base.pow(exponent)), INT_SCALAR.clone()))
             }
             get_builtin_const!("factorial") => {
                 let [n] = cst_ref.template_args.cast_to_int_array();
-                let n = must_be_positive(n, "factorial parameter")?;
+                let n = must_be_small_uint::<u64>(n, "N", u64::MAX)?;
 
                 Ok((Value::Integer(factorial(n).into()), INT_SCALAR.clone()))
             }
             get_builtin_const!("falling_factorial") => {
                 let [n, k] = cst_ref.template_args.cast_to_int_array();
-                let n = must_be_positive(n, "comb n parameter")?;
-                let k = must_be_positive(k, "comb k parameter")?;
+                let n = must_be_positive(n, "N")?;
+                let k = must_be_small_uint::<u64>(k, "K", u64::MAX)?;
 
-                if k > n {
-                    return Err(format!("comb assertion failed: k <= n. Found n={n}, k={k}"));
+                if UBig::from(k) > n {
+                    return Err("K must be <= N.".to_string());
                 }
 
                 Ok((
-                    Value::Integer(falling_factorial(n, &k).into()),
+                    Value::Integer(falling_factorial(n, k).into()),
                     INT_SCALAR.clone(),
                 ))
             }
             get_builtin_const!("comb") => {
                 let [n, k] = cst_ref.template_args.cast_to_int_array();
-                let n = must_be_positive(n, "comb n parameter")?;
-                let k = must_be_positive(k, "comb k parameter")?;
+                let n = must_be_positive(n, "N")?;
+                let k = must_be_small_uint::<u64>(k, "K", u64::MAX)?;
 
-                if k > n {
-                    return Err(format!("comb assertion failed: k <= n. Found n={n}, k={k}"));
+                if UBig::from(k) > n {
+                    return Err("K must be <= N.".to_string());
                 }
 
                 Ok((
-                    Value::Integer((falling_factorial(n, &k) / factorial(k)).into()),
+                    Value::Integer((falling_factorial(n, k) / factorial(k)).into()),
                     INT_SCALAR.clone(),
                 ))
             }
@@ -751,12 +764,17 @@ impl<'l> ExecutionContext<'l> {
                 self.linker,
                 "For executing compile-time constants, all arguments must be fully specified",
             )
-            .map_err(|e| (cst_ref.get_total_span(), e))?;
+            .map_err(|e| {
+                let cst_disp = concrete_ref.display(&self.linker.globals);
+                (cst_ref.get_total_span(), format!("{cst_disp}: {e}"))
+            })?;
 
         if linker_cst.link_info.is_extern == IsExtern::Builtin {
             cst_ref.get_total_span().debug();
-            self.evaluate_builtin_constant(&concrete_ref)
-                .map_err(|e| (cst_ref.get_total_span(), e))
+            self.evaluate_builtin_constant(&concrete_ref).map_err(|e| {
+                let cst_disp = concrete_ref.display(&self.linker.globals);
+                (cst_ref.get_total_span(), format!("{cst_disp}: {e}"))
+            })
         } else {
             todo!("Custom Constants");
         }
@@ -1902,20 +1920,21 @@ mod tests {
 
     #[test]
     fn test_factorial() {
-        let a = ibig::ubig!(7);
-
-        assert_eq!(factorial(a), ibig::ubig!(5040))
+        assert_eq!(factorial(4), ibig::UBig::from(4u32 * 3 * 2));
+        assert_eq!(factorial(5), ibig::UBig::from(5u32 * 4 * 3 * 2));
+        assert_eq!(factorial(6), ibig::UBig::from(6u32 * 5 * 4 * 3 * 2));
+        assert_eq!(factorial(7), ibig::UBig::from(7u32 * 6 * 5 * 4 * 3 * 2));
     }
     #[test]
     fn test_falling_factorial() {
-        let a = ibig::ubig!(20);
-        let b = ibig::ubig!(15);
+        let a = 20;
+        let b = 15;
 
-        let a_factorial = factorial(a.clone());
-        let a_b_factorial = factorial(&a - &b);
+        let a_factorial = factorial(a);
+        let a_b_factorial = factorial(a - b);
 
         assert_eq!(
-            falling_factorial(a.clone(), &b),
+            falling_factorial(ibig::ubig!(a), b),
             a_factorial / a_b_factorial
         )
     }

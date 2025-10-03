@@ -3637,19 +3637,19 @@ Error: Used 'if' in a non generative context, use 'when' instead
       │     ─┬  
       │      ╰── Used 'if' in a non generative context, use 'when' instead
 ──────╯
-Error: For executing compile-time constants, all arguments must be fully specified: sizeof #(T: type int #(FROM: ?, TO: ?)[10][10]). The arguments 'T' were not valid
+Error: sizeof #(T: type int #(FROM: ?, TO: ?)[10][10]): For executing compile-time constants, all arguments must be fully specified. The arguments 'T' were not valid
       ╭─[ test.sus:1071:25 ]
       │
  1071 │     gen int INT_ARR_SIZE = sizeof #(T: type int[10][10])
       │                            ──────────────┬──────────────  
-      │                                          ╰──────────────── For executing compile-time constants, all arguments must be fully specified: sizeof #(T: type int #(FROM: ?, TO: ?)[10][10]). The arguments 'T' were not valid
+      │                                          ╰──────────────── sizeof #(T: type int #(FROM: ?, TO: ?)[10][10]): For executing compile-time constants, all arguments must be fully specified. The arguments 'T' were not valid
 ──────╯
-Error: Assertion failed
+Error: assert #(C: false): Assertion failed
       ╭─[ test.sus:1081:2 ]
       │
  1081 │     assert #(C: 15 + 3 == 19)
       │     ────────────┬────────────  
-      │                 ╰────────────── Assertion failed
+      │                 ╰────────────── assert #(C: false): Assertion failed
 ──────╯
 Error: Used 'when' in a generative context, use 'if' instead
       ╭─[ test.sus:1092:2 ]
