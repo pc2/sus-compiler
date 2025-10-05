@@ -1,4 +1,13 @@
 # Changelog
+## 0.3.2
+- Execute: Add `BitsToUIntGen`, `BitsToIntGen`, `UIntToBitsGen` and `IntToBitsGen` for compiletime `gen bool[] <-> gen int` conversion (#120)
+- Codegen: Fix incorrect codegen for negative int literals (#117)
+- Dot output: Replace `shape=record` with HTML tables, to sidestep graphviz bug (#116)
+- Use logging library for prints -> All prints now go over stderr instead of stdout
+- LSP: Add `--stdio` support, so no more need for TCP LSP. LSP now enforces minimum sus_compiler version of 0.3.2
+- LSP: Fix crash when renaming module inputs/outputs (#119)
+- LSP: Fix crash when renaming files (#118)
+
 ## 0.3.1
 - Add VIM & NeoVim LSP support (#113) (Thanks @papeg!)
 - Downgrade to Rust 1.88 to use on EasyBuild-powered clusters
@@ -6,14 +15,14 @@
 - Codegen: Invalid use of `{}` converted to `'{}` #112
 - Codegen: Inlining of constants was to eager (#110 and #111)
 - `--standalone` now properly generates `./verilog_output` if it doesn't exist. (#109)
-- When bindings now proprly bind binding domain to condition domain (#97)
+- When bindings now properly bind binding domain to condition domain (#97)
 
 ## 0.3.0: The Integral Update
 ### Standard Library is delivered with the compiler
 This means from now on `cargo install sus_compiler` will create a new directory in `~/.sus/{version}` (so now `~/.sus/0.3.0/` that contains the standard library. It also contains a folder `crash_dumps` to which crash dumps are saved for easier debugging. You can change this by passing `sus_compiler --sus-home /new/path/to/other/home/`, but it's mostly used to support development. 
 
 ### Subtyping System
-Subtyping currently only occurs for integer parameters, and the only subtyping rules are "equality" (such as for array sizes), and "<=" and ">=" which are currently only used for integer subtyping (`int #(FROM: F_A, TO: T_A)` can be assigned to `int #(FROM: F_B, TO: T_B)` iff `F_A >= F_B && T_A <= T_B`. 
+Subtyping currently only occurs for integer parameters, and the only subtyping rules are "equality" (such as for array sizes), and "<=" and ">=" which are currently only used for integer subtyping (`int #(FROM: F_A, TO: T_A)` can be assigned to `int #(FROM: F_B, TO: T_B)` iff `F_A >= F_B && T_A <= T_B`.)
 
 Described more formally in #87 . 
 
