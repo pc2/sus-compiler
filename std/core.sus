@@ -143,21 +143,64 @@ module LatencyOffsetActionNoData #(int OFFSET) {
 }
 
 
+/// Convert signed int to 2s complement bits. (`bits[0]` is `value`'s Least Significant Bit)
+///
+/// Requires `-pow2 #(E: NUM_BITS - 1) <= value < pow2 #(E: NUM_BITS - 1)`
+///
+/// Runtime equivalent of [IntToBitsGen]
 __builtin__ module IntToBits #(int NUM_BITS) {
     interface IntToBits : int #(FROM: -pow2 #(E: NUM_BITS - 1), TO: pow2 #(E: NUM_BITS - 1)) value'0 -> bool[NUM_BITS] bits'0
 }
-
-__builtin__ module BitsToInt #(int NUM_BITS) {
-    interface BitsToInt : bool[NUM_BITS] bits'0 -> int #(FROM: -pow2 #(E: NUM_BITS - 1), TO: pow2 #(E: NUM_BITS - 1)) value'0
-}
-
+/// Convert int to unsigned bits. (`bits[0]` is `value`'s Least Significant Bit)
+///
+/// Requires `0 <= value < pow2 #(E: NUM_BITS)`
+///
+/// Runtime equivalent of [UIntToBitsGen]
 __builtin__ module UIntToBits #(int NUM_BITS) {
     interface UIntToBits : int #(FROM: 0, TO: pow2 #(E: NUM_BITS)) value'0 -> bool[NUM_BITS] bits'0
 }
-
+/// Convert 2s complement bits to a signed int. (`bits[0]` is `value`'s Least Significant Bit)
+///
+/// Creates an int in the range `-pow2 #(E: NUM_BITS - 1) <= value < pow2 #(E: NUM_BITS - 1)`
+///
+/// Runtime equivalent of [BitsToIntGen]
+__builtin__ module BitsToInt #(int NUM_BITS) {
+    interface BitsToInt : bool[NUM_BITS] bits'0 -> int #(FROM: -pow2 #(E: NUM_BITS - 1), TO: pow2 #(E: NUM_BITS - 1)) value'0
+}
+/// Convert unsigned bits to an unsigned int. (`bits[0]` is `value`'s Least Significant Bit)
+///
+/// Creates an int in the range `0 <= value < pow2 #(E: NUM_BITS)`
+///
+/// Runtime equivalent of [BitsToUIntGen]
 __builtin__ module BitsToUInt #(int NUM_BITS) {
     interface BitsToUInt : bool[NUM_BITS] bits'0 -> int #(FROM: 0, TO: pow2 #(E: NUM_BITS)) value'0
 }
+
+/// Convert gen int to 2s complement bits. (`RESULT[0]` is `V`'s Least Significant Bit)
+///
+/// Requires `-pow2 #(E: NUM_BITS - 1) <= V < pow2 #(E: NUM_BITS - 1)`
+///
+/// Generative equivalent of [IntToBits]
+__builtin__ const bool[NUM_BITS] IntToBitsGen #(int NUM_BITS, int V) {}
+/// Convert gen int to unsigned bits. (`RESULT[0]` is `V`'s Least Significant Bit)
+///
+/// Requires `0 <= V < pow2 #(E: NUM_BITS)`
+///
+/// Generative equivalent of [UIntToBits]
+__builtin__ const bool[NUM_BITS] UIntToBitsGen #(int NUM_BITS, int V) {}
+/// Convert gen 2s complement bits to a gen signed int. (`BITS[0]` is `V`'s Least Significant Bit)
+///
+/// Creates an int in the range `-pow2 #(E: NUM_BITS - 1) <= value < pow2 #(E: NUM_BITS - 1)`
+///
+/// Generative equivalent of [BitsToInt]
+__builtin__ const int BitsToIntGen #(int NUM_BITS, bool[NUM_BITS] BITS) {}
+/// Convert gen unsigned bits to a gen unsigned int. (`BITS[0]` is `V`'s Least Significant Bit)
+///
+/// Creates an int in the range `0 <= value < pow2 #(E: NUM_BITS)`
+///
+/// Generative equivalent of [BitsToUInt]
+__builtin__ const int BitsToUIntGen #(int NUM_BITS, bool[NUM_BITS] BITS) {}
+
 
 __builtin__ module transmute_to_bits #(T) {
     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0

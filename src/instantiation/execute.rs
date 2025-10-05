@@ -512,6 +512,60 @@ fn must_be_small_uint<'a, UT: TryFrom<&'a IBig> + Ord + std::fmt::Display>(
         }
     }
 }
+
+/// When value doesn't fit in num_bits, returns Err(minimum_needed_bits)
+fn cvt_ubig_to_bits<const INVERT: bool, const INCLUDE_SIGN_BIT: usize>(
+    v: &UBig,
+    num_bits: usize,
+) -> Result<Vec<Value>, usize> {
+    let num_bits_needed = v.bit_len() + INCLUDE_SIGN_BIT;
+    if num_bits_needed > num_bits {
+        Err(num_bits_needed)
+    } else {
+        Ok((0..num_bits)
+            .map(|idx| Value::Bool(v.bit(idx) ^ INVERT))
+            .collect())
+    }
+}
+/// When value doesn't fit in num_bits, returns Err(minimum_needed_bits)
+fn cvt_ibig_to_signed_bits(v: IBig, num_bits: usize) -> Result<Vec<Value>, usize> {
+    if v >= IBig::from(0) {
+        // Is positive
+        let as_unsigned = UBig::try_from(v).unwrap();
+
+        cvt_ubig_to_bits::<false, 1>(&as_unsigned, num_bits)
+    } else {
+        // Is negative
+        let mut negative_as_unsigned = UBig::try_from(-v).unwrap();
+        // -x = (!x + 1) = !(x - 1)
+        negative_as_unsigned -= 1;
+        cvt_ubig_to_bits::<true, 1>(&negative_as_unsigned, num_bits)
+    }
+}
+fn cvt_bits_to_ubig<const INVERT: bool>(bits: &[Value]) -> UBig {
+    let mut result = ibig::ubig!(0);
+
+    for (idx, bit) in bits.iter().enumerate().rev() {
+        let bit = bit.unwrap_bool() ^ INVERT;
+        if bit {
+            result.set_bit(idx);
+        }
+    }
+
+    result
+}
+/// Requires `bits.len() >= 1`
+fn cvt_signed_bits_to_ibig(bits: &[Value]) -> IBig {
+    let is_negative = bits.last().unwrap().unwrap_bool();
+    if is_negative {
+        // Do manual 2s complement if negative, such that we don't work with an infinite number of leading 1 bits.
+        // Of course, because we've inverted once, we need to re-invert again
+        let as_ubig = cvt_bits_to_ubig::<true>(bits);
+        -IBig::from(as_ubig + 1) // -bits = !bits + 1
+    } else {
+        cvt_bits_to_ubig::<false>(bits).into()
+    }
+}
 /// n! / (n - k)!
 fn falling_factorial(mut n: UBig, num_terms: u64) -> UBig {
     let mut result = ibig::ubig!(1);
@@ -731,7 +785,7 @@ impl<'l> ExecutionContext<'l> {
                 if condition.unwrap_value().unwrap_bool() {
                     Ok((Value::Bool(true), BOOL_SCALAR))
                 } else {
-                    Err("Assertion failed".into())
+                    Err("Assertion failed".to_string())
                 }
             }
             get_builtin_const!("sizeof") => {
@@ -740,7 +794,62 @@ impl<'l> ExecutionContext<'l> {
                 if let Some(typ_sz) = concrete_typ.unwrap_type().sizeof() {
                     Ok((Value::Integer(typ_sz), INT_SCALAR.clone()))
                 } else {
-                    Err("This is an incomplete type".into())
+                    Err("This is an incomplete type".to_string())
+                }
+            }
+            get_builtin_const!("BitsToUIntGen") => {
+                let [num_bits, bits] = cst_ref.template_args.cast_to_unifyable_array();
+                let bits = bits.unwrap_array();
+                if &IBig::from(bits.len()) != num_bits.unwrap_integer() {
+                    return Err("NUM_BITS != length of BITS".to_string());
+                }
+
+                let resulting_ubig = cvt_bits_to_ubig::<false>(bits);
+
+                Ok((Value::Integer(resulting_ubig.into()), INT_SCALAR.clone()))
+            }
+            get_builtin_const!("BitsToIntGen") => {
+                let [num_bits, bits] = cst_ref.template_args.cast_to_unifyable_array();
+                let bits = bits.unwrap_array();
+                if &IBig::from(bits.len()) != num_bits.unwrap_integer() {
+                    return Err("NUM_BITS != length of BITS".to_string());
+                }
+                if bits.is_empty() {
+                    return Err("NUM_BITS must be >= 1 for signed bits".to_string());
+                };
+
+                let resulting_ibig = cvt_signed_bits_to_ibig(bits);
+
+                Ok((Value::Integer(resulting_ibig), INT_SCALAR.clone()))
+            }
+            get_builtin_const!("UIntToBitsGen") => {
+                let [num_bits, v] = cst_ref.template_args.cast_to_int_array();
+                let num_bits = must_be_small_uint::<usize>(num_bits, "V", usize::MAX)?;
+                let v = must_be_positive(v, "V")?;
+
+                let v_bit_len = v.bit_len();
+                if v_bit_len > num_bits {
+                    return Err(format!(
+                        "NUM_BITS is too small to store the {v_bit_len} bits needed for {v} (unsigned)!"
+                    ));
+                }
+
+                match cvt_ubig_to_bits::<false, 0>(&v, num_bits) {
+                    Ok(bits) => Ok((Value::Array(bits), INT_SCALAR.clone())),
+                    Err(expected_num_bits) => Err(format!(
+                        "NUM_BITS is too small to store the {expected_num_bits} bits needed for {v} (signed)!"
+                    )),
+                }
+            }
+            get_builtin_const!("IntToBitsGen") => {
+                let [num_bits, v] = cst_ref.template_args.cast_to_int_array();
+                let num_bits = must_be_small_uint::<usize>(num_bits, "V", usize::MAX)?;
+
+                match cvt_ibig_to_signed_bits(v.clone(), num_bits) {
+                    Ok(bits) => Ok((Value::Array(bits), INT_SCALAR.clone())),
+                    Err(expected_num_bits) => Err(format!(
+                        "NUM_BITS is too small to store the {expected_num_bits} bits needed for {v} (signed)!"
+                    )),
                 }
             }
             get_builtin_const!("__crash_compiler") => {
@@ -1915,6 +2024,7 @@ impl<'l> ExecutionContext<'l> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ibig::{ibig, ops::Abs, ubig};
 
     use crate::instantiation::execute::factorial;
 
@@ -1934,8 +2044,134 @@ mod tests {
         let a_b_factorial = factorial(a - b);
 
         assert_eq!(
-            falling_factorial(ibig::ubig!(a), b),
+            falling_factorial(UBig::from(a), b),
             a_factorial / a_b_factorial
         )
+    }
+
+    #[test]
+    fn test_cvt_ubig_to_bits_basic() {
+        // 5 (0b101)
+        let bits = cvt_ubig_to_bits::<false, 0>(&ubig!(5), 3).unwrap();
+        assert_eq!(
+            bits.iter().map(|b| b.unwrap_bool()).collect::<Vec<_>>(),
+            vec![true, false, true]
+        );
+        // Not enough bits
+        assert_eq!(cvt_ubig_to_bits::<false, 0>(&ubig!(5), 2), Err(3));
+        // Large value (70 bits)
+        let v = ubig!(1) << 69;
+        let bits = cvt_ubig_to_bits::<false, 0>(&v, 70).unwrap();
+        assert!(bits[69].unwrap_bool());
+        assert!(bits[..69].iter().all(|b| !b.unwrap_bool()));
+    }
+
+    #[test]
+    fn test_cvt_ibig_to_signed_bits_basic() {
+        // Positive 5 (0b101)
+        let v = ibig!(5);
+        let bits = cvt_ibig_to_signed_bits(v, 4).unwrap();
+        assert_eq!(
+            bits.iter().map(|b| b.unwrap_bool()).collect::<Vec<_>>(),
+            vec![true, false, true, false]
+        );
+        // Negative -5 (should be two's complement)
+        let v = ibig!(-5);
+        let bits = cvt_ibig_to_signed_bits(v, 4).unwrap();
+        // -5 in 4 bits is 0b1011
+        assert_eq!(
+            bits.iter().map(|b| b.unwrap_bool()).collect::<Vec<_>>(),
+            vec![true, true, false, true]
+        );
+        // Not enough bits
+        assert!(cvt_ibig_to_signed_bits(ibig!(127), 8).is_ok());
+        assert_eq!(cvt_ibig_to_signed_bits(ibig!(128), 8), Err(9)); // Needs 9 bits (8+1 sign)
+        assert!(cvt_ibig_to_signed_bits(ibig!(-512), 10).is_ok());
+        assert_eq!(cvt_ibig_to_signed_bits(ibig!(-513), 10), Err(11)); // Needs 11 bits (10+1 sign)
+        // Large negative
+        let v = -ibig!(1) << 70;
+        let bits = cvt_ibig_to_signed_bits(v, 71).unwrap();
+        assert!(bits[70].unwrap_bool());
+        assert!(bits[..70].iter().all(|b| !b.unwrap_bool()));
+    }
+
+    #[test]
+    fn test_cvt_bits_to_ubig_basic() {
+        // 0b10101
+        let bits = vec![
+            Value::Bool(true),
+            Value::Bool(false),
+            Value::Bool(true),
+            Value::Bool(false),
+            Value::Bool(true),
+        ];
+        assert_eq!(cvt_bits_to_ubig::<false>(&bits), ubig!(21));
+        // Invert
+        assert_eq!(cvt_bits_to_ubig::<true>(&bits), ubig!(10)); // 0b01010
+        // Large (>64 bits)
+        let mut bits = vec![Value::Bool(false); 130];
+        bits[129] = Value::Bool(true);
+        assert_eq!(cvt_bits_to_ubig::<false>(&bits), ubig!(1) << 129);
+    }
+
+    #[test]
+    fn test_cvt_signed_bits_to_ibig_basic() {
+        // Positive: 0b0101 (4 bits, sign bit 0)
+        let bits = vec![
+            Value::Bool(true),
+            Value::Bool(false),
+            Value::Bool(true),
+            Value::Bool(false),
+        ];
+        assert_eq!(cvt_signed_bits_to_ibig(&bits), ibig!(5));
+        // Negative: 0b1011 (4 bits, sign bit 1)
+        let bits = vec![
+            Value::Bool(true),
+            Value::Bool(true),
+            Value::Bool(false),
+            Value::Bool(true),
+        ];
+        assert_eq!(cvt_signed_bits_to_ibig(&bits), ibig!(-5));
+        // Large negative
+        let mut bits = vec![Value::Bool(false); 130];
+        bits[129] = Value::Bool(true); // sign bit
+        assert_eq!(cvt_signed_bits_to_ibig(&bits), -ibig!(1) << 129);
+    }
+
+    #[test]
+    fn test_ubig_bits_roundtrip() {
+        // Try a range of values, including large
+        let vals = [
+            ubig!(0),
+            ubig!(1),
+            ubig!(123456789),
+            (ubig!(1) << 100) + 1234,
+        ];
+        for v in vals.iter() {
+            let n = v.bit_len();
+            let bits = cvt_ubig_to_bits::<false, 0>(v, n).unwrap();
+            let v2 = cvt_bits_to_ubig::<false>(&bits);
+            assert_eq!(v, &v2);
+        }
+    }
+
+    #[test]
+    fn test_ibig_signed_bits_roundtrip() {
+        // Try a range of values, including large and negative
+        let vals = [
+            ibig!(0),
+            ibig!(1),
+            ibig!(-1),
+            ibig!(123456789),
+            ibig!(-123456789),
+            (ibig!(1) << 100) + 1234,
+            -((ibig!(1) << 100) + 1234u64),
+        ];
+        for v in vals.iter() {
+            let n = UBig::try_from(v.abs()).unwrap().bit_len() + 1;
+            let bits = cvt_ibig_to_signed_bits(v.clone(), n).unwrap();
+            let v2 = cvt_signed_bits_to_ibig(&bits);
+            assert_eq!(v, &v2);
+        }
     }
 }
