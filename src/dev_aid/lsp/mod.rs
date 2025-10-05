@@ -211,6 +211,10 @@ fn initialize_all_files(init_params: &InitializeParams) -> (Linker, LSPFileManag
     if !files.is_empty() {
         for f in files {
             let Ok(path) = f.canonicalize() else {
+                warn!(
+                    "Previously existing file {} no longer exists??? Ignoring",
+                    f.to_string_lossy()
+                );
                 continue;
             };
             linker.add_file(&path, &mut manager);
