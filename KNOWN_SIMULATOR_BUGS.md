@@ -1,7 +1,7 @@
 
 # 1-bit Conditional Assigns become don't care
 ## Affects: Vivado 23.1, Vivado 23.2
-## Fixed in: Vivado 24.2
+## Fixed in: Vivado 24.1
 ```sv
 module sim_reproduce_bug;
 
