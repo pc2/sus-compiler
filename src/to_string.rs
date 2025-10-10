@@ -754,6 +754,10 @@ impl LinkInfo {
     ) -> std::fmt::Result {
         let mut spans_print = Vec::new();
         for (id, instr) in &self.instructions {
+            let domain = self.display_domain_of(id, domains);
+            let span = self.get_instruction_span(id);
+            spans_print.push((format!("{id:?} {domain}"), span));
+
             let parent = FmtWrapper(|f| {
                 if let Some(p) = instr.get_parent_condition() {
                     let p_when = p.parent_when;
@@ -767,7 +771,6 @@ impl LinkInfo {
                 }
                 Ok(())
             });
-            let domain = self.display_domain_of(id, domains);
             write!(f, "{id:?}: {parent} {domain} ")?;
             match instr {
                 Instruction::SubModule(SubModuleInstance {
@@ -830,8 +833,9 @@ impl LinkInfo {
                                  }| {
                                     let target_domain = target_domain.get();
                                     let target_domain = target_domain.debug(domains);
+                                    let typ_disp = to.output_typ.display(globals, self);
                                     let to = to.display(globals, self);
-                                    write!(f, "{target_domain} {write_modifiers} {to}")
+                                    write!(f, "{target_domain} ({typ_disp}) {write_modifiers} {to}")
                                 },
                             );
                             write!(f, "({write_tos}) = ")?;
@@ -922,8 +926,6 @@ impl LinkInfo {
                 }
             }
             writeln!(f)?;
-            let span = self.get_instruction_span(id);
-            spans_print.push((format!("{id:?} {domain}"), span));
         }
         pretty_print_many_spans(file_data, &spans_print);
         Ok(())

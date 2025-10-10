@@ -560,7 +560,6 @@ fn has_poison_edge(fanouts: &ListOfLists<FanInOut>) -> bool {
         .all(|fanout_list| fanout_list.iter().all(|f| f.delta_latency.is_some()))
 }
 
-#[allow(unused)]
 fn print_latency_test_case(
     fanins: &ListOfLists<FanInOut>,
     ports: &LatencyCountingPorts,

@@ -1499,6 +1499,7 @@ impl<'l> ExecutionContext<'l> {
                 unreachable!("Constant cannot be non-compile-time");
             }
         };
+        // By now all multi-output expressions are already handled
         let typ = self
             .concretize_type(expression.as_single_output_expr().unwrap().typ, None)
             .unwrap();

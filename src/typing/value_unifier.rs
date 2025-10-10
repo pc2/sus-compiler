@@ -268,7 +268,17 @@ impl Value {
             }
         };
 
-        Ok(content_typ.stack_arrays_usize(&tensor_sizes))
+        assert!(tensor_sizes.len() <= array_depth);
+        let mut array_size_vars: Vec<UnifyableValue> = Vec::with_capacity(array_depth);
+        for sz in tensor_sizes {
+            array_size_vars.push(Value::Integer(IBig::from(sz)).into());
+        }
+        // Because we might encounter zero sized arrays, we don't actually know sizes under there
+        // Fill remaining array slots with Unknown
+        while array_size_vars.len() < array_depth {
+            array_size_vars.push(value_alloc.alloc_unknown());
+        }
+        Ok(content_typ.stack_arrays(array_size_vars))
     }
     fn get_tensor_size_recursive<'v>(
         &'v self,

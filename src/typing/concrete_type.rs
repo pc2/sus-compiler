@@ -11,8 +11,6 @@ use std::ops::Deref;
 use std::ops::DerefMut;
 use std::sync::LazyLock;
 
-use crate::value::Value;
-
 use super::template::TVec;
 
 use super::template::TemplateKind;
@@ -92,17 +90,10 @@ impl ConcreteType {
         template_args: FlatAlloc::new(),
     });
 
-    pub fn stack_arrays_usize(self, tensor_sizes: &[usize]) -> Self {
+    pub fn stack_arrays(self, tensor_sizes: Vec<UnifyableValue>) -> Self {
         let mut result = self;
-        for s in tensor_sizes.iter().rev() {
-            result = ConcreteType::Array(Box::new((result, Value::Integer(IBig::from(*s)).into())));
-        }
-        result
-    }
-    pub fn stack_arrays(self, tensor_sizes: &[UnifyableValue]) -> Self {
-        let mut result = self;
-        for s in tensor_sizes.iter().rev() {
-            result = ConcreteType::Array(Box::new((result, s.clone())));
+        for s in tensor_sizes.into_iter().rev() {
+            result = ConcreteType::Array(Box::new((result, s)));
         }
         result
     }

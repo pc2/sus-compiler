@@ -264,7 +264,7 @@ pub fn parse_args() {
             } else if matches.get_flag("stdio") {
                 ConnectionMethod::Stdio
             } else {
-                panic!(
+                fatal_exit!(
                     "When passing --lsp, must either pass --stdio for STDIO communication, or --socket {{port}} for TCP connection",
                 );
             },
