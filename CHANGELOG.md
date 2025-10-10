@@ -1,4 +1,10 @@
 # Changelog
+## 0.3.3-devel
+- Can now bake in custom SUS_HOME directories into compiler while building: `INSTALL_SUS_HOME=/path/to/home/ cargo install sus_compiler`. Also, default SUS_HOME is now $XDG_DATA_HOME. (#104)
+- SUS_HOME is now controllable via cli override `--sus-home`, env var `$SUS_HOME`, and falls back to the baked-in `$INSTALL_SUS_HOME` set while installing. 
+- Crash dumps try to dump in `$SUS_HOME/crash_dumps`, if `SUS_HOME` is ready-only they dump to `./sus_crash_dumps`
+- Fix crash when crash dump name too long (ironic, isn't it?)
+
 ## 0.3.2
 - Execute: Add `BitsToUIntGen`, `BitsToIntGen`, `UIntToBitsGen` and `IntToBitsGen` for compiletime `gen bool[] <-> gen int` conversion (#120)
 - Codegen: Fix incorrect codegen for negative int literals (#117)

@@ -30,7 +30,9 @@ These are optional paths that can be enabled at commandline. They allow for a mo
 | `--debug TEST` | Temporary marker for debugging |
 
 ## Crash Dumps
-When the compiler panics, it dumps the contents of the user-specified files in `~/.sus/{version}/crash_dumps`. Standard library files are not stored. Each crash is stored in a folder, named after the compiler stage, the module in which the crash took place, as well as a timestamp. Crashes can be reproduced by running `sus_compiler --no-redump` in the directory of the crash dump, as it will automatically include all .sus files in the directory. `--no-redump` should be used such that no duplicate dumps are created when reproducing the crash. 
+When the compiler panics, it dumps the contents of the user-specified files in `$SUS_HOME/{version}/crash_dumps`. Standard library files are not stored. Each crash is stored in a folder, named after the compiler stage, the module in which the crash took place, as well as a timestamp. Crashes can be reproduced by running `sus_compiler --no-redump` in the directory of the crash dump, as it will automatically include all .sus files in the directory. `--no-redump` should be used such that no duplicate dumps are created when reproducing the crash. 
+
+On some systems (notably our cluster), the SUS_HOME directory isn't writable. When a crash occurs, we'll try to write it to `SUS_HOME/crash_dumps/<dump_name>`, and if that fails we write to `./sus_crash_dumps/<dump_name>`. 
 
 Crashes can also be debugged on master with the "Debug Crash Dump" [.vscode/launch.json](../.vscode/launch.json) configuration. 
 
