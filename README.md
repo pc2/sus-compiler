@@ -14,10 +14,11 @@
 SUS is a new RTL Hardware Design Language, similar to Verilog or VHDL, that focuses on simplifying the development of high-performance computing FPGA accelerators, without sacrificing any design freedom at the altar of abstraction. 
 
 ## Installation
-Installation is done through [Rust](https://www.rust-lang.org/)'s package manager cargo ([cargo installation info](https://doc.rust-lang.org/cargo/getting-started/installation.html)). 
+Installation is done through [Rust](https://www.rust-lang.org/)'s package manager cargo ([cargo installation info](https://doc.rust-lang.org/cargo/getting-started/installation.html)). [^installdir]
 ```bash
 cargo install sus_compiler
 ```
+[^installdir]: By default, the standard library is stored in the [$XDG_DATA_HOME](https://wiki.archlinux.org/title/XDG_Base_Directory) folder, but it can be overwritten with `SUS_HOME=/path/to/sus_home/ cargo install sus_compiler`. 
 
 To use the accompanying VSCode Extension for Syntax Highlighting and Code Suggestions ([sus-lsp](https://github.com/pc2/sus-lsp)), install [SUS Hardware Design Language](https://marketplace.visualstudio.com/items?itemName=LennartVanHirtum.sus-lsp) through the VSCode Extension Explorer, or use the F1 installation command:
 ```

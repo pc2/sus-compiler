@@ -1,23 +1,23 @@
 #!/bin/bash
-# Usage: ./clear_fixed_panics.sh /path/to/sus_home
+# Usage: ./clear_fixed_panics.sh /path/to/crash_dumps
 # Must contain a subdirectory crash_dumps
 
 if [ "$#" -ne 1 ]; then
-    echo "Usage: $0 <sus_home_directory>"
+    echo "Usage: $0 <crash dumps directory>"
     exit 1
 fi
 
-SUS_HOME="$1"
+CRASH_DUMPS_FOLDER="$1"
 cargo build
 SUS_COMPILER="/home/lennart/Desktop/sus-compiler/target/debug/sus_compiler"
 
-if [ ! -d "$SUS_HOME/crash_dumps" ]; then
-    echo "Directory $SUS_HOME/crash_dumps does not exist."
+if [ ! -d "$CRASH_DUMPS_FOLDER" ]; then
+    echo "Directory $CRASH_DUMPS_FOLDER does not exist."
     exit 1
 fi
 
-echo "Directory is $SUS_HOME/crash_dumps/*"
-for dump in "$SUS_HOME"/crash_dumps/*
+echo "Directory is $CRASH_DUMPS_FOLDER/*"
+for dump in "$CRASH_DUMPS_FOLDER"/*
 do
     echo "Checking $dump..."
 

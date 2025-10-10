@@ -25,11 +25,10 @@ mod linker;
 
 mod compiler_top;
 
-use std::io::Write;
 use std::{error::Error, path::PathBuf};
 
 use codegen::{CodeGenBackend, VHDLCodegenBackend, VerilogCodegenBackend};
-use config::{EarlyExitUpTo, config, initialize_config_from_cli_args};
+use config::{EarlyExitUpTo, config};
 use dev_aid::ariadne_interface::*;
 use flattening::Module;
 use instantiation::InstantiatedModule;
@@ -39,7 +38,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         .filter_level(log::LevelFilter::Info)
         .init();
 
-    initialize_config_from_cli_args();
+    crate::config::parse_args();
 
     let config = config();
 
@@ -73,9 +72,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
                 .iter()
                 .find(|(_, md)| &md.link_info.name == top_md_name)
             else {
-                let mut err_lock = std::io::stderr().lock();
-                writeln!(err_lock, "Unknown module {top_md_name}").unwrap();
-                std::process::exit(1);
+                fatal_exit!("Unknown module {top_md_name}");
             };
 
             if let Some(codegen_file) = &standalone.file_path {

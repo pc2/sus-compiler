@@ -3,16 +3,24 @@ use std::{
     path::{Path, PathBuf},
 };
 
-fn main() {
-    let home_dir = get_sus_dir().join(env!("CARGO_PKG_VERSION"));
+fn main() -> Result<(), String> {
+    let home_dir = get_sus_dir()?;
     let std_dir = home_dir.join("std");
 
-    fs::create_dir_all(&std_dir).expect("Failed to create std_lib directory");
-
-    copy_dir("std", &std_dir).expect("Failed to copy STD folder");
+    copy_dir(&PathBuf::from("std"), &std_dir);
 
     // Print the path to make it available during the build
-    println!("cargo:rustc-env=SUS_HOME={}", home_dir.to_str().unwrap());
+    println!(
+        "cargo:rustc-env=INSTALL_SUS_HOME={}",
+        home_dir.to_str().unwrap()
+    );
+
+    let features_str = if std::env::var_os("CARGO_FEATURE_LSP").is_some() {
+        ""
+    } else {
+        " without LSP Support"
+    };
+    println!("cargo:rustc-env=BUILD_FEATURES={features_str}");
 
     // note: add error checking yourself.
     let output = std::process::Command::new("git")
@@ -23,35 +31,76 @@ fn main() {
     println!("cargo:rustc-env=GIT_HASH={git_hash}");
     println!(
         "cargo:rustc-env=BUILD_DATE={}",
-        chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
+        chrono::Local::now().format("%Y-%m-%d_%H:%M:%S")
     );
+    Ok(())
 }
 
-fn get_sus_dir() -> PathBuf {
-    let mut sus_dir = dirs_next::home_dir().expect("Could not determine home directory");
-    sus_dir.push(".sus");
+fn get_sus_dir() -> Result<PathBuf, String> {
+    Ok(
+        if let Some(sus_install_dir) = std::env::var_os("INSTALL_SUS_HOME") {
+            let sus_install_dir = PathBuf::from(sus_install_dir);
 
-    // Create the .sus directory if it doesn't exist
-    if !sus_dir.exists() {
-        fs::create_dir(&sus_dir).expect("Failed to create .sus directory");
+            let help_str = "When manually specifying $INSTALL_SUS_HOME you should create it first as an empty directory.";
+
+            let sus_install_dir = sus_install_dir.canonicalize().map_err(|e| {
+                format!(
+                    "The directory {} does not exist. {help_str} ({e})",
+                    sus_install_dir.to_string_lossy()
+                )
+            })?;
+            let Ok(mut dir_iter) = sus_install_dir.read_dir() else {
+                return Err(format!(
+                    "{} exists but is a file??? {help_str}",
+                    sus_install_dir.to_string_lossy()
+                ));
+            };
+            if dir_iter.next().is_some() {
+                return Err(format!(
+                    "The directory {} is not empty. Does it contain a previous install? {help_str}",
+                    sus_install_dir.to_string_lossy()
+                ));
+            }
+
+            sus_install_dir
+        } else {
+            let mut sus_dir = dirs::data_dir().expect("Could not determine data directory");
+            sus_dir.push("sus");
+            sus_dir.push(env!("CARGO_PKG_VERSION"));
+            if let Err(e) = fs::create_dir_all(&sus_dir) {
+                return Err(format!(
+                    "Failed to create {} directory: {e}",
+                    sus_dir.to_string_lossy()
+                ));
+            };
+
+            sus_dir
+        },
+    )
+}
+
+fn copy_dir(src: &Path, dst: &Path) {
+    if dst.is_dir() {
+        fs::remove_dir_all(dst).unwrap();
+    } else if dst.is_file() {
+        fs::remove_file(dst).unwrap();
     }
+    fs::create_dir(dst).unwrap();
 
-    sus_dir
+    copy_dir_recurse(src, dst);
 }
-
 // Helper function to copy a directory and its contents recursively
-fn copy_dir(src: &str, dst: &Path) -> std::io::Result<()> {
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
+fn copy_dir_recurse(src: &Path, dst: &Path) {
+    for entry in fs::read_dir(src).unwrap() {
+        let entry = entry.unwrap();
         let path = entry.path();
         let dest_path = dst.join(entry.file_name());
 
         if path.is_dir() {
-            fs::create_dir_all(&dest_path)?;
-            copy_dir(path.to_str().unwrap(), &dest_path)?;
+            fs::create_dir(&dest_path).unwrap();
+            copy_dir_recurse(&path, &dest_path);
         } else {
-            fs::copy(&path, &dest_path)?;
+            fs::copy(&path, &dest_path).unwrap();
         }
     }
-    Ok(())
 }

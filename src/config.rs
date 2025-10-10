@@ -1,12 +1,11 @@
+use crate::prelude::*;
+
 use clap::{Arg, Command, ValueEnum};
+use log::info;
 use std::collections::HashSet;
 use std::sync::OnceLock;
 use std::time::Duration;
-use std::{
-    env,
-    ffi::{OsStr, OsString},
-    path::PathBuf,
-};
+use std::{env, ffi::OsStr, path::PathBuf};
 
 /// Describes at what point in the compilation process we should exit early.
 ///
@@ -55,7 +54,7 @@ pub struct ConfigStruct {
     pub ci: bool,
     pub target_language: TargetLanguage,
     pub files: Vec<PathBuf>,
-    pub sus_home_override: Option<PathBuf>,
+    pub sus_home: PathBuf,
 
     /// Enable debugging printouts and figures
     ///
@@ -79,7 +78,9 @@ pub const VERSION_INFO: &str = concat!(
     " (",
     env!("GIT_HASH"),
     ") built at ",
-    env!("BUILD_DATE")
+    env!("BUILD_DATE"),
+    " ",
+    env!("BUILD_FEATURES")
 );
 
 fn command_builder() -> Command {
@@ -209,12 +210,14 @@ fn command_builder() -> Command {
             .action(clap::ArgAction::SetTrue))
 }
 
-fn parse_args<I, T>(itr: I) -> Result<ConfigStruct, clap::Error>
-where
-    I: IntoIterator<Item = T>,
-    T: Into<OsString> + Clone,
-{
-    let matches = command_builder().try_get_matches_from(itr)?;
+pub fn parse_args() {
+    assert!(CONFIG.get().is_none(), "parse_args() used twice!");
+
+    let matches = match command_builder().try_get_matches_from(std::env::args_os()) {
+        Ok(matches) => matches,
+        Err(e) => e.exit(),
+    };
+
     let codegen = matches.get_flag("codegen")
         || matches.get_many::<PathBuf>("files").is_none()
         || matches.contains_id("standalone");
@@ -270,7 +273,33 @@ where
         None
     };
 
-    Ok(ConfigStruct {
+    // Compute sus_home based on priorities: --sus-home explicit override, then $SUS_HOME env var, then $INSTALL_SUS_HOME that was set while compiling
+    let sus_home = if let Some(override_path) = sus_home_override {
+        override_path
+    } else if let Some(override_path) = std::env::var_os("SUS_HOME") {
+        PathBuf::from(override_path) // Runtime env variable
+    } else {
+        PathBuf::from(env!("INSTALL_SUS_HOME")) // Compiletime env while building, this is baked into the compiler
+    };
+
+    let sus_home = match sus_home.canonicalize() {
+        Ok(sus_home) => sus_home,
+        Err(e) => {
+            fatal_exit!(
+                "Could not access SUS_HOME directory ({}): {e}",
+                sus_home.to_string_lossy()
+            );
+        }
+    };
+
+    let ci = matches.get_flag("ci");
+
+    if !ci {
+        // Otherwise this might vary on build server, and spuriously change the output
+        info!("SUS_HOME is {}", sus_home.to_string_lossy());
+    }
+
+    let cfg = ConfigStruct {
         lsp_settings,
         codegen,
         debug_whitelist,
@@ -279,23 +308,17 @@ where
         standalone,
         early_exit: *matches.get_one("upto").unwrap(),
         use_color,
-        ci: matches.get_flag("ci"),
+        ci,
         target_language: *matches.get_one("target").unwrap(),
         files,
-        sus_home_override,
+        sus_home,
         no_redump: matches.get_flag("no-redump"),
         float_size: *matches.get_one("float-size").unwrap(),
-    })
+    };
+    CONFIG.set(cfg).unwrap();
 }
 
 static CONFIG: OnceLock<ConfigStruct> = OnceLock::new();
-
-pub fn initialize_config_from_cli_args() {
-    match parse_args(std::env::args_os()) {
-        Ok(parsed_args) => CONFIG.set(parsed_args).unwrap(),
-        Err(err) => err.exit(),
-    }
-}
 
 /// Access the singleton [ConfigStruct] representing the CLI arguments passed to `sus_compiler`
 pub fn config() -> &'static ConfigStruct {
@@ -305,13 +328,4 @@ pub fn config() -> &'static ConfigStruct {
 /// Access the singleton [ConfigStruct] representing the CLI arguments passed to `sus_compiler`
 pub fn lsp_config() -> &'static LSPSettings {
     config().lsp_settings.as_ref().unwrap()
-}
-
-/// Returns the SUS_HOME directory, using the override if set, otherwise the env variable
-pub fn get_sus_home() -> PathBuf {
-    if let Some(ref override_path) = config().sus_home_override {
-        override_path.clone()
-    } else {
-        PathBuf::from(env!("SUS_HOME"))
-    }
 }

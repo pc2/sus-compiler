@@ -26,6 +26,18 @@ pub use sus_proc_macro::__debug_breakpoint;
 #[allow(unused_imports)]
 pub use sus_proc_macro::__debug_breakpoint_if;
 
+#[macro_export]
+macro_rules! fatal_exit {
+    ($($arg:tt)*) => {{
+        use colored::*;
+
+        let msg = format!("FATAL: {}", format!($($arg)*)).red();
+        eprintln!("{msg}");
+        std::process::exit(1);
+    }};
+}
+pub use crate::fatal_exit;
+
 // private imports, for the IDs
 
 use crate::alloc::{UUID, UUIDMarker, UUIDRange};

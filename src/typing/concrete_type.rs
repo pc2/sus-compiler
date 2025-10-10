@@ -168,7 +168,9 @@ impl ConcreteType {
 
                 Self::co_iterate_parameters(a, b, f);
             }
-            (a, b) => unreachable!("{a:?}, {b:?}"),
+            (a, b) => unreachable!(
+                "Non-matching concretetype shape? Should have been caught by abstract typecheck! {a:?}, {b:?}"
+            ),
         }
     }
     pub fn co_iterate_parameters_mut<'a>(

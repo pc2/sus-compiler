@@ -3,6 +3,7 @@ use crate::prelude::*;
 use std::{
     cell::RefCell,
     ops::Range,
+    path::PathBuf,
     sync::{
         Arc, LazyLock, Mutex,
         atomic::{AtomicBool, AtomicPtr},
@@ -15,7 +16,6 @@ use circular_buffer::CircularBuffer;
 use colored::Colorize;
 
 use crate::{
-    compiler_top::get_crash_dumps_dir,
     config::config,
     linker::{FileData, Linker},
     prelude::Span,
@@ -83,7 +83,7 @@ pub fn debug_print_span(span: Span, label: String) {
     MOST_RECENT_FILE_DATA.with(|ptr| {
         let ptr = ptr.load(std::sync::atomic::Ordering::SeqCst);
         if ptr.is_null() {
-            error!("No FileData registered!");
+            error!("No FileData registered for Span Debugging!");
         } else {
             let fd: &FileData = unsafe { &*ptr };
             pretty_print_span(fd, span, label);
@@ -239,7 +239,9 @@ pub fn create_dump_on_panic(linker: &mut Linker, f: impl FnOnce(&mut Linker)) {
 
     if let Err(panic_info) = result {
         // Get ~/.sus/crash_dumps/{timestamp}
-        let cur_time = chrono::Local::now();
+        let cur_time = chrono::Local::now()
+            .format("_%Y-%m-%d_%H:%M:%S")
+            .to_string();
 
         let failure_name = DEBUG_STACK.with_borrow(|history| {
             if let Some(SpanDebuggerStackElement {
@@ -249,19 +251,44 @@ pub fn create_dump_on_panic(linker: &mut Linker, f: impl FnOnce(&mut Linker)) {
             }) = history.debug_stack.last()
             {
                 let global_obj_name = global_obj_name.replace(char::is_whitespace, "");
-                format!(
-                    "{stage}_{global_obj_name}_{}",
-                    cur_time.format("%Y-%m-%d_%H:%M:%S")
-                )
+                format!("{stage}_{global_obj_name}",)
             } else {
-                format!("no module {cur_time}")
+                "unknown".to_string()
             }
         });
 
-        let dump_dir = get_crash_dumps_dir().join(failure_name);
+        // Limit total folder name size to 255, which is the maximum on just about every platform
+        let max_failure_name_bytes = 255 - cur_time.len();
+        let shortened_failure_name = if failure_name.len() <= max_failure_name_bytes {
+            &failure_name
+        } else {
+            let mut limit = max_failure_name_bytes;
+            while !failure_name.is_char_boundary(limit) {
+                limit -= 1;
+            }
+            &failure_name[0..limit]
+        };
+        let dump_name = format!("{shortened_failure_name}{cur_time}");
+        let mut dump_dir = config().sus_home.join("crash_dumps").join(&dump_name);
+
         if let Err(err) = fs::create_dir_all(&dump_dir) {
-            error!("Could not create {}: {err}", dump_dir.to_string_lossy());
-            std::panic::resume_unwind(panic_info);
+            let new_dump_dir = PathBuf::from("sus_crash_dumps").join(&dump_name);
+            error!(
+                "Could not create {} in the SUS install directory: {err} Trying to save it locally to {}",
+                dump_dir.to_string_lossy(),
+                new_dump_dir.to_string_lossy()
+            );
+
+            if let Err(err) = fs::create_dir_all(&new_dump_dir) {
+                error!(
+                    "Could not create {} locally either: {err} Giving up on dumping the error",
+                    new_dump_dir.to_string_lossy()
+                );
+
+                std::panic::resume_unwind(panic_info);
+            }
+
+            dump_dir = new_dump_dir;
         }
 
         // Write reproduce.sh with compiler args
@@ -318,14 +345,9 @@ fn spawn_watchdog_thread() {
             timers.retain(|entry| {
             let deadline = entry.started_at + duration;
             if deadline <= now && entry.alive.load(std::sync::atomic::Ordering::SeqCst) {
-                error!("⏰⏰⏰⏰⏰⏰⏰⏰⏰"); // To show in stdout when this happens too
-                error!(
-                    "⏰ OutOfTimeKiller triggered in {} after it took more than {:.2} seconds to execute ⏰",
+                fatal_exit!("⏰⏰⏰⏰⏰⏰⏰⏰⏰\n⏰ OutOfTimeKiller triggered in {} after it took more than {:.2} seconds to execute ⏰\nProcess will now be terminated.", 
                     entry.info,
-                    (now - entry.started_at).as_secs_f64()
-                );
-                error!("Process will now be terminated.");
-                std::process::exit(1);
+                    (now - entry.started_at).as_secs_f64()); // To show in stdout when this happens too
             } else {
                 deadline > now
             }

@@ -15,14 +15,10 @@ use tree_sitter::Parser;
 
 use crate::{config::config, errors::ErrorStore, file_position::FileText, linker::FileData};
 
-use crate::config::get_sus_home;
 use crate::flattening::{flatten_all_globals, gather_initial_file_data};
 
 pub fn get_std_dir() -> PathBuf {
-    get_sus_home().join("std")
-}
-pub fn get_crash_dumps_dir() -> PathBuf {
-    get_sus_home().join("crash_dumps")
+    config().sus_home.join("std")
 }
 
 /// Any extra operations that should happen when files are added or removed from the linker. Such as caching line offsets.
@@ -43,12 +39,6 @@ impl Linker {
         assert!(self.types.is_empty());
         assert!(self.constants.is_empty());
         let std_lib_path = get_std_dir();
-        if !config().ci {
-            info!(
-                "Standard Library Directory: {}",
-                std_lib_path.to_string_lossy()
-            );
-        }
         self.add_all_files_in_directory(&std_lib_path, info_mngr);
         for (_, f) in &mut self.files {
             f.is_std = true; // Mark standard library files
