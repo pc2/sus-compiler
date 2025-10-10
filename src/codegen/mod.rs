@@ -37,20 +37,35 @@ pub trait CodeGenBackend {
             name.len() + self.output_dir_name().len() + self.file_extension().len() + 2,
         );
         path.push(self.output_dir_name());
-        fs::create_dir_all(&path).unwrap();
+        if let Err(e) = fs::create_dir_all(&path) {
+            fatal_exit!(
+                "Could not create the output directory {}: {e}",
+                path.to_string_lossy()
+            );
+        }
         path.push(name);
         path.set_extension(self.file_extension());
         path
     }
     fn make_output_file(&self, path: &Path) -> File {
-        let mut file = File::create(path).unwrap();
+        let mut file = match File::create(path) {
+            Ok(f) => f,
+            Err(e) => {
+                fatal_exit!(
+                    "Could not create the output file {}: {e}",
+                    path.to_string_lossy()
+                );
+            }
+        };
 
         let generation_time =
             chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
-        write!(file,
+        if let Err(e) = write!(
+            file,
             "// THIS IS A GENERATED FILE (Generated at {generation_time})\n// This file was generated with SUS Compiler {VERSION_INFO}\n"
-        )
-        .unwrap();
+        ) {
+            fatal_exit!("Error while writing to {}: {e}", path.to_string_lossy());
+        }
 
         file
     }
@@ -61,12 +76,15 @@ pub trait CodeGenBackend {
         md: &Module,
         linker: &Linker,
         out_file: &mut File,
+        path: &Path,
     ) {
         if inst.errors.did_error {
             return; // Continue
         }
         let code = self.codegen(md, inst, linker, true); // hardcode use_latency = true for now. Maybe forever, we'll see
-        write!(out_file, "{code}").unwrap();
+        if let Err(e) = write!(out_file, "{code}") {
+            fatal_exit!("Error while writing to {}: {e}", path.to_string_lossy());
+        }
     }
 
     fn codegen_to_file(&self, id: ModuleUUID, md: &Module, linker: &Linker) {
@@ -78,7 +96,7 @@ pub trait CodeGenBackend {
             let path = self.make_output_file_path(&md.link_info.name);
             let mut out_file = self.make_output_file(&path);
             for (_global_ref, inst) in instantiatior_borrow.iter_for_module(id) {
-                self.codegen_instance(inst.as_ref(), md, linker, &mut out_file)
+                self.codegen_instance(inst.as_ref(), md, linker, &mut out_file, &path)
             }
         }
     }
@@ -124,6 +142,7 @@ pub trait CodeGenBackend {
                 &linker.modules[cur_instance.global_ref.id],
                 linker,
                 &mut out_file,
+                path,
             );
 
             cur_idx += 1;

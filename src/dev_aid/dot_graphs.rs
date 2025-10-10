@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use crate::alloc::UUID;
 use crate::instantiation::IsPort;
-use crate::to_string::FmtWrapper;
+use crate::to_string::{FmtWrapper, join_shorten_filename};
 use crate::{
     alloc::FlatAlloc,
     flattening::Direction,
@@ -20,23 +20,28 @@ use crate::{
 
 /// Ensures dot_output exists and returns a File in dot_output with a unique name based on `module_name`, `dot_type`, and `.dot` extension.
 /// Returns the file handle and the full path to the file.
-fn unique_file_name(module_name: &str, dot_type: &str) -> std::io::Result<(File, PathBuf)> {
+fn unique_file_name(module_name: &str, dot_type: &str) -> std::io::Result<PathBuf> {
     let mut path = PathBuf::from("dot_output");
     fs::create_dir_all(&path)?;
-    path.push(format!("{module_name}_{dot_type}.dot"));
+    path.push(join_shorten_filename(
+        module_name,
+        &format!("_{dot_type}.dot"),
+    ));
     let mut count = 1;
     while path.exists() {
-        path.set_file_name(format!("{module_name}_{dot_type}_{count}.dot"));
+        path.set_file_name(join_shorten_filename(
+            module_name,
+            &format!("_{dot_type}_{count}.dot"),
+        ));
         count += 1;
     }
-    let file = File::create(&path)?;
-    Ok((file, path))
+    Ok(path)
 }
 
-fn dot_command(dot_path: &Path, file_name: &str) {
-    let output_path = dot_path.with_extension(file_name);
+fn dot_command(dot_path: &Path, file_type: &str) {
+    let output_path = dot_path.with_extension(file_type);
     match std::process::Command::new("dot")
-        .arg(format!("-T{file_name}"))
+        .arg(format!("-T{file_type}"))
         .arg(dot_path)
         .arg("-o")
         .arg(&output_path)
@@ -67,8 +72,35 @@ fn try_convert_dot_to_image(dot_path: &Path) {
 }
 
 pub fn display_generated_hardware_structure(md_instance: &ModuleTypingContext<'_>) {
-    let (mut file, path) = unique_file_name(&md_instance.name, "hw_structure").unwrap();
-    write!(file, "{}", custom_render_hardware_structure(md_instance)).unwrap();
+    write_dot_file(
+        &md_instance.name,
+        "hw_structure",
+        custom_render_hardware_structure(md_instance),
+    );
+}
+
+pub fn write_dot_file(module_name: &str, dot_type: &str, content: impl Display) {
+    let path = match unique_file_name(module_name, dot_type) {
+        Ok(o) => o,
+        Err(e) => {
+            error!("Could not create dot_output folder: {e}");
+            return;
+        }
+    };
+    let mut file = match File::create_new(&path) {
+        Ok(o) => o,
+        Err(e) => {
+            error!("Could not create {}: {e}", path.to_string_lossy());
+            return;
+        }
+    };
+    if let Err(e) = write!(file, "{content}") {
+        error!(
+            "Could not write the hardware structure to {}: {e}",
+            path.to_string_lossy()
+        );
+        return;
+    }
     try_convert_dot_to_image(&path);
 }
 
@@ -159,23 +191,18 @@ pub fn display_latency_count_graph(
         extra_node_info[spec.node].1 = Some(spec.latency);
     }
 
-    let (mut file, path) = unique_file_name(module_name, dot_type).unwrap();
-
-    use std::io::Write;
-    write!(
-        file,
-        "{}",
+    write_dot_file(
+        module_name,
+        dot_type,
         custom_render_latency_count_graph(
             lc_problem,
             wires,
             submodules,
             linker,
             solution,
-            module_name
-        )
+            module_name,
+        ),
     )
-    .unwrap();
-    try_convert_dot_to_image(&path);
 }
 
 struct NodeId {

@@ -1401,6 +1401,27 @@ pub fn trim_known_prefix<'a>(in_str: &'a str, prefix: &str) -> &'a str {
     &in_str[prefix.len()..]
 }
 
+// Limit total folder/file name size to 255, which is the maximum on just about every platform
+const MAX_FILENAME_LEN: usize = 255;
+/// Shorten the total string (name + postfix) such that `format!("{name}{postfix}").len() <= MAX_FILENAME_LEN`
+pub fn join_shorten_filename(name: &str, postfix: &str) -> String {
+    let max_len = MAX_FILENAME_LEN - postfix.len();
+    if name.len() <= max_len {
+        format!("{name}{postfix}")
+    } else {
+        let mut limit = max_len;
+        while !name.is_char_boundary(limit) {
+            limit -= 1;
+        }
+        let shortened = &name[0..limit];
+        let result = format!("{shortened}{postfix}");
+        warn!(
+            "Filename {name}{postfix} was shortened to {result} to avoid too long filenames on some platforms"
+        );
+        result
+    }
+}
+
 pub struct FmtWrapper<F: Fn(&mut Formatter<'_>) -> std::fmt::Result>(pub F);
 
 impl<F: Fn(&mut Formatter<'_>) -> std::fmt::Result> Display for FmtWrapper<F> {

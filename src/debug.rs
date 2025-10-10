@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, to_string::join_shorten_filename};
 
 use std::{
     cell::RefCell,
@@ -257,18 +257,7 @@ pub fn create_dump_on_panic(linker: &mut Linker, f: impl FnOnce(&mut Linker)) {
             }
         });
 
-        // Limit total folder name size to 255, which is the maximum on just about every platform
-        let max_failure_name_bytes = 255 - cur_time.len();
-        let shortened_failure_name = if failure_name.len() <= max_failure_name_bytes {
-            &failure_name
-        } else {
-            let mut limit = max_failure_name_bytes;
-            while !failure_name.is_char_boundary(limit) {
-                limit -= 1;
-            }
-            &failure_name[0..limit]
-        };
-        let dump_name = format!("{shortened_failure_name}{cur_time}");
+        let dump_name = join_shorten_filename(&failure_name, &cur_time);
         let mut dump_dir = config().sus_home.join("crash_dumps").join(&dump_name);
 
         if let Err(err) = fs::create_dir_all(&dump_dir) {
