@@ -1,4 +1,5 @@
 use std::{
+    cmp::Ordering,
     fmt::{Debug, Formatter},
     hash::{Hash, Hasher},
     iter::Enumerate,
@@ -32,6 +33,16 @@ impl<IndexMarker> PartialEq for UUID<IndexMarker> {
     }
 }
 impl<IndexMarker> Eq for UUID<IndexMarker> {}
+impl<IndexMarker> PartialOrd for UUID<IndexMarker> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl<IndexMarker> Ord for UUID<IndexMarker> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
+    }
+}
 impl<IndexMarker> Hash for UUID<IndexMarker> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.hash(state);
@@ -820,6 +831,17 @@ impl<T: PartialEq, IndexMarker> PartialEq for FlatAlloc<T, IndexMarker> {
     }
 }
 impl<T: Eq, IndexMarker> Eq for FlatAlloc<T, IndexMarker> {}
+
+impl<T: PartialOrd, IndexMarker> PartialOrd for FlatAlloc<T, IndexMarker> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.data.partial_cmp(&other.data)
+    }
+}
+impl<T: Ord, IndexMarker> Ord for FlatAlloc<T, IndexMarker> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.data.cmp(&other.data)
+    }
+}
 
 impl<T: Hash, IndexMarker> std::hash::Hash for FlatAlloc<T, IndexMarker> {
     fn hash<H: Hasher>(&self, state: &mut H) {

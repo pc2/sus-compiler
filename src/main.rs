@@ -53,8 +53,8 @@ fn main() -> ExitCode {
 
     debug::setup_panic_handler();
 
-    let (linker, mut paths_arena, exit_code) = compile_all(file_paths);
+    let (linker, mut paths_arena) = compile_all(file_paths);
     print_all_errors(&linker, &mut paths_arena.file_sources);
 
-    exit_code
+    crate::codegen::codegen(&linker)
 }

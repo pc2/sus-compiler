@@ -1,5 +1,3 @@
-// THIS IS A GENERATED FILE (Generated at 2025-10-11T23:40:34+02:00)
-// This file was generated with SUS Compiler 0.3.3-devel (e11e88ff414143eddfa6c18e6bad6435687cace8) built at 2025-10-11_23:35:44  without LSP Support
 // check_non_inlineds #()
 module check_non_inlineds(
 	input clk
@@ -499,22 +497,6 @@ always_comb begin
 end
 endmodule
 
-// infer_me #(A: 2)
-module infer_me__A2(
-	input clk,
-	input wire x,
-	output /*mux_wire*/ logic y
-);
-
-/*latency*/ logic _x_D1; always_ff @(posedge clk) begin _x_D1 <= x; end
-/*latency*/ logic _x_D2; always_ff @(posedge clk) begin _x_D2 <= _x_D1; end
-always_comb begin
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 1'bx;
-	y = _x_D2;
-end
-endmodule
-
 // infer_me #(A: 5)
 module infer_me__A5(
 	input clk,
@@ -531,6 +513,22 @@ always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	y = 1'bx;
 	y = _x_D5;
+end
+endmodule
+
+// infer_me #(A: 2)
+module infer_me__A2(
+	input clk,
+	input wire x,
+	output /*mux_wire*/ logic y
+);
+
+/*latency*/ logic _x_D1; always_ff @(posedge clk) begin _x_D1 <= x; end
+/*latency*/ logic _x_D2; always_ff @(posedge clk) begin _x_D2 <= _x_D1; end
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	y = 1'bx;
+	y = _x_D2;
 end
 endmodule
 
@@ -756,19 +754,6 @@ tinyTestMod__beep3 c(
 );
 endmodule
 
-// tinyTestMod #(beep: 3)
-module tinyTestMod__beep3(
-	input clk,
-	output /*mux_wire*/ logic[1:0] o
-);
-
-always_comb begin
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o = 2'dx;
-	o = 2'd3;
-end
-endmodule
-
 // tinyTestMod #(beep: 4)
 module tinyTestMod__beep4(
 	input clk,
@@ -779,6 +764,19 @@ always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	o = 3'dx;
 	o = 3'd4;
+end
+endmodule
+
+// tinyTestMod #(beep: 3)
+module tinyTestMod__beep3(
+	input clk,
+	output /*mux_wire*/ logic[1:0] o
+);
+
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	o = 2'dx;
+	o = 2'd3;
 end
 endmodule
 
@@ -3144,16 +3142,6 @@ module transmute_from_bits__Ttypeint__FROM0_TO65536(
 assign value = bits;
 endmodule
 
-// transmute_to_bits #(T: type bool #()[60])
-module transmute_to_bits__Ttypebool____60(
-	input clk,
-	input wire[59:0] value,
-	output /*mux_wire*/ logic[59:0] bits
-);
-
-assign bits = value;
-endmodule
-
 // transmute_to_bits #(T: type int #(FROM: 0, TO: 255)[2])
 module transmute_to_bits__Ttypeint__FROM0_TO255__2(
 	input clk,
@@ -3167,6 +3155,16 @@ for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
 assign bits[(_g0) * 8 +: 8] = value[_g0];
 end
 endgenerate
+endmodule
+
+// transmute_to_bits #(T: type bool #()[60])
+module transmute_to_bits__Ttypebool____60(
+	input clk,
+	input wire[59:0] value,
+	output /*mux_wire*/ logic[59:0] bits
+);
+
+assign bits = value;
 endmodule
 
 // CrossActionNoData #()

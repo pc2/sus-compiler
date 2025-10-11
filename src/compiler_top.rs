@@ -2,7 +2,6 @@ use crate::prelude::*;
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::process::ExitCode;
 
 use crate::config::EarlyExitUpTo;
 use crate::flattening::typecheck::{perform_lints, typecheck};
@@ -207,11 +206,11 @@ impl Linker {
             .find(|_id, f| f.file_identifier == file_identifier)
     }
 
-    pub fn recompile_all_report_panics(&mut self) -> ExitCode {
+    pub fn recompile_all_report_panics(&mut self) {
         crate::debug::create_dump_on_panic(self, |slf| slf.recompile_all())
     }
 
-    pub fn recompile_all(&mut self) -> ExitCode {
+    pub fn recompile_all(&mut self) {
         let config = config();
 
         self.instantiator.borrow_mut().clear_instances();
@@ -225,14 +224,14 @@ impl Linker {
             link_info.instructions.clear();
         }
         if config.early_exit == EarlyExitUpTo::Initialize {
-            return ExitCode::SUCCESS;
+            return;
         }
 
         flatten_all_globals(self);
 
         self.checkpoint(&global_ids, AFTER_FLATTEN_CP);
         if config.early_exit == EarlyExitUpTo::Flatten {
-            return ExitCode::SUCCESS;
+            return;
         }
 
         for global_id in &global_ids {
@@ -254,7 +253,7 @@ impl Linker {
         }
 
         if config.early_exit == EarlyExitUpTo::AbstractTypecheck {
-            return ExitCode::SUCCESS;
+            return;
         }
 
         for global_id in &global_ids {
@@ -265,7 +264,7 @@ impl Linker {
         self.checkpoint(&global_ids, AFTER_LINTS_CP);
 
         if config.early_exit == EarlyExitUpTo::Lint {
-            return ExitCode::SUCCESS;
+            return;
         }
 
         if config.top_modules.is_empty() {
@@ -316,10 +315,5 @@ impl Linker {
                 }
             }
         }
-        if config.early_exit == EarlyExitUpTo::Instantiate {
-            return ExitCode::SUCCESS;
-        }
-
-        crate::codegen::codegen(self)
     }
 }

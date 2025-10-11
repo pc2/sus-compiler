@@ -1,5 +1,6 @@
 use std::cell::RefCell;
-use std::{collections::HashMap, rc::Rc};
+use std::collections::BTreeMap;
+use std::rc::Rc;
 
 use crate::errors::CompileError;
 use crate::instantiation::perform_instantiation;
@@ -16,7 +17,7 @@ use super::InstantiatedModule;
 /// Also, with incremental builds (#49) this will be a prime area for investigation
 #[derive(Debug)]
 pub struct InstantiationCache {
-    cache: HashMap<Rc<ConcreteGlobalReference<ModuleUUID>>, Rc<InstantiatedModule>>,
+    cache: BTreeMap<Rc<ConcreteGlobalReference<ModuleUUID>>, Rc<InstantiatedModule>>,
 }
 
 impl InstantiationCache {
@@ -74,7 +75,7 @@ impl Default for Instantiator {
 impl Instantiator {
     pub fn new() -> Self {
         let cache = InstantiationCache {
-            cache: HashMap::new(),
+            cache: BTreeMap::new(),
         };
 
         Self {

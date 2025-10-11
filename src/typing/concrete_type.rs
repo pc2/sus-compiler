@@ -18,7 +18,7 @@ use super::value_unifier::UnifyableValue;
 
 pub type ConcreteTemplateArg = TemplateKind<ConcreteType, UnifyableValue>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ConcreteGlobalReference<ID> {
     pub id: ID,
     pub template_args: TVec<ConcreteTemplateArg>,
@@ -50,7 +50,7 @@ pub enum SubtypeRelation {
 ///
 /// Not to be confused with [crate::typing::abstract_type::AbstractType] which represents pre-instantiation types,
 /// or [crate::flattening::WrittenType] which represents the textual in-editor data.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ConcreteType {
     Named(ConcreteGlobalReference<TypeUUID>),
     Array(Box<(ConcreteType, UnifyableValue)>),

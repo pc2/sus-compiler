@@ -147,79 +147,6 @@
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated check_non_inlineds #()
 [ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate make_when #()
 [ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate use_make_when #()
-[ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen test_various_assignments #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen multiply_add_with_latencies #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen first_bit_idx_24 #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen permute #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen permute24 #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen disjoint_ports #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen undeteriminable_input_latency #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen conflicting_latency_declarations #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen bad_cycle #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen matrix_vector_mul #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen bad_cycle2 #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen contains_submodule_submodule #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen use_submodule_named_ports #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen contains_submodule_submodule #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen dual_port_mem #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen use_fifo #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen test_separated_domain #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen use_no_input_module #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen test_write_to_gen_var #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen use_bad_interface #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen sequenceDownFrom #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen sumUpTo #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen use_test #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 31) due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 255) due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 15) due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 63) due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 3) due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 7) due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 1) due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 127) due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen make_tree_add #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen use_replicate #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen run_instruction #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen use_no_main_interface #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen moduleWithBadDeclaration #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen moduleWithBadInterface #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen useModuleWithBadInterface #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen m #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen xyz #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen implicit_domain_forbidden #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen conflicting_domain_with_port_name #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen make_infinite_type #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen UseDualPortMem #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen example_FIFO #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen use_Iterator #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen UseBuiltinConstants #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen FailingAssert #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen latency_counting_disjoint_blocks #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen latency_counting_disjoint_blocks_merge_error #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen use_infer_me #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen instantiate_fifo #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen inference_edge_case #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen testArrayWrite #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen instantiate_infer_me_with_poison_output #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen use_MultiStateLoop #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen CombineArray #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen useUnknownLatency #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen use_infer_me_conflicting_directions #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen use_infer_me_inputs_only #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen use_ranks #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen use_FIFO #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen write_to_generative_through_when #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen InstantiateTransmutes #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen StraightTransmute #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen testSlicing #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen wrong_slice_length #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen negative_slice #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen duplicate_port_names #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen make_when #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen use_make_when #() due to errors!
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -5324,3 +5251,76 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                     ┬  
       │                     ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+[ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen test_various_assignments #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen multiply_add_with_latencies #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen first_bit_idx_24 #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen permute #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen permute24 #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen disjoint_ports #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen undeteriminable_input_latency #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen conflicting_latency_declarations #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen bad_cycle #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen matrix_vector_mul #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen bad_cycle2 #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen contains_submodule_submodule #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_submodule_named_ports #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen contains_submodule_submodule #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen dual_port_mem #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_fifo #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen test_separated_domain #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_no_input_module #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen test_write_to_gen_var #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_bad_interface #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen sequenceDownFrom #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen sumUpTo #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_test #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 1) due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 3) due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 7) due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 15) due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 31) due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 63) due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 127) due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 255) due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen make_tree_add #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_replicate #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen run_instruction #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_no_main_interface #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen moduleWithBadDeclaration #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen moduleWithBadInterface #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen useModuleWithBadInterface #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen m #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen xyz #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen implicit_domain_forbidden #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen conflicting_domain_with_port_name #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen make_infinite_type #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen UseDualPortMem #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen example_FIFO #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_Iterator #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen UseBuiltinConstants #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen FailingAssert #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen latency_counting_disjoint_blocks #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen latency_counting_disjoint_blocks_merge_error #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_infer_me #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen instantiate_fifo #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen inference_edge_case #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen testArrayWrite #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen instantiate_infer_me_with_poison_output #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_MultiStateLoop #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen CombineArray #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen useUnknownLatency #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_infer_me_conflicting_directions #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_infer_me_inputs_only #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_ranks #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_FIFO #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen write_to_generative_through_when #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen InstantiateTransmutes #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen StraightTransmute #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen testSlicing #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen wrong_slice_length #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen negative_slice #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen duplicate_port_names #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen make_when #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_make_when #() due to errors!

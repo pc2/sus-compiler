@@ -25,12 +25,14 @@ fn make_output_file(path: &Path) -> File {
         }
     };
 
-    let generation_time = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
-    if let Err(e) = write!(
-        file,
-        "// THIS IS A GENERATED FILE (Generated at {generation_time})\n// This file was generated with SUS Compiler {VERSION_INFO}\n"
-    ) {
-        fatal_exit!("Error while writing to {}: {e}", path.to_string_lossy());
+    if !config().ci {
+        let gen_time = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
+        if let Err(e) = write!(
+            file,
+            "// THIS IS A GENERATED FILE (Generated at {gen_time})\n// This file was generated with SUS Compiler {VERSION_INFO}\n"
+        ) {
+            fatal_exit!("Error while writing to {}: {e}", path.to_string_lossy());
+        }
     }
 
     file

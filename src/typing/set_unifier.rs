@@ -112,6 +112,21 @@ impl<T: std::hash::Hash + Debug, IDMarker: UUIDMarker> std::hash::Hash for Unify
     }
 }
 
+impl<T: PartialOrd + Debug, IDMarker: UUIDMarker> PartialOrd for Unifyable<T, IDMarker> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let_unwrap!(Self::Set(a), self);
+        let_unwrap!(Self::Set(b), other);
+        a.partial_cmp(b)
+    }
+}
+impl<T: Ord + Debug + Eq, IDMarker: UUIDMarker> Ord for Unifyable<T, IDMarker> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let_unwrap!(Self::Set(a), self);
+        let_unwrap!(Self::Set(b), other);
+        a.cmp(b)
+    }
+}
+
 pub struct UnifyableAlloc<T: Eq + Clone, IDMarker> {
     ptrs: UUIDAllocator<IDMarker>,
     _ph: PhantomData<T>,

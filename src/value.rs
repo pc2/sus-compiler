@@ -23,6 +23,23 @@ pub enum Value {
     /// The initial [Value] a variable has, before it's been set. (translates to `'x` don't care)
     Unset,
 }
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for Value {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        use Value::*;
+        match (self, other) {
+            (Bool(a), Bool(b)) => a.cmp(b),
+            (Integer(a), Integer(b)) => a.cmp(b),
+            (Float(a), Float(b)) => a.cmp(b),
+            (Array(a), Array(b)) => a.cmp(b),
+            _ => unreachable!("Should have been caught by typecheck"),
+        }
+    }
+}
 /*impl ConcreteType {
     fn update_smallest_common_supertype(&mut self, other: &Self) -> Option<()> {
         match (self, other) {
