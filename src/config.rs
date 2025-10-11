@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use clap::{Arg, Command, ValueEnum};
+use clap::{Arg, ArgGroup, Command, ValueEnum};
 use log::info;
 use std::collections::HashSet;
 use std::sync::OnceLock;
@@ -21,16 +21,23 @@ pub enum EarlyExitUpTo {
     CodeGen,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TargetLanguage {
     SystemVerilog,
     Vhdl,
 }
 
-#[derive(Debug)]
-pub struct StandaloneCodegenSettings {
-    pub top_module: String,
-    pub file_path: Option<PathBuf>,
+impl ValueEnum for TargetLanguage {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[TargetLanguage::SystemVerilog, TargetLanguage::Vhdl]
+    }
+
+    fn to_possible_value(&self) -> Option<clap::builder::PossibleValue> {
+        Some(match self {
+            TargetLanguage::SystemVerilog => "sv".into(),
+            TargetLanguage::Vhdl => "vhdl".into(),
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -48,13 +55,16 @@ pub enum ConnectionMethod {
 #[derive(Debug)]
 pub struct ConfigStruct {
     pub lsp_settings: Option<LSPSettings>,
-    pub codegen: bool,
-    pub standalone: Option<StandaloneCodegenSettings>,
+
+    pub sus_home: PathBuf,
+    pub codegen_file: Option<PathBuf>,
+    pub codegen_separate_folder: Option<PathBuf>,
+    /// When no top modules specified, then codegen all
+    pub top_modules: Vec<String>,
     pub use_color: bool,
     pub ci: bool,
     pub target_language: TargetLanguage,
     pub files: Vec<PathBuf>,
-    pub sus_home: PathBuf,
 
     /// Enable debugging printouts and figures
     ///
@@ -110,24 +120,36 @@ fn command_builder() -> Command {
         .arg(Arg::new("lsp-listen")
             .long("lsp-listen")
             .help("Instead of the LSP Server connecting to an open socket provided by the parent process, this makes the LSP server open a socket and listen for incoming connections")
-            .action(clap::ArgAction::SetTrue)
             .requires("lsp")
-            .requires("socket"))
-        .arg(Arg::new("codegen")
-            .long("codegen")
-            .help("Enable code generation for all modules. This creates a file named [ModuleName].sv per module.")
+            .requires("socket")
             .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("standalone")
-            .long("standalone")
-            .help("Generate standalone code with all dependencies in one file of the module specified."))
-        .arg(Arg::new("standalone-file")
-            .long("standalone-file")
-            .requires("standalone")
-            .help("Set the output file of --standalone code generation")
+        .arg(Arg::new("o")
+            .short('o')
+            .help("Activate code generation and writes the result to the provided output file")
+            .conflicts_with("codegen-separate")
             .value_parser(|file_path_str : &str| {
                 let file_path = PathBuf::from(file_path_str);
                 Result::<PathBuf, &'static str>::Ok(file_path)
             }))
+        .arg(Arg::new("codegen-separate")
+            .long("codegen-separate")
+            .help("Activate code generation and creates a systemverilog file per module in the chosen folder")
+            .conflicts_with("o")
+            .value_parser(|file_path_str : &str| {
+                let file_path = PathBuf::from(file_path_str);
+                Result::<PathBuf, &'static str>::Ok(file_path)
+            }))
+        .group(ArgGroup::new("codegen-enabled").args(["o", "codegen-separate"]))
+        .arg(Arg::new("codegen-language")
+            .long("codegen-language")
+            .hide(true) // Hidden because we don't support VHDL
+            .help("Sets the target HDL")
+            .requires("codegen-enabled")
+            .value_parser(clap::builder::EnumValueParser::<TargetLanguage>::new()))
+        .arg(Arg::new("top")
+            .long("top")
+            .help("List of top module names to limit compilation/codegen to")
+            .action(clap::ArgAction::Append))
         .arg(Arg::new("upto")
             .long("upto")
             .help("Describes at what point in the compilation process we should exit early. This is mainly to aid in debugging, where incorrect results from flattening/typechecking may lead to errors, which we still wish to see in say the LSP")
@@ -139,13 +161,9 @@ fn command_builder() -> Command {
             .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("ci")
             .long("ci")
+            .hide(true)
             .help("Makes the compiler output as environment agnostic as possible")
             .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("target")
-            .long("target")
-            .help("Sets the target HDL")
-            .value_parser(clap::builder::EnumValueParser::<TargetLanguage>::new())
-            .default_value("system-verilog"))
         .arg(Arg::new("files")
             .action(clap::ArgAction::Append)
             .help(".sus Files")
@@ -163,7 +181,6 @@ fn command_builder() -> Command {
             }))
         .arg(Arg::new("sus-home")
             .long("sus-home")
-            .hide(true)
             .help("Override the SUS_HOME directory (for std/core.sus, crash_dumps, etc)")
             .value_parser(|dir: &str| {
                 let path = PathBuf::from(dir);
@@ -218,9 +235,6 @@ pub fn parse_args() {
         Err(e) => e.exit(),
     };
 
-    let codegen = matches.get_flag("codegen")
-        || matches.get_many::<PathBuf>("files").is_none()
-        || matches.contains_id("standalone");
     let debug_whitelist = matches
         .get_many("debug-whitelist")
         .unwrap_or_default()
@@ -244,13 +258,13 @@ pub fn parse_args() {
             .collect(),
     };
 
-    let standalone =
-        matches
-            .get_one("standalone")
-            .map(|top_module: &String| StandaloneCodegenSettings {
-                top_module: top_module.to_string(),
-                file_path: matches.get_one::<PathBuf>("standalone-file").cloned(),
-            });
+    let codegen_file: Option<PathBuf> = matches.get_one("o").cloned();
+    let codegen_separate_folder: Option<PathBuf> = matches.get_one("codegen-separate").cloned();
+
+    let top_modules = matches
+        .get_many("top")
+        .map(|t| t.cloned().collect())
+        .unwrap_or(Vec::new());
 
     let sus_home_override = matches.get_one::<PathBuf>("sus-home").cloned();
 
@@ -299,19 +313,45 @@ pub fn parse_args() {
         info!("SUS_HOME is {}", sus_home.to_string_lossy());
     }
 
+    let target_language = matches
+        .get_one("codegen-language")
+        .copied()
+        .unwrap_or_else(|| {
+            if let Some(codegen_file) = &codegen_file
+                && let Some(ext) = codegen_file.extension()
+            {
+                if ext == "sv" {
+                    TargetLanguage::SystemVerilog
+                } else if ext == "vhd" {
+                    TargetLanguage::Vhdl
+                } else {
+                    TargetLanguage::SystemVerilog
+                }
+            } else {
+                TargetLanguage::SystemVerilog
+            }
+        });
+
+    if target_language == TargetLanguage::Vhdl {
+        fatal_exit!(
+            "VHDL as a target code generation language is not yet supported. Use SystemVerilog instead"
+        );
+    }
+
     let cfg = ConfigStruct {
         lsp_settings,
-        codegen,
+        sus_home,
+        files,
+        codegen_file,
+        codegen_separate_folder,
+        top_modules,
+        target_language,
+        use_color,
+        ci,
         debug_whitelist,
         enabled_debug_paths,
         kill_timeout: *matches.get_one::<Duration>("kill-timeout").unwrap(),
-        standalone,
         early_exit: *matches.get_one("upto").unwrap(),
-        use_color,
-        ci,
-        target_language: *matches.get_one("target").unwrap(),
-        files,
-        sus_home,
         no_redump: matches.get_flag("no-redump"),
         float_size: *matches.get_one("float-size").unwrap(),
     };

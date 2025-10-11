@@ -52,27 +52,6 @@ impl VariableAlloc {
     }
 }
 
-#[derive(Debug)]
-pub struct VerilogCodegenBackend;
-
-impl super::CodeGenBackend for VerilogCodegenBackend {
-    fn file_extension(&self) -> &str {
-        "sv"
-    }
-    fn output_dir_name(&self) -> &str {
-        "verilog_output"
-    }
-    fn codegen(
-        &self,
-        md: &Module,
-        instance: &InstantiatedModule,
-        linker: &Linker,
-        use_latency: bool,
-    ) -> String {
-        gen_verilog_code(md, instance, linker, use_latency)
-    }
-}
-
 /// Creates the Verilog variable declaration for tbis variable.
 ///
 /// IE for `int[15] myVar` it creates `[31:0] myVar[14:0]`
@@ -966,20 +945,15 @@ impl RealWireDataSource {
     }
 }
 
-fn gen_verilog_code(
-    md: &Module,
-    instance: &InstantiatedModule,
-    linker: &Linker,
-    use_latency: bool,
-) -> String {
+pub fn gen_verilog_code(instance: &InstantiatedModule, linker: &Linker) -> String {
     let mut ctx = CodeGenerationContext {
-        md,
+        md: &linker.modules[instance.global_ref.id],
         instance,
         linker,
         program_text: String::new(),
         genvars: VariableAlloc::new("_g"),
         for_vars: VariableAlloc::new("_v"),
-        use_latency,
+        use_latency: true, // Always set use_latecy to true, maybe forever
         needed_untils: instance.compute_needed_untils(),
     };
     ctx.write_verilog_code();

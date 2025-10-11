@@ -1,151 +1,126 @@
 mod shared;
 pub mod system_verilog;
-pub mod vhdl;
 
-pub use system_verilog::VerilogCodegenBackend;
-pub use vhdl::VHDLCodegenBackend;
-
+use crate::codegen::system_verilog::gen_verilog_code;
 use crate::prelude::*;
 
-use crate::{InstantiatedModule, Linker, Module};
+use crate::to_string::join_shorten_filename;
+use crate::{InstantiatedModule, Linker};
 
-use crate::config::VERSION_INFO;
+use crate::config::{TargetLanguage, VERSION_INFO, config};
 
+use std::collections::HashSet;
 use std::path::Path;
-use std::{
-    fs::{self, File},
-    io::Write,
-    ops::Deref,
-    path::PathBuf,
-    rc::Rc,
-};
+use std::process::ExitCode;
+use std::{fs::File, io::Write};
 
-/// Implemented for SystemVerilog [self::system_verilog] or VHDL [self::vhdl]
-pub trait CodeGenBackend {
-    fn file_extension(&self) -> &str;
-    fn output_dir_name(&self) -> &str;
-    fn codegen(
-        &self,
-        md: &Module,
-        instance: &InstantiatedModule,
-        linker: &Linker,
-        use_latency: bool,
-    ) -> String;
-
-    fn make_output_file_path(&self, name: &str) -> PathBuf {
-        let mut path = PathBuf::with_capacity(
-            name.len() + self.output_dir_name().len() + self.file_extension().len() + 2,
-        );
-        path.push(self.output_dir_name());
-        if let Err(e) = fs::create_dir_all(&path) {
+fn make_output_file(path: &Path) -> File {
+    let mut file = match File::create(path) {
+        Ok(f) => f,
+        Err(e) => {
             fatal_exit!(
-                "Could not create the output directory {}: {e}",
+                "Could not create the output file {}: {e}",
                 path.to_string_lossy()
             );
         }
-        path.push(name);
-        path.set_extension(self.file_extension());
-        path
-    }
-    fn make_output_file(&self, path: &Path) -> File {
-        let mut file = match File::create(path) {
-            Ok(f) => f,
-            Err(e) => {
-                fatal_exit!(
-                    "Could not create the output file {}: {e}",
-                    path.to_string_lossy()
-                );
-            }
-        };
+    };
 
-        let generation_time =
-            chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
-        if let Err(e) = write!(
-            file,
-            "// THIS IS A GENERATED FILE (Generated at {generation_time})\n// This file was generated with SUS Compiler {VERSION_INFO}\n"
-        ) {
-            fatal_exit!("Error while writing to {}: {e}", path.to_string_lossy());
-        }
-
-        file
-    }
-
-    fn codegen_instance(
-        &self,
-        inst: &InstantiatedModule,
-        md: &Module,
-        linker: &Linker,
-        out_file: &mut File,
-        path: &Path,
+    let generation_time = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
+    if let Err(e) = write!(
+        file,
+        "// THIS IS A GENERATED FILE (Generated at {generation_time})\n// This file was generated with SUS Compiler {VERSION_INFO}\n"
     ) {
-        if inst.errors.did_error {
-            return; // Continue
-        }
-        let code = self.codegen(md, inst, linker, true); // hardcode use_latency = true for now. Maybe forever, we'll see
-        if let Err(e) = write!(out_file, "{code}") {
-            fatal_exit!("Error while writing to {}: {e}", path.to_string_lossy());
-        }
+        fatal_exit!("Error while writing to {}: {e}", path.to_string_lossy());
     }
 
-    fn codegen_to_file(&self, id: ModuleUUID, md: &Module, linker: &Linker) {
-        let instantiatior_borrow = linker.instantiator.borrow();
-        if instantiatior_borrow
-            .iter_for_module(id)
-            .any(|(_, inst)| !inst.errors.did_error)
-        {
-            let path = self.make_output_file_path(&md.link_info.name);
-            let mut out_file = self.make_output_file(&path);
-            for (_global_ref, inst) in instantiatior_borrow.iter_for_module(id) {
-                self.codegen_instance(inst.as_ref(), md, linker, &mut out_file, &path)
-            }
-        }
+    file
+}
+
+/// Performs a topological sort of the module hierarchy. When finished stack contains the partial order of dependencies, with leaf submodules at the front, and the top level modules at the end
+fn order_dependencies<'inst>(
+    seen: &mut HashSet<*const InstantiatedModule>,
+    stack: &mut Vec<&'inst InstantiatedModule>,
+    md: &'inst InstantiatedModule,
+) {
+    assert!(!md.errors.did_error);
+    if !seen.insert(md) {
+        return; // already saw this module
     }
 
-    fn codegen_with_dependencies(&self, linker: &Linker, md_id: ModuleUUID, path: &Path) {
-        info!("Codegen to {}", path.to_string_lossy());
-        let mut out_file = self.make_output_file(path);
-        let mut to_process_queue: Vec<Rc<InstantiatedModule>> = Vec::new();
-        for (_template_args, inst) in linker.instantiator.borrow().iter_for_module(md_id) {
-            if inst.errors.did_error {
-                error!("Cannot codegen {}, due to errors!", inst.name);
-            } else {
-                to_process_queue.push(inst.clone());
-            }
-        }
+    for (_, sm) in &md.submodules {
+        let sm_md = sm.instance.get().unwrap(); // No errors should have occured for the module
+        order_dependencies(seen, stack, sm_md);
+    }
 
-        let mut to_process_queue: Vec<&InstantiatedModule> =
-            to_process_queue.iter().map(|inst| inst.deref()).collect();
+    stack.push(md);
+}
 
-        let mut cur_idx = 0;
+pub fn codegen(linker: &Linker) -> ExitCode {
+    let config = config();
+    if config.codegen_file.is_none() && config.codegen_separate_folder.is_none() {
+        return ExitCode::SUCCESS; // early exit, to save work
+    }
+    assert_eq!(config.target_language, TargetLanguage::SystemVerilog);
+    let instantiatior = linker.instantiator.borrow();
 
-        while cur_idx < to_process_queue.len() {
-            let cur_instance = to_process_queue[cur_idx];
-
-            for (_, sub_mod) in &cur_instance.submodules {
-                let new_inst = sub_mod.instance.get().unwrap().as_ref();
-
-                // Skip duplicates
-                // Yeah yeah I know O(n²) but this list shouldn't grow too big. Fix if needed
-                if to_process_queue
-                    .iter()
-                    .any(|existing| std::ptr::eq(*existing, new_inst))
-                {
-                    continue;
+    let mut all_instances = HashSet::new();
+    let mut dependency_stack = Vec::new();
+    let mut any_error = false;
+    if config.top_modules.is_empty() {
+        for (id, _) in &linker.modules {
+            for (_, md) in instantiatior.iter_for_module(id) {
+                if !md.errors.did_error {
+                    order_dependencies(&mut all_instances, &mut dependency_stack, md);
+                } else {
+                    any_error = true;
+                    error!("Cannot codegen {} due to errors!", md.name);
                 }
-
-                to_process_queue.push(new_inst);
             }
-
-            info!("Codegen instance {}", cur_instance.name);
-            self.codegen_instance(
-                cur_instance,
-                &linker.modules[cur_instance.global_ref.id],
-                linker,
-                &mut out_file,
-                path,
-            );
-
-            cur_idx += 1;
         }
+    } else {
+        for top in &config.top_modules {
+            let md_id = linker.get_by_name(top).unwrap().unwrap_module();
+            for (_, md) in instantiatior.iter_for_module(md_id) {
+                if !md.errors.did_error {
+                    order_dependencies(&mut all_instances, &mut dependency_stack, md);
+                } else {
+                    any_error = true;
+                    error!("Cannot codegen {} due to errors!", md.name);
+                }
+            }
+        }
+    }
+    if let Some(path) = &config.codegen_file {
+        let mut out_file = make_output_file(path);
+        for md in dependency_stack.iter().rev() {
+            let code = gen_verilog_code(md, linker);
+            if let Err(e) = out_file.write(code.as_bytes()) {
+                fatal_exit!("Error while writing to {}: {e}", path.to_string_lossy());
+            }
+        }
+    }
+    if let Some(output_folder) = &config.codegen_separate_folder {
+        if let Err(e) = std::fs::create_dir_all(output_folder) {
+            fatal_exit!(
+                "Could not create the output directory {}: {e}",
+                output_folder.to_string_lossy()
+            );
+        }
+        for (id, md) in &linker.modules {
+            let filename = join_shorten_filename(&md.link_info.name, ".sv");
+            let path = output_folder.join(filename);
+            let mut out_file = make_output_file(&path);
+            for (_global_ref, inst) in instantiatior.iter_for_module(id) {
+                let code = gen_verilog_code(inst, linker);
+                if let Err(e) = write!(out_file, "{code}") {
+                    fatal_exit!("Error while writing to {}: {e}", path.to_string_lossy());
+                }
+            }
+        }
+    }
+    if any_error {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }

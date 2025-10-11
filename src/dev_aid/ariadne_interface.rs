@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::process::ExitCode;
 use std::{ops::Range, path::PathBuf};
 
 use crate::compiler_top::LinkerExtraFileInfoManager;
@@ -76,7 +77,7 @@ impl LinkerExtraFileInfoManager for FileSourcesManager {
     }
 }
 
-pub fn compile_all(file_paths: Vec<PathBuf>) -> (Linker, FileSourcesManager) {
+pub fn compile_all(file_paths: Vec<PathBuf>) -> (Linker, FileSourcesManager, ExitCode) {
     let mut linker = Linker::new();
     let mut file_source_manager = FileSourcesManager {
         file_sources: ArenaVector::new(),
@@ -101,9 +102,9 @@ pub fn compile_all(file_paths: Vec<PathBuf>) -> (Linker, FileSourcesManager) {
         );
     }
 
-    linker.recompile_all_report_panics();
+    let exit_code = linker.recompile_all_report_panics();
 
-    (linker, file_source_manager)
+    (linker, file_source_manager, exit_code)
 }
 
 fn ariadne_config() -> Config {

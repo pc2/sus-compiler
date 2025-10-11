@@ -214,6 +214,13 @@ impl GlobalUUID {
         };
         *id
     }
+    pub fn get_kind_name(&self) -> &'static str {
+        match self {
+            GlobalUUID::Module(_) => "Module",
+            GlobalUUID::Type(_) => "Struct",
+            GlobalUUID::Constant(_) => "Constant",
+        }
+    }
 }
 
 impl From<ModuleUUID> for GlobalUUID {
@@ -268,6 +275,12 @@ pub struct LinkerGlobals {
     pub types: ArenaAllocator<StructType, TypeUUIDMarker>,
     pub modules: ArenaAllocator<Module, ModuleUUIDMarker>,
     pub constants: ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
+}
+
+impl std::fmt::Debug for LinkerGlobals {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("LinkerGlobals {...}")
+    }
 }
 
 impl Index<ModuleUUID> for LinkerGlobals {
@@ -342,6 +355,72 @@ impl<'slf> LinkerGlobals {
             GlobalObj::Constant(cst_id) => GlobalObj::Constant(&mut self.constants[cst_id]),
         }
     }
+
+    fn get_by_name<'s>(
+        &'s self,
+        global_namespace: &'s HashMap<String, NamespaceElement>,
+        name: &'s str,
+    ) -> Result<GlobalUUID, GetGlobalByNameError<'s>> {
+        match global_namespace.get(name) {
+            Some(NamespaceElement::Global(found)) => Ok(*found),
+            Some(NamespaceElement::Colission(colliding)) => Err(GetGlobalByNameError::Colission {
+                globals: self,
+                colliding,
+                name,
+            }),
+            None => Err(GetGlobalByNameError::NotFound {
+                globals: self,
+                name,
+            }),
+        }
+    }
+}
+#[derive(Debug)]
+pub enum GetGlobalByNameError<'globals> {
+    NotFound {
+        globals: &'globals LinkerGlobals,
+        name: &'globals str,
+    },
+    Colission {
+        globals: &'globals LinkerGlobals,
+        colliding: &'globals [GlobalUUID],
+        name: &'globals str,
+    },
+}
+
+impl<'globals> GetGlobalByNameError<'globals> {
+    pub fn get_main_message(&self) -> String {
+        match self {
+            GetGlobalByNameError::NotFound { name, .. } => {
+                format!("No Global '{name}' was found.")
+            }
+            GetGlobalByNameError::Colission { name, .. } => {
+                format!("Multiple globals are named '{name}'.")
+            }
+        }
+    }
+    pub fn infos(&self) -> Vec<ErrorInfo> {
+        match self {
+            GetGlobalByNameError::NotFound { .. } => Vec::new(),
+            GetGlobalByNameError::Colission {
+                globals, colliding, ..
+            } => colliding
+                .iter()
+                .map(|collider_global| {
+                    let link_info = globals.get(*collider_global).get_link_info();
+                    ErrorInfo {
+                        info: format!(
+                            "{} {} declared here",
+                            collider_global.get_kind_name(),
+                            link_info.name
+                        ),
+                        position: link_info.span,
+                        file: link_info.file,
+                    }
+                })
+                .collect(),
+        }
+    }
 }
 
 /// The global singleton object that collects all [Module]s, [StructType]s, and [NamedConstant]s that are in the current SUS codebase.
@@ -409,6 +488,13 @@ impl Linker {
             .map(|(id, obj)| (id.into(), &obj.link_info));
 
         md_iter.chain(typ_iter).chain(cst_iter)
+    }
+
+    pub fn get_by_name<'s>(
+        &'s self,
+        name: &'s str,
+    ) -> Result<GlobalUUID, GetGlobalByNameError<'s>> {
+        self.globals.get_by_name(&self.global_namespace, name)
     }
 
     fn collect_duplicate_declaration_errors(

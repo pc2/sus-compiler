@@ -28,7 +28,7 @@ jobs:
     - name: Run tests
       run: cargo test --verbose --all-features
     - name: Run regression test
-      run: ./target/debug/sus_compiler test.sus platform/xilinx/xpm.sus --ci --nocolor 1> test.sus_output_ci.txt 2> test.sus_errors_ci.txt || true && diff test.sus_output_ci.txt /dev/null && diff test.sus_errors_ci.txt test.sus_errors.txt
+      run: ./target/debug/sus_compiler test.sus platform/xilinx/xpm.sus --ci --nocolor -o test.sus_codegen_ci.sv 1> test.sus_output_ci.txt 2> test.sus_errors_ci.txt || true && diff test.sus_output_ci.txt /dev/null && diff test.sus_errors_ci.txt test.sus_errors.txt && diff test.sus_codegen_ci.sv test.sus_codegen.sv
       
   lint:
     runs-on: ubuntu-latest

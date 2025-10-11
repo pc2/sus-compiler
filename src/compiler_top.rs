@@ -1,5 +1,8 @@
+use crate::prelude::*;
+
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::process::ExitCode;
 
 use crate::config::EarlyExitUpTo;
 use crate::flattening::typecheck::{perform_lints, typecheck};
@@ -7,7 +10,6 @@ use crate::linker::GlobalObj;
 use crate::linker::checkpoint::{
     AFTER_FLATTEN_CP, AFTER_INITIAL_PARSE_CP, AFTER_LINTS_CP, AFTER_TYPE_CHECK_CP,
 };
-use crate::prelude::*;
 use crate::typing::concrete_type::ConcreteGlobalReference;
 
 use sus_proc_macro::{get_builtin_const, get_builtin_type};
@@ -205,11 +207,11 @@ impl Linker {
             .find(|_id, f| f.file_identifier == file_identifier)
     }
 
-    pub fn recompile_all_report_panics(&mut self) {
+    pub fn recompile_all_report_panics(&mut self) -> ExitCode {
         crate::debug::create_dump_on_panic(self, |slf| slf.recompile_all())
     }
 
-    pub fn recompile_all(&mut self) {
+    pub fn recompile_all(&mut self) -> ExitCode {
         let config = config();
 
         self.instantiator.borrow_mut().clear_instances();
@@ -223,14 +225,14 @@ impl Linker {
             link_info.instructions.clear();
         }
         if config.early_exit == EarlyExitUpTo::Initialize {
-            return;
+            return ExitCode::SUCCESS;
         }
 
         flatten_all_globals(self);
 
         self.checkpoint(&global_ids, AFTER_FLATTEN_CP);
         if config.early_exit == EarlyExitUpTo::Flatten {
-            return;
+            return ExitCode::SUCCESS;
         }
 
         for global_id in &global_ids {
@@ -252,7 +254,7 @@ impl Linker {
         }
 
         if config.early_exit == EarlyExitUpTo::AbstractTypecheck {
-            return;
+            return ExitCode::SUCCESS;
         }
 
         for global_id in &global_ids {
@@ -263,24 +265,61 @@ impl Linker {
         self.checkpoint(&global_ids, AFTER_LINTS_CP);
 
         if config.early_exit == EarlyExitUpTo::Lint {
-            return;
+            return ExitCode::SUCCESS;
         }
 
-        // Make an initial instantiation of all modules
-        // Won't be possible once we have template modules
-        for (id, md) in &self.modules {
-            // Already instantiate any modules without parameters
-            // Can immediately instantiate modules that have no template args
-            if md.link_info.parameters.is_empty() {
-                let _inst = self.instantiator.instantiate(
-                    self,
-                    ConcreteGlobalReference {
-                        id,
-                        template_args: FlatAlloc::new(),
-                    },
-                );
+        if config.top_modules.is_empty() {
+            info!("Selecting all parameter-less modules as --top");
+
+            // Make an initial instantiation of all modules
+            // Won't be possible once we have template modules
+            for (id, md) in &self.modules {
+                // Already instantiate any modules without parameters
+                // Can immediately instantiate modules that have no template args
+                if md.link_info.parameters.is_empty() {
+                    let _inst = self.instantiator.instantiate(
+                        self,
+                        ConcreteGlobalReference {
+                            id,
+                            template_args: FlatAlloc::new(),
+                        },
+                    );
+                }
+            }
+        } else {
+            for top in &config.top_modules {
+                match self.get_by_name(top) {
+                    Ok(GlobalObj::Module(id)) => {
+                        let md = &self.modules[id];
+                        if md.link_info.parameters.is_empty() {
+                            let _inst = self.instantiator.instantiate(
+                                self,
+                                ConcreteGlobalReference {
+                                    id,
+                                    template_args: FlatAlloc::new(),
+                                },
+                            );
+                        } else {
+                            let md_with_args = md.link_info.display_full_name_and_args(
+                                &self.files[md.link_info.file].file_text,
+                            );
+                            fatal_exit!(
+                                "Can't instantiate module {md_with_args} as top-level module, because it has parameters"
+                            )
+                        }
+                    }
+                    Ok(obj) => {
+                        let kind = obj.get_kind_name();
+                        fatal_exit!("{kind} {top} is not a module! It can't be a --top");
+                    }
+                    Err(e) => fatal_exit!("{}", e.get_main_message()),
+                }
             }
         }
-        if config.early_exit == EarlyExitUpTo::Instantiate {}
+        if config.early_exit == EarlyExitUpTo::Instantiate {
+            return ExitCode::SUCCESS;
+        }
+
+        crate::codegen::codegen(self)
     }
 }

@@ -111,12 +111,6 @@ impl ResolvedGlobals {
     }
 }
 
-struct LinkingErrorLocation {
-    pub named_type: &'static str,
-    pub full_name: String,
-    pub location: SpanFile,
-}
-
 /// This struct encapsulates the concept of name resolution. It reports name-not-found errors,
 /// and remembers all of the requested globals in preparation for #49
 pub struct GlobalResolver<'linker, 'from> {
@@ -126,58 +120,24 @@ pub struct GlobalResolver<'linker, 'from> {
 }
 
 impl<'linker, 'from> GlobalResolver<'linker, 'from> {
-    fn get_linking_error_location(&self, global: GlobalUUID) -> LinkingErrorLocation {
-        let named_type = match global {
-            GlobalUUID::Module(_) => "Module",
-            GlobalUUID::Type(_) => "Struct",
-            GlobalUUID::Constant(_) => "Constant",
-        };
-        let link_info = self.get(global).get_link_info();
-        LinkingErrorLocation {
-            named_type,
-            full_name: link_info.display_full_name().to_string(),
-            location: link_info.get_span_file(),
-        }
-    }
-
     pub fn resolve_global(
         &self,
         name_span: Span,
         name: &str,
         errors: &ErrorCollector,
     ) -> Option<GlobalUUID> {
-        match self.global_namespace.get(name) {
-            Some(NamespaceElement::Global(found)) => {
-                self.resolved_globals
-                    .borrow_mut()
-                    .referenced_globals
-                    .push(*found);
-                Some(*found)
+        let mut resolved_globals = self.resolved_globals.borrow_mut();
+        match self.globals.get_by_name(self.global_namespace, name) {
+            Ok(found) => {
+                resolved_globals.referenced_globals.push(found);
+                Some(found)
             }
-            Some(NamespaceElement::Colission(coll)) => {
-                self.resolved_globals.borrow_mut().all_resolved = false;
+            Err(err) => {
+                resolved_globals.all_resolved = false;
 
-                let mut err_ref = errors.error(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."));
-
-                for collider_global in coll.iter() {
-                    let err_loc = self.get_linking_error_location(*collider_global);
-                    err_ref = err_ref.info(
-                        err_loc.location,
-                        format!("{} {} declared here", err_loc.named_type, err_loc.full_name),
-                    );
-                }
-
-                None
-            }
-            None => {
-                self.resolved_globals.borrow_mut().all_resolved = false;
-
-                errors.error(
-                    name_span,
-                    format!(
-                        "No Global of the name '{name}' was found. Did you forget to import it?"
-                    ),
-                );
+                errors
+                    .error(name_span, err.get_main_message())
+                    .add_info_list(err.infos());
 
                 None
             }
@@ -192,15 +152,15 @@ impl<'linker, 'from> GlobalResolver<'linker, 'from> {
     ) where
         GlobalUUID: From<ID>,
     {
-        // SAFETY: The allocated linker objects aren't going to change.
-        let info = self.get_linking_error_location(GlobalUUID::from(global_ref.id));
-        let name = &info.full_name;
-        let global_type = info.named_type;
+        let global = GlobalUUID::from(global_ref.id);
+        let link_info = self.get(global).get_link_info();
+        let name = link_info.display_full_name();
+        let global_type = global.get_kind_name();
         let err_ref = errors.error(
             global_ref.name_span,
             format!("{name} is not a {expected}, it is a {global_type} instead!"),
         );
-        err_ref.info(info.location, "Defined here");
+        err_ref.info_obj(link_info);
     }
 
     pub fn get(&self, id: GlobalUUID) -> GlobalRef<'linker> {

@@ -225,87 +225,86 @@ pub fn setup_panic_handler() {
     }));
 }
 
-pub fn create_dump_on_panic(linker: &mut Linker, f: impl FnOnce(&mut Linker)) {
+pub fn create_dump_on_panic<R>(linker: &mut Linker, f: impl FnOnce(&mut Linker) -> R) -> R {
     if crate::config::config().no_redump {
         // Run without protection, don't create a dump on panic
-        f(linker);
-        return;
+        return f(linker);
     }
 
     use std::fs;
     use std::io::Write;
 
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(linker)));
+    let panic_info = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(linker))) {
+        Ok(result) => return result,
+        Err(panic_info) => panic_info,
+    };
+    // Get ~/.sus/crash_dumps/{timestamp}
+    let cur_time = chrono::Local::now()
+        .format("_%Y-%m-%d_%H:%M:%S")
+        .to_string();
 
-    if let Err(panic_info) = result {
-        // Get ~/.sus/crash_dumps/{timestamp}
-        let cur_time = chrono::Local::now()
-            .format("_%Y-%m-%d_%H:%M:%S")
-            .to_string();
+    let failure_name = DEBUG_STACK.with_borrow(|history| {
+        if let Some(SpanDebuggerStackElement {
+            stage,
+            global_obj_name,
+            ..
+        }) = history.debug_stack.last()
+        {
+            let global_obj_name = global_obj_name.replace(char::is_whitespace, "");
+            format!("{stage}_{global_obj_name}",)
+        } else {
+            "unknown".to_string()
+        }
+    });
 
-        let failure_name = DEBUG_STACK.with_borrow(|history| {
-            if let Some(SpanDebuggerStackElement {
-                stage,
-                global_obj_name,
-                ..
-            }) = history.debug_stack.last()
-            {
-                let global_obj_name = global_obj_name.replace(char::is_whitespace, "");
-                format!("{stage}_{global_obj_name}",)
-            } else {
-                "unknown".to_string()
-            }
-        });
+    let dump_name = join_shorten_filename(&failure_name, &cur_time);
+    let mut dump_dir = config().sus_home.join("crash_dumps").join(&dump_name);
 
-        let dump_name = join_shorten_filename(&failure_name, &cur_time);
-        let mut dump_dir = config().sus_home.join("crash_dumps").join(&dump_name);
+    if let Err(err) = fs::create_dir_all(&dump_dir) {
+        let new_dump_dir = PathBuf::from("sus_crash_dumps").join(&dump_name);
+        error!(
+            "Could not create {} in the SUS install directory: {err} Trying to save it locally to {}",
+            dump_dir.to_string_lossy(),
+            new_dump_dir.to_string_lossy()
+        );
 
-        if let Err(err) = fs::create_dir_all(&dump_dir) {
-            let new_dump_dir = PathBuf::from("sus_crash_dumps").join(&dump_name);
+        if let Err(err) = fs::create_dir_all(&new_dump_dir) {
             error!(
-                "Could not create {} in the SUS install directory: {err} Trying to save it locally to {}",
-                dump_dir.to_string_lossy(),
+                "Could not create {} locally either: {err} Giving up on dumping the error",
                 new_dump_dir.to_string_lossy()
             );
 
-            if let Err(err) = fs::create_dir_all(&new_dump_dir) {
-                error!(
-                    "Could not create {} locally either: {err} Giving up on dumping the error",
-                    new_dump_dir.to_string_lossy()
-                );
-
-                std::panic::resume_unwind(panic_info);
-            }
-
-            dump_dir = new_dump_dir;
+            std::panic::resume_unwind(panic_info);
         }
 
-        // Write reproduce.sh with compiler args
-        let args: Vec<String> = std::env::args().collect();
-        let reproduce_path = dump_dir.join("reproduce.sh");
-        if let Ok(mut f) = fs::File::create(&reproduce_path) {
-            use crate::config::VERSION_INFO;
-            let cmd = format!(
-                "#!/bin/sh\n#SUS Compiler Version: {VERSION_INFO}\n{}\n",
-                args.join(" ")
-            );
-            let _ = f.write_all(cmd.as_bytes());
-        }
-
-        for (_id, file_data) in &linker.files {
-            // Exclude files from the standard library directory
-            if file_data.is_std {
-                continue;
-            }
-            let filename = file_data.file_identifier.replace("/", "_");
-            let path = dump_dir.join(&filename);
-            if let Ok(mut f) = fs::File::create(&path) {
-                let _ = f.write_all(file_data.file_text.file_text.as_bytes());
-            }
-        }
-        error!("Internal compiler error! All files dumped to {dump_dir:?}");
-        std::panic::resume_unwind(panic_info);
+        dump_dir = new_dump_dir;
     }
+
+    // Write reproduce.sh with compiler args
+    let args: Vec<String> = std::env::args().collect();
+    let reproduce_path = dump_dir.join("reproduce.sh");
+    if let Ok(mut f) = fs::File::create(&reproduce_path) {
+        use crate::config::VERSION_INFO;
+        let cmd = format!(
+            "#!/bin/sh\n#SUS Compiler Version: {VERSION_INFO}\n{}\n",
+            args.join(" ")
+        );
+        let _ = f.write_all(cmd.as_bytes());
+    }
+
+    for (_id, file_data) in &linker.files {
+        // Exclude files from the standard library directory
+        if file_data.is_std {
+            continue;
+        }
+        let filename = file_data.file_identifier.replace("/", "_");
+        let path = dump_dir.join(&filename);
+        if let Ok(mut f) = fs::File::create(&path) {
+            let _ = f.write_all(file_data.file_text.file_text.as_bytes());
+        }
+    }
+    error!("Internal compiler error! All files dumped to {dump_dir:?}");
+    std::panic::resume_unwind(panic_info);
 }
 
 struct TimerEntry {

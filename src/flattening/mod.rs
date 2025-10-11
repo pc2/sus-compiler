@@ -95,7 +95,7 @@ impl Module {
         assert_eq!(
             self.link_info.parameters.len(),
             self.inference_info.parameter_inference_candidates.len(),
-            "{}",
+            "{} is not valid",
             self.link_info.name
         );
     }
