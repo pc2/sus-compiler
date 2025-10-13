@@ -147,6 +147,8 @@ struct FlatteningContext<'l, 'errs> {
     current_parent_condition: Option<ParentCondition>,
 }
 
+// Otherwise clippy reports silly things like kind!("number") | kind!("float") | kind!("bool_array_literal") as "make this a range" errors
+#[allow(clippy::manual_range_patterns)]
 impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     fn flatten_latency_specifier(&mut self, cursor: &mut Cursor<'c>) -> Option<(FlatID, Span)> {
         cursor.optional_field(field!("latency_specifier")).then(|| {

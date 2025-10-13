@@ -225,7 +225,7 @@
                         "${userHome}/.sus/0.3.0/crash_dumps/",
                         "${userHome}/.sus/0.3.1-devel/crash_dumps/",
                         "${userHome}/.sus/0.3.2-devel/crash_dumps/",
-                        "${userHome}/.local/share/sus/0.3.3-devel/crash_dumps/",
+                        "${userHome}/.local/share/sus/0.3.3/crash_dumps/",
                         "${workspaceFolder}/crash_dumps/",
                     ]
                 },
