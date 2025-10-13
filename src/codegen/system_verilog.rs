@@ -799,14 +799,26 @@ impl<'g> CodeGenerationContext<'g> {
                         "<="
                     } else {
                         writeln!(self.program_text, "always_comb begin\n\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches").unwrap();
-                        let cst_str = Self::display_constant(&w.typ, &Value::Unset);
-                        writeln!(self.program_text, "\t{output_name} = {cst_str};").unwrap();
+                        let unset_str = Self::display_constant(&w.typ, &Value::Unset);
+                        writeln!(self.program_text, "\t{output_name} = {unset_str};").unwrap();
                         "="
                     };
 
                     for s in sources {
                         self.write_assign(&output_name, arrow_str, s, w);
                     }
+
+                    write!(
+                        self.program_text,
+                        "{}",
+                        super::patches::patch_combinatorial_write_one_bit_dont_care(
+                            is_state,
+                            &output_name,
+                            &w.typ
+                        )
+                    )
+                    .unwrap();
+
                     writeln!(self.program_text, "end").unwrap();
                 }
                 RealWireDataSource::ReadOnly

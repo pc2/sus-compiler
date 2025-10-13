@@ -4,6 +4,11 @@
 - SUS_HOME is now controllable via cli override `--sus-home`, env var `$SUS_HOME`, and falls back to the baked-in `$INSTALL_SUS_HOME` set while installing. 
 - Crash dumps try to dump in `$SUS_HOME/crash_dumps`, if `SUS_HOME` is ready-only they dump to `./sus_crash_dumps`
 - Fix crash when crash dump name too long (ironic, isn't it?)
+- Replace `--codegen`, `--standalone`, `--standalone-file` with `-o` and `--top` (#123)
+- Fix ICE on assign `[]` to `bool[3][4]` (#124)
+- Fix double underscores in codegen (#128)
+- Better display of IO errors (#125) (#98)
+- Work around Vivado sim wrong result for single-bit combinatorial assigns (#127)
 
 ## 0.3.2
 - Execute: Add `BitsToUIntGen`, `BitsToIntGen`, `UIntToBitsGen` and `IntToBitsGen` for compiletime `gen bool[] <-> gen int` conversion (#120)

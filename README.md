@@ -38,6 +38,11 @@ call plug#end()
 
 ## Learning SUS
 
+Use SUS with:
+```sh
+sus_compiler myFile.sus -o outFile.sv --top MyTopModule
+```
+
 To get started with learning SUS, have a look at [this (mildly outdated) talk](https://www.youtube.com/watch?v=jJvtZvcimyM). In 40 minutes it goes over most language features through examples. For the changes, please look at the [Changelog](CHANGELOG.md). 
 
 A full language reference can be found here:    

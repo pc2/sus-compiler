@@ -31,7 +31,7 @@ module Abs #(int TO) {
 
 /// Concatenate two arrays, such that the elements of b come after the elements of a
 module Concat #(T, int SIZE_A, int SIZE_B) {
-	interface Concat : T[SIZE_A] a, T[SIZE_B] b -> T[SIZE_A + SIZE_B] result
+	interface Concat : T[SIZE_A] a'0, T[SIZE_B] b'0 -> T[SIZE_A + SIZE_B] result'0
 
 	result[:SIZE_A] = a
 	result[SIZE_A:] = b
@@ -39,7 +39,7 @@ module Concat #(T, int SIZE_A, int SIZE_B) {
 
 /// Concatenate two arrays, such that the elements of b come after the elements of a
 module Repeat #(T, int SIZE) {
-	interface Repeat : T v -> T[SIZE] result
+	interface Repeat : T v'0 -> T[SIZE] result'0
 
 	for int I in 0..SIZE {
 		result[I] = v
@@ -47,7 +47,7 @@ module Repeat #(T, int SIZE) {
 }
 
 module BitSelect #(int SIZE) {
-	interface BitSelect : int#(FROM: 0, TO: SIZE - 1) selection -> bool[SIZE] bits
+	interface BitSelect : int#(FROM: 0, TO: SIZE - 1) selection'0 -> bool[SIZE] bits'0
 
 	for int I in 0..SIZE {
 		bits[I] = false

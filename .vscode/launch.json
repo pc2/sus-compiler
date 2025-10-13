@@ -41,7 +41,7 @@
             "args": [
                 "--debug-whitelist", "TEST",
                 "tinyTestFile.sus",
-                "--standalone", "TEST",
+                "--top", "TEST",
                 "--debug", "TEST", // Temporary to add in code when debugging
                 "--debug", "print-abstract-pre-typecheck",
                 "--debug", "print-abstract",
@@ -68,7 +68,7 @@
             },
             "sourceLanguages": ["rust"],
             "args": [
-                "--standalone",
+                "--top",
                 "BitSerialMatrixMultiply",
             ],
             "cwd": "${workspaceFolder}"
@@ -101,7 +101,7 @@
                 "--debug", "print-abstract-pre-typecheck",
                 "--debug", "print-abstract",
                 "--debug", "print-concrete",
-                "--standalone", "MandelbrotSlowIter2"
+                "--top", "MandelbrotSlowIter2"
             ],
             "cwd": "${workspaceFolder}"
         },

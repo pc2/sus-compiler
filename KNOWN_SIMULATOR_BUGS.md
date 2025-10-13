@@ -2,6 +2,7 @@
 # 1-bit Conditional Assigns become don't care
 ## Affects: Vivado 23.1, Vivado 23.2
 ## Fixed in: Vivado 24.1
+## Workaround in: SUS 0.3.3 (crate::codegen::patches::patch_combinatorial_write_one_bit_dont_care)
 ```sv
 module sim_reproduce_bug;
 

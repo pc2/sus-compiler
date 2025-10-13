@@ -1,3 +1,4 @@
+mod patches;
 mod shared;
 pub mod system_verilog;
 

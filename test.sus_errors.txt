@@ -147,6 +147,10 @@
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated check_non_inlineds #()
 [ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate make_when #()
 [ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate use_make_when #()
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated Repeat #(T: type bool #(), SIZE: 1)
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated Repeat #(T: type bool #(), SIZE: 2)
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated Repeat #(T: type bool #(), SIZE: 3)
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated test_vivado_bug #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -5250,6 +5254,48 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1554 │     when w.t : bool c {
       │                     ┬  
       │                     ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1562:13 ]
+      │
+ 1562 │     input bool b
+      │                ┬  
+      │                ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1564:11 ]
+      │
+ 1564 │        for int SZ in 1..4 {
+      │                ─┬  
+      │                 ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1565:13 ]
+      │
+ 1565 │          bool[SZ] x = Repeat(false)
+      │                   ┬  
+      │                   ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1566:13 ]
+      │
+ 1566 │          bool[SZ] y = x
+      │                   ┬  
+      │                   ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1568:26 ]
+      │
+ 1568 │          int#(FROM: 0, TO: SZ) u = 0
+      │                                ┬  
+      │                                ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1569:8 ]
+      │
+ 1569 │          int v = u
+      │              ┬  
+      │              ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!

@@ -1556,3 +1556,17 @@ module use_make_when {
 	}
 }
 
+
+/// Test the workaround for 1-bit Conditional Assigns become don't care
+module test_vivado_bug {
+	input bool b
+	when b {
+		for int SZ in 1..4 {
+			bool[SZ] x = Repeat(false)
+			bool[SZ] y = x
+
+			int#(FROM: 0, TO: SZ) u = 0
+			int v = u
+		}
+	}
+}
