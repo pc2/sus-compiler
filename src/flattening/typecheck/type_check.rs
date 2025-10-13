@@ -592,15 +592,6 @@ impl<'l> TypeCheckingContext<'l> {
                     self.type_checker.alloc_unknown()
                 }
             }
-            ExpressionSource::Literal(value) => match value {
-                Value::Bool(_) => BOOL_SCALAR,
-                Value::Float(_) => FLOAT_SCALAR,
-                Value::Integer(_) => INT_SCALAR.clone(),
-                Value::Array(_) => unreachable!(
-                    "Value::get_type_abs is only ever used for terminal Values, because any array instantiations would be Expression::ArrayConstruct"
-                ),
-                Value::Unset => unreachable!(),
-            },
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut arr_iter = arr.iter();
                 let arr_elem_typ = if let Some(first_elem) = arr_iter.next() {
@@ -631,6 +622,25 @@ impl<'l> TypeCheckingContext<'l> {
                 };
                 arr_elem_typ.rank_up()
             }
+            ExpressionSource::Literal(value) => match value {
+                Value::Bool(_) => BOOL_SCALAR,
+                Value::Float(_) => FLOAT_SCALAR,
+                Value::Integer(_) => INT_SCALAR.clone(),
+                Value::Array(elements) => {
+                    if let Some(fst) = elements.first() {
+                        assert!(
+                            matches!(fst, Value::Bool(_)),
+                            "The only type of array literal we have is boolean arrays!"
+                        ); // Future proof? Idk
+                    }
+
+                    AbstractRankedType {
+                        inner: BOOL_INNER,
+                        rank: PeanoType::from_natural(1),
+                    }
+                }
+                Value::Unset => unreachable!(),
+            },
         }
     }
     fn typecheck_multi_output_expr(&mut self, expr: &'l Expression, multi_write: &'l [WriteTo]) {

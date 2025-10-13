@@ -1,6 +1,6 @@
 use std::{
     fmt::Debug,
-    ops::{Index, Range},
+    ops::{Index, Range, RangeBounds},
 };
 
 use crate::prelude::FileUUID;
@@ -54,6 +54,19 @@ impl Span {
     pub fn empty_span_at_end(self) -> Span {
         self.debug();
         Span(self.1, self.1).debug()
+    }
+    pub fn sub_span<R: RangeBounds<usize>>(&self, bound: R) -> Span {
+        let start = match bound.start_bound() {
+            std::ops::Bound::Included(from) => self.0 + from,
+            std::ops::Bound::Excluded(from) => self.0 + from + 1,
+            std::ops::Bound::Unbounded => self.0,
+        };
+        let end = match bound.end_bound() {
+            std::ops::Bound::Included(to) => self.0 + to + 1,
+            std::ops::Bound::Excluded(to) => self.0 + to,
+            std::ops::Bound::Unbounded => self.1,
+        };
+        Span(start, end)
     }
 }
 

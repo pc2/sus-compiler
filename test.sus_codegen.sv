@@ -1,3 +1,24 @@
+// boolean_array_literals #()
+module boolean_array_literals(
+	input clk
+);
+
+/*mux_wire*/ logic[49:0] b;
+localparam[49:0] _1 = 50'b00000000000000000000000000000000000000010100100110;
+/*mux_wire*/ logic[99:0] ob;
+localparam[99:0] _2 = 100'b0000000000000000000000000000000000000000000000000000000000000000000011101100011100000111100110100111;
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	b = 50'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
+	b = _1;
+end
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	ob = 100'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
+	ob = _2;
+end
+endmodule
+
 // test_vivado_bug #()
 module test_vivado_bug(
 	input clk,
@@ -2298,6 +2319,188 @@ always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	data_out = 7'dx;
 	data_out = _data_in_D200;
+end
+endmodule
+
+// matrix_vector_mul #()
+module matrix_vector_mul(
+	input clk,
+	input wire[6:0] mat[3:0][5:0],
+	input wire[6:0] vec[3:0],
+	output /*mux_wire*/ logic[15:0] result[5:0]
+);
+
+/*mux_wire*/ logic[13:0] row_products[3:0];
+wire[6:0] _1 = mat[0][0];
+wire[6:0] _2 = vec[0];
+wire[13:0] _3;
+assign _3 = _1 * _2;
+wire[6:0] _4 = mat[1][0];
+wire[6:0] _5 = vec[1];
+wire[13:0] _6;
+assign _6 = _4 * _5;
+wire[6:0] _7 = mat[2][0];
+wire[6:0] _8 = vec[2];
+wire[13:0] _9;
+assign _9 = _7 * _8;
+wire[6:0] _10 = mat[3][0];
+wire[6:0] _11 = vec[3];
+wire[13:0] _12;
+assign _12 = _10 * _11;
+wire[15:0] _14;
+assign _14 = +row_products;
+/*mux_wire*/ logic[13:0] row_products_2[3:0];
+wire[6:0] _15 = mat[0][1];
+wire[6:0] _16 = vec[0];
+wire[13:0] _17;
+assign _17 = _15 * _16;
+wire[6:0] _18 = mat[1][1];
+wire[6:0] _19 = vec[1];
+wire[13:0] _20;
+assign _20 = _18 * _19;
+wire[6:0] _21 = mat[2][1];
+wire[6:0] _22 = vec[2];
+wire[13:0] _23;
+assign _23 = _21 * _22;
+wire[6:0] _24 = mat[3][1];
+wire[6:0] _25 = vec[3];
+wire[13:0] _26;
+assign _26 = _24 * _25;
+wire[15:0] _28;
+assign _28 = +row_products_2;
+/*mux_wire*/ logic[13:0] row_products_3[3:0];
+wire[6:0] _29 = mat[0][2];
+wire[6:0] _30 = vec[0];
+wire[13:0] _31;
+assign _31 = _29 * _30;
+wire[6:0] _32 = mat[1][2];
+wire[6:0] _33 = vec[1];
+wire[13:0] _34;
+assign _34 = _32 * _33;
+wire[6:0] _35 = mat[2][2];
+wire[6:0] _36 = vec[2];
+wire[13:0] _37;
+assign _37 = _35 * _36;
+wire[6:0] _38 = mat[3][2];
+wire[6:0] _39 = vec[3];
+wire[13:0] _40;
+assign _40 = _38 * _39;
+wire[15:0] _42;
+assign _42 = +row_products_3;
+/*mux_wire*/ logic[13:0] row_products_4[3:0];
+wire[6:0] _43 = mat[0][3];
+wire[6:0] _44 = vec[0];
+wire[13:0] _45;
+assign _45 = _43 * _44;
+wire[6:0] _46 = mat[1][3];
+wire[6:0] _47 = vec[1];
+wire[13:0] _48;
+assign _48 = _46 * _47;
+wire[6:0] _49 = mat[2][3];
+wire[6:0] _50 = vec[2];
+wire[13:0] _51;
+assign _51 = _49 * _50;
+wire[6:0] _52 = mat[3][3];
+wire[6:0] _53 = vec[3];
+wire[13:0] _54;
+assign _54 = _52 * _53;
+wire[15:0] _56;
+assign _56 = +row_products_4;
+/*mux_wire*/ logic[13:0] row_products_5[3:0];
+wire[6:0] _57 = mat[0][4];
+wire[6:0] _58 = vec[0];
+wire[13:0] _59;
+assign _59 = _57 * _58;
+wire[6:0] _60 = mat[1][4];
+wire[6:0] _61 = vec[1];
+wire[13:0] _62;
+assign _62 = _60 * _61;
+wire[6:0] _63 = mat[2][4];
+wire[6:0] _64 = vec[2];
+wire[13:0] _65;
+assign _65 = _63 * _64;
+wire[6:0] _66 = mat[3][4];
+wire[6:0] _67 = vec[3];
+wire[13:0] _68;
+assign _68 = _66 * _67;
+wire[15:0] _70;
+assign _70 = +row_products_5;
+/*mux_wire*/ logic[13:0] row_products_6[3:0];
+wire[6:0] _71 = mat[0][5];
+wire[6:0] _72 = vec[0];
+wire[13:0] _73;
+assign _73 = _71 * _72;
+wire[6:0] _74 = mat[1][5];
+wire[6:0] _75 = vec[1];
+wire[13:0] _76;
+assign _76 = _74 * _75;
+wire[6:0] _77 = mat[2][5];
+wire[6:0] _78 = vec[2];
+wire[13:0] _79;
+assign _79 = _77 * _78;
+wire[6:0] _80 = mat[3][5];
+wire[6:0] _81 = vec[3];
+wire[13:0] _82;
+assign _82 = _80 * _81;
+wire[15:0] _84;
+assign _84 = +row_products_6;
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	result = '{16'dx, 16'dx, 16'dx, 16'dx, 16'dx, 16'dx};
+	result[0] = _14;
+	result[1] = _28;
+	result[2] = _42;
+	result[3] = _56;
+	result[4] = _70;
+	result[5] = _84;
+end
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	row_products = '{14'dx, 14'dx, 14'dx, 14'dx};
+	row_products[0] = _3;
+	row_products[1] = _6;
+	row_products[2] = _9;
+	row_products[3] = _12;
+end
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	row_products_2 = '{14'dx, 14'dx, 14'dx, 14'dx};
+	row_products_2[0] = _17;
+	row_products_2[1] = _20;
+	row_products_2[2] = _23;
+	row_products_2[3] = _26;
+end
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	row_products_3 = '{14'dx, 14'dx, 14'dx, 14'dx};
+	row_products_3[0] = _31;
+	row_products_3[1] = _34;
+	row_products_3[2] = _37;
+	row_products_3[3] = _40;
+end
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	row_products_4 = '{14'dx, 14'dx, 14'dx, 14'dx};
+	row_products_4[0] = _45;
+	row_products_4[1] = _48;
+	row_products_4[2] = _51;
+	row_products_4[3] = _54;
+end
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	row_products_5 = '{14'dx, 14'dx, 14'dx, 14'dx};
+	row_products_5[0] = _59;
+	row_products_5[1] = _62;
+	row_products_5[2] = _65;
+	row_products_5[3] = _68;
+end
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	row_products_6 = '{14'dx, 14'dx, 14'dx, 14'dx};
+	row_products_6[0] = _73;
+	row_products_6[1] = _76;
+	row_products_6[2] = _79;
+	row_products_6[3] = _82;
 end
 endmodule
 

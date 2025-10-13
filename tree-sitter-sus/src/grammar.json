@@ -1087,6 +1087,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "bool_array_literal"
+        },
+        {
+          "type": "SYMBOL",
           "name": "parenthesis_expression"
         },
         {
@@ -2000,7 +2004,11 @@
     },
     "float": {
       "type": "PATTERN",
-      "value": "[0-9]*\\.[0-9]+([eE][-+]?\\d+)?"
+      "value": "\\d*\\.\\d+([eE][-+]?\\d+)?"
+    },
+    "bool_array_literal": {
+      "type": "PATTERN",
+      "value": "\\d+'[\\p{Alphabetic}_\\p{Decimal_Number}]+"
     },
     "_comma": {
       "type": "SEQ",

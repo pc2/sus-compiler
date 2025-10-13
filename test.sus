@@ -344,12 +344,12 @@ module module_taking_time {
 
 module matrix_vector_mul {
 	interface matrix_vector_mul : 
-		int#(FROM: 0, TO: 100)[30][20] mat, int#(FROM: 0, TO: 100)[20] vec -> int[30] result
+		int#(FROM: 0, TO: 100)[6][4] mat, int#(FROM: 0, TO: 100)[4] vec -> int[6] result
 	
-	for int row in 0..30 {
-		int[20] row_products
-		for int col in 0..20 {
-			row_products[col] = mat[row][col] * vec[col]
+	for int row in 0..6 {
+		int[4] row_products
+		for int col in 0..4 {
+			row_products[col] = mat[col][row] * vec[col]
 		}
 		result[row] = +row_products
 	}
@@ -1570,3 +1570,14 @@ module test_vivado_bug {
 		}
 	}
 }
+
+module boolean_array_literals {
+	bool[50] b = 50'b010100_100110
+	gen bool[100] bb = 100'h035434____ae_fb_CDE07846847
+	gen bool[101] bbb
+	for int i in 0..100 {
+		bbb[i] = bb[i]
+	}
+	bool[100] ob = 100'o035434_074647
+}
+

@@ -25,18 +25,11 @@ use crate::typing::value_unifier::UnifyableValue;
 use crate::value::Value;
 use crate::{file_position::FileText, pretty_print_many_spans};
 
-use crate::flattening::{
-    Declaration, DeclarationKind, Direction, DomainInfo, Expression, ExpressionOutput,
-    ExpressionSource, ForStatement, FuncCall, GlobalReference, IfStatement, Instruction,
-    InterfaceDeclKind, InterfaceDeclaration, InterfaceKind, InterfaceToDomainMap, Module,
-    PartSelectDirection, PathElemRefersTo, SliceType, SubModuleInstance, WireReference,
-    WireReferencePathElement, WireReferenceRoot, WriteModifiers, WriteTo, WrittenTemplateArg,
-    WrittenType,
-};
+use crate::flattening::*;
 use crate::linker::{FileData, GlobalUUID, IsExtern, LinkInfo, LinkerGlobals};
 use crate::typing::{abstract_type::AbstractRankedType, concrete_type::ConcreteType};
 
-use std::fmt::{Display, Formatter};
+use std::fmt::{Display, Formatter, Write};
 
 use std::ops::Deref;
 
@@ -339,9 +332,17 @@ impl Display for Value {
                 let mut buf = dtoa::Buffer::new();
                 write!(f, "{}", buf.format(f32::from(*fl)))
             }
-            Value::Array(arr_box) => {
-                let content = display_join(", ", arr_box.iter(), |f, v| v.fmt(f));
-                write!(f, "[{content}]")
+            Value::Array(elements) => {
+                if elements.iter().all(|e| matches!(e, Value::Bool(_))) {
+                    write!(f, "{}'b", elements.len())?;
+                    for e in elements.iter().rev() {
+                        f.write_char(if e.unwrap_bool() { '1' } else { '0' })?;
+                    }
+                } else {
+                    let content = display_join(", ", elements.iter(), |f, v| v.fmt(f));
+                    write!(f, "[{content}]")?;
+                }
+                Ok(())
             }
             Value::Unset => f.write_str("{value_unset}"),
         }

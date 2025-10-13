@@ -842,6 +842,109 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         }))
     }
 
+    fn parse_bool_array_literal(
+        &mut self,
+        cursor: &mut Cursor<'c>,
+        expr_span: Span,
+    ) -> Result<ExpressionSource, (Span, String)> {
+        fn parse_bool_array_data<const RADIX: u8>(
+            binary_data: &str,
+            data_span: Span,
+            acceptable_chars: &'static str,
+        ) -> Result<Vec<Value>, (Span, String)> {
+            fn char_to_u8<const RADIX: u8>(c: char) -> Option<u8> {
+                let v = match c {
+                    '0'..='9' => c as u8 - b'0',
+                    'a'..='z' => (c as u8 - b'a') + 10,
+                    'A'..='Z' => (c as u8 - b'A') + 10,
+                    _ => return None,
+                };
+                (v < RADIX).then_some(v)
+            }
+            let mut bit_vector = Vec::new();
+            for (idx, c) in binary_data.char_indices() {
+                if c == '_' {
+                    continue; // Underscores are for spacing
+                }
+                let Some(bit_chunk) = char_to_u8::<RADIX>(c) else {
+                    let char_span = data_span.sub_span(idx..idx + c.len_utf8());
+                    return Err((
+                        char_span,
+                        format!(
+                            "Disallowed character '{c}' in bitstring. Allowed characters {acceptable_chars}"
+                        ),
+                    ));
+                };
+                if RADIX == 2 {
+                    bit_vector.push(Value::Bool(bit_chunk & 0b1 != 0))
+                }
+                if RADIX == 8 {
+                    bit_vector.push(Value::Bool(bit_chunk & 0b100 != 0));
+                    bit_vector.push(Value::Bool(bit_chunk & 0b010 != 0));
+                    bit_vector.push(Value::Bool(bit_chunk & 0b001 != 0));
+                }
+                if RADIX == 16 {
+                    bit_vector.push(Value::Bool(bit_chunk & 0b1000 != 0));
+                    bit_vector.push(Value::Bool(bit_chunk & 0b0100 != 0));
+                    bit_vector.push(Value::Bool(bit_chunk & 0b0010 != 0));
+                    bit_vector.push(Value::Bool(bit_chunk & 0b0001 != 0));
+                }
+            }
+            bit_vector.reverse();
+            Ok(bit_vector)
+        }
+
+        let literal_text = &cursor.file_data.file_text[expr_span];
+        let size_separator = literal_text.find("'").unwrap();
+        let specified_size = match literal_text[..size_separator].parse::<usize>() {
+            Ok(v) => v,
+            Err(_) => {
+                return Err((
+                    expr_span.sub_span(..size_separator),
+                    format!("Size is too large. Can be max {}", usize::MAX),
+                ));
+            }
+        };
+        let data_start = size_separator + "'".len();
+        let data_radix_char = literal_text[data_start..].chars().next().unwrap();
+        let data_str = &literal_text[data_start + data_radix_char.len_utf8()..];
+        let data_span = expr_span.sub_span(data_start + data_radix_char.len_utf8()..);
+        let mut bools = match data_radix_char {
+            'b' | 'B' => parse_bool_array_data::<2>(
+                data_str,
+                data_span,
+                "in a binary bitvector are '0'-'1'",
+            )?,
+            'o' | 'O' => parse_bool_array_data::<8>(
+                data_str,
+                data_span,
+                "in an octal bitvector are '0'-'7'",
+            )?,
+            'h' | 'H' => parse_bool_array_data::<16>(
+                data_str,
+                data_span,
+                "in a hexadecimal bitvector are '0'-'9', 'a'-'f', 'A'-'F'",
+            )?,
+            _ => {
+                return Err((
+                    Span::from(data_start..data_start + data_radix_char.len_utf8()),
+                    "The radix signifier of a bitvector must be 'b' for binary, 'o' for octal, or 'h' for hexadecimal".to_string(),
+                ));
+            }
+        };
+        let mut minimum_non_truncating_size = 0;
+        for (idx, b) in bools.iter().enumerate() {
+            if b.unwrap_bool() {
+                minimum_non_truncating_size = idx + 1;
+            }
+        }
+        if specified_size < minimum_non_truncating_size {
+            self.errors.warn(expr_span, format!("Truncating ones in this boolean array literal! Last '1' bit occurs at position {} but specified size is {specified_size}", minimum_non_truncating_size - 1));
+        }
+        bools.resize(specified_size, Value::Bool(false));
+        Ok(ExpressionSource::Literal(Value::Array(bools)))
+    }
+
     fn flatten_expr_source(&mut self, cursor: &mut Cursor<'c>) -> (ExpressionSource, Span) {
         let (kind, expr_span) = cursor.kind_span();
 
@@ -855,6 +958,13 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 let text = &cursor.file_data.file_text[expr_span];
                 ExpressionSource::Literal(Value::Float(NotNan::from_str(text).unwrap()))
             }
+            kind!("bool_array_literal") => match self.parse_bool_array_literal(cursor, expr_span) {
+                Ok(v) => v,
+                Err((err_span, err_reason)) => {
+                    self.errors.error(err_span, err_reason);
+                    ExpressionSource::WireRef(self.new_error(expr_span))
+                }
+            },
             kind!("unary_op") => cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("operator"));
                 let op = UnaryOperator::from_kind_id(cursor.kind());
@@ -1052,7 +1162,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
                 wire_ref
             }),
-            kind!("number") | kind!("float") => {
+            kind!("number") | kind!("float") | kind!("bool_array_literal") => {
                 self.errors
                     .error(expr_span, "A constant is not a wire reference");
                 self.new_error(expr_span)
