@@ -485,11 +485,19 @@ impl<'l> ModuleTypingContext<'l> {
 /// Mangle the module name for use in code generation
 fn mangle_name(str: &str) -> String {
     let mut result = String::with_capacity(str.len());
+
+    let mut last_was_underscore = false;
     for c in str.chars() {
-        if c.is_whitespace() || c == ':' {
-            continue;
+        if c.is_alphanumeric() {
+            result.push(c);
+            last_was_underscore = false;
+        } else {
+            // Max 1 underscore at a time, as some tools don't like it (#128)
+            if !last_was_underscore {
+                result.push('_');
+            }
+            last_was_underscore = true;
         }
-        result.push(if c.is_alphanumeric() { c } else { '_' });
     }
     result.trim_matches('_').to_owned()
 }

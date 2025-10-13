@@ -296,7 +296,7 @@ wire _inf_y;
 /*latency*/ logic __inf_y_N1; always_ff @(posedge clk) begin __inf_y_N1 <= __inf_y_N2; end
 /*mux_wire*/ logic _inf_p;
 wire _inf_q;
-infer_me_with_negative_delta__V31 inf(
+infer_me_with_negative_delta_V_31 inf(
 	.clk(clk),
 	.x(_inf_x),
 	.y(_inf_y),
@@ -322,7 +322,7 @@ end
 endmodule
 
 // infer_me_with_negative_delta #(V: 31)
-module infer_me_with_negative_delta__V31(
+module infer_me_with_negative_delta_V_31(
 	input clk,
 	input wire x,
 	output /*mux_wire*/ logic y,
@@ -381,7 +381,7 @@ wire _inf_y;
 /*latency*/ logic __inf_y_N1; always_ff @(posedge clk) begin __inf_y_N1 <= __inf_y_N2; end
 /*mux_wire*/ logic _inf_p;
 wire _inf_q;
-infer_me_with_delta__V_31 inf(
+infer_me_with_delta_V_31 inf(
 	.clk(clk),
 	.x(_inf_x),
 	.y(_inf_y),
@@ -407,7 +407,7 @@ end
 endmodule
 
 // infer_me_with_delta #(V: -31)
-module infer_me_with_delta__V_31(
+module infer_me_with_delta_V_31(
 	input clk,
 	input wire x,
 	output /*mux_wire*/ logic y,
@@ -475,7 +475,7 @@ module infer_from_local_context(
 wire _infer_me_y;
 wire _4;
 assign _4 = _infer_me_y | heavily_pipelined_computation;
-infer_me__A5 infer_me(
+infer_me_A_5 infer_me(
 	.clk(clk),
 	.x(_infer_me_x),
 	.y(_infer_me_y)
@@ -498,7 +498,7 @@ end
 endmodule
 
 // infer_me #(A: 5)
-module infer_me__A5(
+module infer_me_A_5(
 	input clk,
 	input wire x,
 	output /*mux_wire*/ logic y
@@ -517,7 +517,7 @@ end
 endmodule
 
 // infer_me #(A: 2)
-module infer_me__A2(
+module infer_me_A_2(
 	input clk,
 	input wire x,
 	output /*mux_wire*/ logic y
@@ -568,7 +568,7 @@ endmodule
 
 // sized_int_add #(LEFT_SIZE: 4, RIGHT_SIZE: 3, OUTPUT_SIZE: 5)
 // Provided externally
-// module sized_int_add__LEFT_SIZE4_RIGHT_SIZE3_OUTPUT_SIZE5(
+// module sized_int_add_LEFT_SIZE_4_RIGHT_SIZE_3_OUTPUT_SIZE_5(
 // 	input clk,
 // 	input wire[3:0] a,
 // 	input wire[2:0] b,
@@ -583,7 +583,7 @@ module numbersToAddUp(
 /*mux_wire*/ logic[3:0] total;
 /*mux_wire*/ logic[1:0] _adder_values[4:0];
 wire[3:0] _adder_total;
-TreeAdd__WIDTH5_FROM3_TO4 adder(
+TreeAdd_WIDTH_5_FROM_3_TO_4 adder(
 	.clk(clk),
 	.values(_adder_values),
 	.total(_adder_total)
@@ -636,7 +636,7 @@ module use_permute(
 /*mux_wire*/ logic[2:0] _permut_d_in[7:0];
 wire[2:0] _permut_d_out[7:0];
 localparam[2:0] SOURCES[7:0] = '{3'd3, 3'd2, 3'd4, 3'd5, 3'd1, 3'd2, 3'd7, 3'd6};
-permute_t__Ttypeint__FROM1_TO8__SIZE8_SOURCES_3_2_4_5_1_2_7_6 permut(
+permute_t_T_type_int_FROM_1_TO_8_SIZE_8_SOURCES_3_2_4_5_1_2_7_6 permut(
 	.clk(clk),
 	.d_in(_permut_d_in),
 	.d_out(_permut_d_out)
@@ -664,7 +664,7 @@ end
 endmodule
 
 // permute_t #(T: type int #(FROM: 1, TO: 8), SIZE: 8, SOURCES: [3, 2, 4, 5, 1, 2, 7, 6])
-module permute_t__Ttypeint__FROM1_TO8__SIZE8_SOURCES_3_2_4_5_1_2_7_6(
+module permute_t_T_type_int_FROM_1_TO_8_SIZE_8_SOURCES_3_2_4_5_1_2_7_6(
 	input clk,
 	input wire[2:0] d_in[7:0],
 	output /*mux_wire*/ logic[2:0] d_out[7:0]
@@ -693,7 +693,7 @@ end
 endmodule
 
 // replicate #(T: type int #(FROM: 3, TO: 4), NUM_REPLS: 30)
-module replicate__Ttypeint__FROM3_TO4__NUM_REPLS30(
+module replicate_T_type_int_FROM_3_TO_4_NUM_REPLS_30(
 	input clk,
 	input wire[1:0] data,
 	output /*mux_wire*/ logic[1:0] result[29:0]
@@ -740,22 +740,22 @@ module testTinyTestMod(
 	input clk
 );
 
-tinyTestMod__beep3 a(
+tinyTestMod_beep_3 a(
 	.clk(clk),
 	.o()
 );
-tinyTestMod__beep4 b(
+tinyTestMod_beep_4 b(
 	.clk(clk),
 	.o()
 );
-tinyTestMod__beep3 c(
+tinyTestMod_beep_3 c(
 	.clk(clk),
 	.o()
 );
 endmodule
 
 // tinyTestMod #(beep: 4)
-module tinyTestMod__beep4(
+module tinyTestMod_beep_4(
 	input clk,
 	output /*mux_wire*/ logic[2:0] o
 );
@@ -768,7 +768,7 @@ end
 endmodule
 
 // tinyTestMod #(beep: 3)
-module tinyTestMod__beep3(
+module tinyTestMod_beep_3(
 	input clk,
 	output /*mux_wire*/ logic[1:0] o
 );
@@ -2860,7 +2860,7 @@ end
 endmodule
 
 // TreeAdd #(WIDTH: 5, FROM: 3, TO: 4)
-module TreeAdd__WIDTH5_FROM3_TO4(
+module TreeAdd_WIDTH_5_FROM_3_TO_4(
 	input clk,
 	input wire[1:0] values[4:0],
 	output /*mux_wire*/ logic[3:0] total
@@ -2889,12 +2889,12 @@ wire[3:0] _TreeAdd_2_total;
 wire[3:0] _5;
 assign _5 = _left_total_D2 + right_total;
 /*latency*/ logic[3:0] __5_D3; always_ff @(posedge clk) begin __5_D3 <= _5; end
-TreeAdd__WIDTH2_FROM3_TO4 TreeAdd(
+TreeAdd_WIDTH_2_FROM_3_TO_4 TreeAdd(
 	.clk(clk),
 	.values(_TreeAdd_values),
 	.total(_TreeAdd_total)
 );
-TreeAdd__WIDTH3_FROM3_TO4 TreeAdd_2(
+TreeAdd_WIDTH_3_FROM_3_TO_4 TreeAdd_2(
 	.clk(clk),
 	.values(_TreeAdd_2_values),
 	.total(_TreeAdd_2_total)
@@ -2931,7 +2931,7 @@ end
 endmodule
 
 // TreeAdd #(WIDTH: 3, FROM: 3, TO: 4)
-module TreeAdd__WIDTH3_FROM3_TO4(
+module TreeAdd_WIDTH_3_FROM_3_TO_4(
 	input clk,
 	input wire[1:0] values[2:0],
 	output /*mux_wire*/ logic[3:0] total
@@ -2960,12 +2960,12 @@ wire[2:0] _TreeAdd_2_total;
 wire[3:0] _5;
 assign _5 = _left_total_D1 + right_total;
 /*latency*/ logic[3:0] __5_D2; always_ff @(posedge clk) begin __5_D2 <= _5; end
-TreeAdd__WIDTH1_FROM3_TO4 TreeAdd(
+TreeAdd_WIDTH_1_FROM_3_TO_4 TreeAdd(
 	.clk(clk),
 	.values(_TreeAdd_values),
 	.total(_TreeAdd_total)
 );
-TreeAdd__WIDTH2_FROM3_TO4 TreeAdd_2(
+TreeAdd_WIDTH_2_FROM_3_TO_4 TreeAdd_2(
 	.clk(clk),
 	.values(_TreeAdd_2_values),
 	.total(_TreeAdd_2_total)
@@ -3002,7 +3002,7 @@ end
 endmodule
 
 // TreeAdd #(WIDTH: 2, FROM: 3, TO: 4)
-module TreeAdd__WIDTH2_FROM3_TO4(
+module TreeAdd_WIDTH_2_FROM_3_TO_4(
 	input clk,
 	input wire[1:0] values[1:0],
 	output /*mux_wire*/ logic[2:0] total
@@ -3030,12 +3030,12 @@ wire[1:0] _TreeAdd_2_total;
 wire[2:0] _5;
 assign _5 = left_total + right_total;
 /*latency*/ logic[2:0] __5_D1; always_ff @(posedge clk) begin __5_D1 <= _5; end
-TreeAdd__WIDTH1_FROM3_TO4 TreeAdd(
+TreeAdd_WIDTH_1_FROM_3_TO_4 TreeAdd(
 	.clk(clk),
 	.values(_TreeAdd_values),
 	.total(_TreeAdd_total)
 );
-TreeAdd__WIDTH1_FROM3_TO4 TreeAdd_2(
+TreeAdd_WIDTH_1_FROM_3_TO_4 TreeAdd_2(
 	.clk(clk),
 	.values(_TreeAdd_2_values),
 	.total(_TreeAdd_2_total)
@@ -3072,7 +3072,7 @@ end
 endmodule
 
 // TreeAdd #(WIDTH: 1, FROM: 3, TO: 4)
-module TreeAdd__WIDTH1_FROM3_TO4(
+module TreeAdd_WIDTH_1_FROM_3_TO_4(
 	input clk,
 	input wire[1:0] values[0:0],
 	output /*mux_wire*/ logic[1:0] total
@@ -3087,7 +3087,7 @@ end
 endmodule
 
 // transmute #(T1: type int #(FROM: 0, TO: 255)[2], T2: type int #(FROM: 0, TO: 65536))
-module transmute__T1typeint__FROM0_TO255__2__T2typeint__FROM0_TO65536(
+module transmute_T1_type_int_FROM_0_TO_255_2_T2_type_int_FROM_0_TO_65536(
 	input clk,
 	input wire[7:0] a[1:0],
 	output /*mux_wire*/ logic[15:0] b
@@ -3098,12 +3098,12 @@ module transmute__T1typeint__FROM0_TO255__2__T2typeint__FROM0_TO65536(
 wire[15:0] _transmute_to_bits_bits;
 /*mux_wire*/ logic[15:0] _transmute_from_bits_bits;
 wire[15:0] _transmute_from_bits_value;
-transmute_to_bits__Ttypeint__FROM0_TO255__2 transmute_to_bits(
+transmute_to_bits_T_type_int_FROM_0_TO_255_2 transmute_to_bits(
 	.clk(clk),
 	.value(_transmute_to_bits_value),
 	.bits(_transmute_to_bits_bits)
 );
-transmute_from_bits__Ttypeint__FROM0_TO65536 transmute_from_bits(
+transmute_from_bits_T_type_int_FROM_0_TO_65536 transmute_from_bits(
 	.clk(clk),
 	.bits(_transmute_from_bits_bits),
 	.value(_transmute_from_bits_value)
@@ -3133,7 +3133,7 @@ end
 endmodule
 
 // transmute_from_bits #(T: type int #(FROM: 0, TO: 65536))
-module transmute_from_bits__Ttypeint__FROM0_TO65536(
+module transmute_from_bits_T_type_int_FROM_0_TO_65536(
 	input clk,
 	input wire[15:0] bits,
 	output /*mux_wire*/ logic[15:0] value
@@ -3143,7 +3143,7 @@ assign value = bits;
 endmodule
 
 // transmute_to_bits #(T: type int #(FROM: 0, TO: 255)[2])
-module transmute_to_bits__Ttypeint__FROM0_TO255__2(
+module transmute_to_bits_T_type_int_FROM_0_TO_255_2(
 	input clk,
 	input wire[7:0] value[1:0],
 	output /*mux_wire*/ logic[15:0] bits
@@ -3158,7 +3158,7 @@ endgenerate
 endmodule
 
 // transmute_to_bits #(T: type bool #()[60])
-module transmute_to_bits__Ttypebool____60(
+module transmute_to_bits_T_type_bool_60(
 	input clk,
 	input wire[59:0] value,
 	output /*mux_wire*/ logic[59:0] bits
@@ -3176,7 +3176,7 @@ module CrossActionNoData(
 
 /*mux_wire*/ logic _cross_valid_in;
 wire _cross_valid_out;
-CrossDomain__Ttypebool cross_valid(
+CrossDomain_T_type_bool cross_valid(
 	.in_clk(in_clk),
 	.in(_cross_valid_in),
 	.out(_cross_valid_out)
@@ -3196,7 +3196,7 @@ end
 endmodule
 
 // CrossDomain #(T: type bool #())
-module CrossDomain__Ttypebool(
+module CrossDomain_T_type_bool(
 	input in_clk,
 	input wire in,
 	output /*mux_wire*/ logic out
