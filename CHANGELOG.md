@@ -1,4 +1,8 @@
 # Changelog
+## 0.3.4
+- VSCode LSP: Fix Incorrectly marks 0.4.0 as "too old" due to incorrect minimum version code (#130)
+- Codegen: Re-Work around Vivado sim wrong result for single-bit combinatorial assigns (But this time for real!) (#127)
+
 ## 0.3.3
 - Can now bake in custom SUS_HOME directories into compiler while building: `INSTALL_SUS_HOME=/path/to/home/ cargo install sus_compiler`. Also, default SUS_HOME is now $XDG_DATA_HOME. (#104)
 - SUS_HOME is now controllable via cli override `--sus-home`, env var `$SUS_HOME`, and falls back to the baked-in `$INSTALL_SUS_HOME` set while installing. 
