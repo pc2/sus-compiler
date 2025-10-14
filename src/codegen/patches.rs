@@ -2,13 +2,7 @@
 
 use std::fmt::Display;
 
-use sus_proc_macro::get_builtin_type;
-
-use crate::{
-    to_string::FmtWrapper,
-    typing::concrete_type::{ConcreteGlobalReference, ConcreteType},
-    value::Value,
-};
+use crate::{to_string::FmtWrapper, typing::concrete_type::ConcreteType, value::Value};
 
 pub fn patch_combinatorial_write_one_bit_dont_care(
     is_state: &Option<Value>,
@@ -16,16 +10,7 @@ pub fn patch_combinatorial_write_one_bit_dont_care(
     w_typ: &ConcreteType,
 ) -> impl Display {
     FmtWrapper(move |f| {
-        if is_state.is_none()
-            && w_typ.sizeof() == Some(ibig::ibig!(1))
-            && !matches!(
-                w_typ,
-                ConcreteType::Named(ConcreteGlobalReference {
-                    id: get_builtin_type!("bool"),
-                    template_args: _
-                })
-            )
-        {
+        if is_state.is_none() && w_typ.sizeof() == Some(ibig::ibig!(1)) {
             writeln!(
                 f,
                 "\t// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care"
