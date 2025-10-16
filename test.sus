@@ -1587,3 +1587,14 @@ module floats_and_doubles {
 	double a = 0.5d
 	double b = 0.5e9d
 }
+
+extern module module_taking_strings #(string TEXT, string TEXT_2) {
+
+}
+
+module use_module_taking_strings {
+	gen string S = "BEEEP BOOP"
+	string S2 = "BAAP \"BAAP"
+	module_taking_strings #(TEXT: S, TEXT_2: "Halle Luyah") m
+}
+

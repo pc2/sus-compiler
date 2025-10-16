@@ -336,6 +336,9 @@ impl Display for Value {
                 let mut buf = dtoa::Buffer::new();
                 write!(f, "{}", buf.format(f64::from(*fl64)))
             }
+            Value::String(text) => {
+                write!(f, "\"{}\"", text.escape_default())
+            }
             Value::Array(elements) => {
                 if elements.iter().all(|e| matches!(e, Value::Bool(_))) {
                     write!(f, "{}'b", elements.len())?;

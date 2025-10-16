@@ -13,6 +13,9 @@ __builtin__ struct float {}
 /// Single precision IEEE 64-bit double-precision float. Operators are provided by external libraries, but it's defined here for convenience. 
 __builtin__ struct double {}
 
+/// Gen-only type for strings. Only used to pass strings to Verilog submodules - like data files for ROMs. 
+__builtin__ struct string {}
+
 /// For intentionally triggering an ICE for debugging. It is a constant that crashes the compiler when it is evaluated
 __builtin__ const bool __crash_compiler {}
 

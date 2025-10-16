@@ -1087,6 +1087,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "string"
+        },
+        {
+          "type": "SYMBOL",
           "name": "bool_array_literal"
         },
         {
@@ -2005,6 +2009,10 @@
     "float": {
       "type": "PATTERN",
       "value": "\\d*\\.\\d+([eE][-+]?\\d+)?d?"
+    },
+    "string": {
+      "type": "PATTERN",
+      "value": "\\\"(?:[^\\\\\\\"\\n]|(?:\\\\.))*\\\""
     },
     "bool_array_literal": {
       "type": "PATTERN",

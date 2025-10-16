@@ -44,6 +44,10 @@
             "named": true
           },
           {
+            "type": "string",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -110,6 +114,10 @@
             "named": true
           },
           {
+            "type": "string",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -163,6 +171,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           },
           {
@@ -262,6 +274,10 @@
             "named": true
           },
           {
+            "type": "string",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -338,6 +354,10 @@
             "named": true
           },
           {
+            "type": "string",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -401,6 +421,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           },
           {
@@ -513,6 +537,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           },
           {
@@ -639,6 +667,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           },
           {
@@ -828,6 +860,10 @@
             "named": true
           },
           {
+            "type": "string",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -924,6 +960,10 @@
             "named": true
           },
           {
+            "type": "string",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -971,6 +1011,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           },
           {
@@ -1037,6 +1081,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           },
           {
@@ -1161,6 +1209,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           },
           {
@@ -1374,6 +1426,10 @@
             "named": true
           },
           {
+            "type": "string",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -1446,6 +1502,10 @@
             "named": true
           },
           {
+            "type": "string",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -1499,6 +1559,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           },
           {
@@ -1558,6 +1622,10 @@
             "named": true
           },
           {
+            "type": "string",
+            "named": true
+          },
+          {
             "type": "template_global",
             "named": true
           },
@@ -1605,6 +1673,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           },
           {
@@ -1720,6 +1792,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           },
           {
@@ -1898,6 +1974,10 @@
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           },
           {
@@ -2154,6 +2234,10 @@
   {
     "type": "state",
     "named": false
+  },
+  {
+    "type": "string",
+    "named": true
   },
   {
     "type": "struct",

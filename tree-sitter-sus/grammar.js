@@ -235,6 +235,7 @@ module.exports = grammar({
             $.array_op,
             $.number,
             $.float,
+            $.string,
             $.bool_array_literal,
             $.parenthesis_expression,
             $.unary_op,
@@ -357,6 +358,7 @@ module.exports = grammar({
         number: $ => /\d[\d_]*/,
         // Negative floats are instead handled by detecting a (unary_op "-" (float))
         float: $ => /\d*\.\d+([eE][-+]?\d+)?d?/,
+        string: $ => /\"(?:[^\\\"\n]|(?:\\.))*\"/,
         bool_array_literal: $ => /\d+'[\p{Alphabetic}_\p{Decimal_Number}]+/,
         /*bool_array_literal: $ => seq(
             optional(field("array_literal_size", $.number)),

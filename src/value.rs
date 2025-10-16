@@ -21,6 +21,7 @@ pub enum Value {
     Float(NotNan<f32>),
     /// Temporary, one day we'll have Rationals here instead
     Double(NotNan<f64>),
+    String(String),
     Array(Vec<Value>),
     /// The initial [Value] a variable has, before it's been set. (translates to `'x` don't care)
     Unset,
@@ -110,7 +111,11 @@ impl Ord for Value {
 impl Value {
     pub fn contains_unset(&self) -> bool {
         match self {
-            Value::Bool(_) | Value::Integer(_) | Value::Float(_) | Value::Double(_) => false,
+            Value::Bool(_)
+            | Value::Integer(_)
+            | Value::Float(_)
+            | Value::Double(_)
+            | Value::String(_) => false,
             Value::Array(values) => values.iter().any(|v| v.contains_unset()),
             Value::Unset => true,
         }
@@ -119,7 +124,11 @@ impl Value {
         match self {
             Value::Unset => true,
             Value::Array(values) => values.iter().all(|v| v.is_unset()),
-            Value::Bool(_) | Value::Integer(_) | Value::Float(_) | Value::Double(_) => false,
+            Value::Bool(_)
+            | Value::Integer(_)
+            | Value::Float(_)
+            | Value::Double(_)
+            | Value::String(_) => false,
         }
     }
 
@@ -162,6 +171,7 @@ impl Value {
             Value::Bool(_) => typ.unwrap_named().id == get_builtin_type!("bool"),
             Value::Float(_) => typ.unwrap_named().id == get_builtin_type!("float"),
             Value::Double(_) => typ.unwrap_named().id == get_builtin_type!("double"),
+            Value::String(_) => typ.unwrap_named().id == get_builtin_type!("string"),
             Value::Integer(v) => {
                 let bounds = typ.unwrap_int_bounds();
                 v >= bounds.from && v < bounds.to

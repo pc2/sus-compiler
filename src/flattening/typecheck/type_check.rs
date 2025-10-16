@@ -6,7 +6,7 @@ use crate::prelude::*;
 use crate::to_string::display_join;
 use crate::typing::abstract_type::{
     AbstractInnerType, AbstractRankedType, BOOL_INNER, BOOL_SCALAR, DOUBLE_SCALAR, FLOAT_SCALAR,
-    INT_INNER, INT_SCALAR,
+    INT_INNER, INT_SCALAR, STRING_SCALAR,
 };
 use crate::typing::template::TVec;
 use crate::typing::type_inference::{AbstractTypeSubstitutor, TypeUnifier, UnifyErrorReport};
@@ -626,6 +626,7 @@ impl<'l> TypeCheckingContext<'l> {
                 Value::Bool(_) => BOOL_SCALAR,
                 Value::Float(_) => FLOAT_SCALAR,
                 Value::Double(_) => DOUBLE_SCALAR,
+                Value::String(_) => STRING_SCALAR,
                 Value::Integer(_) => INT_SCALAR.clone(),
                 Value::Array(elements) => {
                     if let Some(fst) = elements.first() {

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
-use sus_proc_macro::get_builtin_const;
+use sus_proc_macro::{get_builtin_const, get_builtin_type};
 
 use crate::alloc::ArenaAllocator;
 use crate::dev_aid::ariadne_interface::pretty_print_many_spans;
@@ -33,6 +33,7 @@ pub fn perform_lints(
     ctx.lint_instructions();
     ctx.find_unused_variables();
     ctx.no_duplicate_ports();
+    ctx.check_unsynthesizeable_types();
 }
 
 struct LintContext<'l> {
@@ -500,6 +501,36 @@ impl LintContext<'_> {
                 Entry::Vacant(vacant_entry) => {
                     vacant_entry.insert((span, kind));
                 }
+            }
+        }
+    }
+
+    fn check_unsynthesizeable_types(&self) {
+        for (_, instr) in &self.working_on.get_link_info().instructions {
+            match instr {
+                Instruction::Declaration(declaration) => {
+                    if declaration.decl_kind.is_generative() {
+                        continue;
+                    }
+                    let non_synthesizeable_typ_name =
+                        if let AbstractInnerType::Named(global_ref) = &declaration.typ.inner {
+                            match global_ref.id {
+                                get_builtin_type!("string") => "string",
+                                _ => continue,
+                            }
+                        } else {
+                            continue;
+                        };
+                    self.errors.error(
+                        declaration.decl_span,
+                        format!("'{non_synthesizeable_typ_name}' cannot be non-generative."),
+                    );
+                }
+                Instruction::Expression(_)
+                | Instruction::SubModule(_)
+                | Instruction::Interface(_)
+                | Instruction::IfStatement(_)
+                | Instruction::ForStatement(_) => {}
             }
         }
     }

@@ -4,4 +4,6 @@
 
 module TEST {
     double x = 5.0d
+    
+    string y = "qzdjilliqz\\djizq\"qzdljqzlidj"
 }

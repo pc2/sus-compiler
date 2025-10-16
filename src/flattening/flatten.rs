@@ -966,6 +966,19 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     ExpressionSource::Literal(Value::Float(NotNan::from_str(text).unwrap()))
                 }
             }
+            kind!("string") => {
+                let text = &cursor.file_data.file_text[expr_span];
+                let text = text.strip_prefix("\"").unwrap();
+                let text = text.strip_suffix("\"").unwrap();
+
+                if let Some(escaped) = unescape::unescape(text) {
+                    ExpressionSource::Literal(Value::String(escaped))
+                } else {
+                    self.errors
+                        .error(expr_span, "Invalid escape sequence in string!");
+                    ExpressionSource::WireRef(self.new_error(expr_span))
+                }
+            }
             kind!("bool_array_literal") => match self.parse_bool_array_literal(cursor, expr_span) {
                 Ok(v) => v,
                 Err((err_span, err_reason)) => {

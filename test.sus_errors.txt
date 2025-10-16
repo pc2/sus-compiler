@@ -153,6 +153,7 @@
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated test_vivado_bug #()
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated boolean_array_literals #()
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated floats_and_doubles #()
+[ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate use_module_taking_strings #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -3424,9 +3425,9 @@ Warning: Unused port 'bits'
       │                                           │  
       │                                           ╰── b declared here
       │
-      ├─[ core.sus:209:66 ]
+      ├─[ core.sus:212:66 ]
       │
-  209 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+  212 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                                                  ──┬─  
       │                                                                    ╰─── Port 'bits' declared here
 ──────╯
@@ -3439,9 +3440,9 @@ Warning: Unused port 'value'
       │                                           │  
       │                                           ╰── b declared here
       │
-      ├─[ core.sus:209:37 ]
+      ├─[ core.sus:212:37 ]
       │
-  209 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+  212 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                     ──┬──  
       │                                       ╰──── Port 'value' declared here
 ──────╯
@@ -3962,6 +3963,34 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │            ┬  
       │            ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: Not Instantiating use_module_taking_strings #() due to abstract typing errors
+      ╭─[ test.sus:1595:8 ]
+      │
+ 1595 │ module use_module_taking_strings {
+      │        ────────────┬────────────  
+      │                    ╰────────────── Not Instantiating use_module_taking_strings #() due to abstract typing errors
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1596:13 ]
+      │
+ 1596 │     gen string S = "BEEEP BOOP"
+      │                ┬  
+      │                ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: 'string' cannot be non-generative.
+      ╭─[ test.sus:1597:2 ]
+      │
+ 1597 │     string S2 = "BAAP \"BAAP"
+      │     ────┬────  
+      │         ╰────── 'string' cannot be non-generative.
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1597:9 ]
+      │
+ 1597 │     string S2 = "BAAP \"BAAP"
+      │            ─┬  
+      │             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen test_various_assignments #() due to errors!
@@ -4034,3 +4063,4 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [ERROR sus_compiler::codegen] Cannot codegen duplicate_port_names #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen make_when #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen use_make_when #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen use_module_taking_strings #() due to errors!
