@@ -107,8 +107,6 @@ struct CodeGenerationContext<'g> {
     instance: &'g InstantiatedModule,
     linker: &'g Linker,
 
-    use_latency: bool,
-
     needed_untils: FlatAlloc<i64, WireIDMarker>,
 }
 
@@ -297,12 +295,10 @@ impl<'g> CodeGenerationContext<'g> {
             RealWireDataSource::Constant { value } if self.can_inline(wire) => {
                 Cow::Owned(Self::display_constant(&wire.typ, value).to_string())
             }
-            RealWireDataSource::Select { root, path } if path.is_empty() => wire_name_with_latency(
-                &self.instance.wires[*root],
-                requested_latency,
-                self.use_latency,
-            ),
-            _other => wire_name_with_latency(wire, requested_latency, self.use_latency),
+            RealWireDataSource::Select { root, path } if path.is_empty() => {
+                wire_name_with_latency(&self.instance.wires[*root], requested_latency)
+            }
+            _other => wire_name_with_latency(wire, requested_latency),
         }
     }
 
@@ -311,20 +307,18 @@ impl<'g> CodeGenerationContext<'g> {
         wire_id: WireID,
         w: &RealWire,
     ) -> Result<(), std::fmt::Error> {
-        if self.use_latency {
-            // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it's only needed this cycle
-            for i in w.absolute_latency.unwrap()..self.needed_untils[wire_id] {
-                let from = wire_name_with_latency(w, AbsLat::new(i), self.use_latency);
-                let to = wire_name_with_latency(w, AbsLat::new(i + 1), self.use_latency);
+        // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it's only needed this cycle
+        for i in w.absolute_latency.unwrap()..self.needed_untils[wire_id] {
+            let from = wire_name_with_latency(w, AbsLat::new(i));
+            let to = wire_name_with_latency(w, AbsLat::new(i + 1));
 
-                let var_decl = typ_to_declaration(&w.typ, &to);
+            let var_decl = typ_to_declaration(&w.typ, &to);
 
-                let clk_name = self.md.get_clock_name();
-                writeln!(
-                    self.program_text,
-                    "/*latency*/ logic{var_decl}; always_ff @(posedge {clk_name}) begin {to} <= {from}; end"
-                ).unwrap();
-            }
+            let clk_name = self.md.get_clock_name();
+            writeln!(
+                self.program_text,
+                "/*latency*/ logic{var_decl}; always_ff @(posedge {clk_name}) begin {to} <= {from}; end"
+            ).unwrap();
         }
         Ok(())
     }
@@ -398,7 +392,7 @@ impl<'g> CodeGenerationContext<'g> {
                 continue;
             };
             let wire_doc = port_wire.source.wire_or_reg();
-            let wire_name = wire_name_self_latency(port_wire, self.use_latency);
+            let wire_name = wire_name_self_latency(port_wire);
             let wire_decl = typ_to_declaration(&port_wire.typ, &wire_name);
             write!(self.program_text, ",\n\t{direction} {wire_doc}{wire_decl}").unwrap();
         }
@@ -594,7 +588,7 @@ impl<'g> CodeGenerationContext<'g> {
             }
             let wire_or_reg = w.source.wire_or_reg();
 
-            let wire_name = wire_name_self_latency(w, self.use_latency);
+            let wire_name = wire_name_self_latency(w);
             let wire_decl = typ_to_declaration(&w.typ, &wire_name);
 
             match &w.source {
@@ -722,13 +716,9 @@ impl<'g> CodeGenerationContext<'g> {
             )
             .unwrap();
             for (port_id, iport) in sm_inst.interface_ports.iter_valids() {
-                let port_name =
-                    wire_name_self_latency(&sm_inst.wires[iport.wire], self.use_latency);
+                let port_name = wire_name_self_latency(&sm_inst.wires[iport.wire]);
                 let wire_name = if let Some(port_wire) = &sm.port_map[port_id] {
-                    wire_name_self_latency(
-                        &self.instance.wires[port_wire.maps_to_wire],
-                        self.use_latency,
-                    )
+                    wire_name_self_latency(&self.instance.wires[port_wire.maps_to_wire])
                 } else {
                     // Ports that are defined on the submodule, but not used by impl
                     Cow::Borrowed("")
@@ -801,7 +791,7 @@ impl<'g> CodeGenerationContext<'g> {
         for (_id, w) in &self.instance.wires {
             match &w.source {
                 RealWireDataSource::Multiplexer { is_state, sources } => {
-                    let output_name = wire_name_self_latency(w, self.use_latency);
+                    let output_name = wire_name_self_latency(w);
                     let arrow_str = if is_state.is_some() {
                         let clk_name = self.md.get_clock_name();
                         writeln!(self.program_text, "always_ff @(posedge {clk_name}) begin")
@@ -975,7 +965,6 @@ pub fn gen_verilog_code(instance: &InstantiatedModule, linker: &Linker) -> Strin
         program_text: String::new(),
         genvars: VariableAlloc::new("_g"),
         for_vars: VariableAlloc::new("_v"),
-        use_latency: true, // Always set use_latecy to true, maybe forever
         needed_untils: instance.compute_needed_untils(),
     };
     ctx.write_verilog_code();
