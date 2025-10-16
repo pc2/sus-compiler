@@ -960,7 +960,11 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             }
             kind!("float") => {
                 let text = &cursor.file_data.file_text[expr_span];
-                ExpressionSource::Literal(Value::Float(NotNan::from_str(text).unwrap()))
+                if let Some(text) = text.strip_suffix('d') {
+                    ExpressionSource::Literal(Value::Double(NotNan::from_str(text).unwrap()))
+                } else {
+                    ExpressionSource::Literal(Value::Float(NotNan::from_str(text).unwrap()))
+                }
             }
             kind!("bool_array_literal") => match self.parse_bool_array_literal(cursor, expr_span) {
                 Ok(v) => v,
@@ -984,7 +988,15 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     }
                     (UnaryOperator::Negate, kind!("float")) => {
                         let text = &cursor.file_data.file_text[cursor.span()];
-                        ExpressionSource::Literal(Value::Float(-NotNan::from_str(text).unwrap()))
+                        if let Some(text) = text.strip_suffix('d') {
+                            ExpressionSource::Literal(Value::Double(
+                                -NotNan::from_str(text).unwrap(),
+                            ))
+                        } else {
+                            ExpressionSource::Literal(Value::Float(
+                                -NotNan::from_str(text).unwrap(),
+                            ))
+                        }
                     }
                     _ => {
                         let right = self.flatten_subexpr(cursor);

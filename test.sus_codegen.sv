@@ -1,3 +1,34 @@
+// floats_and_doubles #()
+module floats_and_doubles(
+	input clk
+);
+
+/*mux_wire*/ logic[31:0] x;
+/*mux_wire*/ logic[31:0] y;
+/*mux_wire*/ logic[63:0] a;
+/*mux_wire*/ logic[63:0] b;
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x = 'x;
+	x = 32'h3f000000 /* 0.5 */;
+end
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	y = 'x;
+	y = 32'h4dee6b28 /* 500000000.0 */;
+end
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	a = 'x;
+	a = 64'h3fe0000000000000 /* 0.5 */;
+end
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	b = 'x;
+	b = 64'h41bdcd6500000000 /* 500000000.0 */;
+end
+endmodule
+
 // boolean_array_literals #()
 module boolean_array_literals(
 	input clk

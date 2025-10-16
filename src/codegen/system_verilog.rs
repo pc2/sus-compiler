@@ -6,7 +6,6 @@ use ibig::IBig;
 use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::zip_eq;
-use crate::config::config;
 use crate::latency::AbsLat;
 use crate::linker::{IsExtern, LinkInfo};
 use crate::prelude::*;
@@ -15,7 +14,7 @@ use crate::flattening::{Direction, Module, PartSelectDirection, Port};
 use crate::instantiation::{
     InstantiatedModule, IsPort, MultiplexerSource, RealWire, RealWireDataSource, RealWirePathElem,
 };
-use crate::to_string::{FmtWrapper, display_join, trim_known_prefix};
+use crate::to_string::{FmtWrapper, display_join};
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg, IntBounds};
 use crate::typing::template::{TVec, TemplateKind};
 use crate::{typing::concrete_type::ConcreteType, value::Value};
@@ -74,8 +73,10 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
                 }
                 get_builtin_type!("bool") => return format!(" {var_name}{array_string}"),
                 get_builtin_type!("float") => {
-                    let float_msb = config().float_size - 1;
-                    return format!("[{float_msb}:0] {var_name}{array_string}");
+                    return format!("[31:0] {var_name}{array_string}");
+                }
+                get_builtin_type!("double") => {
+                    return format!("[63:0] {var_name}{array_string}");
                 }
                 _ => todo!("Structs"),
             },
@@ -200,9 +201,17 @@ impl<'g> CodeGenerationContext<'g> {
                     }
                 }
                 get_builtin_type!("float") => match cst {
-                    Value::Float(fl) => {
-                        let as_bits = fl.to_bits();
+                    Value::Float(fl32) => {
+                        let as_bits = fl32.to_bits();
                         write!(f, "32'h{as_bits:08x} /* {cst} */")
+                    }
+                    Value::Unset => write!(f, "'x"),
+                    _ => unreachable!(),
+                },
+                get_builtin_type!("double") => match cst {
+                    Value::Double(fl64) => {
+                        let as_bits = fl64.to_bits();
+                        write!(f, "64'h{as_bits:16x} /* {cst} */")
                     }
                     Value::Unset => write!(f, "'x"),
                     _ => unreachable!(),
@@ -271,6 +280,7 @@ impl<'g> CodeGenerationContext<'g> {
                         get_builtin_type!("int")
                             | get_builtin_type!("bool")
                             | get_builtin_type!("float")
+                            | get_builtin_type!("double")
                     )
                 } else {
                     false
@@ -616,8 +626,8 @@ impl<'g> CodeGenerationContext<'g> {
                         .unwrap();
                     } else {
                         // We're basically trimming "<assert wire_name>[...] = ..." off the string, so we can stitch it to the declaration
-                        let content = trim_known_prefix(&content, "assign ");
-                        let content = trim_known_prefix(content, &wire_name);
+                        let content = content.strip_prefix("assign ").unwrap();
+                        let content = content.strip_prefix(wire_name.as_ref()).unwrap();
                         write!(self.program_text, "{wire_or_reg}{wire_decl}{content}").unwrap();
                     }
                 }

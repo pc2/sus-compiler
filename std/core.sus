@@ -7,8 +7,11 @@ __builtin__ struct bool {}
 // An integer of variable size.
 __builtin__ struct int #(int FROM, int TO) {}
 
-/// Single precision IEEE 32-bit float. Operators are definted externally, but it's defined here for convenience. 
+/// Single precision IEEE 32-bit float. Operators are provided by external libraries, but it's defined here for convenience. 
 __builtin__ struct float {}
+
+/// Single precision IEEE 64-bit double-precision float. Operators are provided by external libraries, but it's defined here for convenience. 
+__builtin__ struct double {}
 
 /// For intentionally triggering an ICE for debugging. It is a constant that crashes the compiler when it is evaluated
 __builtin__ const bool __crash_compiler {}

@@ -2004,7 +2004,7 @@
     },
     "float": {
       "type": "PATTERN",
-      "value": "\\d*\\.\\d+([eE][-+]?\\d+)?"
+      "value": "\\d*\\.\\d+([eE][-+]?\\d+)?d?"
     },
     "bool_array_literal": {
       "type": "PATTERN",

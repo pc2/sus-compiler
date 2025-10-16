@@ -78,9 +78,6 @@ pub struct ConfigStruct {
     pub enabled_debug_paths: HashSet<String>,
     pub early_exit: EarlyExitUpTo,
     pub no_redump: bool,
-
-    /// Temporary, just because flopoco forces weirdly-sized floats, have it provide a struct in the future instead
-    pub float_size: usize,
 }
 
 pub const VERSION_INFO: &str = concat!(
@@ -192,13 +189,6 @@ fn command_builder() -> Command {
                     Ok(path)
                 }
             })
-        )
-        .arg(Arg::new("float-size")
-            .long("float-size")
-            .hide(true)
-            .help("Set the size of floats - in bits. Makes no claims about the representation, that's up to the libraries")
-            .value_parser(clap::value_parser!(usize))
-            .default_value("32")
         )
         // Debug stuff
         .arg(Arg::new("debug")
@@ -353,7 +343,6 @@ pub fn parse_args() {
         kill_timeout: *matches.get_one::<Duration>("kill-timeout").unwrap(),
         early_exit: *matches.get_one("upto").unwrap(),
         no_redump: matches.get_flag("no-redump"),
-        float_size: *matches.get_one("float-size").unwrap(),
     };
     CONFIG.set(cfg).unwrap();
 }

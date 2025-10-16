@@ -152,6 +152,7 @@
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated Repeat #(T: type bool #(), SIZE: 3)
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated test_vivado_bug #()
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated boolean_array_literals #()
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated floats_and_doubles #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -3423,9 +3424,9 @@ Warning: Unused port 'bits'
       │                                           │  
       │                                           ╰── b declared here
       │
-      ├─[ core.sus:206:66 ]
+      ├─[ core.sus:209:66 ]
       │
-  206 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+  209 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                                                  ──┬─  
       │                                                                    ╰─── Port 'bits' declared here
 ──────╯
@@ -3438,9 +3439,9 @@ Warning: Unused port 'value'
       │                                           │  
       │                                           ╰── b declared here
       │
-      ├─[ core.sus:206:37 ]
+      ├─[ core.sus:209:37 ]
       │
-  206 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+  209 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                     ──┬──  
       │                                       ╰──── Port 'value' declared here
 ──────╯
@@ -3932,6 +3933,34 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1581 │     bool[100] ob = 100'o035434_074647
       │               ─┬  
       │                ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1585:8 ]
+      │
+ 1585 │     float x = 0.5
+      │           ┬  
+      │           ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1586:8 ]
+      │
+ 1586 │     float y = 0.5e9
+      │           ┬  
+      │           ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1587:9 ]
+      │
+ 1587 │     double a = 0.5d
+      │            ┬  
+      │            ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1588:9 ]
+      │
+ 1588 │     double b = 0.5e9d
+      │            ┬  
+      │            ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!

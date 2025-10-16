@@ -328,9 +328,13 @@ impl Display for Value {
         match self {
             Value::Bool(b) => b.fmt(f),
             Value::Integer(i) => i.fmt(f),
-            Value::Float(fl) => {
+            Value::Float(fl32) => {
                 let mut buf = dtoa::Buffer::new();
-                write!(f, "{}", buf.format(f32::from(*fl)))
+                write!(f, "{}", buf.format(f32::from(*fl32)))
+            }
+            Value::Double(fl64) => {
+                let mut buf = dtoa::Buffer::new();
+                write!(f, "{}", buf.format(f64::from(*fl64)))
             }
             Value::Array(elements) => {
                 if elements.iter().all(|e| matches!(e, Value::Bool(_))) {
@@ -1397,11 +1401,6 @@ pub fn display_maybe<T>(
 
 pub fn display_if(b: bool, func: impl Fn(&mut Formatter<'_>) -> std::fmt::Result) -> impl Display {
     FmtWrapper(move |f| if b { func(f) } else { Ok(()) })
-}
-
-pub fn trim_known_prefix<'a>(in_str: &'a str, prefix: &str) -> &'a str {
-    assert_eq!(&in_str[..prefix.len()], prefix);
-    &in_str[prefix.len()..]
 }
 
 // Limit total folder/file name size to 255, which is the maximum on just about every platform

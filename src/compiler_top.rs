@@ -54,6 +54,10 @@ impl Linker {
             self.types[get_builtin_type!("float")].link_info.name,
             "float"
         );
+        assert_eq!(
+            self.types[get_builtin_type!("double")].link_info.name,
+            "double"
+        );
 
         assert_eq!(
             self.constants[get_builtin_const!("true")].link_info.name,

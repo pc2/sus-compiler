@@ -356,7 +356,7 @@ module.exports = grammar({
         // Negative ints are instead handled by detecting a (unary_op "-" (number))
         number: $ => /\d[\d_]*/,
         // Negative floats are instead handled by detecting a (unary_op "-" (float))
-        float: $ => /\d*\.\d+([eE][-+]?\d+)?/,
+        float: $ => /\d*\.\d+([eE][-+]?\d+)?d?/,
         bool_array_literal: $ => /\d+'[\p{Alphabetic}_\p{Decimal_Number}]+/,
         /*bool_array_literal: $ => seq(
             optional(field("array_literal_size", $.number)),
