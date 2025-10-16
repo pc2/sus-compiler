@@ -84,29 +84,31 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
 
     let (working_on, globals) = pass.get_with_context();
     let link_info = working_on.get_link_info();
-    for FailedUnification {
-        mut found,
-        mut expected,
-        span,
-        context,
-        infos,
-    } in finalize_ctx.domain_checker.extract_errors()
-    {
-        let _ = found.fully_substitute(&finalize_ctx.domain_checker);
-        let _ = expected.fully_substitute(&finalize_ctx.domain_checker);
+    if let GlobalObj::Module(md) = working_on {
+        for FailedUnification {
+            mut found,
+            mut expected,
+            span,
+            context,
+            infos,
+        } in finalize_ctx.domain_checker.extract_errors()
+        {
+            let _ = found.fully_substitute(&finalize_ctx.domain_checker);
+            let _ = expected.fully_substitute(&finalize_ctx.domain_checker);
 
-        let expected_name = format!("{expected:?}");
-        let found_name = format!("{found:?}");
-        errors
+            let expected_name = expected.display(&md.domains);
+            let found_name = found.display(&md.domains);
+            errors
             .error(span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"))
             .add_info_list(infos);
 
-        assert_ne!(found, expected);
+            assert_ne!(found, expected);
 
-        /*assert!(
-            expected_name != found_name,
-            "{expected_name} != {found_name}"
-        );*/
+            /*assert!(
+                expected_name != found_name,
+                "{expected_name} != {found_name}"
+            );*/
+        }
     }
     // Print all errors
     for FailedUnification {
@@ -121,8 +123,8 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
         let _ = found.fully_substitute(&finalize_ctx.type_checker);
         let _ = expected.fully_substitute(&finalize_ctx.type_checker);
 
-        let expected_name = expected.display(globals.globals, link_info).to_string();
-        let found_name = found.display(globals.globals, link_info).to_string();
+        let expected_name = expected.display(globals.globals, link_info);
+        let found_name = found.display(globals.globals, link_info);
         errors
             .error(
                 span,
