@@ -1,5 +1,4 @@
 mod patches;
-mod shared;
 pub mod system_verilog;
 
 use crate::codegen::system_verilog::gen_verilog_code;

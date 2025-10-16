@@ -10,7 +10,7 @@ pub fn patch_combinatorial_write_one_bit_dont_care(
     w_typ: &ConcreteType,
 ) -> impl Display {
     FmtWrapper(move |f| {
-        if is_state.is_none() && w_typ.sizeof() == Some(ibig::ibig!(1)) {
+        if is_state.is_none() && w_typ.sizeof() == ibig::ubig!(1) {
             writeln!(
                 f,
                 "\t// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care"

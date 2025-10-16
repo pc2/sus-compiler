@@ -1,3 +1,34 @@
+// zero_sized_stuffs #()
+module zero_sized_stuffs(
+	input clk
+);
+
+// (zero sized) x
+// (zero sized) as_bits
+// (zero sized) _UIntToBits_value
+// (zero sized) _UIntToBits_bits
+// (zero sized) zero_sized_arr
+// (zero sized) _3
+// (zero sized) make_real
+// (zero sized) zero_sized_gen
+/*mux_wire*/ logic[2:0] addr;
+// (zero sized) a
+// (zero sized) zero_sized_gen_2
+// (zero sized) _6
+// (zero sized) b
+// (zero sized) _8
+UIntToBits_NUM_BITS_0 UIntToBits(
+	.clk(clk)
+	// (zero sized port) .value(_UIntToBits_value)
+	// (zero sized port) .bits(_UIntToBits_bits)
+);
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	addr = 3'dx;
+	addr = 3'd4;
+end
+endmodule
+
 // floats_and_doubles #()
 module floats_and_doubles(
 	input clk
@@ -60,8 +91,8 @@ module test_vivado_bug(
 /*mux_wire*/ logic _Repeat_v;
 wire[0:0] _Repeat_result;
 /*mux_wire*/ logic[0:0] y;
-/*mux_wire*/ logic[0:0] u;
-/*mux_wire*/ logic[0:0] v;
+// (zero sized) u
+// (zero sized) v
 /*mux_wire*/ logic[1:0] x_2;
 /*mux_wire*/ logic _Repeat_2_v;
 wire[1:0] _Repeat_2_result;
@@ -109,20 +140,6 @@ always_comb begin
 	if(b) y = x;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	y = y;
-end
-always_comb begin
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	u = 1'dx;
-	if(b) u = 1'd0;
-	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
-	u = u;
-end
-always_comb begin
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	v = 1'dx;
-	if(b) v = u;
-	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
-	v = v;
 end
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -3672,6 +3689,15 @@ module transmute_to_bits_T_type_bool_60(
 );
 
 assign bits = value;
+endmodule
+
+// UIntToBits #(NUM_BITS: 0)
+module UIntToBits_NUM_BITS_0(
+	input clk
+	// (zero sized) input value
+	// (zero sized) output bits
+);
+
 endmodule
 
 // CrossActionNoData #()

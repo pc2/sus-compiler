@@ -230,19 +230,17 @@ impl ConcreteType {
         total_is_identical
     }
     /// Returns the size of this type in *wires*. So int #(TO: 256) would return '8'
-    ///
-    /// If it contains any Unknowns, then returns None
-    pub fn sizeof(&self) -> Option<IBig> {
+    pub fn sizeof(&self) -> UBig {
         match self {
-            ConcreteType::Named(reference) => Some(Self::sizeof_named(reference).into()),
+            ConcreteType::Named(reference) => Self::sizeof_named(reference).into(),
             ConcreteType::Array(arr_box) => {
                 let (typ, size) = arr_box.deref();
 
-                let mut typ_sz = typ.sizeof()?;
+                let mut typ_sz = typ.sizeof();
 
-                typ_sz *= size.unwrap_integer();
+                typ_sz *= UBig::try_from(size.unwrap_integer()).unwrap();
 
-                Some(typ_sz)
+                typ_sz
             }
         }
     }
@@ -370,7 +368,7 @@ impl IntBounds<&'_ IBig> {
         } else {
             let max = UBig::try_from(max).unwrap();
 
-            u64::max(max.bit_len() as u64, 1) // Can't have 0-width wires
+            max.bit_len() as u64
         }
     }
     pub fn contains(self, idx: &IBig) -> bool {
@@ -462,6 +460,6 @@ mod tests {
         assert_eq!(IntBounds{from: &IBig::from(-256), to: &IBig::from(256)}.bitwidth(), 9);
         assert_eq!(IntBounds{from: &IBig::from(0), to: &IBig::from(256)}.bitwidth(), 8);
         assert_eq!(IntBounds{from: &IBig::from(20), to: &IBig::from(257)}.bitwidth(), 9);
-        assert_eq!(IntBounds{from: &IBig::from(0), to: &IBig::from(1)}.bitwidth(), 1); // Temporary fix, such that we never generate Length 0 wires (#86)
+        assert_eq!(IntBounds{from: &IBig::from(0), to: &IBig::from(1)}.bitwidth(), 0); // Zero sized wires are now possible
     }
 }

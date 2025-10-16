@@ -154,6 +154,8 @@
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated boolean_array_literals #()
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated floats_and_doubles #()
 [ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate use_module_taking_strings #()
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated UIntToBits #(NUM_BITS: 0)
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated zero_sized_stuffs #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -3990,6 +3992,62 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1597 │     string S2 = "BAAP \"BAAP"
       │            ─┬  
       │             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1602:6 ]
+      │
+ 1602 │     int x = 0
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1603:10 ]
+      │
+ 1603 │     bool[0] as_bits = UIntToBits(x)
+      │             ───┬───  
+      │                ╰───── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1604:9 ]
+      │
+ 1604 │     int[5] zero_sized_arr = [0, 0, 0, 0, 0]
+      │            ───────┬──────  
+      │                   ╰──────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1605:13 ]
+      │
+ 1605 │     gen int[5] zero_sized_gen = [0, 0, 0, 0, 0]
+      │                ───────┬──────  
+      │                       ╰──────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1606:9 ]
+      │
+ 1606 │     int[5] make_real = zero_sized_gen
+      │            ────┬────  
+      │                ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1607:6 ]
+      │
+ 1607 │     int addr = 4
+      │         ──┬─  
+      │           ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1608:6 ]
+      │
+ 1608 │     int a = zero_sized_gen[addr]
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1609:6 ]
+      │
+ 1609 │     int b = zero_sized_arr[addr]
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!

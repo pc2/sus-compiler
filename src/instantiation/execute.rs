@@ -791,11 +791,10 @@ impl<'l> ExecutionContext<'l> {
             get_builtin_const!("sizeof") => {
                 let [concrete_typ] = cst_ref.template_args.cast_to_array();
 
-                if let Some(typ_sz) = concrete_typ.unwrap_type().sizeof() {
-                    Ok((Value::Integer(typ_sz), INT_SCALAR.clone()))
-                } else {
-                    Err("This is an incomplete type".to_string())
-                }
+                Ok((
+                    Value::Integer(concrete_typ.unwrap_type().sizeof().into()),
+                    INT_SCALAR.clone(),
+                ))
             }
             get_builtin_const!("BitsToUIntGen") => {
                 let [num_bits, bits] = cst_ref.template_args.cast_to_unifyable_array();

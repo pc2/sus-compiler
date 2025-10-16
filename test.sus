@@ -1598,3 +1598,13 @@ module use_module_taking_strings {
 	module_taking_strings #(TEXT: S, TEXT_2: "Halle Luyah") m
 }
 
+module zero_sized_stuffs {
+	int x = 0
+	bool[0] as_bits = UIntToBits(x)
+	int[5] zero_sized_arr = [0, 0, 0, 0, 0]
+	gen int[5] zero_sized_gen = [0, 0, 0, 0, 0]
+	int[5] make_real = zero_sized_gen
+	int addr = 4
+	int a = zero_sized_gen[addr]
+	int b = zero_sized_arr[addr]
+}

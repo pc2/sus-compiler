@@ -3,7 +3,5 @@
 // To use with VSCode debugger, name the module "TEST", and in the code use `if crate::debug::is_enabled("TEST") {}` to enable breakpoint code
 
 module TEST {
-    double x = 5.0d
-    
-    string y = "qzdjilliqz\\djizq\"qzdljqzlidj"
+
 }

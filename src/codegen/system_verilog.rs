@@ -10,16 +10,16 @@ use crate::latency::AbsLat;
 use crate::linker::{IsExtern, LinkInfo};
 use crate::prelude::*;
 
-use crate::flattening::{Direction, Module, PartSelectDirection, Port};
+use crate::flattening::{Direction, Module, PartSelectDirection};
 use crate::instantiation::{
-    InstantiatedModule, IsPort, MultiplexerSource, RealWire, RealWireDataSource, RealWirePathElem,
+    InstantiatedModule, InstantiatedPort, IsPort, MultiplexerSource, RealWire, RealWireDataSource,
+    RealWirePathElem,
 };
 use crate::to_string::{FmtWrapper, display_join};
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg, IntBounds};
 use crate::typing::template::{TVec, TemplateKind};
 use crate::{typing::concrete_type::ConcreteType, value::Value};
 
-use super::shared::*;
 use std::fmt::{Display, Write};
 
 struct VariableAlloc {
@@ -97,17 +97,41 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
     }
 }
 
-struct CodeGenerationContext<'g> {
-    /// Generate code to this variable
-    program_text: String,
-    for_vars: VariableAlloc,
-    genvars: VariableAlloc,
+fn should_not_codegen(wire: &RealWire) -> bool {
+    wire.typ.sizeof() == ibig::ubig!(0)
+}
 
-    md: &'g Module,
-    instance: &'g InstantiatedModule,
-    linker: &'g Linker,
+fn get_zero_sized_type_inline_value(typ: &ConcreteType) -> Cow<'static, str> {
+    assert_eq!(typ.sizeof(), ibig::ubig!(0));
 
-    needed_untils: FlatAlloc<i64, WireIDMarker>,
+    match typ {
+        ConcreteType::Named(global_ref) => match global_ref.id {
+            get_builtin_type!("int") => Cow::Borrowed("1'd0"),
+            _ => unreachable!("Unknown zero-sized type {:?}", global_ref.id),
+        },
+        ConcreteType::Array(_) => unreachable!(
+            "Since this is for inline values, and arrays cannot be used inline, they cannot appear in [get_zero_sized_type_inline_value]"
+        ),
+    }
+}
+
+pub fn wire_name_with_latency(wire: &RealWire, target_abs_lat: AbsLat) -> Cow<'_, str> {
+    let wire_abs_lat = wire.absolute_latency.unwrap();
+    let target_abs_lat = target_abs_lat.unwrap();
+    assert!(wire_abs_lat <= target_abs_lat);
+    if wire_abs_lat != target_abs_lat {
+        if target_abs_lat < 0 {
+            Cow::Owned(format!("_{}_N{}", wire.name, -target_abs_lat))
+        } else {
+            Cow::Owned(format!("_{}_D{}", wire.name, target_abs_lat))
+        }
+    } else {
+        Cow::Borrowed(&wire.name)
+    }
+}
+
+pub fn wire_name_self_latency(wire: &RealWire) -> Cow<'_, str> {
+    wire_name_with_latency(wire, wire.absolute_latency)
 }
 
 enum ForEachPathElement<'g> {
@@ -156,6 +180,58 @@ impl ForEachPath<'_, '_> {
         }
         result
     }
+}
+
+struct CommaSeparatedList {
+    /// (is_commented, line_text)
+    lines: Vec<(bool, String)>,
+    comment_text: &'static str,
+}
+impl CommaSeparatedList {
+    fn new(comment_text: &'static str) -> Self {
+        Self {
+            lines: Vec::new(),
+            comment_text,
+        }
+    }
+    fn line(&mut self, line: String) {
+        self.lines.push((false, line));
+    }
+    fn commented(&mut self, line: String) {
+        self.lines.push((true, line));
+    }
+}
+impl Display for CommaSeparatedList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.lines.is_empty() {
+            return Ok(());
+        }
+        writeln!(f)?;
+        let last_non_comment_line = self.lines.iter().rposition(|l| !l.0).unwrap_or(0);
+        for (idx, (is_commented, line)) in self.lines.iter().enumerate() {
+            if *is_commented {
+                let c = self.comment_text;
+                writeln!(f, "\t{c}{line}")?;
+            } else {
+                let comma = if idx < last_non_comment_line { "," } else { "" };
+                writeln!(f, "\t{line}{comma}")?;
+            }
+        }
+        Ok(())
+    }
+}
+
+struct CodeGenerationContext<'g> {
+    /// Generate code to this variable
+    program_text: String,
+    for_vars: VariableAlloc,
+    genvars: VariableAlloc,
+
+    md: &'g Module,
+    instance: &'g InstantiatedModule,
+    linker: &'g Linker,
+
+    needed_untils: FlatAlloc<i64, WireIDMarker>,
 }
 
 impl<'g> CodeGenerationContext<'g> {
@@ -291,6 +367,10 @@ impl<'g> CodeGenerationContext<'g> {
 
     fn wire_name(&self, wire: WireID, requested_latency: AbsLat) -> Cow<'g, str> {
         let wire = &self.instance.wires[wire];
+
+        if should_not_codegen(wire) {
+            return get_zero_sized_type_inline_value(&wire.typ);
+        }
         match &wire.source {
             RealWireDataSource::Constant { value } if self.can_inline(wire) => {
                 Cow::Owned(Self::display_constant(&wire.typ, value).to_string())
@@ -307,6 +387,8 @@ impl<'g> CodeGenerationContext<'g> {
         wire_id: WireID,
         w: &RealWire,
     ) -> Result<(), std::fmt::Error> {
+        assert!(!should_not_codegen(w));
+
         // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it's only needed this cycle
         for i in w.absolute_latency.unwrap()..self.needed_untils[wire_id] {
             let from = wire_name_with_latency(w, AbsLat::new(i));
@@ -381,26 +463,30 @@ impl<'g> CodeGenerationContext<'g> {
     fn write_module_signature(&mut self) {
         // First output the interface of the module
         let clk_name = self.md.get_clock_name();
-        write!(
-            self.program_text,
-            "module {}(\n\tinput {clk_name}",
-            &self.instance.mangled_name
-        )
-        .unwrap();
+        let module_name = &self.instance.mangled_name;
+        let mut port_list = CommaSeparatedList::new("// (zero sized) ");
+        port_list.line(format!("input {clk_name}"));
         for (_id, port_wire) in &self.instance.wires {
             let IsPort::Port(_, direction) = port_wire.is_port else {
                 continue;
             };
-            let wire_doc = port_wire.source.wire_or_reg();
-            let wire_name = wire_name_self_latency(port_wire);
-            let wire_decl = typ_to_declaration(&port_wire.typ, &wire_name);
-            write!(self.program_text, ",\n\t{direction} {wire_doc}{wire_decl}").unwrap();
+            if should_not_codegen(port_wire) {
+                port_list.commented(format!("{direction} {}", port_wire.name));
+            } else {
+                let wire_doc = port_wire.source.wire_or_reg();
+                let wire_name = wire_name_self_latency(port_wire);
+                let wire_decl = typ_to_declaration(&port_wire.typ, &wire_name);
+                port_list.line(format!("{direction} {wire_doc}{wire_decl}"));
+            }
         }
-        write!(self.program_text, "\n);\n\n").unwrap();
+        writeln!(self.program_text, "module {module_name}({port_list});\n").unwrap();
 
         // Add latency registers for the interface declarations
         // Should not appear in the program text for extern modules
         for (port_wire_id, port_wire) in &self.instance.wires {
+            if should_not_codegen(port_wire) {
+                continue;
+            }
             if matches!(port_wire.is_port, IsPort::Port(_, _)) {
                 self.add_latency_registers(port_wire_id, port_wire).unwrap();
             }
@@ -586,6 +672,10 @@ impl<'g> CodeGenerationContext<'g> {
             if matches!(w.is_port, IsPort::Port(_, _)) {
                 continue;
             }
+            if should_not_codegen(w) {
+                writeln!(self.program_text, "// (zero sized) {}", w.name).unwrap();
+                continue;
+            }
             let wire_or_reg = w.source.wire_or_reg();
 
             let wire_name = wire_name_self_latency(w);
@@ -698,34 +788,37 @@ impl<'g> CodeGenerationContext<'g> {
         let parent_clk_name = self.md.get_clock_name();
         for (_id, sm) in &self.instance.submodules {
             let sm_md = &self.linker.modules[sm.refers_to.id];
-            let sm_inst: &InstantiatedModule = sm
-                .instance
-                .get()
-                .expect("Invalid submodules are impossible to remain by the time codegen happens");
+
+            // Invalid submodules are impossible to remain by the time codegen happens
+            let sm_inst: &InstantiatedModule = sm.instance.get().unwrap();
             if sm_md.link_info.is_extern == IsExtern::Extern {
                 self.write_template_args(&sm_md.link_info, &sm_inst.global_ref.template_args);
             } else {
                 self.program_text.write_str(&sm_inst.mangled_name).unwrap();
             };
             let sm_name = &sm.name;
-            let submodule_clk_name = sm_md.get_clock_name();
-            writeln!(self.program_text, " {sm_name}(").unwrap();
-            write!(
-                self.program_text,
-                "\t.{submodule_clk_name}({parent_clk_name})"
-            )
-            .unwrap();
+
+            let mut port_list = CommaSeparatedList::new("// (zero sized port) ");
+            let submod_clk = sm_md.get_clock_name();
+            port_list.line(format!(".{submod_clk}({parent_clk_name})"));
+
             for (port_id, iport) in sm_inst.interface_ports.iter_valids() {
-                let port_name = wire_name_self_latency(&sm_inst.wires[iport.wire]);
+                let sm_port = &sm_inst.wires[iport.wire];
+                let port_name = &sm_port.name;
                 let wire_name = if let Some(port_wire) = &sm.port_map[port_id] {
-                    wire_name_self_latency(&self.instance.wires[port_wire.maps_to_wire])
+                    &self.instance.wires[port_wire.maps_to_wire].name
                 } else {
                     // Ports that are defined on the submodule, but not used by impl
-                    Cow::Borrowed("")
+                    ""
                 };
-                write!(self.program_text, ",\n\t.{port_name}({wire_name})").unwrap();
+                let line = format!(".{port_name}({wire_name})");
+                if should_not_codegen(sm_port) {
+                    port_list.commented(line);
+                } else {
+                    port_list.line(line);
+                }
             }
-            writeln!(self.program_text, "\n);").unwrap();
+            writeln!(self.program_text, " {sm_name}({port_list});").unwrap();
         }
     }
 
@@ -734,7 +827,6 @@ impl<'g> CodeGenerationContext<'g> {
         link_info: &LinkInfo,
         concrete_template_args: &TVec<ConcreteTemplateArg>,
     ) {
-        let extern_name = &link_info.name;
         let args = display_join(
             ", ",
             zip_eq(concrete_template_args, &link_info.parameters),
@@ -752,6 +844,7 @@ impl<'g> CodeGenerationContext<'g> {
                 }
             },
         );
+        let extern_name = &link_info.name;
         write!(self.program_text, "{extern_name} #({args})").unwrap();
     }
 
@@ -789,6 +882,9 @@ impl<'g> CodeGenerationContext<'g> {
 
     fn write_multiplexers(&mut self) {
         for (_id, w) in &self.instance.wires {
+            if should_not_codegen(w) {
+                continue;
+            }
             match &w.source {
                 RealWireDataSource::Multiplexer { is_state, sources } => {
                     let output_name = wire_name_self_latency(w);
@@ -831,65 +927,88 @@ impl<'g> CodeGenerationContext<'g> {
         }
     }
 
-    fn check_ports<const N: usize>(&self, ports: &[(Direction, &'static str)]) -> &[Port; N] {
-        let actual_ports: &[Port; N] = self.md.ports.cast_to_array();
+    /// Returns true if all ports are of size 0, or false if none are. Panics otherwise
+    fn check_ports<const N: usize>(&self, ports: [(Direction, &'static str); N]) -> bool {
+        let actual_ports: &[Option<InstantiatedPort>; N] =
+            self.instance.interface_ports.cast_to_array();
 
-        for ((direction, name), port) in crate::util::zip_eq(ports, actual_ports) {
-            assert_eq!(&port.name, *name);
-            assert_eq!(port.direction, *direction);
+        let mut zero_size_count = 0;
+        for i in 0..N {
+            let actual_port = actual_ports[i].as_ref().unwrap();
+            let (direction, name) = ports[i];
+            let port_wire = &self.instance.wires[actual_port.wire];
+            assert_eq!(&port_wire.name, name);
+            assert_eq!(actual_port.direction, direction);
+            if should_not_codegen(port_wire) {
+                zero_size_count += 1;
+            }
         }
 
-        actual_ports
+        if zero_size_count == 0 {
+            false
+        } else if zero_size_count == N {
+            true
+        } else {
+            panic!("Mishmash of zero and non-zero sized ports")
+        }
     }
 
     /// TODO probably best to have some smarter system for this in the future.
     fn write_builtins(&mut self) {
         let args = &self.instance.global_ref.template_args;
+        use Direction::{Input, Output};
         match self.md.link_info.name.as_str() {
             "LatencyOffset" => {
-                let [_in_port, _out_port] =
-                    self.check_ports(&[(Direction::Input, "in"), (Direction::Output, "out")]);
+                if self.check_ports([(Input, "in"), (Output, "out")]) {
+                    return;
+                }
 
                 self.program_text.write_str("\tassign out = in;\n").unwrap();
             }
             "CrossDomain" => {
-                let [_in_port, _out_port] =
-                    self.check_ports(&[(Direction::Input, "in"), (Direction::Output, "out")]);
+                if self.check_ports([(Input, "in"), (Output, "out")]) {
+                    return;
+                }
 
                 self.program_text.write_str("\tassign out = in;\n").unwrap();
             }
             "IntToBits" => {
                 let [_num_bits] = args.cast_to_int_array();
-                let [_value_port, _bits_port] =
-                    self.check_ports(&[(Direction::Input, "value"), (Direction::Output, "bits")]);
+                if self.check_ports([(Input, "value"), (Output, "bits")]) {
+                    return;
+                }
 
                 writeln!(self.program_text, "\tassign bits = value;").unwrap();
             }
             "BitsToInt" => {
                 let [_num_bits] = args.cast_to_int_array();
-                let [_bits_port, _value_port] =
-                    self.check_ports(&[(Direction::Input, "bits"), (Direction::Output, "value")]);
+                if self.check_ports([(Input, "bits"), (Output, "value")]) {
+                    return;
+                }
 
                 writeln!(self.program_text, "\tassign value = bits;").unwrap();
             }
             "UIntToBits" => {
                 let [_num_bits] = args.cast_to_int_array();
-                let [_value_port, _bits_port] =
-                    self.check_ports(&[(Direction::Input, "value"), (Direction::Output, "bits")]);
+                if self.check_ports([(Input, "value"), (Output, "bits")]) {
+                    return;
+                }
 
                 writeln!(self.program_text, "\tassign bits = value;").unwrap();
             }
             "BitsToUInt" => {
                 let [_num_bits] = args.cast_to_int_array();
-                let [_bits_port, _value_port] =
-                    self.check_ports(&[(Direction::Input, "bits"), (Direction::Output, "value")]);
+                if self.check_ports([(Input, "bits"), (Output, "value")]) {
+                    return;
+                }
 
                 writeln!(self.program_text, "\tassign value = bits;").unwrap();
             }
             "unsafe_int_cast" => {
                 let [_from_i, _to_i, _from, _to] = args.cast_to_int_array();
-                let [_bits_port, _value_port] =
-                    self.check_ports(&[(Direction::Input, "in"), (Direction::Output, "out")]);
+                if self.check_ports([(Input, "in"), (Output, "out")]) {
+                    return;
+                }
 
                 writeln!(self.program_text, "\tassign out = in;").unwrap();
             }
@@ -897,8 +1016,9 @@ impl<'g> CodeGenerationContext<'g> {
                 let [typ] = args.cast_to_array();
                 let typ = typ.unwrap_type();
 
-                let [_value_port, _bits_port] =
-                    self.check_ports(&[(Direction::Input, "value"), (Direction::Output, "bits")]);
+                if self.check_ports([(Input, "value"), (Output, "bits")]) {
+                    return;
+                }
 
                 self.in_generate(|slf| {
                     slf.foreach_for_copy_unpacked(typ, false, |path, num_bits| {
@@ -915,8 +1035,9 @@ impl<'g> CodeGenerationContext<'g> {
                 let [typ] = args.cast_to_array();
                 let typ = typ.unwrap_type();
 
-                let [_bits_port, _value_port] =
-                    self.check_ports(&[(Direction::Input, "bits"), (Direction::Output, "value")]);
+                if self.check_ports([(Input, "bits"), (Output, "value")]) {
+                    return;
+                }
 
                 self.in_generate(|slf| {
                     slf.foreach_for_copy_unpacked(typ, false, |path, num_bits| {
