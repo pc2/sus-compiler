@@ -929,8 +929,10 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             )?,
             _ => {
                 return Err((
-                    Span::from(data_start..data_start + data_radix_char.len_utf8()),
-                    "The radix signifier of a bitvector must be 'b' for binary, 'o' for octal, or 'h' for hexadecimal".to_string(),
+                    expr_span.sub_span(data_start..data_start + data_radix_char.len_utf8()),
+                    format!(
+                        "Unknown radix signifier '{data_radix_char}'. The radix signifier of a bitvector must be 'b' for binary, 'o' for octal, or 'h' for hexadecimal"
+                    ),
                 ));
             }
         };
