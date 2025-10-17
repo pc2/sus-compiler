@@ -230,8 +230,8 @@ pub fn compute_binary_op(left: &Value, op: BinaryOperator, right: &Value) -> Val
         BinaryOperator::Divide => Value::Integer(left.unwrap_integer() / right.unwrap_integer()),
         BinaryOperator::Modulo => Value::Integer(left.unwrap_integer() % right.unwrap_integer()),
         BinaryOperator::And => Value::Bool(left.unwrap_bool() & right.unwrap_bool()),
-        BinaryOperator::Or => Value::Bool(left.unwrap_bool() & right.unwrap_bool()),
-        BinaryOperator::Xor => Value::Bool(left.unwrap_bool() & right.unwrap_bool()),
+        BinaryOperator::Or => Value::Bool(left.unwrap_bool() | right.unwrap_bool()),
+        BinaryOperator::Xor => Value::Bool(left.unwrap_bool() ^ right.unwrap_bool()),
         //BinaryOperator::ShiftLeft => todo!(), // Still a bit iffy about shift operator inclusion
         //BinaryOperator::ShiftRight => todo!()
     }

@@ -176,7 +176,7 @@ pub struct FileData {
     pub parsing_errors: ErrorStore,
     /// In source file order
     pub associated_values: Vec<GlobalUUID>,
-    pub tree: tree_sitter::Tree,
+    pub tree: Tree,
     pub is_std: bool,
 }
 
