@@ -1191,7 +1191,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
                 wire_ref
             }),
-            kind!("number") | kind!("float") | kind!("bool_array_literal") => {
+            kind!("number") | kind!("float") | kind!("bool_array_literal") | kind!("string") => {
                 self.errors
                     .error(expr_span, "A constant is not a wire reference");
                 self.new_error(expr_span)
