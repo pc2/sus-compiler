@@ -930,7 +930,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                                     let to_port_name = &poison_submod_md.ports[*port_to].name;
                                     err = err.info_same_file(
                                         poison_sm.get_span(self.link_info),
-                                        format!("{poison_sm_refer_to} {poison_sm_name} isn't resolved, in turn preventing the unknown latency from {from_port_name} to {to_port_name} prevented {sm_name}.{template_name} from resolving"),
+                                        format!("{sm_name}.{template_name} could not be resolved due to the unknown latency from {poison_sm_name}.{from_port_name} to {poison_sm_name}.{to_port_name}. ({poison_sm_refer_to} {poison_sm_name})"),
                                     );
                                 }
                                 InferenceResult::PortNotUsed
