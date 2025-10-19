@@ -3427,9 +3427,9 @@ Warning: Unused port 'bits'
       │                                           │  
       │                                           ╰── b declared here
       │
-      ├─[ core.sus:212:66 ]
+      ├─[ core.sus:218:66 ]
       │
-  212 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+  218 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                                                  ──┬─  
       │                                                                    ╰─── Port 'bits' declared here
 ──────╯
@@ -3442,9 +3442,9 @@ Warning: Unused port 'value'
       │                                           │  
       │                                           ╰── b declared here
       │
-      ├─[ core.sus:212:37 ]
+      ├─[ core.sus:218:37 ]
       │
-  212 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+  218 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                     ──┬──  
       │                                       ╰──── Port 'value' declared here
 ──────╯
