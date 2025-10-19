@@ -775,6 +775,16 @@ impl<'l> ExecutionContext<'l> {
                     INT_SCALAR.clone(),
                 ))
             }
+            get_builtin_const!("min") => {
+                let [a, b] = cst_ref.template_args.cast_to_int_array();
+
+                Ok((Value::Integer(a.min(b).clone()), INT_SCALAR.clone()))
+            }
+            get_builtin_const!("max") => {
+                let [a, b] = cst_ref.template_args.cast_to_int_array();
+
+                Ok((Value::Integer(a.max(b).clone()), INT_SCALAR.clone()))
+            }
             get_builtin_const!("noinfer") => {
                 let [v] = cst_ref.template_args.cast_to_int_array();
                 Ok((Value::Integer(v.clone()), INT_SCALAR.clone()))

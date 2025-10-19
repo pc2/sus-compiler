@@ -61,6 +61,12 @@ __builtin__ const int falling_factorial #(int N, int K) {}
 /// Computes `N! / (K! * (N - K)!)`. for `0 <= K <= N`
 __builtin__ const int comb #(int N, int K) {}
 
+/// Compute the minimum of `A` and `B`
+__builtin__ const int min #(int A, int B) {}
+
+/// Compute the maximum of `A` and `B`
+__builtin__ const int max #(int A, int B) {}
+
 /// `Result == V`, but this prevents this from being included in the inference parameters. 
 __builtin__ const int noinfer #(int V) {}
 
