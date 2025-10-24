@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
 use ibig::IBig;
+use ibig::modular::{IntoModulo, ModuloRing};
 use ordered_float::NotNan;
 
 use sus_proc_macro::get_builtin_type;
@@ -228,7 +229,10 @@ pub fn compute_binary_op(left: &Value, op: BinaryOperator, right: &Value) -> Val
         BinaryOperator::Subtract => Value::Integer(left.unwrap_integer() - right.unwrap_integer()),
         BinaryOperator::Multiply => Value::Integer(left.unwrap_integer() * right.unwrap_integer()),
         BinaryOperator::Divide => Value::Integer(left.unwrap_integer() / right.unwrap_integer()),
-        BinaryOperator::Modulo => Value::Integer(left.unwrap_integer() % right.unwrap_integer()),
+        BinaryOperator::Modulo => {
+            let modulo = ModuloRing::new(&right.unwrap_integer().try_into().unwrap());
+            Value::Integer(left.unwrap_integer().into_modulo(&modulo).residue().into())
+        }
         BinaryOperator::And => Value::Bool(left.unwrap_bool() & right.unwrap_bool()),
         BinaryOperator::Or => Value::Bool(left.unwrap_bool() | right.unwrap_bool()),
         BinaryOperator::Xor => Value::Bool(left.unwrap_bool() ^ right.unwrap_bool()),

@@ -1664,12 +1664,21 @@ impl<'l> ExecutionContext<'l> {
                     rank.count().unwrap(),
                     &mut |[l, r]| {
                         match op {
-                            BinaryOperator::Divide | BinaryOperator::Modulo => {
-                                if right_val.unwrap_integer() == &ibig::ibig!(0) {
-                                    return Err(format!(
-                                        "Divide or Modulo by zero: {} / 0",
-                                        l.unwrap_integer()
-                                    ));
+                            BinaryOperator::Divide => {
+                                let l = l.unwrap_integer();
+                                let r = r.unwrap_integer();
+                                if r == &ibig::ibig!(0) {
+                                    return Err(format!("Divide by zero: {l} / 0"));
+                                }
+                            }
+                            BinaryOperator::Modulo => {
+                                let l = l.unwrap_integer();
+                                let r = r.unwrap_integer();
+                                if r == &ibig::ibig!(0) {
+                                    return Err(format!("Modulo by zero: {l} % 0"));
+                                }
+                                if r < &ibig::ibig!(0) {
+                                    return Err(format!("Negative modulo: {l} % {r}"));
                                 }
                             }
                             _ => {}
