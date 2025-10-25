@@ -156,6 +156,7 @@
 [ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate use_module_taking_strings #()
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated UIntToBits #(NUM_BITS: 0)
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated zero_sized_stuffs #()
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated test_all_modulos #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -4048,6 +4049,153 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1609 │     int b = zero_sized_arr[addr]
       │         ┬  
       │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1613:24 ]
+      │
+ 1613 │     int#(FROM: 0, TO: 13) unsigned_val
+      │                           ──────┬─────  
+      │                                 ╰─────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1614:26 ]
+      │
+ 1614 │     int#(FROM: -20, TO: 13) signed_val
+      │                             ─────┬────  
+      │                                  ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1616:23 ]
+      │
+ 1616 │     int#(FROM: 5, TO: 8) dynamic_mod
+      │                          ─────┬─────  
+      │                               ╰─────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1619:2 ]
+      │
+ 1619 │     unsigned_val % 8
+      │     ────────┬───────  
+      │             ╰───────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1620:2 ]
+      │
+ 1620 │     unsigned_val % 4
+      │     ────────┬───────  
+      │             ╰───────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1621:2 ]
+      │
+ 1621 │     unsigned_val % 2
+      │     ────────┬───────  
+      │             ╰───────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1622:2 ]
+      │
+ 1622 │     signed_val % 8
+      │     ───────┬──────  
+      │            ╰──────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1623:2 ]
+      │
+ 1623 │     signed_val % 4
+      │     ───────┬──────  
+      │            ╰──────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1624:2 ]
+      │
+ 1624 │     signed_val % 2
+      │     ───────┬──────  
+      │            ╰──────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1626:2 ]
+      │
+ 1626 │     unsigned_val % 1
+      │     ────────┬───────  
+      │             ╰───────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1627:2 ]
+      │
+ 1627 │     signed_val % 1
+      │     ───────┬──────  
+      │            ╰──────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1631:2 ]
+      │
+ 1631 │     unsigned_val % 13
+      │     ────────┬────────  
+      │             ╰────────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1633:2 ]
+      │
+ 1633 │     (unsigned_val + 1) % 13
+      │     ───────────┬───────────  
+      │                ╰───────────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1635:2 ]
+      │
+ 1635 │     (unsigned_val + 2) % 13
+      │     ───────────┬───────────  
+      │                ╰───────────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1636:2 ]
+      │
+ 1636 │     (unsigned_val + 13) % 13
+      │     ────────────┬───────────  
+      │                 ╰───────────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1638:2 ]
+      │
+ 1638 │     (unsigned_val + 14) % 13
+      │     ────────────┬───────────  
+      │                 ╰───────────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1642:2 ]
+      │
+ 1642 │     (unsigned_val - 1) % 13
+      │     ───────────┬───────────  
+      │                ╰───────────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1644:2 ]
+      │
+ 1644 │     (unsigned_val - 2) % 13
+      │     ───────────┬───────────  
+      │                ╰───────────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1645:2 ]
+      │
+ 1645 │     (unsigned_val - 13) % 13
+      │     ────────────┬───────────  
+      │                 ╰───────────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1647:2 ]
+      │
+ 1647 │     (unsigned_val - 14) % 13
+      │     ────────────┬───────────  
+      │                 ╰───────────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1650:2 ]
+      │
+ 1650 │     unsigned_val % dynamic_mod
+      │     ─────────────┬────────────  
+      │                  ╰────────────── The result of this expression is not used. Only function calls can return nothing. 
 ──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!

@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::ops::Deref;
 use std::rc::Rc;
 
-use ibig::IBig;
+use ibig::{IBig, UBig};
 use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::zip_eq;
@@ -10,7 +10,7 @@ use crate::latency::AbsLat;
 use crate::linker::{IsExtern, LinkInfo};
 use crate::prelude::*;
 
-use crate::flattening::{Direction, Module, PartSelectDirection};
+use crate::flattening::{BinaryOperator, Direction, Module, PartSelectDirection};
 use crate::instantiation::{
     InstantiatedModule, InstantiatedPort, IsPort, MultiplexerSource, RealWire, RealWireDataSource,
     RealWirePathElem,
@@ -134,6 +134,57 @@ pub fn wire_name_self_latency(wire: &RealWire) -> Cow<'_, str> {
     wire_name_with_latency(wire, wire.absolute_latency)
 }
 
+fn codegen_optimized_modulo(
+    left_int_range: IntBounds<&IBig>,
+    right_int_range: IntBounds<&IBig>,
+    left: &str,
+    right: &str,
+) -> String {
+    let modulo_to_minus_one = right_int_range.to - 1;
+    if right_int_range.from == &modulo_to_minus_one {
+        let mod_s = right_int_range.from;
+        let mod_u = UBig::try_from(modulo_to_minus_one).unwrap();
+        if mod_u.is_power_of_two() {
+            // Unsigned/Signed mod power of two
+            let num_bits_to_slice = mod_u.trailing_zeros().unwrap();
+            if num_bits_to_slice == 0 {
+                "0; // == mod 1".to_string()
+            } else {
+                let bitslice_start_at = num_bits_to_slice - 1;
+                format!("({left})[{bitslice_start_at}:0]; // == mod {mod_u}")
+            }
+        } else if left_int_range.from >= &IBig::from(0) {
+            // Unsigned mod
+            if left_int_range.to <= mod_s {
+                format!("{left}; // == mod {mod_u}")
+            } else if *left_int_range.to == mod_s + 1 {
+                // Optimize rollover by one
+                format!("({left} == {mod_u}) ? 0 : {left}; // == mod {mod_u}")
+            } else if *left_int_range.to <= mod_s * 2 {
+                // Optimize to a conditional subtract
+                format!("{left} - (({left} >= {mod_u}) ? {mod_u} : 0); // == mod {mod_u}")
+            } else {
+                format!("{left} % {mod_u}; // == mod {mod_u}")
+            }
+        } else if left_int_range.to <= mod_s {
+            // Signed mod
+            if left_int_range.from == &IBig::from(-1) {
+                // Optimize rollover by one
+                format!("({left} < 0) ? {} : {left}; // == mod {mod_u}", &mod_u - 1)
+            } else if *left_int_range.from >= -mod_s {
+                // Optimize to a conditional add
+                format!("{left} + (({left} < 0) ? {mod_u} : 0); // == mod {mod_u}")
+            } else {
+                format!("(({left} % {mod_u}) + {mod_u}) % {mod_u}; // == mod {mod_u}")
+            }
+        } else {
+            format!("(({left} % {mod_u}) + {mod_u}) % {mod_u}; // == mod {mod_u}")
+        }
+    } else {
+        format!("(({left} % {right}) + {right}) % {right}; // == mod")
+    }
+}
+
 enum ForEachPathElement<'g> {
     Array { var: Rc<str>, arr_size: &'g IBig },
 }
@@ -163,7 +214,18 @@ impl<'g, 'p> Display for ForEachPath<'g, 'p> {
     }
 }
 
-impl<'g, 'p> ForEachPath<'g, 'p> {}
+impl<'t> ForEachPath<'_, '_> {
+    fn walk_type(&self, mut t: &'t ConcreteType) -> &'t ConcreteType {
+        for p in self.path {
+            match p {
+                ForEachPathElement::Array { .. } => {
+                    t = &t.unwrap_array().0;
+                }
+            }
+        }
+        t
+    }
+}
 
 impl ForEachPath<'_, '_> {
     fn to_bit_index_formula(&self) -> String {
@@ -718,7 +780,6 @@ impl<'g> CodeGenerationContext<'g> {
                 RealWireDataSource::UnaryOp { op, right, .. } => {
                     writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
 
-                    let op = op.op_text();
                     let right_name = self.wire_name(*right, w.absolute_latency);
                     self.in_generate(|slf| {
                         slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| {
@@ -731,14 +792,25 @@ impl<'g> CodeGenerationContext<'g> {
                 } => {
                     writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
 
-                    let op = op.op_text();
+                    let left_wire = &self.instance.wires[*left];
+                    let right_wire = &self.instance.wires[*right];
                     let left_name = self.wire_name(*left, w.absolute_latency);
                     let right_name = self.wire_name(*right, w.absolute_latency);
                     self.in_generate(|slf| {
                         slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| {
-                            format!(
-                                "assign {wire_name}{path} = {left_name}{path} {op} {right_name}{path};\n"
-                            )
+                            if *op == BinaryOperator::Modulo {
+                                let left_int_range = path.walk_type(&left_wire.typ).unwrap_int_bounds();
+                                let right_int_range = path.walk_type(&right_wire.typ).unwrap_int_bounds();
+
+                                let content = codegen_optimized_modulo(left_int_range, right_int_range, &format!("{left_name}{path}"), &format!("{right_name}{path}"));
+                                format!(
+                                    "assign {wire_name}{path} = {content}\n"
+                                )
+                            } else {
+                                format!(
+                                    "assign {wire_name}{path} = {left_name}{path} {op} {right_name}{path};\n"
+                                )
+                            }
                         })
                     });
                 }

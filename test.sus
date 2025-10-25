@@ -1608,3 +1608,44 @@ module zero_sized_stuffs {
 	int a = zero_sized_gen[addr]
 	int b = zero_sized_arr[addr]
 }
+
+module test_all_modulos {
+	int#(FROM: 0, TO: 13) unsigned_val
+	int#(FROM: -20, TO: 13) signed_val
+
+	int#(FROM: 5, TO: 8) dynamic_mod
+	
+	// Power of two optimization
+	unsigned_val % 8
+	unsigned_val % 4
+	unsigned_val % 2
+	signed_val % 8
+	signed_val % 4
+	signed_val % 2
+	// mod 1 optimization
+	unsigned_val % 1
+	signed_val % 1
+
+	// Unsigneds
+	// No mod needed
+	unsigned_val % 13
+	// To conditional assign 0
+	(unsigned_val + 1) % 13
+	// To conditional subtract 13
+	(unsigned_val + 2) % 13
+	(unsigned_val + 13) % 13
+	// To remainder
+	(unsigned_val + 14) % 13
+
+	// Signeds
+	// To conditional assign 12
+	(unsigned_val - 1) % 13
+	// To conditional add 13
+	(unsigned_val - 2) % 13
+	(unsigned_val - 13) % 13
+	// To double remainder
+	(unsigned_val - 14) % 13
+
+	// dynamic modulo
+	unsigned_val % dynamic_mod
+}
