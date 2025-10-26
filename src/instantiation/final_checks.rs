@@ -67,7 +67,11 @@ impl<'l> ModuleTypingContext<'l> {
         })
     }
     fn boundscheck_array(&self, idx_bounds: IntBounds<&IBig>, sz: &IBig, span: Span, ctx: &str) {
-        if !IntBounds::new_from_zero(sz).contains_bounds(idx_bounds) {
+        let array_bound = IntBounds {
+            from: &IBig::from(0),
+            to: sz,
+        };
+        if !array_bound.contains_bounds(idx_bounds) {
             self.errors.error(
                 span,
                 format!(
@@ -76,11 +80,15 @@ impl<'l> ModuleTypingContext<'l> {
             );
         }
     }
-    fn boundscheck_idx(&self, idx: &IBig, sz: &IBig, span: Span, ctx: &str) {
-        if !IntBounds::new_from_zero(sz).contains(idx) {
+    fn boundscheck_idx(&self, idx: &IBig, sz: &IBig, span: Span) {
+        let array_bound = IntBounds {
+            from: &IBig::from(0),
+            to: sz,
+        };
+        if !array_bound.contains(idx) {
             self.errors.error(
                 span,
-                format!("Out of bounds! The array is of size {sz}, but the {ctx} is {idx}"),
+                format!("Out of bounds! The array is of size {sz}, but the index is {idx}"),
             );
         }
     }
@@ -102,7 +110,7 @@ impl<'l> ModuleTypingContext<'l> {
                     typ = content;
 
                     let span = span.inner_span();
-                    self.boundscheck_idx(idx, arr_sz, span, "index");
+                    self.boundscheck_idx(idx, arr_sz, span);
                 }
                 RealWirePathElem::Slice { span, bounds, .. } => {
                     let idx_bounds = bounds.unwrap_valid();

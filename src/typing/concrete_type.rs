@@ -8,7 +8,6 @@ use crate::to_string::display_join;
 use crate::util::all_equal;
 use std::ops::Deref;
 use std::ops::DerefMut;
-use std::sync::LazyLock;
 
 use super::template::TVec;
 
@@ -339,11 +338,7 @@ pub struct IntBounds<T> {
     pub to: T,
 }
 
-static ZERO: LazyLock<IBig> = LazyLock::new(|| IBig::from(0));
 impl IntBounds<&'_ IBig> {
-    pub fn new_from_zero(to: &IBig) -> IntBounds<&IBig> {
-        IntBounds { from: &ZERO, to }
-    }
     pub fn is_valid(self) -> bool {
         self.from < self.to
     }
@@ -372,12 +367,9 @@ impl IntBounds<&'_ IBig> {
         }
     }
     pub fn contains(self, idx: &IBig) -> bool {
-        assert!(self.is_valid(), "{self}");
         idx >= self.from && idx < self.to
     }
     pub fn contains_bounds(self, other: IntBounds<&IBig>) -> bool {
-        assert!(self.is_valid(), "{self}");
-        assert!(self.is_valid(), "{other}");
         other.from >= self.from && other.to <= self.to
     }
 }
