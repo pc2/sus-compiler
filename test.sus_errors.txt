@@ -1,6 +1,8 @@
 [INFO  sus_compiler::compiler_top] Selecting all parameter-less modules as --top
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated CrossDomain #(T: type bool #())
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated CrossActionNoData #()
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated IntToBool #()
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated BoolToInt #()
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated pow17 #()

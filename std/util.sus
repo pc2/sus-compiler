@@ -120,3 +120,131 @@ extern module PopCount_native #(int WIDTH) {
 		bool[WIDTH] bits'0 ->
 		int#(FROM: 0, TO: WIDTH + 1) count'0
 }
+
+
+/// Splits the given integer. The upper [LOWER_BITS:] bits are returned as upper, the lower [:LOWER_BITS] bits are returned in lower
+/// See also [BitwiseIntConcat]
+module BitwiseIntSplit #(int TO, int LOWER_BITS) {
+    gen int UPPER_TO = (TO-1) / pow2#(E: LOWER_BITS) + 1
+    interface BitwiseIntSplit :
+        int#(FROM: 0, TO) v'0 ->
+        int#(FROM: 0, TO: UPPER_TO) upper'0,
+        int#(FROM: 0, TO: pow2#(E: LOWER_BITS)) lower'0
+
+    bool[clog2#(V: TO)] v_bits = UIntToBits(v)
+
+    lower = BitsToUInt(v_bits[:LOWER_BITS])
+    upper = transmute_from_bits#(T: type int#(FROM: 0, TO: UPPER_TO))(v_bits[LOWER_BITS:])
+}
+
+/// Recombines a lower and upper integer parts. 
+/// See also [BitwiseIntSplit]
+module BitwiseIntConcat #(int UPPER_TO, int LOWER_BITS) {
+    interface BitwiseIntConcat :
+        int#(FROM: 0, TO: UPPER_TO) upper'0,
+        int#(FROM: 0, TO: pow2#(E: LOWER_BITS)) lower'0 ->
+        int#(FROM: 0, TO: UPPER_TO * pow2#(E: LOWER_BITS)) v'0
+
+    bool[clog2#(V: UPPER_TO) + LOWER_BITS] v_bits
+    v_bits[:LOWER_BITS] = UIntToBits(lower)
+    v_bits[LOWER_BITS:] = UIntToBits(upper)
+    v = transmute_from_bits#(T: type int#(FROM: 0, TO: UPPER_TO * pow2#(E: LOWER_BITS)))(v_bits)
+}
+
+/// Sets the lower [:LOWER_BITS] bits to false, thus aligning the value
+/// Works for unsigned and signed integers alike
+module AlignToPow2 #(int FROM, int TO, int LOWER_BITS) {
+    gen int ALIGNED_FROM = FROM - FROM % clog2#(V: LOWER_BITS)
+    gen int ALIGNED_TO = TO - (TO + 1) % clog2#(V: LOWER_BITS)
+    interface AlignToPow2 :
+        int#(FROM, TO) i'0 ->
+        int#(FROM: ALIGNED_FROM, TO: ALIGNED_TO) o'0
+
+    bool[sizeof#(T: type int#(FROM, TO))] bits = transmute_to_bits(i)
+    bool[sizeof#(T: type int#(FROM, TO))] aligned_bits
+    aligned_bits[:LOWER_BITS] = Repeat(false)
+    aligned_bits[LOWER_BITS:] = bits[LOWER_BITS:]
+    o = transmute_from_bits#(T: type int#(FROM: ALIGNED_FROM, TO: ALIGNED_TO))(aligned_bits)
+}
+
+/// Converts a '0' or '1' into the equivalent boolean 'false' or 'true' respectively
+module IntToBool {
+    interface IntToBool : int#(FROM: 0, TO: 2) i'0 -> bool o'0
+
+    o = i == 1
+}
+/// Converts a 'false' or 'true' into the equivalent integer '0' or '1' respectively
+module BoolToInt {
+    interface BoolToInt : bool i'0 -> int#(FROM: 0, TO: 2) o'0
+
+    when i {
+        o = 1
+    } else {
+        o = 0
+    }
+}
+
+/// Equivalent to the C/Verilog `cond ? a : b` ternary operator. When `cond` is `true` it returns `a`, otherwise it returns `b`
+module Ternary #(T) {
+    interface Ternary : bool cond'0, T a'0, T b'0 -> T o'0
+
+    when cond {
+        o = a
+    } else {
+        o = b
+    }
+}
+
+/// Rotates towards lower indexes by the provided offset. Implemented as a Barrel Shifter
+/// 
+/// Example: `RotateLeft([1, 2, 3, 4], 1) == [2, 3, 4, 1]`
+module RotateLeft#(T, int ARRAY_LEN) {
+    interface RotateLeft : T[ARRAY_LEN] data'0, int#(FROM: 0, TO: ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0
+
+    gen int NUM_STAGES = clog2#(V: ARRAY_LEN)
+    bool[NUM_STAGES] offset_bits = UIntToBits(offset)
+
+    T[ARRAY_LEN][NUM_STAGES+1] rotate_stages
+    rotate_stages[0] = data
+
+    for int STAGE in 0..NUM_STAGES {
+        T[ARRAY_LEN] from = rotate_stages[STAGE]
+
+        for int ELEM in 0..ARRAY_LEN {
+            when offset_bits[STAGE] {
+                rotate_stages[STAGE+1][ELEM] = from[(ELEM + pow2#(E: STAGE)) % ARRAY_LEN]
+            } else {
+                rotate_stages[STAGE+1][ELEM] = from[ELEM]
+            }
+        }
+    }
+
+    rotated_data = rotate_stages[NUM_STAGES]
+}
+
+/// Rotates towards higher indexes by the provided offset. Implemented as a Barrel Shifter
+/// 
+/// Example: `RotateRight([1, 2, 3, 4], 1) == [4, 1, 2, 3]`
+module RotateRight#(T, int ARRAY_LEN) {
+    interface RotateRight : T[ARRAY_LEN] data'0, int#(FROM: 0, TO: ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0
+
+    gen int NUM_STAGES = clog2#(V: ARRAY_LEN)
+    bool[NUM_STAGES] offset_bits = UIntToBits(offset)
+
+    T[ARRAY_LEN][NUM_STAGES+1] rotate_stages
+    rotate_stages[0] = data
+
+    for int STAGE in 0..NUM_STAGES {
+        T[ARRAY_LEN] from = rotate_stages[STAGE]
+
+        for int ELEM in 0..ARRAY_LEN {
+            when offset_bits[STAGE] {
+                rotate_stages[STAGE+1][ELEM] = from[(ELEM - pow2#(E: STAGE)) % ARRAY_LEN]
+            } else {
+                rotate_stages[STAGE+1][ELEM] = from[ELEM]
+            }
+        }
+    }
+
+    rotated_data = rotate_stages[NUM_STAGES]
+}

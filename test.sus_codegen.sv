@@ -3408,6 +3408,41 @@ always_comb begin
 end
 endmodule
 
+// BoolToInt #()
+module BoolToInt(
+	input clk,
+	input wire i,
+	output /*mux_wire*/ logic[0:0] o
+);
+
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	o = 1'dx;
+	if(i) o = 1'd1;
+	if(!i) o = 1'd0;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	o = o;
+end
+endmodule
+
+// IntToBool #()
+module IntToBool(
+	input clk,
+	input wire[0:0] i,
+	output /*mux_wire*/ logic o
+);
+
+wire _3;
+assign _3 = i == 1'd1;
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	o = 1'bx;
+	o = _3;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	o = o;
+end
+endmodule
+
 // TreeAdd #(WIDTH: 5, FROM: 3, TO: 4)
 module TreeAdd_WIDTH_5_FROM_3_TO_4(
 	input clk,
