@@ -101,6 +101,14 @@ fn should_not_codegen(wire: &RealWire) -> bool {
     wire.typ.sizeof() == ibig::ubig!(0)
 }
 
+fn should_not_codegen_assign(source: &MultiplexerSource) -> bool {
+    source.to_path.iter().any(|e| match e {
+        RealWirePathElem::Index { .. } | RealWirePathElem::ConstIndex { .. } => false,
+        RealWirePathElem::PartSelect { width, .. } => width == &IBig::from(0),
+        RealWirePathElem::Slice { bounds, .. } => !bounds.unwrap_valid().is_non_empty(),
+    })
+}
+
 fn get_zero_sized_type_inline_value(typ: &ConcreteType) -> Cow<'static, str> {
     assert_eq!(typ.sizeof(), ibig::ubig!(0));
 
@@ -726,6 +734,10 @@ impl<'g> CodeGenerationContext<'g> {
 
     fn write_wire_declarations(&mut self) {
         for (wire_id, w) in &self.instance.wires {
+            self.md
+                .link_info
+                .get_instruction_span(w.original_instruction)
+                .debug();
             // For better readability of output Verilog
             if self.can_inline(w) {
                 continue;
@@ -954,6 +966,10 @@ impl<'g> CodeGenerationContext<'g> {
 
     fn write_multiplexers(&mut self) {
         for (_id, w) in &self.instance.wires {
+            self.md
+                .link_info
+                .get_instruction_span(w.original_instruction)
+                .debug();
             if should_not_codegen(w) {
                 continue;
             }
@@ -973,6 +989,10 @@ impl<'g> CodeGenerationContext<'g> {
                     };
 
                     for s in sources {
+                        if should_not_codegen_assign(s) {
+                            // Eliminate zero-size sub-slice assignments
+                            continue;
+                        }
                         self.write_assign(&output_name, arrow_str, s, w);
                     }
 
@@ -1160,7 +1180,15 @@ pub fn gen_verilog_code(instance: &InstantiatedModule, linker: &Linker) -> Strin
         for_vars: VariableAlloc::new("_v"),
         needed_untils: instance.compute_needed_untils(),
     };
-    ctx.write_verilog_code();
+
+    crate::debug::debug_context(
+        "codegen",
+        instance.name.clone(),
+        &linker.files[ctx.md.link_info.file],
+        || {
+            ctx.write_verilog_code();
+        },
+    );
 
     ctx.program_text
 }

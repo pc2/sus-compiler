@@ -94,6 +94,14 @@ pub fn codegen(linker: &Linker) -> ExitCode {
     }
     if let Some(path) = &config.codegen_file {
         let mut out_file = make_output_file(path);
+
+        if !config.ci {
+            info!(
+                "Codegen to {}",
+                path.canonicalize().unwrap().to_string_lossy()
+            );
+        }
+
         for md in dependency_stack.iter().rev() {
             let code = gen_verilog_code(md, linker);
             if let Err(e) = out_file.write(code.as_bytes()) {
@@ -108,6 +116,13 @@ pub fn codegen(linker: &Linker) -> ExitCode {
                 output_folder.to_string_lossy()
             );
         }
+        if !config.ci {
+            info!(
+                "Codegen to directory {}",
+                output_folder.canonicalize().unwrap().to_string_lossy()
+            );
+        }
+
         for (id, md) in &linker.modules {
             let filename = join_shorten_filename(&md.link_info.name, ".sv");
             let path = output_folder.join(filename);

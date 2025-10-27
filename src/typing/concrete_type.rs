@@ -294,7 +294,7 @@ impl ConcreteType {
 
                 if global_ref.id == get_builtin_type!("int") {
                     let bounds = global_ref.unwrap_int_bounds();
-                    if !bounds.is_valid() {
+                    if !bounds.is_non_empty() {
                         return false;
                     }
                 }
@@ -339,11 +339,12 @@ pub struct IntBounds<T> {
 }
 
 impl IntBounds<&'_ IBig> {
-    pub fn is_valid(self) -> bool {
-        self.from < self.to
+    pub fn is_non_empty(self) -> bool {
+        assert!(self.from <= self.to);
+        self.from != self.to
     }
     pub fn bitwidth(self) -> u64 {
-        assert!(self.is_valid(), "{self}");
+        assert!(self.is_non_empty(), "{self}");
         let min = self.from;
         let max = self.to - IBig::from(1);
         if min < &IBig::from(0) {

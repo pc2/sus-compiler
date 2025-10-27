@@ -204,21 +204,27 @@ pub fn setup_panic_handler() {
 
         DEBUG_STACK.with_borrow(|history| {
             if let Some(last_stack_elem) = history.debug_stack.last() {
-                info!(
-                    "Panic happened in Span-guarded context {} in {}",
-                    last_stack_elem.stage.red(),
-                    last_stack_elem.global_obj_name.red()
+                eprintln!(
+                    "{}",
+                    format!(
+                        "Panic happened in Span-guarded context {} in {}",
+                        last_stack_elem.stage.red(),
+                        last_stack_elem.global_obj_name.red()
+                    )
+                    .red()
                 );
                 let file_data = unsafe { &*last_stack_elem.file_data };
                 //pretty_print_span(file_data, span, label);
                 print_most_recent_spans(file_data, last_stack_elem);
+            } else {
+                eprintln!("{}", "No Span-guarding context".red());
             }
-            info!("Most recent available debug paths:");
+            eprintln!("{}", "Most recent available debug paths:".red());
             for (ctx, d) in &history.recent_debug_options {
                 if let Some(ctx) = ctx {
-                    info!("--debug-whitelist {ctx} --debug {d}");
+                    eprintln!("{}", format!("--debug-whitelist {ctx} --debug {d}").red());
                 } else {
-                    info!("(no SpanDebugger Context) --debug {d}");
+                    eprintln!("{}", format!("(no SpanDebugger Context) --debug {d}").red());
                 }
             }
         })
