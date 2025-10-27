@@ -124,7 +124,7 @@
             },
             "sourceLanguages": ["rust"],
             "args": [
-                "--codegen"
+                "-o", "/dev/null"
             ],
             "cwd": "${workspaceFolder}"
         },
