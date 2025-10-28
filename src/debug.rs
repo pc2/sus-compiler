@@ -1,4 +1,4 @@
-use crate::{prelude::*, to_string::join_shorten_filename};
+use crate::{prelude::*, to_string::sanitize_filename};
 
 use std::{
     cell::RefCell,
@@ -263,7 +263,7 @@ pub fn create_dump_on_panic<R>(linker: &mut Linker, f: impl FnOnce(&mut Linker) 
         }
     });
 
-    let dump_name = join_shorten_filename(&failure_name, &cur_time);
+    let dump_name = sanitize_filename(&failure_name, &cur_time);
     let mut dump_dir = config().sus_home.join("crash_dumps").join(&dump_name);
 
     if let Err(err) = fs::create_dir_all(&dump_dir) {

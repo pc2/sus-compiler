@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use crate::alloc::UUID;
 use crate::instantiation::IsPort;
-use crate::to_string::{FmtWrapper, join_shorten_filename};
+use crate::to_string::{FmtWrapper, sanitize_filename};
 use crate::{
     alloc::FlatAlloc,
     flattening::Direction,
@@ -23,13 +23,10 @@ use crate::{
 fn unique_file_name(module_name: &str, dot_type: &str) -> std::io::Result<PathBuf> {
     let mut path = PathBuf::from("dot_output");
     fs::create_dir_all(&path)?;
-    path.push(join_shorten_filename(
-        module_name,
-        &format!("_{dot_type}.dot"),
-    ));
+    path.push(sanitize_filename(module_name, &format!("_{dot_type}.dot")));
     let mut count = 1;
     while path.exists() {
-        path.set_file_name(join_shorten_filename(
+        path.set_file_name(sanitize_filename(
             module_name,
             &format!("_{dot_type}_{count}.dot"),
         ));

@@ -4,7 +4,7 @@ pub mod system_verilog;
 use crate::codegen::system_verilog::gen_verilog_code;
 use crate::prelude::*;
 
-use crate::to_string::join_shorten_filename;
+use crate::to_string::sanitize_filename;
 use crate::{InstantiatedModule, Linker};
 
 use crate::config::{TargetLanguage, VERSION_INFO, config};
@@ -124,7 +124,7 @@ pub fn codegen(linker: &Linker) -> ExitCode {
         }
 
         for (id, md) in &linker.modules {
-            let filename = join_shorten_filename(&md.link_info.name, ".sv");
+            let filename = sanitize_filename(&md.link_info.name, ".sv");
             let path = output_folder.join(filename);
             let mut out_file = make_output_file(&path);
             for (_global_ref, inst) in instantiatior.iter_for_module(id) {
