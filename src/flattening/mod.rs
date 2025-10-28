@@ -509,6 +509,12 @@ pub enum ExpressionSource {
     ArrayConstruct(Vec<FlatID>),
     Literal(Value),
 }
+impl ExpressionSource {
+    pub fn unwrap_wire_ref(&self) -> &WireReference {
+        let_unwrap!(Self::WireRef(wr), self);
+        wr
+    }
+}
 /// [FuncCall]s (and potentially, in the future, other things) can have multiple outputs.
 /// We make the distinction between [SubExpression] that can only represent one output, and [MultiWrite], which can represent multiple outputs.
 /// Workarounds like putting multiple outputs together in a tuple would not work, because:

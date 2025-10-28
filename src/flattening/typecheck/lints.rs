@@ -34,6 +34,7 @@ pub fn perform_lints(
     ctx.find_unused_variables();
     ctx.no_duplicate_ports();
     ctx.check_unsynthesizeable_types();
+    ctx.no_calling_local_actions();
 }
 
 struct LintContext<'l> {
@@ -531,6 +532,51 @@ impl LintContext<'_> {
                 | Instruction::Interface(_)
                 | Instruction::IfStatement(_)
                 | Instruction::ForStatement(_) => {}
+            }
+        }
+    }
+
+    fn no_calling_local_actions(&self) {
+        let GlobalObj::Module(md) = &self.working_on else {
+            return;
+        };
+
+        for (_, instr) in &md.link_info.instructions {
+            let Instruction::Expression(expr_instr) = instr else {
+                continue;
+            };
+            expr_instr.span.debug();
+            let ExpressionSource::FuncCall(fc) = &expr_instr.source else {
+                continue;
+            };
+            let fc_func_wireref = md.link_info.instructions[fc.func_wire_ref]
+                .unwrap_expression()
+                .source
+                .unwrap_wire_ref();
+
+            let WireReferenceRoot::LocalInterface(interf) = &fc_func_wireref.root else {
+                continue;
+            };
+
+            let interface_instr = md.link_info.instructions[*interf].unwrap_interface();
+            match interface_instr.interface_kind {
+                InterfaceKind::RegularInterface | InterfaceKind::Action(_) => {
+                    let kind_capitalized = match interface_instr.interface_kind {
+                        InterfaceKind::RegularInterface => "Interface",
+                        InterfaceKind::Action(_) => "Action",
+                        InterfaceKind::Trigger(_) => "Trigger",
+                    };
+                    self.errors
+                        .error(
+                            fc_func_wireref.root_span,
+                            format!("Cannot call local {}s", interface_instr.interface_kind),
+                        )
+                        .info_same_file(
+                            interface_instr.name_span,
+                            format!("{kind_capitalized} {} declared here", interface_instr.name),
+                        );
+                }
+                InterfaceKind::Trigger(_) => {}
             }
         }
     }
