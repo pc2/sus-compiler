@@ -158,8 +158,7 @@ fn codegen_optimized_modulo(
             if num_bits_to_slice == 0 {
                 "0; // == mod 1".to_string()
             } else {
-                let bitslice_start_at = num_bits_to_slice - 1;
-                format!("({left})[{bitslice_start_at}:0]; // == mod {mod_u}")
+                format!("{left}; // == mod {mod_u} (target is {num_bits_to_slice} bits wide)")
             }
         } else if left_int_range.from >= &IBig::from(0) {
             // Unsigned mod

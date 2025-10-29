@@ -7,17 +7,17 @@ module test_all_modulos(
 /*mux_wire*/ logic signed[5:0] signed_val;
 /*mux_wire*/ logic[2:0] dynamic_mod;
 wire[2:0] _3;
-assign _3 = (unsigned_val)[2:0]; // == mod 8
+assign _3 = unsigned_val; // == mod 8 (target is 3 bits wide)
 wire[1:0] _6;
-assign _6 = (unsigned_val)[1:0]; // == mod 4
+assign _6 = unsigned_val; // == mod 4 (target is 2 bits wide)
 wire[0:0] _9;
-assign _9 = (unsigned_val)[0:0]; // == mod 2
+assign _9 = unsigned_val; // == mod 2 (target is 1 bits wide)
 wire[2:0] _12;
-assign _12 = (signed_val)[2:0]; // == mod 8
+assign _12 = signed_val; // == mod 8 (target is 3 bits wide)
 wire[1:0] _15;
-assign _15 = (signed_val)[1:0]; // == mod 4
+assign _15 = signed_val; // == mod 4 (target is 2 bits wide)
 wire[0:0] _18;
-assign _18 = (signed_val)[0:0]; // == mod 2
+assign _18 = signed_val; // == mod 2 (target is 1 bits wide)
 // (zero sized) _21
 // (zero sized) _24
 wire[3:0] _27;
