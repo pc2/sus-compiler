@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
-use ibig::IBig;
 use ibig::modular::{IntoModulo, ModuloRing};
+use ibig::{IBig, UBig};
 use ordered_float::NotNan;
 
 use sus_proc_macro::get_builtin_type;
@@ -189,56 +189,111 @@ impl Value {
 
 pub fn compute_unary_op(op: UnaryOperator, v: &Value) -> Value {
     match op {
-        UnaryOperator::Or => {
-            todo!("Array Values")
-        }
         UnaryOperator::And => {
-            todo!("Array Values")
+            let mut result = true;
+            for e in v.unwrap_array() {
+                result &= e.unwrap_bool();
+            }
+            Value::Bool(result)
+        }
+        UnaryOperator::Or => {
+            let mut result = false;
+            for e in v.unwrap_array() {
+                result |= e.unwrap_bool();
+            }
+            Value::Bool(result)
         }
         UnaryOperator::Xor => {
-            todo!("Array Values")
-        }
-        UnaryOperator::Not => {
-            let Value::Bool(b) = v else {
-                unreachable!("Only not bool supported, should be caught by abstract typecheck")
-            };
-            Value::Bool(!*b)
+            let mut result = false;
+            for e in v.unwrap_array() {
+                result ^= e.unwrap_bool();
+            }
+            Value::Bool(result)
         }
         UnaryOperator::Sum => {
-            todo!("Array Values")
+            let mut result = IBig::from(0);
+            for e in v.unwrap_array() {
+                result += e.unwrap_integer();
+            }
+            Value::Integer(result)
         }
         UnaryOperator::Product => {
-            todo!("Array Values")
+            let mut result = IBig::from(1);
+            for e in v.unwrap_array() {
+                result *= e.unwrap_integer();
+            }
+            Value::Integer(result)
         }
-        UnaryOperator::Negate => {
-            let Value::Integer(v) = v else { panic!() };
-            Value::Integer(-v)
-        }
+        UnaryOperator::Not => Value::Bool(!v.unwrap_bool()),
+        UnaryOperator::Negate => Value::Integer(-v.unwrap_integer()),
     }
 }
 
-pub fn compute_binary_op(left: &Value, op: BinaryOperator, right: &Value) -> Value {
-    match op {
+/// A limit is set on the max size of a shift, such that the user doesn't accidentally OOM themselves.
+pub const MAX_SHIFT: usize = 1usize << 30;
+pub fn compute_binary_op(left: &Value, op: BinaryOperator, right: &Value) -> Result<Value, String> {
+    Ok(match op {
+        BinaryOperator::Or => Value::Bool(left.unwrap_bool() | right.unwrap_bool()),
+        BinaryOperator::Xor => Value::Bool(left.unwrap_bool() ^ right.unwrap_bool()),
+        BinaryOperator::And => Value::Bool(left.unwrap_bool() & right.unwrap_bool()),
         BinaryOperator::Equals => Value::Bool(left == right),
         BinaryOperator::NotEquals => Value::Bool(left != right),
         BinaryOperator::GreaterEq => Value::Bool(left.unwrap_integer() >= right.unwrap_integer()),
         BinaryOperator::Greater => Value::Bool(left.unwrap_integer() > right.unwrap_integer()),
         BinaryOperator::LesserEq => Value::Bool(left.unwrap_integer() <= right.unwrap_integer()),
         BinaryOperator::Lesser => Value::Bool(left.unwrap_integer() < right.unwrap_integer()),
+        BinaryOperator::Modulo => {
+            let left = left.unwrap_integer();
+            let right = right.unwrap_integer();
+            let Ok(right_ubig): Result<UBig, _> = right.try_into() else {
+                return Err(format!("Negative modulo: {left} mod {right}"));
+            };
+            if right_ubig == UBig::from(0u32) {
+                return Err(format!("Modulo by zero: {left} mod {right}"));
+            }
+            let modulo = ModuloRing::new(&right_ubig);
+            Value::Integer(left.into_modulo(&modulo).residue().into())
+        }
+        BinaryOperator::ShiftLeft => {
+            let right = right.unwrap_integer();
+            if right < &IBig::from(0) {
+                return Err(format!("Negative shift: {left} << {right}"));
+            }
+            if right >= &IBig::from(MAX_SHIFT) {
+                return Err(format!("Too large shift: {left} << {right}"));
+            }
+            Value::Integer(left.unwrap_integer() << usize::try_from(right).unwrap())
+        }
+        BinaryOperator::ShiftRight => {
+            let right = right.unwrap_integer();
+            if right < &IBig::from(0) {
+                return Err(format!("Negative shift: {left} >> {right}"));
+            }
+            if right >= &IBig::from(MAX_SHIFT) {
+                return Err(format!("Too large shift: {left} >> {right}"));
+            }
+            Value::Integer(left.unwrap_integer() >> usize::try_from(right).unwrap())
+        }
         BinaryOperator::Add => Value::Integer(left.unwrap_integer() + right.unwrap_integer()),
         BinaryOperator::Subtract => Value::Integer(left.unwrap_integer() - right.unwrap_integer()),
         BinaryOperator::Multiply => Value::Integer(left.unwrap_integer() * right.unwrap_integer()),
-        BinaryOperator::Divide => Value::Integer(left.unwrap_integer() / right.unwrap_integer()),
-        BinaryOperator::Modulo => {
-            let modulo = ModuloRing::new(&right.unwrap_integer().try_into().unwrap());
-            Value::Integer(left.unwrap_integer().into_modulo(&modulo).residue().into())
+        BinaryOperator::Divide => {
+            let left = left.unwrap_integer();
+            let right = right.unwrap_integer();
+            if right == &ibig::ibig!(0) {
+                return Err(format!("Divide by zero: {left} / 0"));
+            }
+            Value::Integer(left / right)
         }
-        BinaryOperator::And => Value::Bool(left.unwrap_bool() & right.unwrap_bool()),
-        BinaryOperator::Or => Value::Bool(left.unwrap_bool() | right.unwrap_bool()),
-        BinaryOperator::Xor => Value::Bool(left.unwrap_bool() ^ right.unwrap_bool()),
-        //BinaryOperator::ShiftLeft => todo!(), // Still a bit iffy about shift operator inclusion
-        //BinaryOperator::ShiftRight => todo!()
-    }
+        BinaryOperator::Remainder => {
+            let left = left.unwrap_integer();
+            let right = right.unwrap_integer();
+            if right == &ibig::ibig!(0) {
+                return Err(format!("Divide by zero: {left} % 0"));
+            }
+            Value::Integer(left % right)
+        }
+    })
 }
 
 impl ConcreteType {
@@ -292,5 +347,19 @@ impl From<bool> for ConcreteTemplateArg {
 impl From<Vec<Value>> for ConcreteTemplateArg {
     fn from(value: Vec<Value>) -> Self {
         ConcreteTemplateArg::Value(Unifyable::Set(Value::Array(value)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ibig::IBig;
+
+    #[test]
+    fn test_remainder() {
+        let a = IBig::from(-7);
+        let b = IBig::from(-5);
+
+        dbg!((-7) % (-5));
+        assert!(a % b == IBig::from((-7) % (-5)))
     }
 }

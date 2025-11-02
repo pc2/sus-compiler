@@ -1662,30 +1662,7 @@ impl<'l> ExecutionContext<'l> {
                 duplicate_for_all_array_ranks(
                     &[left_val, right_val],
                     rank.count().unwrap(),
-                    &mut |[l, r]| {
-                        match op {
-                            BinaryOperator::Divide => {
-                                let l = l.unwrap_integer();
-                                let r = r.unwrap_integer();
-                                if r == &ibig::ibig!(0) {
-                                    return Err(format!("Divide by zero: {l} / 0"));
-                                }
-                            }
-                            BinaryOperator::Modulo => {
-                                let l = l.unwrap_integer();
-                                let r = r.unwrap_integer();
-                                if r == &ibig::ibig!(0) {
-                                    return Err(format!("Modulo by zero: {l} % 0"));
-                                }
-                                if r < &ibig::ibig!(0) {
-                                    return Err(format!("Negative modulo: {l} % {r}"));
-                                }
-                            }
-                            _ => {}
-                        }
-
-                        Ok(compute_binary_op(l, *op, r))
-                    },
+                    &mut |[l, r]| compute_binary_op(l, *op, r),
                 )
                 .map_err(|reason| (expr.span, reason))?
             }

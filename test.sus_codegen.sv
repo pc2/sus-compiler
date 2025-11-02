@@ -1,3 +1,45 @@
+// testRemainder #()
+module testRemainder(
+	input clk
+);
+
+/*mux_wire*/ logic[3:0] a;
+/*mux_wire*/ logic[1:0] b;
+wire[1:0] _5;
+assign _5 = a % b;
+wire signed[4:0] _7;
+assign _7 = -a;
+wire signed[1:0] _9;
+assign _9 = _7 % b;
+wire signed[2:0] _12;
+assign _12 = -b;
+wire[1:0] _13;
+assign _13 = a % _12;
+wire signed[4:0] _15;
+assign _15 = -a;
+wire signed[2:0] _17;
+assign _17 = -b;
+wire signed[1:0] _18;
+assign _18 = _15 % _17;
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	a = 4'dx;
+	a = 4'd10;
+end
+always_comb begin
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	b = 2'dx;
+	b = 2'd3;
+end
+endmodule
+
+// testShifts #()
+module testShifts(
+	input clk
+);
+
+endmodule
+
 // test_all_modulos #()
 module test_all_modulos(
 	input clk
@@ -2562,7 +2604,10 @@ wire[6:0] _11 = vec[3];
 wire[13:0] _12;
 assign _12 = _10 * _11;
 wire[15:0] _14;
-assign _14 = +row_products;
+always_comb begin
+	_14 = 0;
+	for(int _v0 = 0; _v0 < 4; _v0 += 1) _14 += row_products[_v0];
+end
 /*mux_wire*/ logic[13:0] row_products_2[3:0];
 wire[6:0] _15 = mat[0][1];
 wire[6:0] _16 = vec[0];
@@ -2581,7 +2626,10 @@ wire[6:0] _25 = vec[3];
 wire[13:0] _26;
 assign _26 = _24 * _25;
 wire[15:0] _28;
-assign _28 = +row_products_2;
+always_comb begin
+	_28 = 0;
+	for(int _v0 = 0; _v0 < 4; _v0 += 1) _28 += row_products_2[_v0];
+end
 /*mux_wire*/ logic[13:0] row_products_3[3:0];
 wire[6:0] _29 = mat[0][2];
 wire[6:0] _30 = vec[0];
@@ -2600,7 +2648,10 @@ wire[6:0] _39 = vec[3];
 wire[13:0] _40;
 assign _40 = _38 * _39;
 wire[15:0] _42;
-assign _42 = +row_products_3;
+always_comb begin
+	_42 = 0;
+	for(int _v0 = 0; _v0 < 4; _v0 += 1) _42 += row_products_3[_v0];
+end
 /*mux_wire*/ logic[13:0] row_products_4[3:0];
 wire[6:0] _43 = mat[0][3];
 wire[6:0] _44 = vec[0];
@@ -2619,7 +2670,10 @@ wire[6:0] _53 = vec[3];
 wire[13:0] _54;
 assign _54 = _52 * _53;
 wire[15:0] _56;
-assign _56 = +row_products_4;
+always_comb begin
+	_56 = 0;
+	for(int _v0 = 0; _v0 < 4; _v0 += 1) _56 += row_products_4[_v0];
+end
 /*mux_wire*/ logic[13:0] row_products_5[3:0];
 wire[6:0] _57 = mat[0][4];
 wire[6:0] _58 = vec[0];
@@ -2638,7 +2692,10 @@ wire[6:0] _67 = vec[3];
 wire[13:0] _68;
 assign _68 = _66 * _67;
 wire[15:0] _70;
-assign _70 = +row_products_5;
+always_comb begin
+	_70 = 0;
+	for(int _v0 = 0; _v0 < 4; _v0 += 1) _70 += row_products_5[_v0];
+end
 /*mux_wire*/ logic[13:0] row_products_6[3:0];
 wire[6:0] _71 = mat[0][5];
 wire[6:0] _72 = vec[0];
@@ -2657,7 +2714,10 @@ wire[6:0] _81 = vec[3];
 wire[13:0] _82;
 assign _82 = _80 * _81;
 wire[15:0] _84;
-assign _84 = +row_products_6;
+always_comb begin
+	_84 = 0;
+	for(int _v0 = 0; _v0 < 4; _v0 += 1) _84 += row_products_6[_v0];
+end
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	result = '{16'dx, 16'dx, 16'dx, 16'dx, 16'dx, 16'dx};

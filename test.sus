@@ -42,7 +42,7 @@ module fibonnaci {
 	state int #(FROM: 0, TO: 100) prev = 0
 
 	
-	num = (cur + prev) % 100
+	num = cur + prev mod 100
 	prev = cur
 	cur = num
 }
@@ -53,7 +53,7 @@ module blur2 {
 	state int prev
 
 	when !first {
-		blurred = (data + prev) % 100
+		blurred = data + prev mod 100
 	}
 	prev = data
 
@@ -82,7 +82,7 @@ module Accumulator {
     state int tot
 	initial tot = 0
 
-    int new_tot = (tot + term) % 100
+    int new_tot = tot + term mod 100
     when done {
         reg total = new_tot
         tot = 0
@@ -468,8 +468,8 @@ module fizz_buzz {
 	gen int BUZZ = 555
 	gen int FIZZ_BUZZ = 888555
 	
-	bool fizz = v % 3 == 0
-	bool buzz = v % 5 == 0
+	bool fizz = v mod 3 == 0
+	bool buzz = v mod 5 == 0
 	
 	when fizz & buzz {
 		fb = FIZZ_BUZZ
@@ -492,8 +492,8 @@ module fizz_buzz_gen #(int TABLE_SIZE) {
 	gen int[TABLE_SIZE] lut
 	
 	for int i in 0..TABLE_SIZE {
-		gen bool fizz = i % 3 == 0
-		gen bool buzz = i % 5 == 0
+		gen bool fizz = i mod 3 == 0
+		gen bool buzz = i mod 5 == 0
 		
 		gen int tbl_fb
 		if fizz & buzz {
@@ -527,7 +527,7 @@ module monotonize_down {
 	bool[16] mbf8
 	
 	for int i in 0..16 {
-		if i % 2 == 0 {
+		if i mod 2 == 0 {
 			mbf2[i] = mbf[i] | mbf[i+1]
 		} else {
 			mbf2[i] = mbf[i]
@@ -535,7 +535,7 @@ module monotonize_down {
 	}
 
 	for int i in 0..16 {
-		if i % 4 < 2 {
+		if i mod 4 < 2 {
 			mbf4[i] = mbf2[i] | mbf2[i+2]
 		} else {
 			mbf4[i] = mbf2[i]
@@ -543,7 +543,7 @@ module monotonize_down {
 	}
 	
 	for int i in 0..16 {
-		if i % 8 < 4 {
+		if i mod 8 < 4 {
 			mbf8[i] = mbf4[i] | mbf4[i+4]
 		} else {
 			mbf8[i] = mbf4[i]
@@ -551,7 +551,7 @@ module monotonize_down {
 	}
 	
 	for int i in 0..16 {
-		if i % 16 < 8 {
+		if i mod 16 < 8 {
 			mtDown[i] = mbf8[i] | mbf8[i+8]
 		} else {
 			mtDown[i] = mbf8[i]
@@ -811,7 +811,7 @@ module tree_add #(int WIDTH) {
 			right.values[i] = values[i+HALF_WIDTH]
 		}
 
-		if WIDTH % 2 == 0 {
+		if WIDTH mod 2 == 0 {
 			reg sum = left.sum + right.sum
 		} else {
 			reg sum = left.sum + right.sum + values[WIDTH - 1]
@@ -1616,36 +1616,66 @@ module test_all_modulos {
 	int#(FROM: 5, TO: 8) dynamic_mod
 	
 	// Power of two optimization
-	unsigned_val % 8
-	unsigned_val % 4
-	unsigned_val % 2
-	signed_val % 8
-	signed_val % 4
-	signed_val % 2
+	unsigned_val mod 8
+	unsigned_val mod 4
+	unsigned_val mod 2
+	signed_val mod 8
+	signed_val mod 4
+	signed_val mod 2
 	// mod 1 optimization
-	unsigned_val % 1
-	signed_val % 1
+	unsigned_val mod 1
+	signed_val mod 1
 
 	// Unsigneds
 	// No mod needed
-	unsigned_val % 13
+	unsigned_val mod 13
 	// To conditional assign 0
-	(unsigned_val + 1) % 13
+	unsigned_val + 1 mod 13
 	// To conditional subtract 13
-	(unsigned_val + 2) % 13
-	(unsigned_val + 13) % 13
+	unsigned_val + 2 mod 13
+	unsigned_val + 13 mod 13
 	// To remainder
-	(unsigned_val + 14) % 13
+	unsigned_val + 14 mod 13
 
 	// Signeds
 	// To conditional assign 12
-	(unsigned_val - 1) % 13
+	unsigned_val - 1 mod 13
 	// To conditional add 13
-	(unsigned_val - 2) % 13
-	(unsigned_val - 13) % 13
+	unsigned_val - 2 mod 13
+	unsigned_val - 13 mod 13
 	// To double remainder
-	(unsigned_val - 14) % 13
+	unsigned_val - 14 mod 13
 
 	// dynamic modulo
-	unsigned_val % dynamic_mod
+	unsigned_val mod dynamic_mod
+}
+
+module testShifts {
+	gen int A = 5
+	gen int B = 3
+
+	assert#(C: A << B == 40)
+	assert#(C: A >> 1 == 2)
+
+	assert#(C: 5 << 3000 >> 3000 == 5)
+}
+
+module testRemainder {
+	assert#(C: 10 % 3 == 1)
+	assert#(C: -10 % 3 == -1)
+	assert#(C: 10 % -3 == 1)
+	assert#(C: -10 % -3 == -1)
+
+	assert#(C: 10 mod 3 == 1)
+	assert#(C: -10 mod 3 == 2)
+	//assert#(C: -10 mod -3 == 1)
+	//assert#(C: 10 mod -3 == -1)
+
+	int#(FROM: 10, TO: 11) a = 10
+	int#(FROM: 3, TO: 4) b = 3
+
+	a % b
+	-a % b
+	a % -b
+	-a % -b
 }

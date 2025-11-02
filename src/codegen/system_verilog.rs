@@ -10,7 +10,7 @@ use crate::latency::AbsLat;
 use crate::linker::{IsExtern, LinkInfo};
 use crate::prelude::*;
 
-use crate::flattening::{BinaryOperator, Direction, Module, PartSelectDirection};
+use crate::flattening::{BinaryOperator, Direction, Module, PartSelectDirection, UnaryOperator};
 use crate::instantiation::{
     InstantiatedModule, InstantiatedPort, IsPort, MultiplexerSource, RealWire, RealWireDataSource,
     RealWirePathElem,
@@ -105,7 +105,7 @@ fn should_not_codegen_assign(source: &MultiplexerSource) -> bool {
     source.to_path.iter().any(|e| match e {
         RealWirePathElem::Index { .. } | RealWirePathElem::ConstIndex { .. } => false,
         RealWirePathElem::PartSelect { width, .. } => width == &IBig::from(0),
-        RealWirePathElem::Slice { bounds, .. } => !bounds.unwrap_valid().is_non_empty(),
+        RealWirePathElem::Slice { bounds, .. } => bounds.unwrap_valid().is_empty(),
     })
 }
 
@@ -434,9 +434,7 @@ impl<'g> CodeGenerationContext<'g> {
         }
     }
 
-    fn wire_name(&self, wire: WireID, requested_latency: AbsLat) -> Cow<'g, str> {
-        let wire = &self.instance.wires[wire];
-
+    fn wire_name(&self, wire: &'g RealWire, requested_latency: AbsLat) -> Cow<'g, str> {
         if should_not_codegen(wire) {
             return get_zero_sized_type_inline_value(&wire.typ);
         }
@@ -673,7 +671,7 @@ impl<'g> CodeGenerationContext<'g> {
                     write!(
                         source_path,
                         "[{}]",
-                        self.wire_name(*idx_wire, requested_latency)
+                        self.wire_name(&self.instance.wires[*idx_wire], requested_latency)
                     )
                     .unwrap();
                 }
@@ -694,7 +692,8 @@ impl<'g> CodeGenerationContext<'g> {
                     writeln!(for_stack, "{for_stm} begin").unwrap();
                     writeln!(ends_stack, "end").unwrap();
 
-                    let wire_name = self.wire_name(*from_wire, requested_latency);
+                    let wire_name =
+                        self.wire_name(&self.instance.wires[*from_wire], requested_latency);
                     write!(target_path, "[{var}]").unwrap();
 
                     match direction {
@@ -756,13 +755,14 @@ impl<'g> CodeGenerationContext<'g> {
 
             match &w.source {
                 RealWireDataSource::Select { root, path } => {
-                    let root_wire = &self.instance.wires[*root];
-                    let root_name = self.wire_name(*root, w.absolute_latency);
+                    let root = &self.instance.wires[*root];
+                    let root_name = self.wire_name(root, w.absolute_latency);
 
                     // Custom [Self::in_generate], to generate logic[31:0] my_val = 5 + other_val
                     self.genvars.reuse();
+                    self.for_vars.reuse();
                     let content = self.foreach_for_real_path(
-                        &root_wire.typ,
+                        &root.typ,
                         path,
                         w.absolute_latency,
                         false,
@@ -791,10 +791,33 @@ impl<'g> CodeGenerationContext<'g> {
                 RealWireDataSource::UnaryOp { op, right, .. } => {
                     writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
 
-                    let right_name = self.wire_name(*right, w.absolute_latency);
+                    let right = &self.instance.wires[*right];
+                    let right_name = self.wire_name(right, w.absolute_latency);
+
+                    let for_var = match op {
+                        UnaryOperator::Sum | UnaryOperator::Product => Some(self.for_vars.alloc()),
+                        _ => None,
+                    };
                     self.in_generate(|slf| {
-                        slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| {
-                            format!("assign {wire_name}{path} = {op}{right_name}{path};\n")
+                        slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| match op {
+                            UnaryOperator::And
+                            | UnaryOperator::Or
+                            | UnaryOperator::Xor
+                            | UnaryOperator::Not
+                            | UnaryOperator::Negate => {
+                                format!("assign {wire_name}{path} = {op}{right_name}{path};\n")
+                            }
+                            UnaryOperator::Sum |
+                            UnaryOperator::Product => {
+                                let start_at = match op {
+                                    UnaryOperator::Sum => "0",
+                                    UnaryOperator::Product => "1",
+                                    _ => unreachable!()
+                                };
+                                let list_len = path.walk_type(&right.typ).unwrap_array().1.unwrap_integer();
+                                let for_var = for_var.clone().unwrap();
+                                format!("always_comb begin\n\t{wire_name}{path} = {start_at};\n\tfor(int {for_var} = 0; {for_var} < {list_len}; {for_var} += 1) {wire_name}{path} {op}= {right_name}{path}[{for_var}];\nend\n")
+                            }
                         })
                     })
                 }
@@ -803,24 +826,27 @@ impl<'g> CodeGenerationContext<'g> {
                 } => {
                     writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
 
-                    let left_wire = &self.instance.wires[*left];
-                    let right_wire = &self.instance.wires[*right];
-                    let left_name = self.wire_name(*left, w.absolute_latency);
-                    let right_name = self.wire_name(*right, w.absolute_latency);
+                    let left = &self.instance.wires[*left];
+                    let right = &self.instance.wires[*right];
+                    let left_name = self.wire_name(left, w.absolute_latency);
+                    let right_name = self.wire_name(right, w.absolute_latency);
                     self.in_generate(|slf| {
                         slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| {
-                            if *op == BinaryOperator::Modulo {
-                                let left_int_range = path.walk_type(&left_wire.typ).unwrap_int_bounds();
-                                let right_int_range = path.walk_type(&right_wire.typ).unwrap_int_bounds();
+                            match *op {
+                                BinaryOperator::Modulo => {
+                                    let left_int_range = path.walk_type(&left.typ).unwrap_int_bounds();
+                                    let right_int_range = path.walk_type(&right.typ).unwrap_int_bounds();
 
-                                let content = codegen_optimized_modulo(left_int_range, right_int_range, &format!("{left_name}{path}"), &format!("{right_name}{path}"));
-                                format!(
-                                    "assign {wire_name}{path} = {content}\n"
-                                )
-                            } else {
-                                format!(
-                                    "assign {wire_name}{path} = {left_name}{path} {op} {right_name}{path};\n"
-                                )
+                                    let content = codegen_optimized_modulo(left_int_range, right_int_range, &format!("{left_name}{path}"), &format!("{right_name}{path}"));
+                                    format!(
+                                        "assign {wire_name}{path} = {content}\n"
+                                    )
+                                }
+                                _ => {
+                                    format!(
+                                        "assign {wire_name}{path} = {left_name}{path} {op} {right_name}{path};\n"
+                                    )
+                                }
                             }
                         })
                     });
@@ -835,12 +861,12 @@ impl<'g> CodeGenerationContext<'g> {
                 RealWireDataSource::ConstructArray { array_wires } => {
                     writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
 
-                    for (arr_idx, elem_id) in array_wires.iter().enumerate() {
-                        let elem_wire = &self.instance.wires[*elem_id];
-                        let element_wire_name = self.wire_name(*elem_id, w.absolute_latency);
+                    for (arr_idx, elem) in array_wires.iter().enumerate() {
+                        let elem = &self.instance.wires[*elem];
+                        let element_wire_name = self.wire_name(elem, w.absolute_latency);
 
                         self.in_generate(|slf| {
-                            slf.foreach_for_copy_unpacked(&elem_wire.typ, false, |path, _| {
+                            slf.foreach_for_copy_unpacked(&elem.typ, false, |path, _| {
                                 format!(
                                 "assign {wire_name}[{arr_idx}]{path} = {element_wire_name}{path};\n"
                             )
@@ -938,11 +964,13 @@ impl<'g> CodeGenerationContext<'g> {
         s: &'g MultiplexerSource,
         target: &'g RealWire,
     ) {
-        let from_name = self.wire_name(s.from, target.absolute_latency);
+        let from = &self.instance.wires[s.from];
+        let from_name = self.wire_name(from, target.absolute_latency);
         self.program_text.write_char('\t').unwrap();
         let mut if_stack = String::new();
         for cond in s.condition.iter() {
-            let cond_name = self.wire_name(cond.condition_wire, target.absolute_latency);
+            let condition_wire = &self.instance.wires[cond.condition_wire];
+            let cond_name = self.wire_name(condition_wire, target.absolute_latency);
             let invert = if cond.inverse { "!" } else { "" };
             write!(if_stack, "if({invert}{cond_name}) ").unwrap();
         }

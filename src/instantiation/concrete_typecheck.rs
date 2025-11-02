@@ -15,6 +15,7 @@ use crate::typing::template::TemplateKind;
 use crate::typing::value_unifier::{ValueErrorReporter, ValueUnifierStore};
 use crate::typing::{concrete_type::ConcreteType, value_unifier::ValueUnifier};
 use crate::util::{all_equal, ceil_div, floor_div};
+use crate::value::MAX_SHIFT;
 
 use super::*;
 
@@ -245,7 +246,6 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 unifier.create_subtype_constraint(pairs.iter().copied());
             }
             RealWireDataSource::UnaryOp { op, rank, right } => {
-                // TODO overloading
                 let right = &self.wires[*right];
                 assert_due_to_variable_clones!(unify_rank(rank, &out.typ, unifier));
                 if !unify_rank(rank, &right.typ, unifier) {
@@ -259,58 +259,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 }
                 let out_root = out.typ.walk_rank(rank.len());
                 let right_root = right.typ.walk_rank(rank.len());
-                match op {
-                    UnaryOperator::Not => {
-                        assert_eq!(right_root.unwrap_named().id, get_builtin_type!("bool"));
-                        assert_eq!(out_root.unwrap_named().id, get_builtin_type!("bool"));
-                    }
-                    UnaryOperator::And | UnaryOperator::Or | UnaryOperator::Xor => {
-                        assert_eq!(
-                            right_root.unwrap_array().0.unwrap_named().id,
-                            get_builtin_type!("bool")
-                        );
-                        assert_eq!(out_root.unwrap_named().id, get_builtin_type!("bool"));
-                    }
-                    UnaryOperator::Negate => {
-                        let out = out_root.unwrap_int_bounds_unknown();
-                        let IntBounds { from, to } = right_root.unwrap_int_bounds_unknown();
-
-                        // 4:7 -> -6:-3
-                        unifier_constraint_ints!(unifier, [to], {
-                            unifier.set(out.from, 1 - to).unwrap();
-                        });
-                        unifier_constraint_ints!(unifier, [from], {
-                            unifier.set(out.to, 1 - from).unwrap();
-                        });
-                    }
-                    UnaryOperator::Sum => {
-                        let out = out_root.unwrap_int_bounds_unknown();
-                        let (content, sz) = right_root.unwrap_array();
-                        let IntBounds { from, to } = content.unwrap_int_bounds_unknown();
-
-                        unifier_constraint_ints!(unifier, [from, sz], {
-                            unifier.set(out.from, from * sz).unwrap();
-                        });
-                        unifier_constraint_ints!(unifier, [to, sz], {
-                            unifier.set(out.to, (to - 1) * sz + 1).unwrap();
-                        });
-                    }
-                    UnaryOperator::Product => {
-                        let out = out_root.unwrap_int_bounds_unknown();
-                        let (content, sz) = right_root.unwrap_array();
-                        let IntBounds { from, to } = content.unwrap_int_bounds_unknown();
-
-                        unifier_constraint_ints!(unifier, [from, sz], {
-                            let sz = usize::try_from(sz).unwrap();
-                            unifier.set(out.from, from.pow(sz)).unwrap();
-                        });
-                        unifier_constraint_ints!(unifier, [to, sz], {
-                            let sz = usize::try_from(sz).unwrap();
-                            let max: IBig = to - 1;
-                            unifier.set(out.to, max.pow(sz) + 1).unwrap();
-                        });
-                    }
-                }
+                self.typecheck_unary(unifier, *op, out_root, right_root);
             }
             RealWireDataSource::BinaryOp {
                 op,
@@ -342,107 +291,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         ).info_same_file(left.get_span(self.link_info), format!("Left argument has type {}", left.typ.display_substitute(self.linker, substitutor)));
                     });
                 }
-                // TODO overloading
-                // Typecheck generic INT
-                match op {
-                    BinaryOperator::And | BinaryOperator::Or | BinaryOperator::Xor => {
-                        assert_eq!(left_root.unwrap_named().id, get_builtin_type!("bool"));
-                        assert_eq!(right_root.unwrap_named().id, get_builtin_type!("bool"));
-                        assert_eq!(out_root.unwrap_named().id, get_builtin_type!("bool"));
-                    }
-                    BinaryOperator::Add => {
-                        let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
-                        let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
-                        let out = out_root.unwrap_int_bounds_unknown();
-                        unifier_constraint_ints!(unifier, [lf, rf], {
-                            unifier.set(out.from, lf + rf).unwrap();
-                        });
-                        unifier_constraint_ints!(unifier, [lt, rt], {
-                            unifier.set(out.to, lt + rt - 1).unwrap();
-                        });
-                    }
-                    BinaryOperator::Subtract => {
-                        let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
-                        let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
-                        let out = out_root.unwrap_int_bounds_unknown();
-                        unifier_constraint_ints!(unifier, [lf, rt], {
-                            unifier.set(out.from, lf - (rt - 1)).unwrap();
-                        });
-                        unifier_constraint_ints!(unifier, [lt, rf], {
-                            unifier.set(out.to, lt - rf).unwrap();
-                        });
-                    }
-                    BinaryOperator::Multiply => {
-                        let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
-                        let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
-                        let out = out_root.unwrap_int_bounds_unknown();
-                        unifier_constraint_ints!(unifier, [lf, lt, rf, rt], {
-                            let lmax = lt - 1;
-                            let rmax = rt - 1;
-
-                            let potentials = [lf * rf, &lmax * &rmax, lf * rmax, lmax * rf];
-                            let (min, max) = get_min_max(potentials);
-                            unifier.set(out.from, min).unwrap();
-                            unifier.set(out.to, max + 1).unwrap();
-                        });
-                    }
-                    BinaryOperator::Divide => {
-                        let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
-                        let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
-                        let out = out_root.unwrap_int_bounds_unknown();
-                        unifier_constraint_ints!(unifier, [lf, lt, rf, rt], {
-                            let right_bounds = IntBounds { from: rf, to: rt };
-
-                            if right_bounds.contains(&IBig::from(0)) {
-                                self.errors.error(right.get_span(self.link_info), format!("Possible divide by 0, right argument bounds are {right_bounds}"));
-                            } else {
-                                let lmax = lt - 1;
-                                let rmax = rt - 1;
-
-                                let potentials = [lf / rf, &lmax / &rmax, lf / rmax, lmax / rf];
-                                let (min, max) = get_min_max(potentials);
-                                unifier.set(out.from, min).unwrap();
-                                unifier.set(out.to, max + 1).unwrap();
-                            }
-                        });
-                    }
-                    BinaryOperator::Modulo => {
-                        let _ = left_root.unwrap_int_bounds_unknown();
-                        let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
-                        let out = out_root.unwrap_int_bounds_unknown();
-                        unifier_constraint_ints!(unifier, [rf, rt], {
-                            let right_bounds = IntBounds { from: rf, to: rt };
-
-                            if right_bounds.contains(&IBig::from(0)) {
-                                self.errors.error(right.get_span(self.link_info), format!("Possible divide by 0, right argument bounds are {right_bounds}"));
-                            } else {
-                                unifier.set(out.to, rt - 1).unwrap(); // WTF: borrow error if from comes first???
-                                unifier.set(out.from, IBig::from(0)).unwrap();
-                            }
-                        });
-                    }
-                    BinaryOperator::Equals | BinaryOperator::NotEquals => {
-                        if !unifier.unify_concrete_only_exact(left_root, right_root) {
-                            errors.error(move |substitutor| {
-                                self.errors.type_error(
-                                    "operator ==",
-                                    span,
-                                    right_root.display_substitute(self.linker, substitutor),
-                                    left_root.display_substitute(self.linker, substitutor),
-                                );
-                            });
-                        }
-                        assert_eq!(out_root.unwrap_named().id, get_builtin_type!("bool"));
-                    }
-                    BinaryOperator::GreaterEq
-                    | BinaryOperator::Greater
-                    | BinaryOperator::LesserEq
-                    | BinaryOperator::Lesser => {
-                        assert_eq!(left_root.unwrap_named().id, get_builtin_type!("int"));
-                        assert_eq!(right_root.unwrap_named().id, get_builtin_type!("int"));
-                        assert_eq!(out_root.unwrap_named().id, get_builtin_type!("bool"));
-                    }
-                }
+                self.typecheck_binop(unifier, errors, span, *op, out_root, left_root, right_root);
             }
             RealWireDataSource::Select { root, path } => {
                 let root_wire = &self.wires[*root];
@@ -466,6 +315,283 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
             // type is already set when the wire was created
             RealWireDataSource::Constant { value: _ } => {}
         };
+    }
+
+    /// TODO overloading
+    fn typecheck_unary(
+        &'inst self,
+        unifier: &mut ValueUnifier<'inst>,
+        op: UnaryOperator,
+        out_root: &'inst ConcreteType,
+        right_root: &'inst ConcreteType,
+    ) {
+        match op {
+            UnaryOperator::Not => {
+                assert_eq!(right_root.unwrap_named().id, get_builtin_type!("bool"));
+                assert_eq!(out_root.unwrap_named().id, get_builtin_type!("bool"));
+            }
+            UnaryOperator::And | UnaryOperator::Or | UnaryOperator::Xor => {
+                assert_eq!(
+                    right_root.unwrap_array().0.unwrap_named().id,
+                    get_builtin_type!("bool")
+                );
+                assert_eq!(out_root.unwrap_named().id, get_builtin_type!("bool"));
+            }
+            UnaryOperator::Negate => {
+                let out = out_root.unwrap_int_bounds_unknown();
+                let IntBounds { from, to } = right_root.unwrap_int_bounds_unknown();
+
+                // 4:7 -> -6:-3
+                unifier_constraint_ints!(unifier, [to], {
+                    unifier.set(out.from, 1 - to).unwrap();
+                });
+                unifier_constraint_ints!(unifier, [from], {
+                    unifier.set(out.to, 1 - from).unwrap();
+                });
+            }
+            UnaryOperator::Sum => {
+                let out = out_root.unwrap_int_bounds_unknown();
+                let (content, sz) = right_root.unwrap_array();
+                let IntBounds { from, to } = content.unwrap_int_bounds_unknown();
+
+                unifier_constraint_ints!(unifier, [from, sz], {
+                    unifier.set(out.from, from * sz).unwrap();
+                });
+                unifier_constraint_ints!(unifier, [to, sz], {
+                    unifier.set(out.to, (to - 1) * sz + 1).unwrap();
+                });
+            }
+            UnaryOperator::Product => {
+                let out = out_root.unwrap_int_bounds_unknown();
+                let (content, sz) = right_root.unwrap_array();
+                let IntBounds { from, to } = content.unwrap_int_bounds_unknown();
+
+                unifier_constraint_ints!(unifier, [from, sz], {
+                    let sz = usize::try_from(sz).unwrap();
+                    unifier.set(out.from, from.pow(sz)).unwrap();
+                });
+                unifier_constraint_ints!(unifier, [to, sz], {
+                    let sz = usize::try_from(sz).unwrap();
+                    let max: IBig = to - 1;
+                    unifier.set(out.to, max.pow(sz) + 1).unwrap();
+                });
+            }
+        }
+    }
+
+    /// TODO overloading
+    fn typecheck_binop(
+        &'inst self,
+        unifier: &mut ValueUnifier<'inst>,
+        errors: &ValueErrorReporter<'inst>,
+        span: Span,
+        op: BinaryOperator,
+        out_root: &'inst ConcreteType,
+        left_root: &'inst ConcreteType,
+        right_root: &'inst ConcreteType,
+    ) {
+        match op {
+            BinaryOperator::And | BinaryOperator::Or | BinaryOperator::Xor => {
+                assert_eq!(left_root.unwrap_named().id, get_builtin_type!("bool"));
+                assert_eq!(right_root.unwrap_named().id, get_builtin_type!("bool"));
+                assert_eq!(out_root.unwrap_named().id, get_builtin_type!("bool"));
+            }
+            BinaryOperator::Add => {
+                let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
+                let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
+                let out = out_root.unwrap_int_bounds_unknown();
+                unifier_constraint_ints!(unifier, [lf, rf], {
+                    unifier.set(out.from, lf + rf).unwrap();
+                });
+                unifier_constraint_ints!(unifier, [lt, rt], {
+                    unifier.set(out.to, lt + rt - 1).unwrap();
+                });
+            }
+            BinaryOperator::Subtract => {
+                let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
+                let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
+                let out = out_root.unwrap_int_bounds_unknown();
+                unifier_constraint_ints!(unifier, [lf, rt], {
+                    unifier.set(out.from, lf - (rt - 1)).unwrap();
+                });
+                unifier_constraint_ints!(unifier, [lt, rf], {
+                    unifier.set(out.to, lt - rf).unwrap();
+                });
+            }
+            BinaryOperator::Multiply => {
+                let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
+                let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
+                let out = out_root.unwrap_int_bounds_unknown();
+                unifier_constraint_ints!(unifier, [lf, lt, rf, rt], {
+                    let lmax = lt - 1;
+                    let rmax = rt - 1;
+
+                    let potentials = [lf * rf, &lmax * &rmax, lf * rmax, lmax * rf];
+                    let (min, max) = get_min_max(potentials);
+                    unifier.set(out.from, min).unwrap();
+                    unifier.set(out.to, max + 1).unwrap();
+                });
+            }
+            BinaryOperator::Divide => {
+                let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
+                let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
+                let out = out_root.unwrap_int_bounds_unknown();
+                unifier_constraint_ints!(unifier, [lf, lt, rf, rt], {
+                    let right_bounds = IntBounds { from: rf, to: rt };
+
+                    if !right_bounds.is_valid_non_empty() {
+                        return; // Invalid bounds errors are reported by final_checks.rs
+                    }
+                    if right_bounds.contains(&IBig::from(0)) {
+                        self.errors.error(
+                            span,
+                            format!(
+                                "Possible divide by 0, right argument bounds are {right_bounds}"
+                            ),
+                        );
+                        return;
+                    }
+                    let lmax = lt - 1;
+                    let rmax = rt - 1;
+
+                    let potentials = [lf / rf, &lmax / &rmax, lf / rmax, lmax / rf];
+                    let (min, max) = get_min_max(potentials);
+                    unifier.set(out.from, min).unwrap();
+                    unifier.set(out.to, max + 1).unwrap();
+                });
+            }
+            BinaryOperator::Remainder => {
+                let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
+                let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
+                let out = out_root.unwrap_int_bounds_unknown();
+                unifier_constraint_ints!(unifier, [lf, lt, rf, rt], {
+                    let right_bounds = IntBounds { from: rf, to: rt };
+
+                    if !right_bounds.is_valid_non_empty() {
+                        return; // Invalid bounds errors are reported by final_checks.rs
+                    }
+                    if right_bounds.contains(&IBig::from(0)) {
+                        self.errors.error(
+                            span,
+                            format!(
+                                "Possible divide by 0, right argument bounds are {right_bounds}"
+                            ),
+                        );
+                        return;
+                    }
+                    let remainder_max = if rf >= &IBig::from(0) { rt - 1 } else { -rf };
+
+                    let ot = lt.clone().clamp(IBig::from(1), remainder_max.clone());
+                    let of = lf.clone().clamp(-remainder_max + 1, IBig::from(0));
+                    unifier.set(out.from, of).unwrap();
+                    unifier.set(out.to, ot).unwrap();
+                });
+            }
+            BinaryOperator::Modulo => {
+                let _ = left_root.unwrap_int_bounds_unknown();
+                let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
+                let out = out_root.unwrap_int_bounds_unknown();
+                unifier.set(out.from, IBig::from(0)).unwrap();
+                unifier_constraint_ints!(unifier, [rf, rt], {
+                    let right_bounds = IntBounds { from: rf, to: rt };
+                    if !right_bounds.is_valid_non_empty() {
+                        return; // Invalid bounds errors are reported by final_checks.rs
+                    }
+                    if rf <= &IBig::from(0) {
+                        self.errors.error(span, format!("Modulus must be strictly positive, right argument bounds are {right_bounds}"));
+                        return;
+                    }
+                    unifier.set(out.to, rt - 1).unwrap();
+                });
+            }
+            BinaryOperator::ShiftLeft => {
+                let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
+                let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
+                let out = out_root.unwrap_int_bounds_unknown();
+                unifier_constraint_ints!(unifier, [lf, lt, rf, rt], {
+                    let right_bounds = IntBounds { from: rf, to: rt };
+                    if !right_bounds.is_valid_non_empty() {
+                        return; // Invalid bounds errors are reported by final_checks.rs
+                    }
+                    if rf < &IBig::from(0) {
+                        self.errors.error(
+                            span,
+                            format!(
+                                "Shifts must be positive, right argument bounds are {right_bounds}"
+                            ),
+                        );
+                        return;
+                    }
+                    if rt > &IBig::from(MAX_SHIFT) {
+                        self.errors.error(
+                            span,
+                            format!("The top bound of this shift is too large: {right_bounds}"),
+                        );
+                        return;
+                    }
+                    let shift = usize::try_from(rt).unwrap();
+
+                    let of = lf << shift;
+                    let ot = ((lt - 1) << shift) + 1;
+                    unifier.set(out.from, of).unwrap();
+                    unifier.set(out.to, ot).unwrap();
+                });
+            }
+            BinaryOperator::ShiftRight => {
+                let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
+                let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
+                let out = out_root.unwrap_int_bounds_unknown();
+                unifier_constraint_ints!(unifier, [lf, lt, rf, rt], {
+                    let right_bounds = IntBounds { from: rf, to: rt };
+                    if !right_bounds.is_valid_non_empty() {
+                        return; // Invalid bounds errors are reported by final_checks.rs
+                    }
+                    if rf < &IBig::from(0) {
+                        self.errors.error(
+                            span,
+                            format!(
+                                "Shifts must be positive, right argument bounds are {right_bounds}"
+                            ),
+                        );
+                        return;
+                    }
+                    if rt > &IBig::from(MAX_SHIFT) {
+                        self.errors.error(
+                            span,
+                            format!("The top bound of this shift is too large: {right_bounds}"),
+                        );
+                        return;
+                    }
+                    let shift = usize::try_from(rt).unwrap();
+
+                    let of = lf >> shift;
+                    let ot = ((lt - 1) >> shift) + 1;
+                    unifier.set(out.from, of).unwrap();
+                    unifier.set(out.to, ot).unwrap();
+                });
+            }
+            BinaryOperator::Equals | BinaryOperator::NotEquals => {
+                if !unifier.unify_concrete_only_exact(left_root, right_root) {
+                    errors.error(move |substitutor| {
+                        self.errors.type_error(
+                            "operator ==",
+                            span,
+                            right_root.display_substitute(self.linker, substitutor),
+                            left_root.display_substitute(self.linker, substitutor),
+                        );
+                    });
+                }
+                assert_eq!(out_root.unwrap_named().id, get_builtin_type!("bool"));
+            }
+            BinaryOperator::GreaterEq
+            | BinaryOperator::Greater
+            | BinaryOperator::LesserEq
+            | BinaryOperator::Lesser => {
+                assert_eq!(left_root.unwrap_named().id, get_builtin_type!("int"));
+                assert_eq!(right_root.unwrap_named().id, get_builtin_type!("int"));
+                assert_eq!(out_root.unwrap_named().id, get_builtin_type!("bool"));
+            }
+        }
     }
 
     fn get_port_typ(&self, sm: &SubModule, port_id: PortID) -> Option<&ConcreteType> {

@@ -474,6 +474,10 @@
             "named": false
           },
           {
+            "type": "<<",
+            "named": false
+          },
+          {
             "type": "<=",
             "named": false
           },
@@ -490,7 +494,15 @@
             "named": false
           },
           {
+            "type": ">>",
+            "named": false
+          },
+          {
             "type": "^",
+            "named": false
+          },
+          {
+            "type": "mod",
             "named": false
           },
           {
@@ -2101,6 +2113,10 @@
     "named": false
   },
   {
+    "type": "<<",
+    "named": false
+  },
+  {
     "type": "<=",
     "named": false
   },
@@ -2118,6 +2134,10 @@
   },
   {
     "type": ">=",
+    "named": false
+  },
+  {
+    "type": ">>",
     "named": false
   },
   {
@@ -2203,6 +2223,10 @@
   },
   {
     "type": "local",
+    "named": false
+  },
+  {
+    "type": "mod",
     "named": false
   },
   {
