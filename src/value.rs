@@ -38,6 +38,7 @@ impl Ord for Value {
         match (self, other) {
             (Bool(a), Bool(b)) => a.cmp(b),
             (Integer(a), Integer(b)) => a.cmp(b),
+            (String(a), String(b)) => a.cmp(b),
             (Float(a), Float(b)) => a.cmp(b),
             (Double(a), Double(b)) => a.cmp(b),
             (Array(a), Array(b)) => a.cmp(b),
