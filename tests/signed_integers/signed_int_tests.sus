@@ -1,0 +1,209 @@
+
+
+module TestVectorGenerator#(int SIZE, int[SIZE] LEFTS, int[SIZE] RIGHTS, int[SIZE] RESULTS) {
+
+    state int#(FROM: 0, TO: SIZE) cur = 0
+
+    trigger case'0 : int left'0, int right'0, int expected'0
+
+    when cur < SIZE - 1 {
+        case(LEFTS[cur], RIGHTS[cur], RESULTS[cur])
+        cur = cur + 1 mod SIZE
+    }
+}
+
+extern module assert_eq#(string ID) {
+    action assert_eq'0 : 
+        int#(FROM: -pow2#(E: 31), TO: pow2#(E: 31)) l'0,
+        int#(FROM: -pow2#(E: 31), TO: pow2#(E: 31)) r'0,
+        int#(FROM: -pow2#(E: 31), TO: pow2#(E: 31)) found'0,
+        int#(FROM: -pow2#(E: 31), TO: pow2#(E: 31)) expected'0 {}
+}
+
+module TestAdd#(int FROM_L, int TO_L, int FROM_R, int TO_R) {
+    for int R in FROM_R..TO_R {
+        for int L in FROM_L..TO_L {
+            int l = L
+            int r = R
+            int found = l + r
+            gen int EXPECTED = L + R
+
+            assert_eq#(ID: "+ narrow")(l, r, found, EXPECTED)
+
+            int#(FROM: FROM_L, TO: TO_L) l_wide = l
+            int#(FROM: FROM_R, TO: TO_R) r_wide = r
+
+            int found_wide = l_wide + r_wide
+            assert_eq#(ID: "+ wide")(l_wide, r_wide, found_wide, EXPECTED)
+        }
+    }
+}
+
+module TestSub#(int FROM_L, int TO_L, int FROM_R, int TO_R) {
+    for int R in FROM_R..TO_R {
+        for int L in FROM_L..TO_L {
+            int l = L
+            int r = R
+            int found = l - r
+            gen int EXPECTED = L - R
+
+            assert_eq#(ID: "- narrow")(l, r, found, EXPECTED)
+
+            int#(FROM: FROM_L, TO: TO_L) l_wide = l
+            int#(FROM: FROM_R, TO: TO_R) r_wide = r
+
+            int found_wide = l_wide - r_wide
+            assert_eq#(ID: "- wide")(l_wide, r_wide, found_wide, EXPECTED)
+        }
+    }
+}
+
+module TestMul#(int FROM_L, int TO_L, int FROM_R, int TO_R) {
+    for int R in FROM_R..TO_R {
+        for int L in FROM_L..TO_L {
+            int l = L
+            int r = R
+            int found = l * r
+            gen int EXPECTED = L * R
+
+            assert_eq#(ID: "* narrow")(l, r, found, EXPECTED)
+
+            int#(FROM: FROM_L, TO: TO_L) l_wide = l
+            int#(FROM: FROM_R, TO: TO_R) r_wide = r
+
+            int found_wide = l_wide * r_wide
+            assert_eq#(ID: "* wide")(l_wide, r_wide, found_wide, EXPECTED)
+        }
+    }
+}
+
+module TestDiv#(int FROM_L, int TO_L, int FROM_R, int TO_R) {
+    for int R in FROM_R..TO_R {
+        for int L in FROM_L..TO_L {
+            int l = L
+            int r = R
+            int found = l / r
+            gen int EXPECTED = L / R
+
+            assert_eq#(ID: "/ narrow")(l, r, found, EXPECTED)
+
+            int#(FROM: FROM_L, TO: TO_L) l_wide = l
+            int#(FROM: FROM_R, TO: TO_R) r_wide = r
+
+            int found_wide = l_wide / r_wide
+            assert_eq#(ID: "/ wide")(l_wide, r_wide, found_wide, EXPECTED)
+        }
+    }
+}
+
+module TestRem#(int FROM_L, int TO_L, int FROM_R, int TO_R) {
+    for int R in FROM_R..TO_R {
+        for int L in FROM_L..TO_L {
+            int l = L
+            int r = R
+            int found = l % r
+            gen int EXPECTED = L % R
+
+            assert_eq#(ID: "% narrow")(l, r, found, EXPECTED)
+
+            int#(FROM: FROM_L, TO: TO_L) l_wide = l
+            int#(FROM: FROM_R, TO: TO_R) r_wide = r
+
+            int found_wide = l_wide % r_wide
+            assert_eq#(ID: "% wide")(l_wide, r_wide, found_wide, EXPECTED)
+        }
+    }
+}
+
+module TestMod#(int FROM_L, int TO_L, int FROM_R, int TO_R) {
+    for int R in FROM_R..TO_R {
+        for int L in FROM_L..TO_L {
+            int l = L
+            int r = R
+            int found = l mod r
+            gen int EXPECTED = L mod R
+
+            assert_eq#(ID: "mod narrow")(l, r, found, EXPECTED)
+
+            int#(FROM: FROM_L, TO: TO_L) l_wide = l
+            int#(FROM: FROM_R, TO: TO_R) r_wide = r
+
+            int found_wide = l_wide mod r_wide
+            assert_eq#(ID: "mod wide")(l_wide, r_wide, found_wide, EXPECTED)
+        }
+    }
+}
+
+module TestShl#(int FROM_L, int TO_L, int FROM_R, int TO_R) {
+    for int R in FROM_R..TO_R {
+        for int L in FROM_L..TO_L {
+            int l = L
+            int r = R
+            int found = l << r
+            gen int EXPECTED = L << R
+
+            assert_eq#(ID: "<< narrow")(l, r, found, EXPECTED)
+
+            int#(FROM: FROM_L, TO: TO_L) l_wide = l
+            int#(FROM: FROM_R, TO: TO_R) r_wide = r
+
+            int found_wide = l_wide << r_wide
+            assert_eq#(ID: "<< wide")(l_wide, r_wide, found_wide, EXPECTED)
+        }
+    }
+}
+
+module TestShr#(int FROM_L, int TO_L, int FROM_R, int TO_R) {
+    for int R in FROM_R..TO_R {
+        for int L in FROM_L..TO_L {
+            int l = L
+            int r = R
+            int found = l >> r
+            gen int EXPECTED = L >> R
+
+            assert_eq#(ID: ">> narrow")(l, r, found, EXPECTED)
+
+            int#(FROM: FROM_L, TO: TO_L) l_wide = l
+            int#(FROM: FROM_R, TO: TO_R) r_wide = r
+
+            int found_wide = l_wide >> r_wide
+            assert_eq#(ID: ">> wide")(l_wide, r_wide, found_wide, EXPECTED)
+        }
+    }
+}
+
+module AllTests {
+    TestAdd#(FROM_L: -8, TO_L: 7, FROM_R: -8, TO_R: 7) add_both_signed
+    TestAdd#(FROM_L: -8, TO_L: 7, FROM_R: 0, TO_R: 7)  add_l_signed
+    TestAdd#(FROM_L: 0, TO_L: 7, FROM_R: -8, TO_R: 7)  add_r_signed
+    TestAdd#(FROM_L: 0, TO_L: 7, FROM_R: 0, TO_R: 7)   add_unsigned
+
+    TestSub#(FROM_L: -8, TO_L: 7, FROM_R: -8, TO_R: 7) sub_both_signed
+    TestSub#(FROM_L: -8, TO_L: 7, FROM_R: 0, TO_R: 7)  sub_l_signed
+    TestSub#(FROM_L: 0, TO_L: 7, FROM_R: -8, TO_R: 7)  sub_r_signed
+    TestSub#(FROM_L: 0, TO_L: 7, FROM_R: 0, TO_R: 7)   sub_unsigned
+
+    TestMul#(FROM_L: -8, TO_L: 7, FROM_R: -8, TO_R: 7) mul_both_signed
+    TestMul#(FROM_L: -8, TO_L: 7, FROM_R: 0, TO_R: 7)  mul_l_signed
+    TestMul#(FROM_L: 0, TO_L: 7, FROM_R: -8, TO_R: 7)  mul_r_signed
+    TestMul#(FROM_L: 0, TO_L: 7, FROM_R: 0, TO_R: 7)   mul_unsigned
+
+    TestDiv#(FROM_L: -8, TO_L: 7, FROM_R: -8, TO_R: 0) div_both_signed
+    TestDiv#(FROM_L: -8, TO_L: 7, FROM_R: 1, TO_R: 7)  div_l_signed
+    TestDiv#(FROM_L: 0, TO_L: 7, FROM_R: -8, TO_R: 0)  div_r_signed
+    TestDiv#(FROM_L: 0, TO_L: 7, FROM_R: 1, TO_R: 7)   div_unsigned
+
+    TestRem#(FROM_L: -8, TO_L: 7, FROM_R: -8, TO_R: 0) rem_both_signed
+    TestRem#(FROM_L: -8, TO_L: 7, FROM_R: 1, TO_R: 7)  rem_l_signed
+    TestRem#(FROM_L: 0, TO_L: 7, FROM_R: -8, TO_R: 0)  rem_r_signed
+    TestRem#(FROM_L: 0, TO_L: 7, FROM_R: 1, TO_R: 7)   rem_unsigned
+
+    TestMod#(FROM_L: -8, TO_L: 7, FROM_R: 1, TO_R: 7)  mod_l_signed
+    TestMod#(FROM_L: 0, TO_L: 7, FROM_R: 1, TO_R: 7)   mod_unsigned
+
+    TestShl#(FROM_L: -8, TO_L: 7, FROM_R: 0, TO_R: 7)  shl_l_signed
+    TestShl#(FROM_L: 0, TO_L: 7, FROM_R: 0, TO_R: 7)   shl_unsigned
+
+    TestShr#(FROM_L: -8, TO_L: 7, FROM_R: 0, TO_R: 7)  shr_l_signed
+    TestShr#(FROM_L: 0, TO_L: 7, FROM_R: 0, TO_R: 7)   shr_unsigned
+}
