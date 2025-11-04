@@ -191,14 +191,12 @@ fn codegen_optimized_modulo(
                 "$unsigned({left} % {mod_u}) + (({left} % {mod_u} < 0) ? {mod_u} : 0); // == mod {mod_u}"
             )
         }
+    } else if left_int_range.is_signed() {
+        format!(
+            "$unsigned({left} % $signed({{1'b0, {right}}})) + ({left} % $signed({{1'b0, {right}}}) < 0 ? {right} : 0); // == mod"
+        )
     } else {
-        if left_int_range.is_signed() {
-            format!(
-                "$unsigned({left} % $signed({{1'b0, {right}}})) + ({left} % $signed({{1'b0, {right}}}) < 0 ? {right} : 0); // == mod"
-            )
-        } else {
-            format!("{left} % {right}; // == mod")
-        }
+        format!("{left} % {right}; // == mod")
     }
 }
 

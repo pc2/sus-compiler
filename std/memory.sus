@@ -1,0 +1,107 @@
+
+module ROM #(T, int DEPTH, T[DEPTH] DATA) {
+    action read : int #(FROM: 0, TO: DEPTH) index'0 -> T output_data'0 {
+        output_data = DATA[index]
+    }
+}
+
+module RAM #(T, int DEPTH) {
+	domain clk
+
+    CrossAction2 cross_write
+
+    state T[DEPTH] mem
+
+    domain w_dom
+	action write'0 : int#(FROM: 0, TO: DEPTH) addr'0, T data'0 {
+        cross_write.in(addr, data)
+	}
+
+    domain r_dom
+	action read'0: int#(FROM: 0, TO: DEPTH) read_addr'0 -> T read_data'0 {
+		read_data = mem[read_addr]
+	}
+    when cross_write.out : int addr, T data {
+		mem[addr] = data
+    }
+}
+
+module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+    domain clk
+    CrossActionNoData cross_reset_w
+    CrossActionNoData cross_reset_r
+    action rst'0 {
+        cross_reset_w.in()
+        cross_reset_r.in()
+    }
+
+	RAM#(T, DEPTH) mem
+	state int#(FROM: 0, TO: DEPTH) read_addr
+	state int#(FROM: 0, TO: DEPTH) write_addr
+
+    CrossDomain cross_read_addr
+    cross_read_addr.in = read_addr
+    CrossDomain cross_write_addr
+    cross_write_addr.in = write_addr
+
+	int space_remaining = cross_read_addr.out - write_addr mod DEPTH
+
+    domain write
+    output bool may_push'-MAY_PUSH_LATENCY = LatencyOffset #(OFFSET: -MAY_PUSH_LATENCY)(space_remaining > MAY_PUSH_LATENCY)
+    action push'0 : T push_data'0 {
+        mem.write(write_addr, push_data)
+        write_addr = (write_addr + 1) % DEPTH
+    }
+    
+    domain read
+    output bool may_pop'0 = read_addr != cross_write_addr.out
+    action pop'0 : -> T pop_data'0 {
+        pop_data = mem.read(read_addr)
+        read_addr = (read_addr + 1) % DEPTH
+    }
+
+    when cross_reset_r.out {
+        read_addr = 0
+    }
+    when cross_reset_w.out {
+        write_addr = 0
+    }
+}
+
+/// A FIFO implemented as a sequence of registers with a accompanying valid bit. 
+///
+/// Bandwidth limited to 1 element every 2 cycles.  
+///
+/// Use for very small FIFOs, in bandwidth-limited circumstances. 
+module RippleFIFO#(T, int DEPTH) {
+	state T[DEPTH] datas
+	state bool[DEPTH] valids
+
+	for int I in 0..DEPTH - 1 {
+		when !valids[I+1] & valids[I] {
+			datas[I+1] = datas[I]
+			valids[I+1] = true
+			valids[I] = false
+		}
+	}
+
+	domain push_dom
+	CrossDomain cross_may_push
+	CrossAction cross_push
+	cross_may_push.in = !valids[0]
+	output bool may_push'0 = cross_may_push.out
+	action push'0: T push_data'0 {
+		cross_push.in(push_data)
+	}
+	when cross_push.out : T push_data {
+		datas[0] = push_data
+		valids[0] = true
+	}
+
+	domain pop_dom
+	output bool may_pop'0 = valids[DEPTH-1]
+	action try_pop'0 : -> bool did_pop'0, T pop_data'0 {
+		pop_data = datas[DEPTH-1]
+		valids[DEPTH-1] = false
+	}
+}

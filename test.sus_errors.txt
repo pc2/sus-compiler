@@ -920,9 +920,9 @@ Error: Excess output targets. Function returns 1 results, but 2 targets were giv
      │                 ───────┬──────  
      │                        ╰──────── Excess output targets. Function returns 1 results, but 2 targets were given.
      │
-     ├─[ xpm.sus:87:12 ]
+     ├─[ memory.sus:58:12 ]
      │
-  87 │     action pop'0 : -> T pop_data'2 {
+  58 │     action pop'0 : -> T pop_data'0 {
      │            ─┬─  
      │             ╰─── Interface 'pop' defined here
 ─────╯
@@ -940,9 +940,9 @@ Error: Excess argument. Function takes 0 args, but 1 were passed.
      │                                           ──┬─  
      │                                             ╰─── Excess argument. Function takes 0 args, but 1 were passed.
      │
-     ├─[ xpm.sus:87:12 ]
+     ├─[ memory.sus:58:12 ]
      │
-  87 │     action pop'0 : -> T pop_data'2 {
+  58 │     action pop'0 : -> T pop_data'0 {
      │            ─┬─  
      │             ╰─── Interface 'pop' defined here
 ─────╯
@@ -1415,9 +1415,9 @@ Error: 'BITWIDTH' is not a valid template argument of FIFO
      │            ────┬───  
      │                ╰───── 'BITWIDTH' is not a valid template argument of FIFO
      │
-     ├─[ xpm.sus:71:8 ]
+     ├─[ memory.sus:29:8 ]
      │
-  71 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
+  29 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
      │        ──┬─  
      │          ╰─── 'FIFO' defined here
 ─────╯
@@ -2178,9 +2178,9 @@ Error: 'READY_SLACK' is not a valid template argument of FIFO
       │                      ─────┬─────  
       │                           ╰─────── 'READY_SLACK' is not a valid template argument of FIFO
       │
-      ├─[ xpm.sus:71:8 ]
+      ├─[ memory.sus:29:8 ]
       │
-   71 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
+   29 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
       │        ──┬─  
       │          ╰─── 'FIFO' defined here
 ──────╯
@@ -2419,20 +2419,20 @@ Error: Used 'when' in a generative context, use 'if' instead
       │     ──┬─  
       │       ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
-Error: No such field 'ready' on FIFO #(T: type ?[...], DEPTH: _, MAY_PUSH_LATENCY: _, EXTRA_IN_FLIGHT: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
+Error: No such field 'ready' on FIFO #(T: type ?[...], DEPTH: _, MAY_PUSH_LATENCY: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
       ╭─[ test.sus:1157:12 ]
       │
  1157 │     when fifo.ready {
       │               ──┬──  
-      │                 ╰──── No such field 'ready' on FIFO #(T: type ?[...], DEPTH: _, MAY_PUSH_LATENCY: _, EXTRA_IN_FLIGHT: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
+      │                 ╰──── No such field 'ready' on FIFO #(T: type ?[...], DEPTH: _, MAY_PUSH_LATENCY: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
       │
-      ├─[ xpm.sus:71:8 ]
+      ├─[ memory.sus:29:8 ]
       │
-   71 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
+   29 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
       │        ──┬─  
-      │          ╰─── Module 'FIFO' defined here. module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT):
+      │          ╰─── Module 'FIFO' defined here. module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY):
 domain clk:
-action rst:
+action rst'0:
 domain write:
 output bool may_push'-MAY_PUSH_LATENCY
 action push'0:
@@ -2441,7 +2441,7 @@ domain read:
 output bool may_pop'0
 action pop'0:
 	->
-	output T pop_data'2
+	output T pop_data'0
 ──────╯
 Error: Conflicting specified latency
 
@@ -3339,9 +3339,9 @@ Error: 'READY_SLACK' is not a valid template argument of FIFO
       │                       ─────┬─────  
       │                            ╰─────── 'READY_SLACK' is not a valid template argument of FIFO
       │
-      ├─[ xpm.sus:71:8 ]
+      ├─[ memory.sus:29:8 ]
       │
-   71 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY, int EXTRA_IN_FLIGHT) {
+   29 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
       │        ──┬─  
       │          ╰─── 'FIFO' defined here
 ──────╯
@@ -3352,9 +3352,9 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │                  ┬  
       │                  ╰── Excess argument. Function takes 1 args, but 2 were passed.
       │
-      ├─[ xpm.sus:80:12 ]
+      ├─[ memory.sus:51:12 ]
       │
-   80 │     action push'0 : T push_data'0 {
+   51 │     action push'0 : T push_data'0 {
       │            ──┬─  
       │              ╰─── Interface 'push' defined here
 ──────╯
@@ -3432,9 +3432,9 @@ Warning: Unused port 'bits'
       │                                           │  
       │                                           ╰── b declared here
       │
-      ├─[ core.sus:218:66 ]
+      ├─[ core.sus:262:66 ]
       │
-  218 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+  262 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                                                  ──┬─  
       │                                                                    ╰─── Port 'bits' declared here
 ──────╯
@@ -3447,9 +3447,9 @@ Warning: Unused port 'value'
       │                                           │  
       │                                           ╰── b declared here
       │
-      ├─[ core.sus:218:37 ]
+      ├─[ core.sus:262:37 ]
       │
-  218 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+  262 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                     ──┬──  
       │                                       ╰──── Port 'value' declared here
 ──────╯

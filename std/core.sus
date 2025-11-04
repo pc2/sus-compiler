@@ -105,6 +105,50 @@ module CrossAction #(T) {
 }
 /// Unsafe builtin to connect wires from different domains. 
 /// Important: Does not perform any kind of Clock Domain Crossing!
+module CrossAction2 #(T1, T2) {
+    CrossDomain #(T: type bool) cross_valid
+    CrossDomain #(T: type T1) cross_data1
+    CrossDomain #(T: type T2) cross_data2
+    domain in_clk
+    action in'0 : T1 data_in1'0, T2 data_in2'0 {
+        cross_valid.in = true
+        cross_data1.in = data_in1
+        cross_data2.in = data_in2
+    } else {
+        cross_valid.in = false
+    }
+    domain out_clk
+    trigger out'0 : T1 data_out1'0, T2 data_out2'0
+
+    when cross_valid.out {
+        out(cross_data1.out, cross_data2.out)
+    }
+}
+/// Unsafe builtin to connect wires from different domains. 
+/// Important: Does not perform any kind of Clock Domain Crossing!
+module CrossAction3 #(T1, T2, T3) {
+    CrossDomain #(T: type bool) cross_valid
+    CrossDomain #(T: type T1) cross_data1
+    CrossDomain #(T: type T2) cross_data2
+    CrossDomain #(T: type T3) cross_data3
+    domain in_clk
+    action in'0 : T1 data_in1'0, T2 data_in2'0, T3 data_in3'0 {
+        cross_valid.in = true
+        cross_data1.in = data_in1
+        cross_data2.in = data_in2
+        cross_data3.in = data_in3
+    } else {
+        cross_valid.in = false
+    }
+    domain out_clk
+    trigger out'0 : T1 data_out1'0, T2 data_out2'0, T3 data_out3'0
+
+    when cross_valid.out {
+        out(cross_data1.out, cross_data2.out, cross_data3.out)
+    }
+}
+/// Unsafe builtin to connect wires from different domains. 
+/// Important: Does not perform any kind of Clock Domain Crossing!
 module CrossActionNoData {
     CrossDomain #(T: type bool) cross_valid
     domain in_clk
