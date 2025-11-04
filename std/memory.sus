@@ -50,14 +50,14 @@ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
     output bool may_push'-MAY_PUSH_LATENCY = LatencyOffset #(OFFSET: -MAY_PUSH_LATENCY)(space_remaining > MAY_PUSH_LATENCY)
     action push'0 : T push_data'0 {
         mem.write(write_addr, push_data)
-        write_addr = (write_addr + 1) % DEPTH
+        write_addr = write_addr + 1 mod DEPTH
     }
     
     domain read
     output bool may_pop'0 = read_addr != cross_write_addr.out
     action pop'0 : -> T pop_data'0 {
         pop_data = mem.read(read_addr)
-        read_addr = (read_addr + 1) % DEPTH
+        read_addr = read_addr + 1 mod DEPTH
     }
 
     when cross_reset_r.out {

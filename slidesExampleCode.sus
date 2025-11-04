@@ -65,8 +65,8 @@ module fizz_buzz_gen {
     gen int[TABLE_SIZE] lut
     
     for int i in 0..TABLE_SIZE {
-        gen bool fizz = i % 3 == 0
-        gen bool buzz = i % 5 == 0
+        gen bool fizz = i mod 3 == 0
+        gen bool buzz = i mod 5 == 0
         
         gen int tbl_fb
         if fizz & buzz {
@@ -115,7 +115,7 @@ module use_memory {
     state int cur_idx
     action get_next : -> bool[20] d {
         d = mem.read(cur_idx)
-        cur_idx = (cur_idx + 1) % 5
+        cur_idx = cur_idx + 1 mod 5
     }
 }
 
@@ -131,7 +131,7 @@ module iterator#(int MAX) {
 
     when cur != MAX {
         iter(cur, cur == MAX - 1)
-        cur = (cur + 1) % MAX
+        cur = cur + 1 mod MAX
     }
 }
 /// Use of triggers and conditional bindings
@@ -146,7 +146,7 @@ module use_iter {
     }
     trigger done : int sum
     when iter.iter : int idx, bool last {
-        int new_total = (total + terms[idx]) % 256
+        int new_total = total + terms[idx] mod 256
         when last {
             done(new_total)
         }
@@ -162,7 +162,7 @@ module fibonnaci {
     state int prev = 0
     initial prev = 1
 
-    num = (cur + prev) % pow2#(E: 32)
+    num = cur + prev mod pow2#(E: 32)
     prev = cur
     cur = num
 }
@@ -206,7 +206,7 @@ module BRAMShiftReg #(T, int LATENCY) {
     T out_data = memory[idx]
     memory[idx] = d_in
 
-    idx = (idx + 1) % LATENCY
+    idx = idx + 1 mod LATENCY
 
     d_out = LatencyOffset #(OFFSET: LATENCY)(out_data)
 }
@@ -358,7 +358,7 @@ module BRAMShiftReg #(T, int LATENCY) {
     T out_data = memory[idx]
     memory[idx] = d_in
 
-    idx = (idx + 1) % LATENCY
+    idx = idx + 1 mod LATENCY
 
     d_out = LatencyOffset #(OFFSET: LATENCY)(out_data)
 }
@@ -435,7 +435,7 @@ module iterator#(int MAX) {
 
     when cur != MAX {
         iter(cur, cur == MAX - 1)
-        cur = (cur + 1) % MAX
+        cur = cur + 1 mod MAX
     }
 }
 
@@ -450,7 +450,7 @@ module use_iter {
     }
     trigger done : int sum
     when iter.iter : int idx, bool last {
-        int new_total = (total + terms[idx]) % 256
+        int new_total = total + terms[idx] mod 256
         when last {
             done(new_total)
         }

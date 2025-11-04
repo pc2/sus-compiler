@@ -147,8 +147,8 @@ module BitwiseIntConcat #(int UPPER_TO, int LOWER_BITS) {
 /// Sets the lower [:LOWER_BITS] bits to false, thus aligning the value
 /// Works for unsigned and signed integers alike
 module AlignToPow2 #(int FROM, int TO, int LOWER_BITS) {
-    gen int ALIGNED_FROM = FROM - FROM % clog2#(V: LOWER_BITS)
-    gen int ALIGNED_TO = TO - (TO + 1) % clog2#(V: LOWER_BITS)
+    gen int ALIGNED_FROM = FROM - (FROM mod clog2#(V: LOWER_BITS))
+    gen int ALIGNED_TO = TO - (TO + 1 mod clog2#(V: LOWER_BITS))
     interface AlignToPow2 :
         int#(FROM, TO) i'0 ->
         int#(FROM: ALIGNED_FROM, TO: ALIGNED_TO) o'0
@@ -205,7 +205,7 @@ module RotateLeft#(T, int ARRAY_LEN) {
 
         for int ELEM in 0..ARRAY_LEN {
             when offset_bits[STAGE] {
-                rotate_stages[STAGE+1][ELEM] = from[(ELEM + pow2#(E: STAGE)) % ARRAY_LEN]
+                rotate_stages[STAGE+1][ELEM] = from[ELEM + pow2#(E: STAGE) mod ARRAY_LEN]
             } else {
                 rotate_stages[STAGE+1][ELEM] = from[ELEM]
             }
@@ -232,7 +232,7 @@ module RotateRight#(T, int ARRAY_LEN) {
 
         for int ELEM in 0..ARRAY_LEN {
             when offset_bits[STAGE] {
-                rotate_stages[STAGE+1][ELEM] = from[(ELEM - pow2#(E: STAGE)) % ARRAY_LEN]
+                rotate_stages[STAGE+1][ELEM] = from[ELEM - pow2#(E: STAGE) mod ARRAY_LEN]
             } else {
                 rotate_stages[STAGE+1][ELEM] = from[ELEM]
             }
