@@ -160,7 +160,7 @@ fn codegen_optimized_modulo(
             } else {
                 format!("{left}; // == mod {mod_u} (target is {num_bits_to_slice} bits wide)")
             }
-        } else if left_int_range.from >= &IBig::from(0) {
+        } else if !left_int_range.is_signed() {
             // Unsigned mod
             if left_int_range.to <= mod_s {
                 format!("{left}; // == mod {mod_u}")
@@ -182,13 +182,23 @@ fn codegen_optimized_modulo(
                 // Optimize to a conditional add
                 format!("{left} + (({left} < 0) ? {mod_u} : 0); // == mod {mod_u}")
             } else {
-                format!("(({left} % {mod_u}) + {mod_u}) % {mod_u}; // == mod {mod_u}")
+                format!(
+                    "$unsigned({left} % {mod_u}) + (({left} % {mod_u} < 0) ? {mod_u} : 0); // == mod {mod_u}"
+                )
             }
         } else {
-            format!("(({left} % {mod_u}) + {mod_u}) % {mod_u}; // == mod {mod_u}")
+            format!(
+                "$unsigned({left} % {mod_u}) + (({left} % {mod_u} < 0) ? {mod_u} : 0); // == mod {mod_u}"
+            )
         }
     } else {
-        format!("(({left} % {right}) + {right}) % {right}; // == mod")
+        if left_int_range.is_signed() {
+            format!(
+                "$unsigned({left} % $signed({{1'b0, {right}}})) + ({left} % $signed({{1'b0, {right}}}) < 0 ? {right} : 0); // == mod"
+            )
+        } else {
+            format!("{left} % {right}; // == mod")
+        }
     }
 }
 
@@ -323,15 +333,7 @@ impl<'g> CodeGenerationContext<'g> {
 
                     match cst {
                         Value::Integer(v) => {
-                            if bounds.from < &IBig::from(0) {
-                                if v < &IBig::from(0) {
-                                    write!(f, "{bitwidth}'({v})")
-                                } else {
-                                    write!(f, "{bitwidth}'sd{v}")
-                                }
-                            } else {
-                                write!(f, "{bitwidth}'d{v}")
-                            }
+                            write!(f, "{v}")
                         }
                         Value::Unset => {
                             if bounds.from < &IBig::from(0) {
@@ -832,20 +834,74 @@ impl<'g> CodeGenerationContext<'g> {
                     let right_name = self.wire_name(right, w.absolute_latency);
                     self.in_generate(|slf| {
                         slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| {
-                            match *op {
-                                BinaryOperator::Modulo => {
-                                    let left_int_range = path.walk_type(&left.typ).unwrap_int_bounds();
-                                    let right_int_range = path.walk_type(&right.typ).unwrap_int_bounds();
+                            let left_typ = path.walk_type(&left.typ);
+                            let right_typ = path.walk_type(&right.typ);
 
-                                    let content = codegen_optimized_modulo(left_int_range, right_int_range, &format!("{left_name}{path}"), &format!("{right_name}{path}"));
-                                    format!(
-                                        "assign {wire_name}{path} = {content}\n"
-                                    )
+                            fn wrap_in_signed_if_needed(name: &str, path: &ForEachPath, require_signed: bool, bounds: IntBounds<&IBig>) -> impl Display {
+                                FmtWrapper(move |f| {
+                                    if require_signed && !bounds.is_signed() && !name.chars().next().unwrap().is_ascii_digit() { // Raw numbers are already signed
+                                        write!(f, "$signed({{1'b0, {name}{path}}})")
+                                    } else {
+                                        write!(f, "{name}{path}")
+                                    }
+                                })
+                            }
+
+                            match *op {
+                                BinaryOperator::ShiftLeft | BinaryOperator::ShiftRight => {
+                                    let left_int_range = left_typ.unwrap_int_bounds();
+                                    let right_int_range = right_typ.unwrap_int_bounds();
+
+                                    let shift_op = match (*op, left_int_range.is_signed()) {
+                                        (BinaryOperator::ShiftLeft, true) => "<<<",
+                                        (BinaryOperator::ShiftLeft, false) => "<<",
+                                        (BinaryOperator::ShiftRight, true) => ">>>",
+                                        (BinaryOperator::ShiftRight, false) => ">>>",
+                                        _ => unreachable!()
+                                    };
+
+                                    assert!(!right_int_range.is_signed());
+
+                                    format!("assign {wire_name}{path} = {left_name}{path} {shift_op} {right_name}{path};\n")
                                 }
-                                _ => {
-                                    format!(
-                                        "assign {wire_name}{path} = {left_name}{path} {op} {right_name}{path};\n"
-                                    )
+                                BinaryOperator::And |
+                                BinaryOperator::Or |
+                                BinaryOperator::Xor => {
+                                    format!("assign {wire_name}{path} = {left_name}{path} {op} {right_name}{path};\n")
+                                }
+                                BinaryOperator::Add |
+                                BinaryOperator::Subtract |
+                                BinaryOperator::Multiply |
+                                BinaryOperator::Divide |
+                                BinaryOperator::Remainder |
+                                BinaryOperator::Equals |
+                                BinaryOperator::NotEquals |
+                                BinaryOperator::Greater |
+                                BinaryOperator::GreaterEq |
+                                BinaryOperator::Lesser |
+                                BinaryOperator::LesserEq => {
+                                    let left_int_range = left_typ.unwrap_int_bounds();
+                                    let right_int_range = right_typ.unwrap_int_bounds();
+
+                                    let op_is_signed = left_int_range.is_signed() | right_int_range.is_signed();
+                                    let left_arg = wrap_in_signed_if_needed(&left_name, &path, op_is_signed, left_int_range);
+                                    let right_arg = wrap_in_signed_if_needed(&right_name, &path, op_is_signed, right_int_range);
+
+                                    format!("assign {wire_name}{path} = {left_arg} {op} {right_arg};\n")
+                                }
+                                BinaryOperator::Modulo => {
+                                    let left_int_range =
+                                        path.walk_type(&left.typ).unwrap_int_bounds();
+                                    let right_int_range =
+                                        path.walk_type(&right.typ).unwrap_int_bounds();
+
+                                    let content = codegen_optimized_modulo(
+                                        left_int_range,
+                                        right_int_range,
+                                        &format!("{left_name}{path}"),
+                                        &format!("{right_name}{path}"),
+                                    );
+                                    format!("assign {wire_name}{path} = {content}\n")
                                 }
                             }
                         })

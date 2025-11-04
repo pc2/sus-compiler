@@ -349,6 +349,10 @@ impl IntBounds<&'_ IBig> {
         assert!(self.is_valid());
         self.from == self.to
     }
+    pub fn is_signed(self) -> bool {
+        assert!(self.is_valid_non_empty());
+        self.from < &IBig::from(0)
+    }
     pub fn bitwidth(self) -> u64 {
         assert!(!self.is_empty(), "{self}");
         let min = self.from;

@@ -6,6 +6,7 @@
 **/*.vcd
 **/*.fst
 **/*.dot
+**/*.tmp
 sus-lsp/
 crash_dumps/
 dot_output/

@@ -102,7 +102,11 @@ pub fn co_walk_path<'inst>(
 }
 
 /// Panics if `potentials.len() < 2`
-fn get_min_max(potentials: impl IntoIterator<Item = IBig>) -> (IBig, IBig) {
+fn set_min_max_with_min_max<'inst>(
+    unifier: &mut ValueUnifier<'inst>,
+    out_bounds: IntBounds<&UnifyableValue>,
+    potentials: impl IntoIterator<Item = IBig>,
+) {
     let mut potentials = potentials.into_iter();
     let mut min = potentials.next().unwrap();
     let mut max = potentials.next().unwrap();
@@ -116,7 +120,8 @@ fn get_min_max(potentials: impl IntoIterator<Item = IBig>) -> (IBig, IBig) {
             max = p;
         }
     }
-    (min, max)
+    unifier.set(out_bounds.from, min).unwrap();
+    unifier.set(out_bounds.to, max + 1).unwrap();
 }
 
 impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
@@ -427,9 +432,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     let rmax = rt - 1;
 
                     let potentials = [lf * rf, &lmax * &rmax, lf * rmax, lmax * rf];
-                    let (min, max) = get_min_max(potentials);
-                    unifier.set(out.from, min).unwrap();
-                    unifier.set(out.to, max + 1).unwrap();
+                    set_min_max_with_min_max(unifier, out, potentials);
                 });
             }
             BinaryOperator::Divide => {
@@ -455,9 +458,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     let rmax = rt - 1;
 
                     let potentials = [lf / rf, &lmax / &rmax, lf / rmax, lmax / rf];
-                    let (min, max) = get_min_max(potentials);
-                    unifier.set(out.from, min).unwrap();
-                    unifier.set(out.to, max + 1).unwrap();
+                    set_min_max_with_min_max(unifier, out, potentials);
                 });
             }
             BinaryOperator::Remainder => {
@@ -529,12 +530,19 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         );
                         return;
                     }
-                    let shift = usize::try_from(rt).unwrap();
+                    let min_shift = usize::try_from(rf).unwrap();
+                    let max_shift = usize::try_from(rt - 1).unwrap();
 
-                    let of = lf << shift;
-                    let ot = ((lt - 1) << shift) + 1;
-                    unifier.set(out.from, of).unwrap();
-                    unifier.set(out.to, ot).unwrap();
+                    let lmin = lf;
+                    let lmax: IBig = lt - 1;
+
+                    let potentials = [
+                        lmin << min_shift,
+                        lmin << max_shift,
+                        &lmax << min_shift,
+                        lmax << max_shift,
+                    ];
+                    set_min_max_with_min_max(unifier, out, potentials);
                 });
             }
             BinaryOperator::ShiftRight => {
@@ -562,12 +570,19 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         );
                         return;
                     }
-                    let shift = usize::try_from(rt).unwrap();
+                    let min_shift = usize::try_from(rf).unwrap();
+                    let max_shift = usize::try_from(rt - 1).unwrap();
 
-                    let of = lf >> shift;
-                    let ot = ((lt - 1) >> shift) + 1;
-                    unifier.set(out.from, of).unwrap();
-                    unifier.set(out.to, ot).unwrap();
+                    let lmin = lf;
+                    let lmax: IBig = lt - 1;
+
+                    let potentials = [
+                        lmin >> min_shift,
+                        lmin >> max_shift,
+                        &lmax >> min_shift,
+                        lmax >> max_shift,
+                    ];
+                    set_min_max_with_min_max(unifier, out, potentials);
                 });
             }
             BinaryOperator::Equals | BinaryOperator::NotEquals => {

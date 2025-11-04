@@ -10,11 +10,11 @@ assign _5 = a % b;
 wire signed[4:0] _7;
 assign _7 = -a;
 wire signed[1:0] _9;
-assign _9 = _7 % b;
+assign _9 = _7 % $signed({1'b0, b});
 wire signed[2:0] _12;
 assign _12 = -b;
 wire[1:0] _13;
-assign _13 = a % _12;
+assign _13 = $signed({1'b0, a}) % _12;
 wire signed[4:0] _15;
 assign _15 = -a;
 wire signed[2:0] _17;
@@ -24,12 +24,12 @@ assign _18 = _15 % _17;
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	a = 4'dx;
-	a = 4'd10;
+	a = 10;
 end
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	b = 2'dx;
-	b = 2'd3;
+	b = 3;
 end
 endmodule
 
@@ -65,39 +65,39 @@ assign _18 = signed_val; // == mod 2 (target is 1 bits wide)
 wire[3:0] _27;
 assign _27 = unsigned_val; // == mod 13
 wire[3:0] _30;
-assign _30 = unsigned_val + 1'd1;
+assign _30 = unsigned_val + 1;
 wire[3:0] _32;
 assign _32 = (_30 == 13) ? 0 : _30; // == mod 13
 wire[3:0] _35;
-assign _35 = unsigned_val + 2'd2;
+assign _35 = unsigned_val + 2;
 wire[3:0] _37;
 assign _37 = _35 - ((_35 >= 13) ? 13 : 0); // == mod 13
 wire[4:0] _40;
-assign _40 = unsigned_val + 4'd13;
+assign _40 = unsigned_val + 13;
 wire[3:0] _42;
 assign _42 = _40 - ((_40 >= 13) ? 13 : 0); // == mod 13
 wire[4:0] _45;
-assign _45 = unsigned_val + 4'd14;
+assign _45 = unsigned_val + 14;
 wire[3:0] _47;
 assign _47 = _45 % 13; // == mod 13
 wire signed[4:0] _50;
-assign _50 = unsigned_val - 1'd1;
+assign _50 = unsigned_val - 1;
 wire[3:0] _52;
 assign _52 = (_50 < 0) ? 12 : _50; // == mod 13
 wire signed[4:0] _55;
-assign _55 = unsigned_val - 2'd2;
+assign _55 = unsigned_val - 2;
 wire[3:0] _57;
 assign _57 = _55 + ((_55 < 0) ? 13 : 0); // == mod 13
 wire signed[4:0] _60;
-assign _60 = unsigned_val - 4'd13;
+assign _60 = unsigned_val - 13;
 wire[3:0] _62;
 assign _62 = _60 + ((_60 < 0) ? 13 : 0); // == mod 13
 wire signed[4:0] _65;
-assign _65 = unsigned_val - 4'd14;
+assign _65 = unsigned_val - 14;
 wire[3:0] _67;
-assign _67 = ((_65 % 13) + 13) % 13; // == mod 13
+assign _67 = $unsigned(_65 % 13) + ((_65 % 13 < 0) ? 13 : 0); // == mod 13
 wire[2:0] _70;
-assign _70 = ((unsigned_val % dynamic_mod) + dynamic_mod) % dynamic_mod; // == mod
+assign _70 = unsigned_val % dynamic_mod; // == mod
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	unsigned_val = 4'dx;
@@ -139,7 +139,7 @@ UIntToBits_NUM_BITS_0 UIntToBits(
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	addr = 3'dx;
-	addr = 3'd4;
+	addr = 4;
 end
 endmodule
 
@@ -336,7 +336,7 @@ end
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	y = 2'dx;
-	y = 2'd3;
+	y = 3;
 end
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -559,8 +559,8 @@ end
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	boop = 3'dx;
-	if(maybe_use_trigger) boop = 3'd5;
-	if(!maybe_use_trigger) boop = 3'd7;
+	if(maybe_use_trigger) boop = 5;
+	if(!maybe_use_trigger) boop = 7;
 end
 endmodule
 
@@ -570,7 +570,7 @@ module testInts(
 );
 
 /*mux_wire*/ logic[2:0] vs[4:0];
-localparam[2:0] _1[4:0] = '{3'd1, 3'd2, 3'd3, 3'd4, 3'd5};
+localparam[2:0] _1[4:0] = '{1, 2, 3, 4, 5};
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	vs = '{3'dx, 3'dx, 3'dx, 3'dx, 3'dx};
@@ -952,11 +952,11 @@ TreeAdd_WIDTH_5_FROM_3_TO_4 adder(
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	arr = '{2'dx, 2'dx, 2'dx, 2'dx, 2'dx};
-	arr[0] = 2'd3;
-	arr[1] = 2'd3;
-	arr[2] = 2'd3;
-	arr[3] = 2'd3;
-	arr[4] = 2'd3;
+	arr[0] = 3;
+	arr[1] = 3;
+	arr[2] = 3;
+	arr[3] = 3;
+	arr[4] = 3;
 end
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -996,7 +996,7 @@ module use_permute(
 /*mux_wire*/ logic[2:0] beep[7:0];
 /*mux_wire*/ logic[2:0] _permut_d_in[7:0];
 wire[2:0] _permut_d_out[7:0];
-localparam[2:0] SOURCES[7:0] = '{3'd3, 3'd2, 3'd4, 3'd5, 3'd1, 3'd2, 3'd7, 3'd6};
+localparam[2:0] SOURCES[7:0] = '{3, 2, 4, 5, 1, 2, 7, 6};
 permute_t_T_type_int_FROM_1_TO_8_SIZE_8_SOURCES_3_2_4_5_1_2_7_6 permut(
 	.clk(clk),
 	.d_in(_permut_d_in),
@@ -1005,8 +1005,8 @@ permute_t_T_type_int_FROM_1_TO_8_SIZE_8_SOURCES_3_2_4_5_1_2_7_6 permut(
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	inArr = '{20'dx, 20'dx};
-	inArr[0] = 12'd2387;
-	inArr[1] = 20'd786823;
+	inArr[0] = 2387;
+	inArr[1] = 786823;
 end
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -1124,7 +1124,7 @@ module tinyTestMod_beep_4(
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	o = 3'dx;
-	o = 3'd4;
+	o = 4;
 end
 endmodule
 
@@ -1137,7 +1137,7 @@ module tinyTestMod_beep_3(
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	o = 2'dx;
-	o = 2'd3;
+	o = 3;
 end
 endmodule
 
@@ -1195,7 +1195,7 @@ module cross_int(
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	o = 1'dx;
-	o = 1'd1;
+	o = 1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	o = o;
 end
@@ -1277,7 +1277,7 @@ end
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	_my_mod_i = 7'dx;
-	_my_mod_i = 2'd3;
+	_my_mod_i = 3;
 end
 endmodule
 
@@ -1290,9 +1290,9 @@ module my_mod(
 );
 
 wire _3;
-assign _3 = i == 2'd3;
+assign _3 = i == 3;
 wire _6;
-assign _6 = i == 3'd5;
+assign _6 = i == 5;
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	a = 1'bx;
@@ -2108,9 +2108,9 @@ assign _13 = fizz & buzz;
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	fb = 20'dx;
-	if(_13) fb = 20'd888555;
-	if(!_13) if(fizz) fb = 10'd888;
-	if(!_13) if(!fizz) if(buzz) fb = 10'd555;
+	if(_13) fb = 888555;
+	if(!_13) if(fizz) fb = 888;
+	if(!_13) if(!fizz) if(buzz) fb = 555;
 	if(!_13) if(!fizz) if(!buzz) fb = v;
 end
 always_comb begin
@@ -2980,11 +2980,11 @@ always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	first = 3'dx;
 	if(_1) first = 1'd0;
-	if(!_1) if(_3) first = 1'd1;
-	if(!_1) if(!_3) if(_5) first = 2'd2;
-	if(!_1) if(!_3) if(!_5) if(_7) first = 2'd3;
-	if(!_1) if(!_3) if(!_5) if(!_7) if(_9) first = 3'd4;
-	if(!_1) if(!_3) if(!_5) if(!_7) if(!_9) if(_11) first = 3'd5;
+	if(!_1) if(_3) first = 1;
+	if(!_1) if(!_3) if(_5) first = 2;
+	if(!_1) if(!_3) if(!_5) if(_7) first = 3;
+	if(!_1) if(!_3) if(!_5) if(!_7) if(_9) first = 4;
+	if(!_1) if(!_3) if(!_5) if(!_7) if(!_9) if(_11) first = 5;
 end
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -3015,39 +3015,39 @@ assign _3 = t + 1'd0;
 /*mux_wire*/ logic[6:0] t_2;
 wire[6:0] _4 = values[1];
 wire[6:0] _6;
-assign _6 = t_2 + 1'd1;
+assign _6 = t_2 + 1;
 /*mux_wire*/ logic[6:0] t_3;
 wire[6:0] _7 = values[2];
 wire[6:0] _9;
-assign _9 = t_3 + 2'd2;
+assign _9 = t_3 + 2;
 /*mux_wire*/ logic[6:0] t_4;
 wire[6:0] _10 = values[3];
 wire[6:0] _12;
-assign _12 = t_4 + 2'd3;
+assign _12 = t_4 + 3;
 /*mux_wire*/ logic[6:0] t_5;
 wire[6:0] _13 = values[4];
 wire[6:0] _15;
-assign _15 = t_5 + 3'd4;
+assign _15 = t_5 + 4;
 /*mux_wire*/ logic[6:0] t_6;
 wire[6:0] _16 = values[5];
 wire[6:0] _18;
-assign _18 = t_6 + 3'd5;
+assign _18 = t_6 + 5;
 /*mux_wire*/ logic[6:0] t_7;
 wire[6:0] _19 = values[6];
 wire[6:0] _21;
-assign _21 = t_7 + 3'd6;
+assign _21 = t_7 + 6;
 /*mux_wire*/ logic[6:0] t_8;
 wire[6:0] _22 = values[7];
 wire[6:0] _24;
-assign _24 = t_8 + 3'd7;
+assign _24 = t_8 + 7;
 /*mux_wire*/ logic[6:0] t_9;
 wire[6:0] _25 = values[8];
 wire[6:0] _27;
-assign _27 = t_9 + 4'd8;
+assign _27 = t_9 + 8;
 /*mux_wire*/ logic[6:0] t_10;
 wire[6:0] _28 = values[9];
 wire[6:0] _30;
-assign _30 = t_10 + 4'd9;
+assign _30 = t_10 + 9;
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	added_values = '{7'dx, 7'dx, 7'dx, 7'dx, 7'dx, 7'dx, 7'dx, 7'dx, 7'dx, 7'dx};
@@ -3121,7 +3121,7 @@ module Unpack4(
 	output /*mux_wire*/ logic[6:0] out_stream
 );
 
-/*state*/ logic[1:0] st = 2'd0;
+/*state*/ logic[1:0] st = 0;
 /*state*/ logic[6:0] stored_packed[2:0];
 wire _2;
 assign _2 = st == 1'd0;
@@ -3130,13 +3130,13 @@ wire[6:0] _4 = packed_1[1];
 wire[6:0] _5 = packed_1[2];
 wire[6:0] _6 = packed_1[3];
 wire _10;
-assign _10 = st == 1'd1;
+assign _10 = st == 1;
 wire[6:0] _11 = stored_packed[0];
 wire _15;
-assign _15 = st == 2'd2;
+assign _15 = st == 2;
 wire[6:0] _16 = stored_packed[1];
 wire _20;
-assign _20 = st == 2'd3;
+assign _20 = st == 3;
 wire[6:0] _21 = stored_packed[2];
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -3147,9 +3147,9 @@ always_comb begin
 	if(!_2) if(!_10) if(!_15) if(_20) out_stream = _21;
 end
 always_ff @(posedge clk) begin
-	if(_2) st <= 1'd1;
-	if(!_2) if(_10) st <= 2'd2;
-	if(!_2) if(!_10) if(_15) st <= 2'd3;
+	if(_2) st <= 1;
+	if(!_2) if(_10) st <= 2;
+	if(!_2) if(!_10) if(_15) st <= 3;
 	if(!_2) if(!_10) if(!_15) if(_20) st <= 1'd0;
 end
 always_ff @(posedge clk) begin
@@ -3201,7 +3201,7 @@ module Accumulator(
 );
 
 /*latency*/ logic _done_D1; always_ff @(posedge clk) begin _done_D1 <= done; end
-/*state*/ logic[6:0] tot = 7'd0;
+/*state*/ logic[6:0] tot = 0;
 /*mux_wire*/ logic[6:0] new_tot;
 /*latency*/ logic[6:0] _new_tot_D1; always_ff @(posedge clk) begin _new_tot_D1 <= new_tot; end
 wire[7:0] _3;
@@ -3306,7 +3306,7 @@ always_comb begin
 	num = _7;
 end
 always_ff @(posedge clk) begin
-	cur <= 1'd1;
+	cur <= 1;
 	cur <= num;
 end
 always_ff @(posedge clk) begin
@@ -3336,7 +3336,7 @@ end
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	_pow17_i = 7'dx;
-	_pow17_i = 2'd2;
+	_pow17_i = 2;
 end
 endmodule
 
@@ -3478,7 +3478,7 @@ module BoolToInt(
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	o = 1'dx;
-	if(i) o = 1'd1;
+	if(i) o = 1;
 	if(!i) o = 1'd0;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	o = o;
@@ -3493,7 +3493,7 @@ module IntToBool(
 );
 
 wire _3;
-assign _3 = i == 1'd1;
+assign _3 = i == 1;
 always_comb begin
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	o = 1'bx;

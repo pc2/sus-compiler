@@ -2,9 +2,17 @@
 module signed_ints_test;
 
 logic clk = 0;
-always #5 clk = ~clk;
+
+initial begin
+    $display("Starting tests");
+    #5 clk = 1; // Only one clock pulse to run the asserts
+    #5 clk = 0;
+    $display("All tests passed");
+    $finish();
+end
 
 AllTests test_harness(.clk);
+//TestSpecificModulos test_specific(.clk);
 
 endmodule
 
@@ -19,7 +27,7 @@ module assert_eq#(parameter string ID = "...") (
 
 always @(posedge clk) begin
     if(assert_eq & (found != expected)) begin
-        $display("%d %s %d = %d ???   ---    expected %d", l, ID, r, found, expected);
+        $display("Incorrect Value %d %s %d = %d ???   ---    expected %d", l, ID, r, found, expected);
     end
 end
 
@@ -42,4 +50,17 @@ module test_modulo;
     wire signed[10:0] neg_pos = (-5) % 3;
     wire signed[10:0] neg_neg = (-5) % (-3);
 endmodule
+
+
+
+module TestShifts;
+    logic[10:0] v = 100;
+    logic signed[10:0] v_signed = 100;
+      
+    logic[4:0] shift = 12;
+    logic[30:0] v_shifted = v << shift;
+    logic signed[30:0] v_signed_shifted = v_signed << shift;
+    
+endmodule
+
 
