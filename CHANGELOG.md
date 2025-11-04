@@ -1,4 +1,20 @@
 # Changelog
+## 0.3.5: The all about operators update
+- Add `double` and double literals (`0.3d`) (#134)
+- Add `string` and string literals (`"beep \"boop\" baap"`) (#131)
+- Add gen `int min#(int A, int B)` and `int max#(int A, int B)`
+- Extend core.sus: `CrossAction2`, `CrossAction3`
+- Extend util.sus: `BitwiseIntSplit`, `BitwiseIntConcat`, `AlignToPow2`, `IntToBool`, `BoolToInt`, `RotateLeft`, `RotateRight`, `Ternary`, `SlowState`
+- Add memory.sus: `ROM`, `RAM`, `FIFO`, `RippleFIFO`
+- Fix domain errors not showing correct domain name (#133)
+- Implement `mod`, `>>`, `<<` and unary `&`, `^`, `|`, `+`, `*`. (#135)
+- Add optimizations for common modulo cases (#4)
+- Fix signed integer arithmetic differing between generative & non-generative code
+- Execute: Fixed comptime `|` and `^` yielding incorrect results
+- Codegen: now explicitly don't generate zero-sized wires. (#86)
+- VSCode LSP: Slight fixes to language regex for bit vectors, and floats with exponents
+- Fix ICE on calling a locally declared action/interface (#137)
+
 ## 0.3.4
 - VSCode LSP: Fix Incorrectly marks 0.4.0 as "too old" due to incorrect minimum version code (#130)
 - Codegen: Re-Work around Vivado sim wrong result for single-bit combinatorial assigns (But this time for real!) (#127)

@@ -189,7 +189,8 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Access module inputs / outputs through field names
 - [ ] Operator and Module Overloads
 - [x] Array Slices
-- [x] Sized Integers
+- [x] Ranged Integers
+- [x] Signed / Unsigned Integer math
 - [ ] Structs
 - [x] Conditional Bindings
 - [x] Generative variables and assignments

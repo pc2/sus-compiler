@@ -115,13 +115,6 @@ module TreeAdd #(int WIDTH, int FROM, int TO) {
 	}
 }
 
-extern module PopCount_native #(int WIDTH) {
-	interface PopCount_native : 
-		bool[WIDTH] bits'0 ->
-		int#(FROM: 0, TO: WIDTH + 1) count'0
-}
-
-
 /// Splits the given integer. The upper [LOWER_BITS:] bits are returned as upper, the lower [:LOWER_BITS] bits are returned in lower
 /// See also [BitwiseIntConcat]
 module BitwiseIntSplit #(int TO, int LOWER_BITS) {
