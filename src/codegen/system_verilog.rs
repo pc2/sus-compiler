@@ -331,7 +331,15 @@ impl<'g> CodeGenerationContext<'g> {
 
                     match cst {
                         Value::Integer(v) => {
-                            write!(f, "{v}")
+                            if bounds.from < &IBig::from(0) {
+                                if v < &IBig::from(0) {
+                                    write!(f, "-{bitwidth}'sd{}", -v)
+                                } else {
+                                    write!(f, "{bitwidth}'sd{v}")
+                                }
+                            } else {
+                                write!(f, "{bitwidth}'d{v}")
+                            }
                         }
                         Value::Unset => {
                             if bounds.from < &IBig::from(0) {
@@ -837,7 +845,7 @@ impl<'g> CodeGenerationContext<'g> {
 
                             fn wrap_in_signed_if_needed(name: &str, path: &ForEachPath, require_signed: bool, bounds: IntBounds<&IBig>) -> impl Display {
                                 FmtWrapper(move |f| {
-                                    if require_signed && !bounds.is_signed() && !name.chars().next().unwrap().is_ascii_digit() { // Raw numbers are already signed
+                                    if require_signed && !bounds.is_signed() {
                                         write!(f, "$signed({{1'b0, {name}{path}}})")
                                     } else {
                                         write!(f, "{name}{path}")
