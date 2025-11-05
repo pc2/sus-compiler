@@ -549,10 +549,13 @@ impl LintContext<'_> {
             let ExpressionSource::FuncCall(fc) = &expr_instr.source else {
                 continue;
             };
-            let fc_func_wireref = md.link_info.instructions[fc.func_wire_ref]
+            let ExpressionSource::WireRef(fc_func_wireref) = &md.link_info.instructions
+                [fc.func_wire_ref]
                 .unwrap_expression()
                 .source
-                .unwrap_wire_ref();
+            else {
+                continue;
+            };
 
             let WireReferenceRoot::LocalInterface(interf) = &fc_func_wireref.root else {
                 continue;
