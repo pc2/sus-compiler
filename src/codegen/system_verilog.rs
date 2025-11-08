@@ -548,10 +548,22 @@ impl<'g> CodeGenerationContext<'g> {
             if should_not_codegen(port_wire) {
                 port_list.commented(format!("{direction} {}", port_wire.name));
             } else {
-                let wire_doc = port_wire.source.wire_or_reg();
+                let wire_or_reg = port_wire.source.wire_or_reg();
+                let is_state = match direction {
+                    Direction::Input => &None,
+                    Direction::Output => {
+                        let_unwrap!(
+                            RealWireDataSource::Multiplexer { is_state, .. },
+                            &port_wire.source
+                        );
+                        is_state
+                    }
+                };
                 let wire_name = wire_name_self_latency(port_wire);
                 let wire_decl = typ_to_declaration(&port_wire.typ, &wire_name);
-                port_list.line(format!("{direction} {wire_doc}{wire_decl}"));
+                let decl = Self::display_declaration(port_wire, wire_or_reg, wire_decl, is_state);
+
+                port_list.line(format!("{direction} {decl}"));
             }
         }
         writeln!(self.program_text, "module {module_name}({port_list});\n").unwrap();
@@ -757,7 +769,6 @@ impl<'g> CodeGenerationContext<'g> {
                 continue;
             }
             let wire_or_reg = w.source.wire_or_reg();
-
             let wire_name = wire_name_self_latency(w);
             let wire_decl = typ_to_declaration(&w.typ, &wire_name);
 
@@ -940,19 +951,31 @@ impl<'g> CodeGenerationContext<'g> {
                     is_state,
                     sources: _,
                 } => {
-                    write!(self.program_text, "{wire_or_reg}{wire_decl}").unwrap();
-                    match is_state {
-                        Some(initial_val) if !initial_val.is_unset() => {
-                            let cst_str = Self::display_constant(&w.typ, initial_val);
-                            write!(self.program_text, " = {cst_str}",).unwrap();
-                        }
-                        _ => {}
-                    }
-                    self.program_text.write_str(";\n").unwrap();
+                    let decl_stm = Self::display_declaration(w, wire_or_reg, wire_decl, is_state);
+                    writeln!(self.program_text, "{decl_stm};").unwrap();
                 }
             }
             self.add_latency_registers(wire_id, w).unwrap();
         }
+    }
+
+    fn display_declaration(
+        w: &RealWire,
+        wire_or_reg: &str,
+        wire_decl: String,
+        is_state: &Option<Value>,
+    ) -> impl Display {
+        FmtWrapper(move |f| {
+            write!(f, "{wire_or_reg}{wire_decl}")?;
+            match is_state {
+                Some(initial_val) if !initial_val.is_unset() => {
+                    let cst_str = Self::display_constant(&w.typ, initial_val);
+                    write!(f, " = {cst_str}")?;
+                }
+                _ => {}
+            }
+            Ok(())
+        })
     }
 
     fn write_submodules(&mut self) {
@@ -1067,11 +1090,14 @@ impl<'g> CodeGenerationContext<'g> {
                     let output_name = wire_name_self_latency(w);
                     let arrow_str = if is_state.is_some() {
                         let clk_name = self.md.get_clock_name();
-                        writeln!(self.program_text, "always_ff @(posedge {clk_name}) begin")
-                            .unwrap();
+                        writeln!(
+                            self.program_text,
+                            "always_ff @(posedge {clk_name}) begin // state {output_name}"
+                        )
+                        .unwrap();
                         "<="
                     } else {
-                        writeln!(self.program_text, "always_comb begin\n\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches").unwrap();
+                        writeln!(self.program_text, "always_comb begin // combinatorial {output_name}\n\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches").unwrap();
                         let unset_str = Self::display_constant(&w.typ, &Value::Unset);
                         writeln!(self.program_text, "\t{output_name} = {unset_str};").unwrap();
                         "="

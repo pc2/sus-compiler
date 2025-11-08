@@ -161,6 +161,7 @@
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated test_all_modulos #()
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated testShifts #()
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated testRemainder #()
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated ModuleWithInitialStates #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -4242,6 +4243,13 @@ Warning: The result of this expression is not used. Only function calls can retu
  1680 │     -a % -b
       │     ───┬───  
       │        ╰───── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1684:16 ]
+      │
+ 1684 │     state bool[5] A
+      │                   ┬  
+      │                   ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!

@@ -1679,3 +1679,17 @@ module testRemainder {
 	a % -b
 	-a % -b
 }
+
+module ModuleWithInitialStates {
+	state bool[5] A
+
+	initial A[3] = true
+
+	output state bool[5] O'0
+
+	initial O[2] = false
+	initial O[3] = true
+
+	output state int#(FROM: 0, TO: 4)[2] X'0
+	initial X = [1, 2]
+}
