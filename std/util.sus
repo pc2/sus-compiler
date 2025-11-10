@@ -23,9 +23,9 @@ module Abs #(int TO) {
 	interface Abs : int #(FROM: -TO+1, TO) a -> int #(FROM: 0, TO) o
 
 	when a < 0 {
-		o = unsafe_int_cast#(FROM: 0, TO)(-a)
+		o = IntNarrow#(FROM: 0, TO)(-a)
 	} else {
-		o = unsafe_int_cast#(FROM: 0, TO)(a)
+		o = IntNarrow#(FROM: 0, TO)(a)
 	}
 }
 
@@ -127,7 +127,7 @@ module BitwiseIntSplit #(int TO, int LOWER_BITS) {
     bool[clog2#(V: TO)] v_bits = UIntToBits(v)
 
     lower = BitsToUInt(v_bits[:LOWER_BITS])
-    upper = transmute_from_bits#(T: type int#(FROM: 0, TO: UPPER_TO))(v_bits[LOWER_BITS:])
+    upper = FromBits#(T: type int#(FROM: 0, TO: UPPER_TO))(v_bits[LOWER_BITS:])
 }
 
 /// Recombines a lower and upper integer parts. 
@@ -141,7 +141,7 @@ module BitwiseIntConcat #(int UPPER_TO, int LOWER_BITS) {
     bool[clog2#(V: UPPER_TO) + LOWER_BITS] v_bits
     v_bits[:LOWER_BITS] = UIntToBits(lower)
     v_bits[LOWER_BITS:] = UIntToBits(upper)
-    v = transmute_from_bits#(T: type int#(FROM: 0, TO: UPPER_TO * pow2#(E: LOWER_BITS)))(v_bits)
+    v = FromBits#(T: type int#(FROM: 0, TO: UPPER_TO * pow2#(E: LOWER_BITS)))(v_bits)
 }
 
 /// Sets the lower [:LOWER_BITS] bits to false, thus aligning the value
@@ -153,11 +153,11 @@ module AlignToPow2 #(int FROM, int TO, int LOWER_BITS) {
         int#(FROM, TO) i'0 ->
         int#(FROM: ALIGNED_FROM, TO: ALIGNED_TO) o'0
 
-    bool[sizeof#(T: type int#(FROM, TO))] bits = transmute_to_bits(i)
+    bool[sizeof#(T: type int#(FROM, TO))] bits = ToBits(i)
     bool[sizeof#(T: type int#(FROM, TO))] aligned_bits
     aligned_bits[:LOWER_BITS] = Repeat(false)
     aligned_bits[LOWER_BITS:] = bits[LOWER_BITS:]
-    o = transmute_from_bits#(T: type int#(FROM: ALIGNED_FROM, TO: ALIGNED_TO))(aligned_bits)
+    o = FromBits#(T: type int#(FROM: ALIGNED_FROM, TO: ALIGNED_TO))(aligned_bits)
 }
 
 /// Converts a '0' or '1' into the equivalent boolean 'false' or 'true' respectively

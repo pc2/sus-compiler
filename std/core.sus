@@ -258,25 +258,32 @@ __builtin__ const int BitsToIntGen #(int NUM_BITS, bool[NUM_BITS] BITS) {}
 __builtin__ const int BitsToUIntGen #(int NUM_BITS, bool[NUM_BITS] BITS) {}
 
 
-__builtin__ module transmute_to_bits #(T) {
-    interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+/// Bitwise conversion of type T to a sizeof#(T)-bit bitset. 
+__builtin__ module ToBits #(T) {
+    interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
 }
 
-__builtin__ module transmute_from_bits #(T) {
-    interface transmute_from_bits : bool[sizeof #(T)] bits'0 -> T value'0
+/// Bitwise conversion of a sizeof#(T)-bit bitset to type T. 
+__builtin__ module FromBits #(T) {
+    interface FromBits : bool[sizeof #(T)] bits'0 -> T value'0
 }
 
-module transmute #(T1, T2) {
-    interface transmute : T1 a'0 -> T2 b'0
+/// Bitwise conversion of T1 into T2. 
+/// sizeof#(T: type T1) == sizeof#(T: type T2)
+module Transmute #(T1, T2) {
+    interface Transmute : T1 a'0 -> T2 b'0
 
     gen int SIZE = sizeof #(T: type T1)
     
     assert #(C: SIZE == sizeof #(T: type T2))
 
-    bool[SIZE] as_bits = transmute_to_bits #(T: type T1)(a)
-    b = transmute_from_bits #(T: type T2)(as_bits)
+    bool[SIZE] as_bits = ToBits#(T: type T1)(a)
+    b = FromBits#(T: type T2)(as_bits)
 }
 
-__builtin__ module unsafe_int_cast #(int FROM_I, int TO_I, int FROM, int TO) {
-    interface unsafe_int_cast : int#(FROM: FROM_I, TO: TO_I) in'0 -> int#(FROM, TO) out'0
+/// Unsafely shrinks the bounds of an integer.
+/// The result is not defined if the value lies outside the FROM:TO range.
+/// For folding behavior choose the `mod` operator instead. 
+__builtin__ module IntNarrow #(int FROM_I, int TO_I, int FROM, int TO) {
+    interface IntNarrow : int#(FROM: FROM_I, TO: TO_I) in'0 -> int#(FROM, TO) out'0
 }

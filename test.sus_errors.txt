@@ -131,11 +131,11 @@
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated testInts #()
 [ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate use_FIFO #()
 [ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate write_to_generative_through_when #()
-[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated transmute_to_bits #(T: type bool #()[60])
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated ToBits #(T: type bool #()[60])
 [ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate InstantiateTransmutes #()
-[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated transmute_to_bits #(T: type int #(FROM: 0, TO: 255)[2])
-[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated transmute_from_bits #(T: type int #(FROM: 0, TO: 65536))
-[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated transmute #(T1: type int #(FROM: 0, TO: 255)[2], T2: type int #(FROM: 0, TO: 65536))
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated ToBits #(T: type int #(FROM: 0, TO: 255)[2])
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated FromBits #(T: type int #(FROM: 0, TO: 65536))
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated Transmute #(T1: type int #(FROM: 0, TO: 255)[2], T2: type int #(FROM: 0, TO: 65536))
 [ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate StraightTransmute #()
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated use_trigger #()
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated use_use_trigger #()
@@ -3411,58 +3411,58 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │             ─────┬────  
       │                  ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Some submodule parameters of a were still unknown: transmute_from_bits #(T: type int #(FROM: ?, TO: ?)[30])
+Error: Some submodule parameters of a were still unknown: FromBits #(T: type int #(FROM: ?, TO: ?)[30])
 T can be inferred from:
 {*} = T in T value
 
-      ╭─[ test.sus:1388:41 ]
+      ╭─[ test.sus:1388:29 ]
       │
- 1388 │     transmute_from_bits #(T: type int[30]) a
-      │                                            ┬  
-      │                                            ╰── Some submodule parameters of a were still unknown: transmute_from_bits #(T: type int #(FROM: ?, TO: ?)[30])
+ 1388 │     FromBits#(T: type int[30]) a
+      │                                ┬  
+      │                                ╰── Some submodule parameters of a were still unknown: FromBits #(T: type int #(FROM: ?, TO: ?)[30])
 T can be inferred from:
 {*} = T in T value
 
 ──────╯
 Warning: Unused port 'bits'
-      ╭─[ test.sus:1389:40 ]
+      ╭─[ test.sus:1389:28 ]
       │
- 1389 │     transmute_to_bits #(T: type bool[60]) b
-      │                                           ┬  
-      │                                           ╰── Unused port 'bits'
-      │                                           │  
-      │                                           ╰── b declared here
+ 1389 │     ToBits#(T: type bool[60]) b
+      │                               ┬  
+      │                               ╰── Unused port 'bits'
+      │                               │  
+      │                               ╰── b declared here
       │
-      ├─[ core.sus:262:66 ]
+      ├─[ core.sus:263:55 ]
       │
-  262 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
-      │                                                                  ──┬─  
-      │                                                                    ╰─── Port 'bits' declared here
+  263 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
+      │                                                       ──┬─  
+      │                                                         ╰─── Port 'bits' declared here
 ──────╯
 Warning: Unused port 'value'
-      ╭─[ test.sus:1389:40 ]
+      ╭─[ test.sus:1389:28 ]
       │
- 1389 │     transmute_to_bits #(T: type bool[60]) b
-      │                                           ┬  
-      │                                           ╰── Unused port 'value'
-      │                                           │  
-      │                                           ╰── b declared here
+ 1389 │     ToBits#(T: type bool[60]) b
+      │                               ┬  
+      │                               ╰── Unused port 'value'
+      │                               │  
+      │                               ╰── b declared here
       │
-      ├─[ core.sus:262:37 ]
+      ├─[ core.sus:263:26 ]
       │
-  262 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
-      │                                     ──┬──  
-      │                                       ╰──── Port 'value' declared here
+  263 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
+      │                          ──┬──  
+      │                            ╰──── Port 'value' declared here
 ──────╯
-Error: Some submodule parameters of c were still unknown: transmute_to_bits #(T: type int #(FROM: ?, TO: ?)[3][3][5])
+Error: Some submodule parameters of c were still unknown: ToBits #(T: type int #(FROM: ?, TO: ?)[3][3][5])
 T can be inferred from:
 {*} <: T in T value
 
-      ╭─[ test.sus:1390:44 ]
+      ╭─[ test.sus:1390:32 ]
       │
- 1390 │     transmute_to_bits #(T: type int[3][3][5]) c
-      │                                               ┬  
-      │                                               ╰── Some submodule parameters of c were still unknown: transmute_to_bits #(T: type int #(FROM: ?, TO: ?)[3][3][5])
+ 1390 │     ToBits#(T: type int[3][3][5]) c
+      │                                   ┬  
+      │                                   ╰── Some submodule parameters of c were still unknown: ToBits #(T: type int #(FROM: ?, TO: ?)[3][3][5])
 T can be inferred from:
 {*} <: T in T value
 
@@ -3484,7 +3484,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1398:6 ]
       │
- 1398 │     int b = transmute #(T2: type int#(FROM: 0, TO: 256*256)) (a)
+ 1398 │     int b = Transmute#(T2: type int#(FROM: 0, TO: 256*256)) (a)
       │         ┬  
       │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯

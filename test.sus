@@ -1385,9 +1385,9 @@ module SameNameAsType #(NUM_INPUTS) {
 }
 
 module InstantiateTransmutes {
-	transmute_from_bits #(T: type int[30]) a
-	transmute_to_bits #(T: type bool[60]) b
-	transmute_to_bits #(T: type int[3][3][5]) c
+	FromBits#(T: type int[30]) a
+	ToBits#(T: type bool[60]) b
+	ToBits#(T: type int[3][3][5]) c
 }
 
 module StraightTransmute {
@@ -1395,7 +1395,7 @@ module StraightTransmute {
 
 	gen int SZ = sizeof #(T: type int#(FROM: 0, TO: 256*256))
 
-	int b = transmute #(T2: type int#(FROM: 0, TO: 256*256)) (a)
+	int b = Transmute#(T2: type int#(FROM: 0, TO: 256*256)) (a)
 
 	int #(FROM: 5, TO: 3) v
 }

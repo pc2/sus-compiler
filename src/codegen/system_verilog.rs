@@ -1211,7 +1211,7 @@ impl<'g> CodeGenerationContext<'g> {
 
                 writeln!(self.program_text, "\tassign value = bits;").unwrap();
             }
-            "unsafe_int_cast" => {
+            "IntNarrow" => {
                 let [_from_i, _to_i, _from, _to] = args.cast_to_int_array();
                 if self.check_ports([(Input, "in"), (Output, "out")]) {
                     return;
@@ -1219,7 +1219,7 @@ impl<'g> CodeGenerationContext<'g> {
 
                 writeln!(self.program_text, "\tassign out = in;").unwrap();
             }
-            "transmute_to_bits" => {
+            "ToBits" => {
                 let [typ] = args.cast_to_array();
                 let typ = typ.unwrap_type();
 
@@ -1238,7 +1238,7 @@ impl<'g> CodeGenerationContext<'g> {
                     })
                 });
             }
-            "transmute_from_bits" => {
+            "FromBits" => {
                 let [typ] = args.cast_to_array();
                 let typ = typ.unwrap_type();
 

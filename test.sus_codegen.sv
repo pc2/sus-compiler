@@ -3793,54 +3793,54 @@ always_comb begin // combinatorial result
 end
 endmodule
 
-// transmute #(T1: type int #(FROM: 0, TO: 255)[2], T2: type int #(FROM: 0, TO: 65536))
-module transmute_T1_type_int_FROM_0_TO_255_2_T2_type_int_FROM_0_TO_65536(
+// Transmute #(T1: type int #(FROM: 0, TO: 255)[2], T2: type int #(FROM: 0, TO: 65536))
+module Transmute_T1_type_int_FROM_0_TO_255_2_T2_type_int_FROM_0_TO_65536(
 	input clk,
 	input wire[7:0] a[1:0],
 	output /*mux_wire*/ logic[15:0] b
 );
 
 /*mux_wire*/ logic[15:0] as_bits;
-/*mux_wire*/ logic[7:0] _transmute_to_bits_value[1:0];
-wire[15:0] _transmute_to_bits_bits;
-/*mux_wire*/ logic[15:0] _transmute_from_bits_bits;
-wire[15:0] _transmute_from_bits_value;
-transmute_to_bits_T_type_int_FROM_0_TO_255_2 transmute_to_bits(
+/*mux_wire*/ logic[7:0] _ToBits_value[1:0];
+wire[15:0] _ToBits_bits;
+/*mux_wire*/ logic[15:0] _FromBits_bits;
+wire[15:0] _FromBits_value;
+ToBits_T_type_int_FROM_0_TO_255_2 ToBits(
 	.clk(clk),
-	.value(_transmute_to_bits_value),
-	.bits(_transmute_to_bits_bits)
+	.value(_ToBits_value),
+	.bits(_ToBits_bits)
 );
-transmute_from_bits_T_type_int_FROM_0_TO_65536 transmute_from_bits(
+FromBits_T_type_int_FROM_0_TO_65536 FromBits(
 	.clk(clk),
-	.bits(_transmute_from_bits_bits),
-	.value(_transmute_from_bits_value)
+	.bits(_FromBits_bits),
+	.value(_FromBits_value)
 );
 always_comb begin // combinatorial b
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	b = 16'dx;
-	b = _transmute_from_bits_value;
+	b = _FromBits_value;
 end
 always_comb begin // combinatorial as_bits
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	as_bits = 16'bxxxxxxxxxxxxxxxx;
-	as_bits = _transmute_to_bits_bits;
+	as_bits = _ToBits_bits;
 end
-always_comb begin // combinatorial _transmute_to_bits_value
+always_comb begin // combinatorial _ToBits_value
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_transmute_to_bits_value = '{8'dx, 8'dx};
+	_ToBits_value = '{8'dx, 8'dx};
 	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
-_transmute_to_bits_value[_v0] = a[_v0];
+_ToBits_value[_v0] = a[_v0];
 end
 end
-always_comb begin // combinatorial _transmute_from_bits_bits
+always_comb begin // combinatorial _FromBits_bits
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_transmute_from_bits_bits = 16'bxxxxxxxxxxxxxxxx;
-	_transmute_from_bits_bits = as_bits;
+	_FromBits_bits = 16'bxxxxxxxxxxxxxxxx;
+	_FromBits_bits = as_bits;
 end
 endmodule
 
-// transmute_from_bits #(T: type int #(FROM: 0, TO: 65536))
-module transmute_from_bits_T_type_int_FROM_0_TO_65536(
+// FromBits #(T: type int #(FROM: 0, TO: 65536))
+module FromBits_T_type_int_FROM_0_TO_65536(
 	input clk,
 	input wire[15:0] bits,
 	output /*mux_wire*/ logic[15:0] value
@@ -3849,8 +3849,8 @@ module transmute_from_bits_T_type_int_FROM_0_TO_65536(
 assign value = bits;
 endmodule
 
-// transmute_to_bits #(T: type int #(FROM: 0, TO: 255)[2])
-module transmute_to_bits_T_type_int_FROM_0_TO_255_2(
+// ToBits #(T: type int #(FROM: 0, TO: 255)[2])
+module ToBits_T_type_int_FROM_0_TO_255_2(
 	input clk,
 	input wire[7:0] value[1:0],
 	output /*mux_wire*/ logic[15:0] bits
@@ -3864,8 +3864,8 @@ end
 endgenerate
 endmodule
 
-// transmute_to_bits #(T: type bool #()[60])
-module transmute_to_bits_T_type_bool_60(
+// ToBits #(T: type bool #()[60])
+module ToBits_T_type_bool_60(
 	input clk,
 	input wire[59:0] value,
 	output /*mux_wire*/ logic[59:0] bits
