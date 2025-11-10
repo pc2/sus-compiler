@@ -861,6 +861,21 @@ impl<'l> ExecutionContext<'l> {
                     )),
                 }
             }
+            get_builtin_const!("RepeatGen") => {
+                let [t, v, size] = cst_ref.template_args.cast_to_array();
+
+                let t = t.unwrap_type().clone();
+                let v = v.unwrap_value().unwrap_set();
+                let size = must_be_small_uint::<usize>(
+                    size.unwrap_value().unwrap_integer(),
+                    "V",
+                    usize::MAX,
+                )?;
+
+                let v_copies: Vec<Value> = (0..size).map(|_| v.clone()).collect();
+
+                Ok((Value::Array(v_copies), t.to_abstract().rank_up()))
+            }
             get_builtin_const!("__crash_compiler") => {
                 panic!(
                     "__crash_compiler Intentional ICE. This is for debugging the compiler and LSP."

@@ -5,6 +5,10 @@ use sus_proc_macro::get_builtin_type;
 use crate::linker::GlobalUUID;
 use crate::prelude::*;
 use crate::to_string::display_join;
+use crate::typing::abstract_type::AbstractGlobalReference;
+use crate::typing::abstract_type::AbstractInnerType;
+use crate::typing::abstract_type::AbstractRankedType;
+use crate::typing::abstract_type::PeanoType;
 use crate::util::all_equal;
 use std::ops::Deref;
 use std::ops::DerefMut;
@@ -42,11 +46,11 @@ pub enum SubtypeRelation {
 }
 
 /// A post-instantiation type. These fully define what wires should be generated for a given object.
-/// So as opposed to [crate::typing::abstract_type::AbstractType], type parameters are filled out with concrete values.
+/// So as opposed to [crate::typing::abstract_type::AbstractRankedType], type parameters are filled out with concrete values.
 ///
 /// Examples: `bool[3]`, `int #(TO: 20)`
 ///
-/// Not to be confused with [crate::typing::abstract_type::AbstractType] which represents pre-instantiation types,
+/// Not to be confused with [crate::typing::abstract_type::AbstractRankedType] which represents pre-instantiation types,
 /// or [crate::flattening::WrittenType] which represents the textual in-editor data.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ConcreteType {
@@ -283,6 +287,28 @@ impl ConcreteType {
             typ = &typ.unwrap_array().0;
         }
         typ
+    }
+
+    pub fn to_abstract(&self) -> AbstractRankedType {
+        match self {
+            ConcreteType::Named(named_typ) => {
+                let inner = AbstractInnerType::Named(AbstractGlobalReference {
+                    id: named_typ.id,
+                    template_arg_types: named_typ.template_args.map(|(_, arg)| match arg {
+                        TemplateKind::Type(t) => TemplateKind::Type(t.to_abstract()),
+                        TemplateKind::Value(_) => TemplateKind::Value(()),
+                    }),
+                });
+                AbstractRankedType {
+                    inner,
+                    rank: PeanoType::Zero,
+                }
+            }
+            ConcreteType::Array(arr_box) => {
+                let (content, _size) = arr_box.deref();
+                content.to_abstract().rank_up()
+            }
+        }
     }
 
     pub fn is_valid(&self) -> bool {

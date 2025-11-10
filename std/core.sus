@@ -70,6 +70,8 @@ __builtin__ const int max #(int A, int B) {}
 /// `Result == V`, but this prevents this from being included in the inference parameters. 
 __builtin__ const int noinfer #(int V) {}
 
+__builtin__ const T[SIZE] RepeatGen #(T, T V, int SIZE) {}
+
 /// Unsafe builtin to circumvent the Latency Counting System. Connects `out` to `in` without adding the requisite latency
 /// Or: used for negative latencies, for instance to implement Almost-Full FIFOs, stateful for loops, etc. 
 __builtin__ module LatencyOffset #(T, int OFFSET) {

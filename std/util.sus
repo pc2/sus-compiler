@@ -37,7 +37,8 @@ module Concat #(T, int SIZE_A, int SIZE_B) {
 	result[SIZE_A:] = b
 }
 
-/// Concatenate two arrays, such that the elements of b come after the elements of a
+/// Returns an array of SIZE copies of v
+/// Runtime version of [RepeatGen]
 module Repeat #(T, int SIZE) {
 	interface Repeat : T v'0 -> T[SIZE] result'0
 
