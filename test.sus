@@ -1693,3 +1693,12 @@ module ModuleWithInitialStates {
 	output state int#(FROM: 0, TO: 4)[2] X'0
 	initial X = [1, 2]
 }
+
+module TestGenArrayOps {
+	gen int[4] REPEATS = RepeatGen#(T: type int#(FROM: 0, TO: 10), SIZE: 4, V: 7)
+	assert#(C: &(REPEATS == [7, 7, 7, 7]))
+	gen int[4] REVERSE = ReverseGen#(T: type int#(FROM: 0, TO: 10), SIZE: 4, V: [1,2,3,4])
+	assert#(C: &(REVERSE == [4, 3, 2, 1]))
+	gen int[4] CONCAT = ConcatGen#(T: type int#(FROM: 0, TO: 10), SIZE_A: 4, SIZE_B: 3, V_A: [1,2,3,4], V_B: [7, 8, 9])
+	assert#(C: &(CONCAT == [1, 2, 3, 4, 7, 8, 9]))
+}

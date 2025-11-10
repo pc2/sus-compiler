@@ -862,7 +862,7 @@ impl<'l> ExecutionContext<'l> {
                 }
             }
             get_builtin_const!("RepeatGen") => {
-                let [t, v, size] = cst_ref.template_args.cast_to_array();
+                let [t, size, v] = cst_ref.template_args.cast_to_array();
 
                 let t = t.unwrap_type().clone();
                 let v = v.unwrap_value().unwrap_set();
@@ -873,6 +873,65 @@ impl<'l> ExecutionContext<'l> {
                 )?;
 
                 let v_copies: Vec<Value> = (0..size).map(|_| v.clone()).collect();
+
+                Ok((Value::Array(v_copies), t.to_abstract().rank_up()))
+            }
+            get_builtin_const!("ReverseGen") => {
+                let [t, size, v] = cst_ref.template_args.cast_to_array();
+
+                let t = t.unwrap_type().clone();
+                let v = v.unwrap_value().unwrap_array();
+
+                let size = must_be_small_uint::<usize>(
+                    size.unwrap_value().unwrap_integer(),
+                    "V",
+                    usize::MAX,
+                )?;
+
+                if size != v.len() {
+                    return Err(format!(
+                        "SIZE={size} is not the size of the input array={}",
+                        v.len()
+                    ));
+                }
+
+                let v_copies: Vec<Value> = v.iter().rev().cloned().collect();
+
+                Ok((Value::Array(v_copies), t.to_abstract().rank_up()))
+            }
+            get_builtin_const!("ConcatGen") => {
+                let [t, size_a, size_b, v_a, v_b] = cst_ref.template_args.cast_to_array();
+
+                let t = t.unwrap_type().clone();
+                let v_a = v_a.unwrap_value().unwrap_array();
+                let v_b = v_b.unwrap_value().unwrap_array();
+
+                let size_a = must_be_small_uint::<usize>(
+                    size_a.unwrap_value().unwrap_integer(),
+                    "V_A",
+                    usize::MAX,
+                )?;
+                let size_b = must_be_small_uint::<usize>(
+                    size_b.unwrap_value().unwrap_integer(),
+                    "V_B",
+                    usize::MAX,
+                )?;
+
+                if size_a != v_a.len() {
+                    return Err(format!(
+                        "SIZE_A={size_a} is not the size of the input array={}",
+                        v_a.len()
+                    ));
+                }
+
+                if size_b != v_b.len() {
+                    return Err(format!(
+                        "SIZE_A={size_b} is not the size of the input array={}",
+                        v_b.len()
+                    ));
+                }
+
+                let v_copies: Vec<Value> = v_a.iter().chain(v_b.iter()).cloned().collect();
 
                 Ok((Value::Array(v_copies), t.to_abstract().rank_up()))
             }

@@ -29,15 +29,7 @@ module Abs #(int TO) {
 	}
 }
 
-/// Concatenate two arrays, such that the elements of b come after the elements of a
-module Concat #(T, int SIZE_A, int SIZE_B) {
-	interface Concat : T[SIZE_A] a'0, T[SIZE_B] b'0 -> T[SIZE_A + SIZE_B] result'0
-
-	result[:SIZE_A] = a
-	result[SIZE_A:] = b
-}
-
-/// Returns an array of SIZE copies of v
+/// Returns an array of SIZE copies of v - should not consume any hardware
 /// Runtime version of [RepeatGen]
 module Repeat #(T, int SIZE) {
 	interface Repeat : T v'0 -> T[SIZE] result'0
@@ -45,6 +37,25 @@ module Repeat #(T, int SIZE) {
 	for int I in 0..SIZE {
 		result[I] = v
 	}
+}
+
+/// Reverse an array - should not consume any hardware
+/// Runtime version of [ReverseGen]
+module Reverse #(T, int SIZE) {
+	interface Reverse : T[SIZE] v'0 -> T[SIZE] result'0
+
+	for int I in 0..SIZE {
+		result[I] = v[SIZE - I - 1]
+	}
+}
+
+/// Concatenate two arrays, such that the elements of b come after the elements of a - should not consume any hardware
+/// Runtime version of [ConcatGen]
+module Concat #(T, int SIZE_A, int SIZE_B) {
+	interface Concat : T[SIZE_A] a'0, T[SIZE_B] b'0 -> T[SIZE_A + SIZE_B] result'0
+
+	result[:SIZE_A] = a
+	result[SIZE_A:] = b
 }
 
 module BitSelect #(int SIZE) {

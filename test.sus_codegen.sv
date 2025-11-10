@@ -1,3 +1,10 @@
+// TestGenArrayOps #()
+module TestGenArrayOps(
+	input clk
+);
+
+endmodule
+
 // ModuleWithInitialStates #()
 module ModuleWithInitialStates(
 	input clk,
