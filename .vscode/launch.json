@@ -179,10 +179,6 @@
 			"name": "Launch SUS LSP",
 			"runtimeExecutable": "${execPath}",
 			"args": ["--extensionDevelopmentPath=${workspaceRoot}/sus-lsp"],
-			"preLaunchTask": {
-				"type": "npm",
-				"script": "watch"
-			}
 		},
         {
             "type": "lldb",
