@@ -1,4 +1,13 @@
 # Changelog
+## 0.3.6
+- Codegen: Fix incorrect codegen for output state initial values (#141)
+- Codegen: Again output bitwidths for decimal numbers (#140)
+- VSCode LSP: Fix LSP not finding default sus_compiler, due to accidentally clearing PATH. 
+- Rename `transmute_from_bits` -> `FromBits`, `transmute_to_bits` -> `ToBits`, `transmute` -> `Transmute`, `unsafe_int_cast` -> `IntNarrow`
+- Add `RepeatGen`, `ConcatGen`, `Reverse` and `ReverseGen` (#139)
+- Move XPM platform stuff to a separate [sus-xpm](https://github.com/pc2/sus-xpm) library. 
+- Add recommended libraries to README.md
+
 ## 0.3.5: The all about operators update
 - Add `double` and double literals (`0.3d`) (#134)
 - Add `string` and string literals (`"beep \"boop\" baap"`) (#131)
