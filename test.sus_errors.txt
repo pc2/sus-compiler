@@ -116,7 +116,7 @@
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated infer_me #(A: 2)
 [ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate inference_edge_case #()
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated specified_latencies_not_ports_edge_case #()
-[ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate testArrayWrite #()
+[INFO  sus_compiler::instantiation::instantiation_cache] Instantiated testArrayWrite #()
 [ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate instantiate_infer_me_with_poison_output #()
 [ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate use_MultiStateLoop #()
 [ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate CombineArray #()
@@ -163,6 +163,7 @@
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated testRemainder #()
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated ModuleWithInitialStates #()
 [INFO  sus_compiler::instantiation::instantiation_cache] Instantiated TestGenArrayOps #()
+[ERROR sus_compiler::instantiation::instantiation_cache] Failed to instantiate NonGenerativeSliceBoundsMustNotICE #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -2477,454 +2478,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │          ───┬───  
       │             ╰───── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Some parameters of 'in_arr' were still unknown: int #(FROM: ?, TO: ?)[10][6][2]
-      ╭─[ test.sus:1200:43 ]
-      │
- 1200 │     interface testArrayWrite : int[10][6][2] in_arr -> int[10][6] out_arr
-      │                                              ───┬──  
-      │                                                 ╰──── Some parameters of 'in_arr' were still unknown: int #(FROM: ?, TO: ?)[10][6][2]
-──────╯
-Error: Some parameters of 'out_arr' were still unknown: int #(FROM: ?, TO: ?)[10][6]
-      ╭─[ test.sus:1200:64 ]
-      │
- 1200 │     interface testArrayWrite : int[10][6][2] in_arr -> int[10][6] out_arr
-      │                                                                   ───┬───  
-      │                                                                      ╰───── Some parameters of 'out_arr' were still unknown: int #(FROM: ?, TO: ?)[10][6]
-──────╯
-Error: Some parameters of '_1' were still unknown: int #(FROM: ?, TO: ?)[10][6]
-      ╭─[ test.sus:1202:12 ]
-      │
- 1202 │     out_arr = in_arr[0]
-      │               ────┬────  
-      │                   ╰────── Some parameters of '_1' were still unknown: int #(FROM: ?, TO: ?)[10][6]
-──────╯
-Error: Some parameters of '_2' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1204:18 ]
-      │
- 1204 │     out_arr[5][9] = in_arr[0][5][9]
-      │                     ───────┬───────  
-      │                            ╰───────── Some parameters of '_2' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_10' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_10' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_11' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_11' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_12' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_12' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_13' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_13' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_14' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_14' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_15' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_15' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_16' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_16' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_17' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_17' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_18' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_18' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_19' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_19' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_20' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_20' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_21' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_21' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_22' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_22' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_23' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_23' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_24' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_24' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_25' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_25' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_26' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_26' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_27' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_27' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_28' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_28' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_29' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_29' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_3' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_3' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_30' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_30' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_31' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_31' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_32' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_32' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_33' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_33' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_34' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_34' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_35' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_35' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_36' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_36' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_37' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_37' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_38' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_38' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_39' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_39' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_4' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_4' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_40' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_40' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_41' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_41' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_42' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_42' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_43' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_43' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_44' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_44' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_45' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_45' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_46' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_46' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_47' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_47' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_48' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_48' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_49' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_49' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_5' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_5' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_50' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_50' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_51' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_51' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_52' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_52' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_53' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_53' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_54' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_54' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_55' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_55' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_56' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_56' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_57' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_57' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_58' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_58' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_59' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_59' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_6' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_6' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_60' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_60' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_61' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_61' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_62' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_62' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_7' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_7' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_8' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_8' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
-Error: Some parameters of '_9' were still unknown: int #(FROM: ?, TO: ?)
-      ╭─[ test.sus:1208:20 ]
-      │
- 1208 │          out_arr[j][i] = in_arr[0][j][i]
-      │                          ───────┬───────  
-      │                                 ╰───────── Some parameters of '_9' were still unknown: int #(FROM: ?, TO: ?)
-──────╯
 Error: Some submodule parameters of infer_me_with_poison_output were still unknown: infer_me_with_poison_output #(N: ?)
 N can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
     N <= o'{*} - i'{*}  ({*} = ? not reached)
@@ -4252,6 +3805,97 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                   ┬  
       │                   ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: Not Instantiating NonGenerativeSliceBoundsMustNotICE #() due to abstract typing errors
+      ╭─[ test.sus:1706:8 ]
+      │
+ 1706 │ module NonGenerativeSliceBoundsMustNotICE {
+      │        ─────────────────┬────────────────  
+      │                         ╰────────────────── Not Instantiating NonGenerativeSliceBoundsMustNotICE #() due to abstract typing errors
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1707:14 ]
+      │
+ 1707 │     bool[20] arr
+      │              ─┬─  
+      │               ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1709:9 ]
+      │
+ 1709 │     int x = 3
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1710:5 ]
+      │
+ 1710 │     arr[3 +: x]
+      │     ─────┬─────  
+      │          ╰─────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Error: The width of a part-select cannot be non-generative
+      ╭─[ test.sus:1710:14 ]
+      │
+ 1710 │     arr[3 +: x]
+      │              ┬  
+      │              ╰── The width of a part-select cannot be non-generative
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1711:5 ]
+      │
+ 1711 │     arr[x:5]
+      │     ────┬───  
+      │         ╰───── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Error: A slice bound cannot be non-generative
+      ╭─[ test.sus:1711:9 ]
+      │
+ 1711 │     arr[x:5]
+      │         ┬  
+      │         ╰── A slice bound cannot be non-generative
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1712:5 ]
+      │
+ 1712 │     arr[5:x]
+      │     ────┬───  
+      │         ╰───── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Error: A slice bound cannot be non-generative
+      ╭─[ test.sus:1712:11 ]
+      │
+ 1712 │     arr[5:x]
+      │           ┬  
+      │           ╰── A slice bound cannot be non-generative
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1713:5 ]
+      │
+ 1713 │     arr[x:]
+      │     ───┬───  
+      │        ╰───── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Error: A slice bound cannot be non-generative
+      ╭─[ test.sus:1713:9 ]
+      │
+ 1713 │     arr[x:]
+      │         ┬  
+      │         ╰── A slice bound cannot be non-generative
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1714:5 ]
+      │
+ 1714 │     arr[:x]
+      │     ───┬───  
+      │        ╰───── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Error: A slice bound cannot be non-generative
+      ╭─[ test.sus:1714:10 ]
+      │
+ 1714 │     arr[:x]
+      │          ┬  
+      │          ╰── A slice bound cannot be non-generative
+──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen test_various_assignments #() due to errors!
@@ -4306,7 +3950,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [ERROR sus_compiler::codegen] Cannot codegen use_infer_me #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen instantiate_fifo #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen inference_edge_case #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen testArrayWrite #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen instantiate_infer_me_with_poison_output #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen use_MultiStateLoop #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen CombineArray #() due to errors!
@@ -4325,3 +3968,4 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [ERROR sus_compiler::codegen] Cannot codegen make_when #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen use_make_when #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen use_module_taking_strings #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen NonGenerativeSliceBoundsMustNotICE #() due to errors!

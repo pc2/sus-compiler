@@ -1197,7 +1197,7 @@ module specified_latencies_not_ports_edge_case {
 	out_port = out_spec | in_port
 }
 module testArrayWrite {
-	interface testArrayWrite : int[10][6][2] in_arr -> int[10][6] out_arr
+	interface testArrayWrite : int#(FROM: -3, TO: 6)[10][6][2] in_arr -> int[10][6] out_arr
 
 	out_arr = in_arr[0]
 
@@ -1701,4 +1701,15 @@ module TestGenArrayOps {
 	assert#(C: &(REVERSE == [4, 3, 2, 1]))
 	gen int[4] CONCAT = ConcatGen#(T: type int#(FROM: 0, TO: 10), SIZE_A: 4, SIZE_B: 3, V_A: [1,2,3,4], V_B: [7, 8, 9])
 	assert#(C: &(CONCAT == [1, 2, 3, 4, 7, 8, 9]))
+}
+
+module NonGenerativeSliceBoundsMustNotICE {
+    bool[20] arr
+
+    int x = 3
+    arr[3 +: x]
+    arr[x:5]
+    arr[5:x]
+    arr[x:]
+    arr[:x]
 }

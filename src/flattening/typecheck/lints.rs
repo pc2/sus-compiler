@@ -113,6 +113,39 @@ impl LintContext<'_> {
             }
             WireReferenceRoot::Error => {}
         }
+        for pe in &wire_ref.path {
+            match pe {
+                WireReferencePathElement::FieldAccess { .. } => {}
+                WireReferencePathElement::ArrayAccess { .. } => {}
+                WireReferencePathElement::ArrayPartSelect {
+                    from: _,
+                    width,
+                    bracket_span: _,
+                    direction: _,
+                } => {
+                    let width = self.working_on.instructions[*width].unwrap_subexpression();
+                    if width.domain != DomainType::Generative {
+                        self.errors.error(
+                            width.span,
+                            "The width of a part-select cannot be non-generative",
+                        );
+                    }
+                }
+                WireReferencePathElement::ArraySlice {
+                    from,
+                    to,
+                    bracket_span: _,
+                } => {
+                    for bound in from.iter().chain(to.iter()) {
+                        let bound = self.working_on.instructions[*bound].unwrap_subexpression();
+                        if bound.domain != DomainType::Generative {
+                            self.errors
+                                .error(bound.span, "A slice bound cannot be non-generative");
+                        }
+                    }
+                }
+            }
+        }
     }
     fn cant_be_interface(&self, operation: &'static str, wire_ref: &WireReference) {
         match &wire_ref.output_typ.inner {

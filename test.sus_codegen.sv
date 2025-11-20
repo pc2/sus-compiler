@@ -793,6 +793,156 @@ always_comb begin // combinatorial q
 end
 endmodule
 
+// testArrayWrite #()
+module testArrayWrite(
+	input clk,
+	input wire signed[3:0] in_arr[1:0][5:0][9:0],
+	output /*mux_wire*/ logic signed[3:0] out_arr[5:0][9:0]
+);
+
+genvar _g0;
+genvar _g1;
+wire signed[3:0] _1[5:0][9:0];
+generate
+for(_g0 = 0; _g0 < 6; _g0 = _g0 + 1) begin
+for(_g1 = 0; _g1 < 10; _g1 = _g1 + 1) begin
+assign _1[_g0][_g1] = in_arr[0][_g0][_g1];
+end
+end
+endgenerate
+wire signed[3:0] _2 = in_arr[0][5][9];
+wire signed[3:0] _3 = in_arr[0][0][0];
+wire signed[3:0] _4 = in_arr[0][1][0];
+wire signed[3:0] _5 = in_arr[0][2][0];
+wire signed[3:0] _6 = in_arr[0][3][0];
+wire signed[3:0] _7 = in_arr[0][4][0];
+wire signed[3:0] _8 = in_arr[0][5][0];
+wire signed[3:0] _9 = in_arr[0][0][1];
+wire signed[3:0] _10 = in_arr[0][1][1];
+wire signed[3:0] _11 = in_arr[0][2][1];
+wire signed[3:0] _12 = in_arr[0][3][1];
+wire signed[3:0] _13 = in_arr[0][4][1];
+wire signed[3:0] _14 = in_arr[0][5][1];
+wire signed[3:0] _15 = in_arr[0][0][2];
+wire signed[3:0] _16 = in_arr[0][1][2];
+wire signed[3:0] _17 = in_arr[0][2][2];
+wire signed[3:0] _18 = in_arr[0][3][2];
+wire signed[3:0] _19 = in_arr[0][4][2];
+wire signed[3:0] _20 = in_arr[0][5][2];
+wire signed[3:0] _21 = in_arr[0][0][3];
+wire signed[3:0] _22 = in_arr[0][1][3];
+wire signed[3:0] _23 = in_arr[0][2][3];
+wire signed[3:0] _24 = in_arr[0][3][3];
+wire signed[3:0] _25 = in_arr[0][4][3];
+wire signed[3:0] _26 = in_arr[0][5][3];
+wire signed[3:0] _27 = in_arr[0][0][4];
+wire signed[3:0] _28 = in_arr[0][1][4];
+wire signed[3:0] _29 = in_arr[0][2][4];
+wire signed[3:0] _30 = in_arr[0][3][4];
+wire signed[3:0] _31 = in_arr[0][4][4];
+wire signed[3:0] _32 = in_arr[0][5][4];
+wire signed[3:0] _33 = in_arr[0][0][5];
+wire signed[3:0] _34 = in_arr[0][1][5];
+wire signed[3:0] _35 = in_arr[0][2][5];
+wire signed[3:0] _36 = in_arr[0][3][5];
+wire signed[3:0] _37 = in_arr[0][4][5];
+wire signed[3:0] _38 = in_arr[0][5][5];
+wire signed[3:0] _39 = in_arr[0][0][6];
+wire signed[3:0] _40 = in_arr[0][1][6];
+wire signed[3:0] _41 = in_arr[0][2][6];
+wire signed[3:0] _42 = in_arr[0][3][6];
+wire signed[3:0] _43 = in_arr[0][4][6];
+wire signed[3:0] _44 = in_arr[0][5][6];
+wire signed[3:0] _45 = in_arr[0][0][7];
+wire signed[3:0] _46 = in_arr[0][1][7];
+wire signed[3:0] _47 = in_arr[0][2][7];
+wire signed[3:0] _48 = in_arr[0][3][7];
+wire signed[3:0] _49 = in_arr[0][4][7];
+wire signed[3:0] _50 = in_arr[0][5][7];
+wire signed[3:0] _51 = in_arr[0][0][8];
+wire signed[3:0] _52 = in_arr[0][1][8];
+wire signed[3:0] _53 = in_arr[0][2][8];
+wire signed[3:0] _54 = in_arr[0][3][8];
+wire signed[3:0] _55 = in_arr[0][4][8];
+wire signed[3:0] _56 = in_arr[0][5][8];
+wire signed[3:0] _57 = in_arr[0][0][9];
+wire signed[3:0] _58 = in_arr[0][1][9];
+wire signed[3:0] _59 = in_arr[0][2][9];
+wire signed[3:0] _60 = in_arr[0][3][9];
+wire signed[3:0] _61 = in_arr[0][4][9];
+wire signed[3:0] _62 = in_arr[0][5][9];
+always_comb begin // combinatorial out_arr
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	out_arr = '{'{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}, '{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}, '{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}, '{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}, '{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}, '{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}};
+	for(int _v0 = 0; _v0 < 6; _v0 = _v0 + 1) begin
+for(int _v1 = 0; _v1 < 10; _v1 = _v1 + 1) begin
+out_arr[_v0][_v1] = _1[_v0][_v1];
+end
+end
+	out_arr[5][9] = _2;
+	out_arr[0][0] = _3;
+	out_arr[1][0] = _4;
+	out_arr[2][0] = _5;
+	out_arr[3][0] = _6;
+	out_arr[4][0] = _7;
+	out_arr[5][0] = _8;
+	out_arr[0][1] = _9;
+	out_arr[1][1] = _10;
+	out_arr[2][1] = _11;
+	out_arr[3][1] = _12;
+	out_arr[4][1] = _13;
+	out_arr[5][1] = _14;
+	out_arr[0][2] = _15;
+	out_arr[1][2] = _16;
+	out_arr[2][2] = _17;
+	out_arr[3][2] = _18;
+	out_arr[4][2] = _19;
+	out_arr[5][2] = _20;
+	out_arr[0][3] = _21;
+	out_arr[1][3] = _22;
+	out_arr[2][3] = _23;
+	out_arr[3][3] = _24;
+	out_arr[4][3] = _25;
+	out_arr[5][3] = _26;
+	out_arr[0][4] = _27;
+	out_arr[1][4] = _28;
+	out_arr[2][4] = _29;
+	out_arr[3][4] = _30;
+	out_arr[4][4] = _31;
+	out_arr[5][4] = _32;
+	out_arr[0][5] = _33;
+	out_arr[1][5] = _34;
+	out_arr[2][5] = _35;
+	out_arr[3][5] = _36;
+	out_arr[4][5] = _37;
+	out_arr[5][5] = _38;
+	out_arr[0][6] = _39;
+	out_arr[1][6] = _40;
+	out_arr[2][6] = _41;
+	out_arr[3][6] = _42;
+	out_arr[4][6] = _43;
+	out_arr[5][6] = _44;
+	out_arr[0][7] = _45;
+	out_arr[1][7] = _46;
+	out_arr[2][7] = _47;
+	out_arr[3][7] = _48;
+	out_arr[4][7] = _49;
+	out_arr[5][7] = _50;
+	out_arr[0][8] = _51;
+	out_arr[1][8] = _52;
+	out_arr[2][8] = _53;
+	out_arr[3][8] = _54;
+	out_arr[4][8] = _55;
+	out_arr[5][8] = _56;
+	out_arr[0][9] = _57;
+	out_arr[1][9] = _58;
+	out_arr[2][9] = _59;
+	out_arr[3][9] = _60;
+	out_arr[4][9] = _61;
+	out_arr[5][9] = _62;
+end
+endmodule
+
 // specified_latencies_not_ports_edge_case #()
 module specified_latencies_not_ports_edge_case(
 	input clk,

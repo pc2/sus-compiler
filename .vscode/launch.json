@@ -42,7 +42,6 @@
                 "--debug-whitelist", "TEST",
                 "tinyTestFile.sus",
                 "-o", "/dev/null",
-                "--top", "TEST",
                 "--debug", "TEST", // Temporary to add in code when debugging
                 "--debug", "print-abstract-pre-typecheck",
                 "--debug", "print-abstract",
