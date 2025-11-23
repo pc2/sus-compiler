@@ -8,7 +8,7 @@ use ibig::IBig;
 use unique_names::UniqueNames;
 
 use crate::latency::{AbsLat, InferenceFailure};
-use crate::linker::LinkInfo;
+use crate::linker::{LinkInfo, LinkerGlobals};
 use crate::prelude::*;
 use crate::typing::template::TVec;
 use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
@@ -392,7 +392,7 @@ impl Executed {
             generation_state: self.generation_state,
             md,
             link_info: &md.link_info,
-            linker,
+            globals: linker,
             errors,
         };
         (ctx, self.type_var_alloc)
@@ -428,10 +428,10 @@ pub struct ModuleTypingContext<'l> {
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
     pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
     pub generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
-    pub link_info: &'l LinkInfo,
+    pub globals: &'l LinkerGlobals,
     /// Yes I know it's redundant, but it's easier to both have link_info and md
-    pub linker: &'l Linker,
     pub md: &'l Module,
+    pub link_info: &'l LinkInfo,
     pub errors: ErrorCollector<'l>,
 }
 
@@ -586,7 +586,7 @@ fn perform_instantiation(
     }
 
     debug!("Concrete Typechecking {name}");
-    typed.typecheck(type_var_alloc);
+    typed.typecheck(type_var_alloc, linker);
 
     if crate::debug::is_enabled("print-concrete") {
         eprintln!("[[Instantiated {name}]]");

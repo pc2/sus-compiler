@@ -1,3 +1,4 @@
+use crate::linker::LinkerGlobals;
 use crate::prelude::*;
 
 use std::fmt::Display;
@@ -13,7 +14,6 @@ use crate::{
     flattening::Direction,
     instantiation::{ForEachContainedWire, ModuleTypingContext, RealWire, SubModule},
     latency::{LatencyCountingProblem, port_latency_inference::InferenceTarget},
-    linker::Linker,
     prelude::{SubModuleID, SubModuleIDMarker, WireID, WireIDMarker},
     typing::template::TemplateKind,
 };
@@ -145,7 +145,7 @@ fn custom_render_hardware_structure<'a>(
 
         // Emit edges for submodules
         for (_, sm) in &md_instance.submodules {
-            let s_md = &md_instance.linker.modules[sm.refers_to.id];
+            let s_md = &md_instance.globals.modules[sm.refers_to.id];
             let sm_name = &sm.name;
             for (port_id, port) in sm.port_map.iter_valids() {
                 let w_id = port.maps_to_wire;
@@ -170,7 +170,7 @@ pub fn display_latency_count_graph(
     lc_problem: &LatencyCountingProblem,
     wires: &FlatAlloc<RealWire, WireIDMarker>,
     submodules: &FlatAlloc<SubModule, SubModuleIDMarker>,
-    linker: &Linker,
+    globals: &LinkerGlobals,
     solution: Option<&[i64]>,
     module_name: &str,
     dot_type: &str,
@@ -195,7 +195,7 @@ pub fn display_latency_count_graph(
             lc_problem,
             wires,
             submodules,
-            linker,
+            globals,
             solution,
             module_name,
         ),
@@ -212,7 +212,7 @@ fn custom_render_latency_count_graph(
     lc_problem: &LatencyCountingProblem,
     wires: &FlatAlloc<RealWire, WireIDMarker>,
     submodules: &FlatAlloc<SubModule, SubModuleIDMarker>,
-    linker: &Linker,
+    globals: &LinkerGlobals,
     solution: Option<&[i64]>,
     graph_name: &str,
 ) -> impl std::fmt::Display {
@@ -268,7 +268,7 @@ fn custom_render_latency_count_graph(
             }
         };
         for (sm_id, sm) in submodules {
-            let sm_md = &linker.modules[sm.refers_to.id];
+            let sm_md = &globals.modules[sm.refers_to.id];
             if let Some(inst) = sm.instance.get() {
                 let inst_name = &inst.name;
                 let sm_name = &sm.name;
@@ -352,7 +352,7 @@ fn custom_render_latency_count_graph(
                     node.valid_parent = Some(sm_id);
                 }
             } else {
-                let failed_sm_name = sm.refers_to.display(&linker.globals);
+                let failed_sm_name = sm.refers_to.display(globals);
                 writeln!(f, "subgraph cluster_{sm_id:?} {{")?;
                 writeln!(f, "    label=\"{failed_sm_name}\";")?;
                 writeln!(f, "    style=filled;")?;
@@ -429,7 +429,7 @@ fn custom_render_latency_count_graph(
             if sm.instance.get().is_some() {
                 continue;
             }
-            let sm_md = &linker.modules[sm.refers_to.id];
+            let sm_md = &globals.modules[sm.refers_to.id];
             for (_, infer_info, param) in crate::alloc::zip_eq(
                 &sm_md.inference_info.parameter_inference_candidates,
                 &sm_md.link_info.parameters,

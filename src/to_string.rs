@@ -524,7 +524,7 @@ impl Display for InterfaceKind {
 
 /// port: int#(MIN: {*})
 impl InferenceTargetPath {
-    pub fn display(&self, md: &Module, linker: &Linker) -> impl Display {
+    pub fn display(&self, md: &Module, globals: &LinkerGlobals) -> impl Display {
         FmtWrapper(|f| {
             let port = &md.ports[self.port];
             let port_decl =
@@ -532,7 +532,7 @@ impl InferenceTargetPath {
 
             fn recurse_print(
                 f: &mut std::fmt::Formatter<'_>,
-                linker: &Linker,
+                globals: &LinkerGlobals,
                 li: &LinkInfo,
                 typ: &WrittenType,
                 path: &[SubtypeInferencePathElem],
@@ -542,24 +542,24 @@ impl InferenceTargetPath {
                         SubtypeInferencePathElem::DownArray => {
                             let_unwrap!(WrittenType::Array(_, arr_box), typ);
                             let (content, _sz, _) = arr_box.deref();
-                            recurse_print(f, linker, li, content, rest)?;
+                            recurse_print(f, globals, li, content, rest)?;
                             f.write_str("[]")
                         }
                         SubtypeInferencePathElem::ArraySize => {
                             let_unwrap!(WrittenType::Array(_, arr_box), typ);
                             let (content, _sz, _) = arr_box.deref();
-                            recurse_print(f, linker, li, content, rest)?;
+                            recurse_print(f, globals, li, content, rest)?;
                             f.write_str("[{*}]")
                         }
                         SubtypeInferencePathElem::InNamed(arg_id) => {
                             let_unwrap!(WrittenType::Named(named), typ);
-                            let named_type = &linker.types[named.id];
+                            let named_type = &globals.types[named.id];
                             let named_name = &named_type.link_info.name;
                             let param_name = &named_type.link_info.parameters[*arg_id].name;
 
                             write!(f, "{named_name} #({param_name}: ")?;
                             match &named.get_arg_for(*arg_id).unwrap().kind.as_ref().unwrap() {
-                                TemplateKind::Type(t) => recurse_print(f, linker, li, t, rest)?,
+                                TemplateKind::Type(t) => recurse_print(f, globals, li, t, rest)?,
                                 TemplateKind::Value(_) => {
                                     assert!(rest.is_empty());
                                     f.write_str("{*}")?
@@ -569,11 +569,11 @@ impl InferenceTargetPath {
                         }
                     }
                 } else {
-                    write!(f, "{}", typ.display(&linker.globals, &li.parameters))
+                    write!(f, "{}", typ.display(globals, &li.parameters))
                 }
             }
 
-            recurse_print(f, linker, &md.link_info, &port_decl.typ_expr, &self.path)?;
+            recurse_print(f, globals, &md.link_info, &port_decl.typ_expr, &self.path)?;
             write!(f, " {}", &port_decl.name)
         })
     }
@@ -582,7 +582,12 @@ impl InferenceTargetPath {
 impl InferenceCandidate {
     /// V * 5 + 3 <= {*} in int#(FROM: {*}) port
     /// V * 5 + 3 <= {t} - {f} in a'{t}, b'{f}
-    pub fn display(&self, candidate_name: &str, md: &Module, linker: &Linker) -> impl Display {
+    pub fn display(
+        &self,
+        candidate_name: &str,
+        md: &Module,
+        globals: &LinkerGlobals,
+    ) -> impl Display {
         FmtWrapper(|f| {
             let relation = match self.relation {
                 SubtypeRelation::Exact => "==",
@@ -604,7 +609,7 @@ impl InferenceCandidate {
 
             match &self.target {
                 InferenceTarget::Subtype(path) => {
-                    let path = path.display(md, linker);
+                    let path = path.display(md, globals);
                     write!(f, "{{*}} in {path}")
                 }
                 InferenceTarget::PortLatency { from, to } => {
@@ -621,7 +626,7 @@ impl InferenceResult {
     fn display(
         &self,
         submodules: &FlatAlloc<SubModule, SubModuleIDMarker>,
-        linker: &Linker,
+        globals: &LinkerGlobals,
     ) -> impl Display {
         FmtWrapper(move |f| match self {
             InferenceResult::PortNotUsed => f.write_str("N/C"),
@@ -634,7 +639,7 @@ impl InferenceResult {
                 port_to,
             } => {
                 let poison_sm = &submodules[*submod];
-                let poison_submod_md = &linker.modules[poison_sm.refers_to.id];
+                let poison_submod_md = &globals.modules[poison_sm.refers_to.id];
 
                 let poison_sm_name = &poison_sm.name;
                 let from_port_name = &poison_submod_md.ports[*port_from].name;
@@ -651,7 +656,7 @@ impl InferenceResult {
 }
 
 pub fn display_infer_param_info(
-    linker: &Linker,
+    globals: &LinkerGlobals,
     md: &Module,
     template_id: TemplateID,
     final_values: Option<(
@@ -670,7 +675,7 @@ pub fn display_infer_param_info(
                 }
                 for (idx, c) in t_info.candidates.iter().enumerate() {
                     let relation = if idx < t_info.num_inputs { "<:" } else { "=" };
-                    let path = c.display(md, linker);
+                    let path = c.display(md, globals);
                     writeln!(f, "{{*}} {relation} {arg_name} in {path}")?;
                 }
             }
@@ -696,11 +701,15 @@ pub fn display_infer_param_info(
                     }
                 }
                 for (idx, c) in can_infer.iter().enumerate() {
-                    write!(f, "    {}", c.display(arg_name, md, linker))?;
+                    write!(f, "    {}", c.display(arg_name, md, globals))?;
                     if let Some((values_list, submodules)) = final_values
                         && let Some(final_value) = values_list.get(idx)
                     {
-                        write!(f, "  ({{*}} = {})", final_value.display(submodules, linker))?;
+                        write!(
+                            f,
+                            "  ({{*}} = {})",
+                            final_value.display(submodules, globals)
+                        )?;
                     }
                     writeln!(f)?;
                 }
@@ -710,7 +719,7 @@ pub fn display_infer_param_info(
                         "The following constraints were found, but aren't used for inference here"
                     )?;
                     for c in cant_infer {
-                        writeln!(f, "    {}", c.display(arg_name, md, linker))?;
+                        writeln!(f, "    {}", c.display(arg_name, md, globals))?;
                     }
                 }
             }
@@ -720,14 +729,14 @@ pub fn display_infer_param_info(
 }
 
 pub fn display_all_infer_params(
-    linker: &Linker,
+    globals: &LinkerGlobals,
     submodules: &FlatAlloc<SubModule, SubModuleIDMarker>,
     sm: &SubModule,
 ) -> impl Display {
     FmtWrapper(|f| {
-        let md = &linker.modules[sm.refers_to.id];
+        let md = &globals.modules[sm.refers_to.id];
         for (template_id, known_values) in sm.last_infer_values.borrow().iter() {
-            display_infer_param_info(linker, md, template_id, Some((known_values, submodules)))
+            display_infer_param_info(globals, md, template_id, Some((known_values, submodules)))
                 .fmt(f)?;
         }
         Ok(())
@@ -1215,7 +1224,7 @@ impl ModuleTypingContext<'_> {
             } else {
                 "".purple()
             };
-            let typ_str = typ.display(&self.linker.globals).to_string().red();
+            let typ_str = typ.display(self.globals).to_string().red();
             let domain_name = domain.display(&self.md.domains);
             let name = name.green();
             write!(
@@ -1302,8 +1311,8 @@ impl ModuleTypingContext<'_> {
             },
         ) in &self.submodules
         {
-            let instance_md = &self.linker.globals[refers_to.id];
-            let refers_to = refers_to.display(&self.linker.globals);
+            let instance_md = &self.globals[refers_to.id];
+            let refers_to = refers_to.display(self.globals);
             let instantiate_success = if instance.get().is_some() {
                 "Instantiation Successful!".yellow()
             } else {
@@ -1324,7 +1333,7 @@ impl ModuleTypingContext<'_> {
                 write!(f, "    {direction} .{remote_name}({local_name})")?;
                 if let Some(instance) = instance.get() {
                     let typ_str = if let Some(port) = &instance.interface_ports[port_id] {
-                        port.typ.display(&self.linker.globals).to_string()
+                        port.typ.display(self.globals).to_string()
                     } else {
                         "/".into()
                     }

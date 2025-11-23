@@ -124,8 +124,16 @@ fn set_min_max_with_min_max<'inst>(
     unifier.set(out_bounds.to, max + 1).unwrap();
 }
 
+/*pub struct ModuleTypingSuperContext {
+    ctx:
+}*/
+
 impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
-    pub fn typecheck(&mut self, type_substitutor_alloc: ValueUnifierAlloc) {
+    pub fn typecheck(
+        &mut self,
+        type_substitutor_alloc: ValueUnifierAlloc,
+        linker_for_instantiator: &Linker,
+    ) {
         let error_reporter = DelayedErrorCollector::new();
 
         let mut unifier = ValueUnifier::from_alloc(type_substitutor_alloc);
@@ -142,7 +150,11 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
 
         loop {
             unifier.execute_ready_constraints();
-            if !self.try_infer_submodule_params(&mut unifier, &mut all_submod_ids) {
+            if !self.try_infer_submodule_params(
+                &mut unifier,
+                &mut all_submod_ids,
+                linker_for_instantiator,
+            ) {
                 break;
             }
         }
@@ -257,8 +269,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     errors.error(|substitutor| {
                         self.errors
                             .error(right.get_span(self.link_info), format!("Incompatible multi-rank for higher-rank operator: Found {} but output is {}",
-                            right.typ.display_substitute(self.linker, substitutor),
-                            out.typ.display_substitute(self.linker, substitutor))
+                            right.typ.display_substitute(self.globals, substitutor),
+                            out.typ.display_substitute(self.globals, substitutor))
                         );
                     });
                 }
@@ -282,18 +294,18 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     errors.error(|substitutor| {
                         self.errors
                             .error(left.get_span(self.link_info), format!("Incompatible multi-rank for higher-rank operator: Found {} but output is {}",
-                            left.typ.display_substitute(self.linker, substitutor),
-                            out.typ.display_substitute(self.linker, substitutor))
-                        ).info_same_file(right.get_span(self.link_info), format!("Right argument has type {}", right.typ.display_substitute(self.linker, substitutor)));
+                            left.typ.display_substitute(self.globals, substitutor),
+                            out.typ.display_substitute(self.globals, substitutor))
+                        ).info_same_file(right.get_span(self.link_info), format!("Right argument has type {}", right.typ.display_substitute(self.globals, substitutor)));
                     });
                 }
                 if !unify_rank(rank, &right.typ, unifier) {
                     errors.error(|substitutor| {
                         self.errors
                             .error(right.get_span(self.link_info), format!("Incompatible multi-rank for higher-rank operator: Found {} but output is {}",
-                            right.typ.display_substitute(self.linker, substitutor),
-                            out.typ.display_substitute(self.linker, substitutor))
-                        ).info_same_file(left.get_span(self.link_info), format!("Left argument has type {}", left.typ.display_substitute(self.linker, substitutor)));
+                            right.typ.display_substitute(self.globals, substitutor),
+                            out.typ.display_substitute(self.globals, substitutor))
+                        ).info_same_file(left.get_span(self.link_info), format!("Left argument has type {}", left.typ.display_substitute(self.globals, substitutor)));
                     });
                 }
                 self.typecheck_binop(unifier, errors, span, *op, out_root, left_root, right_root);
@@ -591,8 +603,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         self.errors.type_error(
                             "operator ==",
                             span,
-                            right_root.display_substitute(self.linker, substitutor),
-                            left_root.display_substitute(self.linker, substitutor),
+                            right_root.display_substitute(self.globals, substitutor),
+                            left_root.display_substitute(self.globals, substitutor),
                         );
                     });
                 }
@@ -632,7 +644,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
     ) {
         assert!(sm.instance.get().is_none());
 
-        let sm_md = &self.linker[sm.refers_to.id];
+        let sm_md = &self.globals[sm.refers_to.id];
 
         for (_, concrete_param, infer_info) in crate::alloc::zip_eq(
             &sm.refers_to.template_args,
@@ -745,6 +757,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         &'inst self,
         unifier: &mut ValueUnifier<'inst>,
         sm_ids: &mut Vec<SubModuleID>,
+        linker_for_instantiator: &Linker,
     ) -> bool {
         let mut lat_inf = LatencyInferenceProblem::new(self);
 
@@ -753,7 +766,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 &lat_inf.latency_count_problem,
                 &self.wires,
                 &self.submodules,
-                self.linker,
+                self.globals,
                 None,
                 &self.name,
                 "inference_problem",
@@ -762,7 +775,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
 
         for sm_id in sm_ids.iter() {
             let sm = &self.submodules[*sm_id];
-            let sm_md = &self.linker[sm.refers_to.id];
+            let sm_md = &self.globals[sm.refers_to.id];
 
             for (_, concrete_param, last_vals, infer_info) in crate::alloc::zip_eq3(
                 &sm.refers_to.template_args,
@@ -896,7 +909,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 .template_args
                 .can_fully_substitute(&unifier.store)
             {
-                self.try_instantiate_submodule(sm, unifier);
+                self.try_instantiate_submodule(sm, unifier, linker_for_instantiator);
 
                 any_success = true;
                 false
@@ -906,7 +919,12 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         });
         any_success
     }
-    fn try_instantiate_submodule(&'inst self, sm: &SubModule, unifier: &mut ValueUnifier<'inst>) {
+    fn try_instantiate_submodule(
+        &'inst self,
+        sm: &SubModule,
+        unifier: &mut ValueUnifier<'inst>,
+        linker_for_instantiator: &Linker,
+    ) {
         let submod_instr = &self.link_info.instructions[sm.original_instruction];
 
         let mut refers_to_clone = sm.refers_to.clone();
@@ -914,17 +932,16 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
             .template_args
             .fully_substitute(&unifier.store);
 
-        let instance = self
-            .linker
+        let instance = linker_for_instantiator
             .instantiator
-            .instantiate(self.linker, refers_to_clone);
+            .instantiate(linker_for_instantiator, refers_to_clone);
 
         let Some(instance) = instance else {
             self.errors
                 .error(submod_instr.get_span(), "Error instantiating submodule");
             return;
         };
-        let sub_module = &self.linker.modules[sm.refers_to.id];
+        let sub_module = &self.globals.modules[sm.refers_to.id];
 
         for (_port_id, concrete_port, source_code_port, connecting_wire) in
             zip_eq3(&instance.interface_ports, &sub_module.ports, &sm.port_map)
@@ -991,7 +1008,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         format!(
                             "Some parameters of '{}' were still unknown: {}",
                             w.name,
-                            w.typ.display(self.linker)
+                            w.typ.display(self.globals)
                         ),
                     );
                 }
@@ -1001,7 +1018,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     format!(
                         "The type of '{}' is invalid! {}",
                         w.name,
-                        w.typ.display(self.linker)
+                        w.typ.display(self.globals)
                     ),
                 );
             }
@@ -1043,8 +1060,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         sm.get_span(self.link_info),
                         format!(
                             "Some submodule parameters of {sm_name} were still unknown: {}\n{}",
-                            sm.refers_to.display(self.linker),
-                            display_all_infer_params(self.linker, &self.submodules, sm)
+                            sm.refers_to.display(self.globals),
+                            display_all_infer_params(self.globals, &self.submodules, sm)
                         ),
                     );
                     for (template_id, known_values) in sm.last_infer_values.borrow().iter() {
@@ -1055,18 +1072,18 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                                     port_from,
                                     port_to,
                                 } => {
-                                    let sm_md = &self.linker.modules[sm.refers_to.id];
+                                    let sm_md = &self.globals.modules[sm.refers_to.id];
                                     let template_name =
                                         &sm_md.link_info.parameters[template_id].name;
 
                                     let poison_sm = &self.submodules[*submod];
                                     let poison_submod_md =
-                                        &self.linker.modules[poison_sm.refers_to.id];
+                                        &self.globals.modules[poison_sm.refers_to.id];
 
                                     let sm_name = &sm.name;
                                     let poison_sm_name = &poison_sm.name;
                                     let poison_sm_refer_to =
-                                        poison_sm.refers_to.display(&self.linker.globals);
+                                        poison_sm.refers_to.display(self.globals);
                                     let from_port_name = &poison_submod_md.ports[*port_from].name;
                                     let to_port_name = &poison_submod_md.ports[*port_to].name;
                                     err = err.info_same_file(
@@ -1083,7 +1100,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         }
                     }
                 } else if let Err(reason) = sm.refers_to.report_if_errors(
-                    self.linker,
+                    self.globals,
                     "Invalid arguments found in a submodule's template arguments",
                 ) {
                     self.errors.error(sm.get_span(self.link_info), reason);

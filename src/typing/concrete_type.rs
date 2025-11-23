@@ -3,6 +3,7 @@ use ibig::UBig;
 use sus_proc_macro::get_builtin_type;
 
 use crate::linker::GlobalUUID;
+use crate::linker::LinkerGlobals;
 use crate::prelude::*;
 use crate::to_string::display_join;
 use crate::typing::abstract_type::AbstractGlobalReference;
@@ -458,11 +459,11 @@ impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
         failures
     }
 
-    pub fn report_if_errors(&self, linker: &Linker, context: &str) -> Result<(), String> {
+    pub fn report_if_errors(&self, globals: &LinkerGlobals, context: &str) -> Result<(), String> {
         let error_parameters = self.find_invalid_template_args();
         if !error_parameters.is_empty() {
             let error_params_disp = display_join(", ", &error_parameters, |f, id| {
-                let param_name = &linker.globals[self.id.into()].parameters[*id].name;
+                let param_name = &globals[self.id.into()].parameters[*id].name;
                 write!(f, "'{param_name}'")
             });
             Err(format!(

@@ -182,7 +182,7 @@ impl LatencyCountingProblem {
         let mut cur_cycle = Vec::new();
         // Submodules
         for (_, sm) in &ctx.submodules {
-            let sm_md = &ctx.linker.modules[sm.refers_to.id];
+            let sm_md = &ctx.globals.modules[sm.refers_to.id];
 
             if let Some(instance) = sm.instance.get() {
                 // The module has already been instantiated, so we know all local absolute latencies
@@ -274,7 +274,7 @@ impl LatencyInferenceProblem {
 
         // Add poison edges
         for (_, sm) in &ctx.submodules {
-            let sm_md = &ctx.linker.modules[sm.refers_to.id];
+            let sm_md = &ctx.globals.modules[sm.refers_to.id];
             if sm.instance.get().is_none() {
                 for &(from, to) in &sm_md.inference_info.extra_poison {
                     if let (Some(from), Some(to)) = (&sm.port_map[from], &sm.port_map[to]) {
@@ -365,8 +365,7 @@ impl InstantiatedModule {
 }
 
 impl ModuleTypingContext<'_> {
-    // Returns a proper interface if all ports involved did not produce an error. If a port did produce an error then returns None.
-    // Computes all latencies involved
+    /// Computes and sets all latencies involved ([RealWire::absolute_latency])
     pub fn compute_latencies(&mut self) {
         let problem = LatencyCountingProblem::new(self);
 
@@ -375,7 +374,7 @@ impl ModuleTypingContext<'_> {
                 &problem,
                 &self.wires,
                 &self.submodules,
-                self.linker,
+                self.globals,
                 None,
                 &self.name,
                 "latencies_problem",
@@ -398,7 +397,7 @@ impl ModuleTypingContext<'_> {
                         &problem,
                         &self.wires,
                         &self.submodules,
-                        self.linker,
+                        self.globals,
                         Some(&latencies),
                         &self.name,
                         "latencies_solution",

@@ -8,6 +8,7 @@ use sus_proc_macro::get_builtin_type;
 
 use crate::{
     let_unwrap,
+    linker::LinkerGlobals,
     prelude::*,
     typing::{
         abstract_type::{AbstractGlobalReference, AbstractInnerType},
@@ -412,10 +413,14 @@ impl ConcreteType {
             .each_ref()
             .map(|v| v.unwrap_value())
     }
-    pub fn display_substitute(&self, linker: &Linker, substitutor: &ValueUnifierStore) -> String {
+    pub fn display_substitute(
+        &self,
+        globals: &LinkerGlobals,
+        substitutor: &ValueUnifierStore,
+    ) -> String {
         let mut typ_copy = self.clone();
         typ_copy.fully_substitute(substitutor);
-        let as_display = typ_copy.display(linker);
+        let as_display = typ_copy.display(globals);
         as_display.to_string()
     }
 }
