@@ -131,12 +131,12 @@ fn set_min_max_with_min_max<'inst>(
 pub struct MutableContext<'th> {
     unifier: SetUnifier<'th, Value, ConcreteTypeVariableIDMarker>,
     error_reporter: DelayedErrorCollector<'th, Value, ConcreteTypeVariableIDMarker>,
+    all_submod_ids: Vec<SubModuleID>,
 }
 
 #[ouroboros::self_referencing]
 pub struct ModuleTypingSuperContext<'l> {
     ctx: ModuleTypingContext<'l>,
-    all_submod_ids: Vec<SubModuleID>,
     #[borrows(ctx)]
     #[covariant]
     mutable_state: MutableContext<'this>,
@@ -147,14 +147,12 @@ impl<'l> ModuleTypingSuperContext<'l> {
         ctx: ModuleTypingContext<'l>,
         type_substitutor_alloc: ValueUnifierAlloc,
     ) -> Self {
-        let all_submod_ids: Vec<SubModuleID> = ctx.submodules.id_range().iter().collect();
-
         let mut result: ModuleTypingSuperContext<'l> = ModuleTypingSuperContextBuilder {
             ctx,
-            all_submod_ids,
-            mutable_state_builder: move |_| MutableContext {
+            mutable_state_builder: move |ctx| MutableContext {
                 unifier: ValueUnifier::from_alloc(type_substitutor_alloc),
                 error_reporter: DelayedErrorCollector::new(),
+                all_submod_ids: ctx.submodules.id_range().iter().collect(),
             },
         }
         .build();
@@ -178,14 +176,31 @@ impl<'l> ModuleTypingSuperContext<'l> {
         result
     }
 
-    pub fn typecheck_step(&mut self, linker_for_instantiator: &Linker) -> bool {
+    /// Returns a list of submodules that should be instantiated before proceeding with typechecking
+    /// This does not need to be all the submodules in the module, as it could be that it doesn't know some parameters yet.
+    /// If empty, no more progress can be made and the caller may stop calling [Self::typecheck_step].
+    /// For every processed module this method returns the caller should call [Self::apply_instantiated_submodule]
+    pub fn typecheck_step(&mut self) -> Vec<(SubModuleID, ConcreteGlobalReference<ModuleUUID>)> {
         self.with_mut(|self_mut| {
             self_mut.mutable_state.unifier.execute_ready_constraints();
             self_mut.ctx.try_infer_submodule_params(
                 &mut self_mut.mutable_state.unifier,
-                self_mut.all_submod_ids,
-                linker_for_instantiator,
+                &mut self_mut.mutable_state.all_submod_ids,
             )
+        })
+    }
+
+    pub fn apply_instantiated_submodule(
+        &mut self,
+        sm_id: SubModuleID,
+        instance: Option<Rc<InstantiatedModule>>,
+    ) {
+        self.with_mut(|self_mut| {
+            self_mut.ctx.apply_instantiated_submodule(
+                sm_id,
+                instance,
+                &mut self_mut.mutable_state.unifier,
+            );
         })
     }
 
@@ -726,13 +741,11 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         }
     }
 
-    /// Returns true if any submodule was instantiated
     fn try_infer_submodule_params(
         &'inst self,
         unifier: &mut ValueUnifier<'inst>,
         sm_ids: &mut Vec<SubModuleID>,
-        linker_for_instantiator: &Linker,
-    ) -> bool {
+    ) -> Vec<(SubModuleID, ConcreteGlobalReference<ModuleUUID>)> {
         let mut lat_inf = LatencyInferenceProblem::new(self);
 
         if crate::debug::is_enabled("dot-latency-infer") {
@@ -873,42 +886,42 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
             }
         }
 
-        let mut any_success = false;
+        let mut recursive_submodules_to_instantiate = Vec::new();
         // And now instantiate the modules we can
         sm_ids.retain(|id| {
             let sm = &self.submodules[*id];
 
+            // Doing can_fully_substitute first saves on quite a few clones. TODO remove once we switch to unifyable_cell.rs, as that can do fully_substitute without needing &mut.
             if sm
                 .refers_to
                 .template_args
                 .can_fully_substitute(&unifier.store)
             {
-                self.try_instantiate_submodule(sm, unifier, linker_for_instantiator);
+                let mut refers_to_clone = sm.refers_to.clone();
+                assert!(
+                    refers_to_clone
+                        .template_args
+                        .fully_substitute(&unifier.store)
+                );
 
-                any_success = true;
+                recursive_submodules_to_instantiate.push((*id, refers_to_clone));
+
                 false
             } else {
                 true
             }
         });
-        any_success
+
+        recursive_submodules_to_instantiate
     }
-    fn try_instantiate_submodule(
+    fn apply_instantiated_submodule(
         &'inst self,
-        sm: &SubModule,
+        sm_id: SubModuleID,
+        instance: Option<Rc<InstantiatedModule>>,
         unifier: &mut ValueUnifier<'inst>,
-        linker_for_instantiator: &Linker,
     ) {
+        let sm = &self.submodules[sm_id];
         let submod_instr = &self.link_info.instructions[sm.original_instruction];
-
-        let mut refers_to_clone = sm.refers_to.clone();
-        refers_to_clone
-            .template_args
-            .fully_substitute(&unifier.store);
-
-        let instance = linker_for_instantiator
-            .instantiator
-            .instantiate(linker_for_instantiator, refers_to_clone);
 
         let Some(instance) = instance else {
             self.errors

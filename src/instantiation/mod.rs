@@ -588,7 +588,16 @@ fn perform_instantiation(
 
     debug!("Concrete Typechecking {name}");
     let mut context = ModuleTypingSuperContext::start_typechecking(typed, type_var_alloc);
-    while context.typecheck_step(linker) {}
+    loop {
+        let submodules_to_instantiate = context.typecheck_step();
+        if submodules_to_instantiate.is_empty() {
+            break;
+        }
+        for (sm_id, sm_ref) in submodules_to_instantiate {
+            let instance = linker.instantiator.instantiate(linker, sm_ref);
+            context.apply_instantiated_submodule(sm_id, instance);
+        }
+    }
     let typed = context.finish();
 
     if crate::debug::is_enabled("print-concrete") {
