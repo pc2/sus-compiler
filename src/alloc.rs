@@ -260,7 +260,6 @@ impl<IndexMarker> UUIDRangeIter<IndexMarker> {
     }
 }
 
-#[derive(Default)]
 pub struct ArenaAllocator<T, IndexMarker> {
     data: Vec<Option<T>>,
     free_slots: Vec<usize>,
@@ -365,6 +364,12 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
         let indices: [usize; N] = ids.map(|id| id.0);
         let many = self.data.get_disjoint_mut(indices)?;
         Ok(many.map(|r| r.as_mut().unwrap()))
+    }
+}
+
+impl<T, IndexMarker> Default for ArenaAllocator<T, IndexMarker> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

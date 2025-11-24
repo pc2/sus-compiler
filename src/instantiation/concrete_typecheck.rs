@@ -17,6 +17,9 @@ use crate::typing::{concrete_type::ConcreteType, value_unifier::ValueUnifier};
 use crate::util::{all_equal, ceil_div, floor_div};
 use crate::value::MAX_SHIFT;
 
+use crate::typing::set_unifier::SetUnifier;
+use crate::typing::type_inference::ConcreteTypeVariableIDMarker;
+
 use super::*;
 
 macro_rules! unifier_constraint_ints {
@@ -124,117 +127,88 @@ fn set_min_max_with_min_max<'inst>(
     unifier.set(out_bounds.to, max + 1).unwrap();
 }
 
-/*pub struct ModuleTypingSuperContext {
-    ctx:
-}*/
+/// Combine both mutable context elements into a single struct, to avoid <https://github.com/someguynamedjosh/ouroboros/issues/138>
+pub struct MutableContext<'th> {
+    unifier: SetUnifier<'th, Value, ConcreteTypeVariableIDMarker>,
+    error_reporter: DelayedErrorCollector<'th, Value, ConcreteTypeVariableIDMarker>,
+}
+
+#[ouroboros::self_referencing]
+pub struct ModuleTypingSuperContext<'l> {
+    ctx: ModuleTypingContext<'l>,
+    all_submod_ids: Vec<SubModuleID>,
+    #[borrows(ctx)]
+    #[covariant]
+    mutable_state: MutableContext<'this>,
+}
+
+impl<'l> ModuleTypingSuperContext<'l> {
+    pub fn start_typechecking(
+        ctx: ModuleTypingContext<'l>,
+        type_substitutor_alloc: ValueUnifierAlloc,
+    ) -> Self {
+        let all_submod_ids: Vec<SubModuleID> = ctx.submodules.id_range().iter().collect();
+
+        let mut result: ModuleTypingSuperContext<'l> = ModuleTypingSuperContextBuilder {
+            ctx,
+            all_submod_ids,
+            mutable_state_builder: move |_| MutableContext {
+                unifier: ValueUnifier::from_alloc(type_substitutor_alloc),
+                error_reporter: DelayedErrorCollector::new(),
+            },
+        }
+        .build();
+
+        result.with_mut(move |result| {
+            // We do submodules first, such that we don't need to worry handle unification failure
+            for (_, sm) in &result.ctx.submodules {
+                result
+                    .ctx
+                    .add_submodule_subtype_constraints(sm, &mut result.mutable_state.unifier);
+            }
+            for (_, wire) in &result.ctx.wires {
+                result.ctx.add_wire_subtype_constraints(
+                    wire,
+                    &mut result.mutable_state.unifier,
+                    &mut result.mutable_state.error_reporter,
+                );
+            }
+        });
+
+        result
+    }
+
+    pub fn typecheck_step(&mut self, linker_for_instantiator: &Linker) -> bool {
+        self.with_mut(|self_mut| {
+            self_mut.mutable_state.unifier.execute_ready_constraints();
+            self_mut.ctx.try_infer_submodule_params(
+                &mut self_mut.mutable_state.unifier,
+                self_mut.all_submod_ids,
+                linker_for_instantiator,
+            )
+        })
+    }
+
+    pub fn finish(mut self) -> ModuleTypingContext<'l> {
+        let substitutor = self.with_mut(|self_mut| {
+            let unifier = std::mem::take(&mut self_mut.mutable_state.unifier);
+            let substitutor = unifier.decomission();
+            let error_reporter = std::mem::take(&mut self_mut.mutable_state.error_reporter);
+            error_reporter.report(&substitutor);
+            substitutor
+        });
+
+        let mut slf = self.into_heads();
+
+        slf.ctx.compute_latencies();
+
+        slf.ctx.finalize(&substitutor);
+
+        slf.ctx
+    }
+}
 
 impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
-    pub fn typecheck(
-        &mut self,
-        type_substitutor_alloc: ValueUnifierAlloc,
-        linker_for_instantiator: &Linker,
-    ) {
-        let mut error_reporter = DelayedErrorCollector::new();
-
-        let mut unifier = ValueUnifier::from_alloc(type_substitutor_alloc);
-
-        // We do submodules first, such that we don't need to worry handle unification failure
-        for (_, sm) in &self.submodules {
-            self.add_submodule_subtype_constraints(sm, &mut unifier);
-        }
-        for (_, wire) in &self.wires {
-            self.add_wire_subtype_constraints(wire, &mut unifier, &mut error_reporter);
-        }
-
-        let mut all_submod_ids: Vec<SubModuleID> = self.submodules.id_range().iter().collect();
-
-        loop {
-            unifier.execute_ready_constraints();
-            if !self.try_infer_submodule_params(
-                &mut unifier,
-                &mut all_submod_ids,
-                linker_for_instantiator,
-            ) {
-                break;
-            }
-        }
-
-        let substitutor = unifier.decomission();
-
-        error_reporter.report(&substitutor);
-
-        self.compute_latencies();
-
-        self.finalize(&substitutor);
-    }
-    /*fn peano_to_nested_array_of(
-        &mut self,
-        p: &PeanoType,
-        c: ConcreteType,
-        dims: &mut Vec<ConcreteType>,
-    ) -> ConcreteType {
-        let substitutor: TypeSubstitutor<ConcreteType> = 0;
-        match p {
-            PeanoType::Zero => c,
-            PeanoType::Succ(p) => {
-                let this_dim_var = substitutor.alloc_unknown();
-                let arr = ConcreteType::Array(Box::new((c, this_dim_var.clone())));
-                let typ = self.peano_to_nested_array_of(p, arr, dims);
-                dims.push(this_dim_var.clone());
-                typ
-            }
-            _ => unreachable!("Peano abstract ranks being used at concrete type-checking time should never be anything other than Zero, Succ or Named ({p:?})"),
-        }
-    }*/
-    /*fn walk_type_along_path(
-        type_substitutor: &mut TypeUnifier<TypeSubstitutor<ConcreteType>>,
-        mut current_type_in_progress: ConcreteType,
-        path: &[RealWirePathElem],
-    ) -> ConcreteType {
-        for p in path {
-            let typ_after_applying_array = type_substitutor.alloc_unknown();
-            match p {
-                RealWirePathElem::ArrayAccess {
-                    span: _,
-                    idx_wire: _,
-                } => {
-                    // TODO #28 integer size <-> array bound check
-                    let arr_size = type_substitutor.alloc_unknown();
-                    let arr_box = Box::new((typ_after_applying_array.clone(), arr_size));
-                    type_substitutor.unify_must_succeed(
-                        &current_type_in_progress,
-                        &ConcreteType::Array(arr_box),
-                    );
-                    current_type_in_progress = typ_after_applying_array;
-                }
-                RealWirePathElem::ArraySlice { .. }
-                | RealWirePathElem::ArrayPartSelectDown { .. }
-                | RealWirePathElem::ArrayPartSelectUp { .. } => {
-                    let inner_of_array_being_sliced = type_substitutor.alloc_unknown();
-
-                    let array_being_sliced = Box::new((
-                        inner_of_array_being_sliced.clone(),
-                        type_substitutor.alloc_unknown(),
-                    ));
-
-                    let slice_size = type_substitutor.alloc_unknown();
-                    type_substitutor.unify_must_succeed(
-                        &current_type_in_progress,
-                        &ConcreteType::Array(array_being_sliced),
-                    );
-                    type_substitutor.unify_must_succeed(
-                        &typ_after_applying_array,
-                        &ConcreteType::Array(Box::new((inner_of_array_being_sliced, slice_size))),
-                    );
-
-                    current_type_in_progress = typ_after_applying_array;
-                }
-            }
-        }
-
-        current_type_in_progress
-    }*/
-
     fn add_wire_subtype_constraints(
         &'inst self,
         out: &'inst RealWire,

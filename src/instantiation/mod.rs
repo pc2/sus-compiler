@@ -7,6 +7,7 @@ mod unique_names;
 use ibig::IBig;
 use unique_names::UniqueNames;
 
+use crate::instantiation::concrete_typecheck::ModuleTypingSuperContext;
 use crate::latency::{AbsLat, InferenceFailure};
 use crate::linker::{LinkInfo, LinkerGlobals};
 use crate::prelude::*;
@@ -573,7 +574,7 @@ fn perform_instantiation(
     debug!("Executing {name}");
     let exec = execute::execute(&md.link_info, linker, &global_ref.template_args);
 
-    let (mut typed, type_var_alloc) =
+    let (typed, type_var_alloc) =
         exec.into_module_typing_context(linker, md, global_ref, name.clone());
 
     if typed.errors.did_error() {
@@ -586,7 +587,9 @@ fn perform_instantiation(
     }
 
     debug!("Concrete Typechecking {name}");
-    typed.typecheck(type_var_alloc, linker);
+    let mut context = ModuleTypingSuperContext::start_typechecking(typed, type_var_alloc);
+    while context.typecheck_step(linker) {}
+    let typed = context.finish();
 
     if crate::debug::is_enabled("print-concrete") {
         eprintln!("[[Instantiated {name}]]");

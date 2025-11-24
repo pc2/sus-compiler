@@ -5,7 +5,6 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 
 use crate::alloc::{ArenaAllocator, UUID, UUIDAllocator, UUIDMarker};
-use crate::append_only_vec::AppendOnlyVec;
 use crate::prelude::*;
 
 use crate::util::merge_vec_into;
@@ -25,6 +24,7 @@ struct Constraint<'inst, T: Eq + Clone, IDMarker> {
 }
 pub struct ConstraintReservation(UUID<ConstraintIDMarker>, usize);
 
+#[derive(Default)]
 struct KnownIDMarker;
 impl UUIDMarker for KnownIDMarker {
     const DISPLAY_NAME: &'static str = "known_";
@@ -132,18 +132,21 @@ pub struct UnifyableAlloc<T: Eq + Clone, IDMarker> {
     _ph: PhantomData<T>,
 }
 
-impl<T: Eq + Clone, IDMarker> Default for UnifyableAlloc<T, IDMarker> {
-    fn default() -> Self {
+impl<T: Eq + Clone, IDMarker> UnifyableAlloc<T, IDMarker> {
+    pub fn new() -> Self {
         Self {
             ptrs: Default::default(),
             _ph: Default::default(),
         }
     }
-}
-
-impl<T: Eq + Clone, IDMarker> UnifyableAlloc<T, IDMarker> {
     pub fn alloc_unknown(&mut self) -> Unifyable<T, IDMarker> {
         Unifyable::Unknown(self.ptrs.alloc())
+    }
+}
+
+impl<T: Eq + Clone, IDMarker> Default for UnifyableAlloc<T, IDMarker> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -160,6 +163,15 @@ impl<T: Clone, IDMarker> SetUnifierStore<T, IDMarker> {
                 KnownValue::Unknown { .. } => None,
                 KnownValue::Known(new_v) => Some(new_v),
             },
+        }
+    }
+}
+
+impl<T: Clone, IDMarker> Default for SetUnifierStore<T, IDMarker> {
+    fn default() -> Self {
+        Self {
+            ptrs: Default::default(),
+            known_values: Default::default(),
         }
     }
 }
@@ -408,6 +420,15 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
         self.store.get_substitution(val).unwrap()
     }
 }
+impl<'inst, T: Eq + Clone, IDMarker> Default for SetUnifier<'inst, T, IDMarker> {
+    fn default() -> Self {
+        Self {
+            store: Default::default(),
+            constraints: Default::default(),
+            constraints_ready_for_unification: Default::default(),
+        }
+    }
+}
 
 pub trait FullySubstitutable<T: Clone, IDMarker> {
     fn fully_substitute(&mut self, substitutor: &SetUnifierStore<T, IDMarker>) -> bool;
@@ -444,18 +465,18 @@ pub struct DelayedErrorCollector<'inst, T: Clone, IDMarker> {
 
 impl<'inst, T: Clone, IDMarker> Default for DelayedErrorCollector<'inst, T, IDMarker> {
     fn default() -> Self {
-        Self {
-            failures: Default::default(),
-        }
+        Self::new()
     }
 }
 
 impl<'inst, T: Clone, IDMarker> DelayedErrorCollector<'inst, T, IDMarker> {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            failures: Default::default(),
+        }
     }
     pub fn report(self, store: &SetUnifierStore<T, IDMarker>) {
-        for f in Vec::from(self.failures) {
+        for f in self.failures {
             f(store)
         }
     }

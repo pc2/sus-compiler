@@ -170,11 +170,11 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
 ///
 /// Because in typechecking, we will always set it to uninitialized in Flatten, set it to an initial value (&self) in typechecking, and then finalize the type in (&mut self)
 #[derive(Debug)]
-pub struct TyCell<T>(OnceCell<T>);
+pub struct TyCell<T: std::fmt::Debug>(OnceCell<T>);
 
 impl<T: std::fmt::Debug> TyCell<T> {
     pub fn new() -> Self {
-        Self::default()
+        Self(OnceCell::new())
     }
     #[track_caller]
     fn get_mut(&mut self) -> &mut T {
@@ -185,19 +185,18 @@ impl<T: std::fmt::Debug> TyCell<T> {
     fn set(&self, v: T) {
         self.0.set(v).unwrap();
     }
-
     pub fn get_maybe(&self) -> Option<&T> {
         self.0.get()
     }
 }
 
-impl<T> Default for TyCell<T> {
+impl<T: std::fmt::Debug> Default for TyCell<T> {
     fn default() -> Self {
-        Self(Default::default())
+        Self::new()
     }
 }
 
-impl<T> Deref for TyCell<T> {
+impl<T: std::fmt::Debug> Deref for TyCell<T> {
     type Target = T;
 
     #[track_caller]

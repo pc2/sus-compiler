@@ -89,16 +89,13 @@ pub struct ResolvedGlobals {
     all_resolved: bool,
 }
 
-impl Default for ResolvedGlobals {
-    fn default() -> Self {
+impl ResolvedGlobals {
+    pub fn new() -> Self {
         Self {
             referenced_globals: Vec::new(),
             all_resolved: true,
         }
     }
-}
-
-impl ResolvedGlobals {
     pub fn is_untouched(&self) -> bool {
         self.referenced_globals.is_empty() && self.all_resolved
     }
@@ -108,6 +105,11 @@ impl ResolvedGlobals {
     }
     pub fn checkpoint(&self) -> ResolvedGlobalsCheckpoint {
         ResolvedGlobalsCheckpoint(self.referenced_globals.len(), self.all_resolved)
+    }
+}
+impl Default for ResolvedGlobals {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

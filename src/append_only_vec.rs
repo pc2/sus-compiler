@@ -10,9 +10,7 @@ pub struct AppendOnlyVec<T> {
 
 impl<T> Default for AppendOnlyVec<T> {
     fn default() -> Self {
-        Self {
-            v: UnsafeCell::new(Vec::new()),
-        }
+        Self::new()
     }
 }
 
@@ -26,7 +24,9 @@ impl<T> From<Vec<T>> for AppendOnlyVec<T> {
 
 impl<T> AppendOnlyVec<T> {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            v: UnsafeCell::new(Vec::new()),
+        }
     }
     pub fn push(&self, data: T) {
         // SAFETY: AppendOnlyVec is made such that references to the content can only be made from exclusive references. Hence, no reference can be taken and then invalidated by a push

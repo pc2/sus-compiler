@@ -138,7 +138,7 @@ pub enum ChainResolution<'s, T> {
 
 pub struct Substitutor<'s, Typ: Debug + Clone>(AppendOnlyVec<&'s UniCell<Typ>>);
 
-impl<'s, Typ: Debug + Clone> Default for Substitutor<'s, Typ> {
+impl<'s, Typ> Default for Substitutor<'s, Typ> {
     fn default() -> Self {
         Self::new()
     }
