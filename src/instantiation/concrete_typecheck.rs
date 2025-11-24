@@ -134,7 +134,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         type_substitutor_alloc: ValueUnifierAlloc,
         linker_for_instantiator: &Linker,
     ) {
-        let error_reporter = DelayedErrorCollector::new();
+        let mut error_reporter = DelayedErrorCollector::new();
 
         let mut unifier = ValueUnifier::from_alloc(type_substitutor_alloc);
 
@@ -143,7 +143,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
             self.add_submodule_subtype_constraints(sm, &mut unifier);
         }
         for (_, wire) in &self.wires {
-            self.add_wire_subtype_constraints(wire, &mut unifier, &error_reporter);
+            self.add_wire_subtype_constraints(wire, &mut unifier, &mut error_reporter);
         }
 
         let mut all_submod_ids: Vec<SubModuleID> = self.submodules.id_range().iter().collect();
@@ -239,7 +239,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         &'inst self,
         out: &'inst RealWire,
         unifier: &mut ValueUnifier<'inst>,
-        errors: &ValueErrorReporter<'inst>,
+        errors: &mut ValueErrorReporter<'inst>,
     ) {
         let original_instr = &self.link_info.instructions[out.original_instruction];
         let span = original_instr.get_span();
@@ -400,7 +400,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
     fn typecheck_binop(
         &'inst self,
         unifier: &mut ValueUnifier<'inst>,
-        errors: &ValueErrorReporter<'inst>,
+        errors: &mut ValueErrorReporter<'inst>,
         span: Span,
         op: BinaryOperator,
         out_root: &'inst ConcreteType,

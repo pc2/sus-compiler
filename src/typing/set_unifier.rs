@@ -439,7 +439,7 @@ impl<T: Clone, IDMarker> FullySubstitutable<T, IDMarker> for Unifyable<T, IDMark
 }
 
 pub struct DelayedErrorCollector<'inst, T: Clone, IDMarker> {
-    failures: AppendOnlyVec<Box<dyn FnOnce(&SetUnifierStore<T, IDMarker>) + 'inst>>,
+    failures: Vec<Box<dyn FnOnce(&SetUnifierStore<T, IDMarker>) + 'inst>>,
 }
 
 impl<'inst, T: Clone, IDMarker> Default for DelayedErrorCollector<'inst, T, IDMarker> {
@@ -459,7 +459,7 @@ impl<'inst, T: Clone, IDMarker> DelayedErrorCollector<'inst, T, IDMarker> {
             f(store)
         }
     }
-    pub fn error(&self, f: impl FnOnce(&SetUnifierStore<T, IDMarker>) + 'inst) {
+    pub fn error(&mut self, f: impl FnOnce(&SetUnifierStore<T, IDMarker>) + 'inst) {
         self.failures.push(Box::new(f));
     }
 }

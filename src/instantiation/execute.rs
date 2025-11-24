@@ -1060,7 +1060,7 @@ impl<'l> ExecutionContext<'l> {
         }
         Ok((interface_found.0, interface_found.1, path))
     }
-    // Points to the wire in the hardware that corresponds to the root of this.
+    /// Points to the wire in the hardware that corresponds to the root of this.
     fn wire_ref_to_real_path(
         &mut self,
         wire_ref: &'l WireReference,
