@@ -34,7 +34,7 @@ use super::*;
 
 pub fn execute(
     link_info: &LinkInfo,
-    linker: &Linker,
+    globals: &LinkerGlobals,
     working_on_template_args: &TVec<ConcreteTemplateArg>,
 ) -> Executed {
     let mut context = ExecutionContext {
@@ -52,7 +52,7 @@ pub fn execute(
         unique_name_producer: UniqueNames::new(),
         working_on_template_args,
         link_info,
-        linker,
+        globals,
     };
 
     let execution_status = context.instantiate_code_block(link_info.instructions.id_range());
@@ -79,7 +79,7 @@ struct ExecutionContext<'l> {
 
     working_on_template_args: &'l TVec<ConcreteTemplateArg>,
     link_info: &'l LinkInfo,
-    linker: &'l Linker,
+    globals: &'l LinkerGlobals,
 }
 
 macro_rules! caught_by_typecheck {
@@ -595,7 +595,7 @@ impl<'l> ExecutionContext<'l> {
         &mut self,
         global_ref: &GlobalReference<ID>,
     ) -> ExecutionResult<ConcreteGlobalReference<ID>> {
-        let target: &LinkInfo = &self.linker.globals[global_ref.id.into()];
+        let target: &LinkInfo = &self.globals[global_ref.id.into()];
         let template_args = target.parameters.try_map2(
             &global_ref.template_arg_types,
             |(param_id, param, abs_typ)| -> ExecutionResult<ConcreteTemplateArg> {
@@ -640,7 +640,7 @@ impl<'l> ExecutionContext<'l> {
                     self.working_on_template_args[*id].unwrap_type().clone()
                 }
                 AbstractInnerType::Named(name) => {
-                    let target = &self.linker.types[name.id].link_info;
+                    let target = &self.globals.types[name.id].link_info;
                     ConcreteType::Named(match wr_typ {
                         Some(WrittenType::Named(wr_named)) => {
                             assert_eq!(wr_named.id, name.id);
@@ -948,23 +948,23 @@ impl<'l> ExecutionContext<'l> {
         &mut self,
         cst_ref: &GlobalReference<ConstantUUID>,
     ) -> ExecutionResult<(Value, AbstractRankedType)> {
-        let linker_cst = &self.linker.constants[cst_ref.id];
+        let linker_cst = &self.globals.constants[cst_ref.id];
         let concrete_ref = self.execute_global_ref(cst_ref)?;
 
         concrete_ref
             .report_if_errors(
-                self.linker,
+                self.globals,
                 "For executing compile-time constants, all arguments must be fully specified",
             )
             .map_err(|e| {
-                let cst_disp = concrete_ref.display(&self.linker.globals);
+                let cst_disp = concrete_ref.display(self.globals);
                 (cst_ref.get_total_span(), format!("{cst_disp}: {e}"))
             })?;
 
         if linker_cst.link_info.is_extern == IsExtern::Builtin {
             cst_ref.get_total_span().debug();
             self.evaluate_builtin_constant(&concrete_ref).map_err(|e| {
-                let cst_disp = concrete_ref.display(&self.linker.globals);
+                let cst_disp = concrete_ref.display(self.globals);
                 (cst_ref.get_total_span(), format!("{cst_disp}: {e}"))
             })
         } else {
@@ -1078,7 +1078,7 @@ impl<'l> ExecutionContext<'l> {
             }
             WireReferenceRoot::LocalSubmodule(submod_id) => {
                 let submod = self.link_info.instructions[*submod_id].unwrap_submodule();
-                let submod_md = &self.linker.modules[submod.module_ref.id];
+                let submod_md = &self.globals.modules[submod.module_ref.id];
                 let submod_interface = &submod_md.interfaces[port_interface];
                 let_unwrap!(
                     Some(InterfaceDeclKind::SinglePort(port_decl)),
@@ -1214,12 +1214,12 @@ impl<'l> ExecutionContext<'l> {
         }
         let name_hint = self
             .link_info
-            .get_instruction_name_best_effort(&self.linker.globals, original_instruction);
+            .get_instruction_name_best_effort(self.globals, original_instruction);
 
         Ok(self.wires.alloc(RealWire {
             typ: value
                 .concretize_type(
-                    self.linker,
+                    self.globals,
                     abs_typ,
                     self.working_on_template_args,
                     &mut self.type_substitutor,
@@ -1292,7 +1292,7 @@ impl<'l> ExecutionContext<'l> {
             }
             wire_found.maps_to_wire
         } else {
-            let submod_md = &self.linker.modules[submod_instance.refers_to.id];
+            let submod_md = &self.globals.modules[submod_instance.refers_to.id];
             let port_data = &submod_md.ports[port_id];
             let write_span = submod_instance.get_span(self.link_info);
             let source = match port_data.direction {
@@ -1383,7 +1383,7 @@ impl<'l> ExecutionContext<'l> {
             &mut self.submodules[submod_id].interface_call_sites[interface_id],
             interface_span,
         );
-        let md = &self.linker.modules[self.submodules[submod_id].refers_to.id];
+        let md = &self.globals.modules[self.submodules[submod_id].refers_to.id];
         let interface = &md.interfaces[interface_id];
         let_unwrap!(
             Some(InterfaceDeclKind::Interface(interface_id)),
@@ -1443,7 +1443,7 @@ impl<'l> ExecutionContext<'l> {
                 Ok(self.get_submodule_interface(submod_id, interface, name_span, domain))
             }
             WireReferenceRoot::NamedModule(module_ref) => {
-                let md = &self.linker.modules[module_ref.id];
+                let md = &self.globals.modules[module_ref.id];
                 let submod_id = self.instantiate_submodule(
                     module_ref,
                     &md.link_info.name,
@@ -1761,7 +1761,7 @@ impl<'l> ExecutionContext<'l> {
         name_origin: &str,
         original_instruction: FlatID,
     ) -> ExecutionResult<SubModuleID> {
-        let sub_module = &self.linker.modules[module_ref.id];
+        let sub_module = &self.globals.modules[module_ref.id];
 
         let port_map = sub_module.ports.map(|_| None);
         let interface_call_sites = sub_module.interfaces.map(|_| Vec::new());

@@ -1,6 +1,6 @@
 use crate::{
     flattening::{ExpressionSource, Instruction, NamedConstant, WireReferenceRoot},
-    instantiation::instantiation_cache::Instantiator,
+    instantiation::Instantiator,
     linker::passes::ResolvedGlobals,
     prelude::*,
     typing::{
@@ -545,7 +545,7 @@ impl Linker {
         for (_id, link_info) in self.iter_link_infos() {
             all_errs[link_info.file].append(&link_info.errors);
         }
-        for (_id, inst) in self.instantiator.borrow().iter() {
+        for (_id, inst) in self.instantiator.iter() {
             let file_id = self.modules[inst.global_ref.id].link_info.file;
             all_errs[file_id].append(&inst.errors);
         }

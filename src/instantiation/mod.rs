@@ -1,8 +1,12 @@
+use crate::prelude::*;
+
 mod concrete_typecheck;
 mod execute;
 mod final_checks;
-pub mod instantiation_cache;
+mod instantiator;
 mod unique_names;
+
+pub use instantiator::Instantiator;
 
 use ibig::IBig;
 use unique_names::UniqueNames;
@@ -10,7 +14,6 @@ use unique_names::UniqueNames;
 use crate::instantiation::concrete_typecheck::ModuleTypingSuperContext;
 use crate::latency::{AbsLat, InferenceFailure};
 use crate::linker::{LinkInfo, LinkerGlobals};
-use crate::prelude::*;
 use crate::typing::template::TVec;
 use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
 
@@ -364,42 +367,6 @@ impl ForEachContainedWire for RealWireDataSource {
     }
 }
 
-struct Executed {
-    wires: FlatAlloc<RealWire, WireIDMarker>,
-    submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
-    type_var_alloc: ValueUnifierAlloc,
-    generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
-    execution_status: Result<(), (Span, String)>,
-}
-
-impl Executed {
-    pub fn into_module_typing_context<'l>(
-        self,
-        linker: &'l Linker,
-        md: &'l Module,
-        global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
-        name: String,
-    ) -> (ModuleTypingContext<'l>, ValueUnifierAlloc) {
-        let errors = ErrorCollector::new_empty(md.link_info.file, &linker.files);
-        if let Err((position, reason)) = self.execution_status {
-            errors.error(position, reason);
-        }
-        let ctx = ModuleTypingContext {
-            mangled_name: mangle_name(&name),
-            name,
-            global_ref,
-            wires: self.wires,
-            submodules: self.submodules,
-            generation_state: self.generation_state,
-            md,
-            link_info: &md.link_info,
-            globals: linker,
-            errors,
-        };
-        (ctx, self.type_var_alloc)
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum InferenceResult {
     /// Means the inference candidate can be discarded
@@ -420,6 +387,14 @@ pub enum InferenceResult {
     },
     /// Valid value! Can be used for inferring
     Found(IBig),
+}
+
+struct Executed {
+    wires: FlatAlloc<RealWire, WireIDMarker>,
+    submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
+    type_var_alloc: ValueUnifierAlloc,
+    generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
+    execution_status: Result<(), (Span, String)>,
 }
 
 pub struct ModuleTypingContext<'l> {
@@ -481,136 +456,4 @@ impl<'l> ModuleTypingContext<'l> {
             generation_state: self.generation_state,
         }
     }
-}
-
-/// Mangle the module name for use in code generation
-fn mangle_name(str: &str) -> String {
-    let mut result = String::with_capacity(str.len());
-
-    let mut last_was_underscore = false;
-    for c in str.chars() {
-        if c.is_alphanumeric() {
-            result.push(c);
-            last_was_underscore = false;
-        } else {
-            // Max 1 underscore at a time, as some tools don't like it (#128)
-            if !last_was_underscore {
-                result.push('_');
-            }
-            last_was_underscore = true;
-        }
-    }
-    result.trim_matches('_').to_owned()
-}
-
-fn perform_instantiation(
-    linker: &Linker,
-    global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
-) -> InstantiatedModule {
-    let md = &linker.modules[global_ref.id];
-
-    let name = global_ref.display(linker).to_string();
-
-    // Don't instantiate modules that already errored. Otherwise instantiator may crash
-    if md.link_info.errors.did_error {
-        let mut errors = ErrorCollector::new_empty(md.link_info.file, &linker.files);
-        errors.set_did_error();
-        let msg = format!("Not Instantiating {name} due to abstract typing errors");
-        errors.warn(md.link_info.name_span, msg);
-        return InstantiatedModule {
-            global_ref,
-            mangled_name: mangle_name(&name),
-            name,
-            errors: errors.into_storage(),
-            interface_ports: Default::default(),
-            wires: Default::default(),
-            submodules: Default::default(),
-            generation_state: md
-                .link_info
-                .instructions
-                .map(|_| SubModuleOrWire::Unassigned),
-        };
-    }
-    let submodules_with_abs_type_errors: HashSet<_> = md
-        .link_info
-        .resolved_globals
-        .referenced_globals
-        .iter()
-        .filter_map(|global| {
-            let found_link_info: &LinkInfo = &linker.globals[*global];
-
-            found_link_info
-                .errors
-                .did_error
-                .then(|| found_link_info.display_full_name().to_string())
-        })
-        .collect();
-
-    if !submodules_with_abs_type_errors.is_empty() {
-        let mut errors = ErrorCollector::new_empty(md.link_info.file, &linker.files);
-        errors.set_did_error();
-        let mut msg =
-            format!("Not Instantiating {name} due to abstract typing errors of submodules:\n");
-        for s in submodules_with_abs_type_errors {
-            writeln!(msg, "- {s}").unwrap();
-        }
-        errors.warn(md.link_info.name_span, msg);
-
-        return InstantiatedModule {
-            global_ref,
-            mangled_name: mangle_name(&name),
-            name,
-            errors: errors.into_storage(),
-            interface_ports: Default::default(),
-            wires: Default::default(),
-            submodules: Default::default(),
-            generation_state: md
-                .link_info
-                .instructions
-                .map(|_| SubModuleOrWire::Unassigned),
-        };
-    }
-
-    debug!("Executing {name}");
-    let exec = execute::execute(&md.link_info, linker, &global_ref.template_args);
-
-    let (typed, type_var_alloc) =
-        exec.into_module_typing_context(linker, md, global_ref, name.clone());
-
-    if typed.errors.did_error() {
-        return typed.into_instantiated_module();
-    }
-
-    if crate::debug::is_enabled("print-concrete-pre-typecheck") {
-        eprintln!("[[Executed {name}]]");
-        typed.print_instantiated_module();
-    }
-
-    debug!("Concrete Typechecking {name}");
-    let mut context = ModuleTypingSuperContext::start_typechecking(typed, type_var_alloc);
-    loop {
-        let submodules_to_instantiate = context.typecheck_step();
-        if submodules_to_instantiate.is_empty() {
-            break;
-        }
-        for (sm_id, sm_ref) in submodules_to_instantiate {
-            let instance = linker.instantiator.instantiate(linker, sm_ref);
-            context.apply_instantiated_submodule(sm_id, instance);
-        }
-    }
-    let typed = context.finish();
-
-    if crate::debug::is_enabled("print-concrete") {
-        eprintln!("[[Instantiated {name}]]");
-        typed.print_instantiated_module();
-    }
-
-    if typed.errors.did_error() {
-        return typed.into_instantiated_module();
-    }
-
-    debug!("Checking array accesses {name}");
-    typed.check_subtypes();
-
-    typed.into_instantiated_module()
 }

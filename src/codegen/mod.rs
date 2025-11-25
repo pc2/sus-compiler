@@ -63,14 +63,13 @@ pub fn codegen(linker: &Linker) -> ExitCode {
         return ExitCode::SUCCESS; // early exit, to save work
     }
     assert_eq!(config.target_language, TargetLanguage::SystemVerilog);
-    let instantiatior = linker.instantiator.borrow();
 
     let mut all_instances = HashSet::new();
     let mut dependency_stack = Vec::new();
     let mut any_error = false;
     if config.top_modules.is_empty() {
         for (id, _) in &linker.modules {
-            for (_, md) in instantiatior.iter_for_module(id) {
+            for (_, md) in linker.instantiator.iter_for_module(id) {
                 if !md.errors.did_error {
                     order_dependencies(&mut all_instances, &mut dependency_stack, md);
                 } else {
@@ -82,7 +81,7 @@ pub fn codegen(linker: &Linker) -> ExitCode {
     } else {
         for top in &config.top_modules {
             let md_id = linker.get_by_name(top).unwrap().unwrap_module();
-            for (_, md) in instantiatior.iter_for_module(md_id) {
+            for (_, md) in linker.instantiator.iter_for_module(md_id) {
                 if !md.errors.did_error {
                     order_dependencies(&mut all_instances, &mut dependency_stack, md);
                 } else {
@@ -127,7 +126,7 @@ pub fn codegen(linker: &Linker) -> ExitCode {
             let filename = sanitize_filename(&md.link_info.name, ".sv");
             let path = output_folder.join(filename);
             let mut out_file = make_output_file(&path);
-            for (_global_ref, inst) in instantiatior.iter_for_module(id) {
+            for (_global_ref, inst) in linker.instantiator.iter_for_module(id) {
                 let code = gen_verilog_code(inst, linker);
                 if let Err(e) = write!(out_file, "{code}") {
                     fatal_exit!("Error while writing to {}: {e}", path.to_string_lossy());

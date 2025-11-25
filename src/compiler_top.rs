@@ -217,7 +217,7 @@ impl Linker {
     pub fn recompile_all(&mut self) {
         let config = config();
 
-        self.instantiator.borrow_mut().clear_instances();
+        self.instantiator.clear_instances();
 
         let global_ids = self.get_all_global_ids();
         // First reset all modules back to post-gather_initial_file_data
@@ -276,12 +276,13 @@ impl Linker {
 
             // Make an initial instantiation of all modules
             // Won't be possible once we have template modules
-            for (id, md) in &self.modules {
+            for (id, md) in &self.globals.modules {
                 // Already instantiate any modules without parameters
                 // Can immediately instantiate modules that have no template args
                 if md.link_info.parameters.is_empty() {
                     let _inst = self.instantiator.instantiate(
-                        self,
+                        &self.globals,
+                        &self.files,
                         ConcreteGlobalReference {
                             id,
                             template_args: FlatAlloc::new(),
@@ -296,7 +297,8 @@ impl Linker {
                         let md = &self.modules[id];
                         if md.link_info.parameters.is_empty() {
                             let _inst = self.instantiator.instantiate(
-                                self,
+                                &self.globals,
+                                &self.files,
                                 ConcreteGlobalReference {
                                     id,
                                     template_args: FlatAlloc::new(),

@@ -147,7 +147,7 @@ impl Value {
     /// Panics when arrays contain mutually incompatible types
     pub fn concretize_type(
         &self,
-        _linker: &Linker,
+        _linker: &LinkerGlobals,
         abs_typ: &AbstractRankedType,
         template_args: &TVec<ConcreteTemplateArg>,
         value_alloc: &mut ValueUnifierAlloc,

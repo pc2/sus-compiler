@@ -45,7 +45,7 @@ impl HoverCollector<'_> {
 
     fn gather_hover_infos(&mut self, obj_id: GlobalUUID, id: FlatID, is_generative: bool) {
         if let GlobalUUID::Module(md_id) = obj_id {
-            for (_template_args, inst) in self.linker.instantiator.borrow().iter_for_module(md_id) {
+            for (_template_args, inst) in self.linker.instantiator.iter_for_module(md_id) {
                 if is_generative {
                     let value_str = match &inst.generation_state[id] {
                         SubModuleOrWire::SubModule(_) | SubModuleOrWire::Wire(_) => {
@@ -71,7 +71,7 @@ impl HoverCollector<'_> {
     }
 
     fn gather_submodule_hover_infos(&mut self, md_id: ModuleUUID, submodule_instr: FlatID) {
-        for (_template_args, inst) in self.linker.instantiator.borrow().iter_for_module(md_id) {
+        for (_template_args, inst) in self.linker.instantiator.iter_for_module(md_id) {
             for (_id, sm) in &inst.submodules {
                 if sm.original_instruction == submodule_instr {
                     self.sus_code(sm.display_interface(self.linker).to_string());
