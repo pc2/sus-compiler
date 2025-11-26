@@ -1713,3 +1713,7 @@ module NonGenerativeSliceBoundsMustNotICE {
     arr[x:]
     arr[:x]
 }
+
+module InstantiatesItself {
+	InstantiatesItself x
+}

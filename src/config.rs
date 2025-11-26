@@ -74,10 +74,15 @@ pub struct ConfigStruct {
     ///
     /// See also [Self::enabled_debug_paths]
     pub debug_whitelist: Vec<String>,
-    pub kill_timeout: std::time::Duration,
     pub enabled_debug_paths: HashSet<String>,
     pub early_exit: EarlyExitUpTo,
     pub no_redump: bool,
+
+    // Limits for more graceful human interaction in the event of failure
+    /// Hard kill timeout - if the compiler takes longer than this time to finish some internal task, the watchdog thread kills it.
+    pub kill_timeout: std::time::Duration,
+    /// Prevent the compiler from crashing from a stack overflow if the user happens to create an infinite recursion
+    pub recursion_limit: usize,
 }
 
 pub const VERSION_INFO: &str = concat!(
@@ -201,20 +206,32 @@ fn command_builder() -> Command {
             .hide(true)
             .help("Enable debug prints and figures for specific modules.\nDebugging checks if the current debug stage print has one of the debug-whitelist arguments as a substring. So passing 'FIFO' debugs all FIFO stuff, but passing 'Typechecking FIFO' only shows debug prints during typechecking. To show everything, pass --debug-whitelist-is-blacklist")
             .action(clap::ArgAction::Append))
-        .arg(Arg::new("kill-timeout")
-            .long("kill-timeout")
-            .hide(true)
-            .help("Sets how long (in seconds) an individual part of the compiler can take, before terminating. Set to 0 to disable")
-            .action(clap::ArgAction::Set)
-            .default_value("0.0")
-            .value_parser(|duration : &str| -> Result<Duration, String> {
-                Ok(Duration::from_secs_f64(duration.parse::<f64>().map_err(|e| e.to_string())?))
-            }))
         .arg(Arg::new("no-redump")
             .long("no-redump")
             .hide(true)
             .help("Disable creation of new crash dump on panic")
             .action(clap::ArgAction::SetTrue))
+
+        // Reasonable limits for more graceful human interaction
+        .arg(Arg::new("kill-timeout")
+            .long("kill-timeout")
+            .help("Sets how long (in seconds) an individual part of the compiler can take, before terminating. Set to 0.0 to disable")
+            .action(clap::ArgAction::Set)
+            .default_value("0.0")
+            .value_parser(|duration : &str| -> Result<Duration, String> {
+                Ok(Duration::from_secs_f64(duration.parse::<f64>().map_err(|e| e.to_string())?))
+            }))
+        .arg(Arg::new("recursion-limit")
+            .long("recursion-limit")
+            .help("Protect against infinite recursive instantiation of submodules. Set to 0 to disable.")
+            .action(clap::ArgAction::Set)
+            .default_value("1000")
+            .value_parser(|arg_text : &str| {
+                match arg_text.parse::<usize>() {
+                    Ok(v) => Ok(v),
+                    Err(_) => Err("Should be a positive integer")
+                }
+            }))
 }
 
 pub fn parse_args() {
@@ -328,6 +345,11 @@ pub fn parse_args() {
         );
     }
 
+    let mut recursion_limit = *matches.get_one::<usize>("recursion-limit").unwrap();
+    if recursion_limit == 0 {
+        recursion_limit = usize::MAX; // 0 means "disable recursion limit", this is pretty effective at that
+    }
+
     let cfg = ConfigStruct {
         lsp_settings,
         sus_home,
@@ -340,9 +362,10 @@ pub fn parse_args() {
         ci,
         debug_whitelist,
         enabled_debug_paths,
-        kill_timeout: *matches.get_one::<Duration>("kill-timeout").unwrap(),
         early_exit: *matches.get_one("upto").unwrap(),
         no_redump: matches.get_flag("no-redump"),
+        kill_timeout: *matches.get_one::<Duration>("kill-timeout").unwrap(),
+        recursion_limit,
     };
     CONFIG.set(cfg).unwrap();
 }

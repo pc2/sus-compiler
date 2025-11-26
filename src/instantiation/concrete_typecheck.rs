@@ -4,6 +4,7 @@ use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::{zip_eq, zip_eq3};
 use crate::dev_aid::dot_graphs::display_latency_count_graph;
+use crate::instantiation::instantiator::InstantiateError;
 use crate::latency::LatencyInferenceProblem;
 use crate::latency::port_latency_inference::{
     InferenceCandidate, InferenceTarget, InferenceTargetPath, ValueInferStrategy,
@@ -193,7 +194,7 @@ impl<'l> ModuleTypingSuperContext<'l> {
     pub fn apply_instantiated_submodule(
         &mut self,
         sm_id: SubModuleID,
-        instance: Option<Rc<InstantiatedModule>>,
+        instance: Result<Rc<InstantiatedModule>, InstantiateError>,
     ) {
         self.with_mut(|self_mut| {
             self_mut.ctx.apply_instantiated_submodule(
@@ -917,16 +918,23 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
     fn apply_instantiated_submodule(
         &'inst self,
         sm_id: SubModuleID,
-        instance: Option<Rc<InstantiatedModule>>,
+        instance: Result<Rc<InstantiatedModule>, InstantiateError>,
         unifier: &mut ValueUnifier<'inst>,
     ) {
         let sm = &self.submodules[sm_id];
         let submod_instr = &self.link_info.instructions[sm.original_instruction];
 
-        let Some(instance) = instance else {
-            self.errors
-                .error(submod_instr.get_span(), "Error instantiating submodule");
-            return;
+        let instance = match instance {
+            Ok(instance) => instance,
+            Err(InstantiateError::ErrorInModule) => {
+                self.errors
+                    .error(submod_instr.get_span(), "Error instantiating submodule");
+                return;
+            }
+            Err(InstantiateError::RecursionLimitExceeded { message }) => {
+                self.errors.error(submod_instr.get_span(), message);
+                return;
+            }
         };
         let sub_module = &self.globals.modules[sm.refers_to.id];
 

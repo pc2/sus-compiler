@@ -1,11 +1,14 @@
 use super::*;
 
 use std::collections::BTreeMap;
+use std::fmt::Display;
 use std::rc::Rc;
 
 use crate::alloc::ArenaAllocator;
+use crate::config::config;
 use crate::errors::CompileError;
 use crate::linker::{FileData, LinkerGlobals};
+use crate::to_string::FmtWrapper;
 use crate::typing::concrete_type::ConcreteGlobalReference;
 
 use super::InstantiatedModule;
@@ -17,13 +20,32 @@ use super::InstantiatedModule;
 /// Also, with incremental builds (#49) this will be a prime area for investigation
 #[derive(Debug, Default)]
 pub struct Instantiator {
-    cache: BTreeMap<Rc<ConcreteGlobalReference<ModuleUUID>>, Rc<InstantiatedModule>>,
+    cache: BTreeMap<Rc<ConcreteGlobalReference<ModuleUUID>>, InstantiatorCacheElem>,
+    stack: Vec<Rc<ConcreteGlobalReference<ModuleUUID>>>,
+}
+
+#[derive(Debug)]
+enum InstantiatorCacheElem {
+    InProgress,
+    Done(Rc<InstantiatedModule>),
+}
+impl InstantiatorCacheElem {
+    pub fn unwrap(&self) -> &Rc<InstantiatedModule> {
+        let_unwrap!(Self::Done(v), self);
+        v
+    }
+}
+
+pub enum InstantiateError {
+    ErrorInModule,
+    RecursionLimitExceeded { message: String },
 }
 
 impl Instantiator {
     pub fn new() -> Self {
         Self {
             cache: BTreeMap::new(),
+            stack: Vec::new(),
         }
     }
 
@@ -31,23 +53,63 @@ impl Instantiator {
         self.cache.clear()
     }
 
+    pub fn display_cur_stack(&self, globals: &LinkerGlobals) -> impl Display {
+        FmtWrapper(|f| {
+            write!(f, "Current Instantiation Stack:")?;
+            for e in &self.stack {
+                write!(f, "\n- {}", e.display(globals))?;
+            }
+            Ok(())
+        })
+    }
+
     pub fn instantiate(
         &mut self,
-        linker_globals: &LinkerGlobals,
+        globals: &LinkerGlobals,
         linker_files: &ArenaAllocator<FileData, FileUUIDMarker>,
         object_id: ConcreteGlobalReference<ModuleUUID>,
-    ) -> Option<Rc<InstantiatedModule>> {
+    ) -> Result<Rc<InstantiatedModule>, InstantiateError> {
         let instance = if let Some(found) = self.cache.get(&object_id) {
-            found.clone()
+            match found {
+                InstantiatorCacheElem::Done(instantiated_module) => instantiated_module.clone(),
+                InstantiatorCacheElem::InProgress => {
+                    let obj_name = object_id.display(globals);
+                    return Err(InstantiateError::RecursionLimitExceeded {
+                        message: format!(
+                            "{obj_name} depends on itself! Infinite Submodule Recursion is not allowed.\n{}\n- {obj_name}",
+                            self.display_cur_stack(globals)
+                        ),
+                    });
+                }
+            }
         } else {
+            let recursion_limit = config().recursion_limit;
+            if self.stack.len() > recursion_limit {
+                // Make sure we trigger on an actually recursive call, and not on the submodules of some innocent non-recursive submodule used within a deep recursion.
+                // "10" occurences of this module name in the recursion stack seems good enough to call it "part of the bad recursion"
+                if self.stack.iter().filter(|e| e.id == object_id.id).count() > 10 {
+                    return Err(InstantiateError::RecursionLimitExceeded {
+                        message: format!(
+                            "Recursion limit ({recursion_limit}) reached! If a deeply nested recursion is intended, pass a higher value for `--recursion-limit`.\n{}",
+                            self.display_cur_stack(globals)
+                        ),
+                    });
+                }
+            }
             let global_ref = Rc::new(object_id);
+            self.stack.push(global_ref.clone());
+            assert!(
+                self.cache
+                    .insert(global_ref.clone(), InstantiatorCacheElem::InProgress)
+                    .is_none()
+            );
 
-            let name = global_ref.display(linker_globals).to_string();
+            let name = global_ref.display(globals).to_string();
 
-            let md = &linker_globals.modules[global_ref.id];
+            let md = &globals.modules[global_ref.id];
             let file = &linker_files[md.link_info.file];
             let result = crate::debug::debug_context("instantiating", name, file, || {
-                match start_instantiation(linker_globals, linker_files, global_ref.clone()) {
+                match start_instantiation(globals, linker_files, global_ref.clone()) {
                     Ok(mut context) => {
                         loop {
                             let submodules_to_instantiate = context.typecheck_step();
@@ -55,8 +117,7 @@ impl Instantiator {
                                 break;
                             }
                             for (sm_id, sm_ref) in submodules_to_instantiate {
-                                let instance =
-                                    self.instantiate(linker_globals, linker_files, sm_ref);
+                                let instance = self.instantiate(globals, linker_files, sm_ref);
                                 context.apply_instantiated_submodule(sm_id, instance);
                             }
                         }
@@ -72,21 +133,26 @@ impl Instantiator {
                 info!("Instantiated {}", result.name);
             }
 
-            let result_ref = Rc::new(result);
-            assert!(self.cache.insert(global_ref, result_ref.clone()).is_none());
-            result_ref
+            self.stack.pop(); // should pop the global_ref we pushed to earlier
+            let result = Rc::new(result);
+            let_unwrap!(
+                Some(InstantiatorCacheElem::InProgress),
+                self.cache
+                    .insert(global_ref, InstantiatorCacheElem::Done(result.clone()))
+            );
+            result
         };
 
         if !instance.errors.did_error {
-            Some(instance.clone())
+            Ok(instance)
         } else {
-            None
+            Err(InstantiateError::ErrorInModule)
         }
     }
 
     pub fn for_each_error(&self, func: &mut impl FnMut(&CompileError)) {
         for inst in self.cache.values() {
-            for err in &inst.errors {
+            for err in &inst.unwrap().errors {
                 func(err)
             }
         }
@@ -102,7 +168,7 @@ impl Instantiator {
             &Rc<InstantiatedModule>,
         ),
     > {
-        self.cache.iter()
+        self.cache.iter().map(|v| (v.0, v.1.unwrap()))
     }
 
     // Also passes over invalid instances. Instance validity should not be assumed!
@@ -116,7 +182,10 @@ impl Instantiator {
             &Rc<InstantiatedModule>,
         ),
     > {
-        self.cache.iter().filter(move |kv| kv.0.id == md_id)
+        self.cache
+            .iter()
+            .filter(move |kv| kv.0.id == md_id)
+            .map(|v| (v.0, v.1.unwrap()))
     }
 }
 

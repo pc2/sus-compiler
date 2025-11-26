@@ -164,6 +164,7 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated ModuleWithInitialStates #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestGenArrayOps #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate NonGenerativeSliceBoundsMustNotICE #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate InstantiatesItself #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -3896,6 +3897,19 @@ Error: A slice bound cannot be non-generative
       │          ┬  
       │          ╰── A slice bound cannot be non-generative
 ──────╯
+Error: InstantiatesItself #() depends on itself! Infinite Submodule Recursion is not allowed.
+Current Instantiation Stack:
+- InstantiatesItself #()
+- InstantiatesItself #()
+      ╭─[ test.sus:1718:21 ]
+      │
+ 1718 │     InstantiatesItself x
+      │                        ┬  
+      │                        ╰── InstantiatesItself #() depends on itself! Infinite Submodule Recursion is not allowed.
+Current Instantiation Stack:
+- InstantiatesItself #()
+- InstantiatesItself #()
+──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen test_various_assignments #() due to errors!
@@ -3969,3 +3983,4 @@ Error: A slice bound cannot be non-generative
 [ERROR sus_compiler::codegen] Cannot codegen use_make_when #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen use_module_taking_strings #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen NonGenerativeSliceBoundsMustNotICE #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen InstantiatesItself #() due to errors!
