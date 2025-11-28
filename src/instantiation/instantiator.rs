@@ -250,7 +250,7 @@ fn start_instantiation<'l>(
 
     // Don't instantiate modules that already errored. Otherwise instantiator may crash
     if md.link_info.errors.did_error {
-        let mut errors = ErrorCollector::new_empty(md.link_info.file, linker_files);
+        let errors = ErrorCollector::new_empty(md.link_info.file, linker_files);
         errors.set_did_error();
         let msg = format!("Not Instantiating {name} due to abstract typing errors");
         errors.warn(md.link_info.name_span, msg);
@@ -284,7 +284,7 @@ fn start_instantiation<'l>(
         .collect();
 
     if !submodules_with_abs_type_errors.is_empty() {
-        let mut errors = ErrorCollector::new_empty(md.link_info.file, linker_files);
+        let errors = ErrorCollector::new_empty(md.link_info.file, linker_files);
         errors.set_did_error();
         let mut msg =
             format!("Not Instantiating {name} due to abstract typing errors of submodules:\n");

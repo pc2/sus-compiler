@@ -927,8 +927,10 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         let instance = match instance {
             Ok(instance) => instance,
             Err(InstantiateError::ErrorInModule) => {
-                self.errors
-                    .error(submod_instr.get_span(), "Error instantiating submodule");
+                self.errors.set_did_error();
+                // Don't report errors on submodule instantiation erroring. This should reduce the "error overload" certainly in recursive modules. (See #146)
+                /*self.errors
+                .error(submod_instr.get_span(), "Error instantiating submodule");*/
                 return;
             }
             Err(InstantiateError::RecursionLimitExceeded { message }) => {

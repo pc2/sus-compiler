@@ -235,7 +235,7 @@ impl<'linker> ErrorCollector<'linker> {
     pub fn did_error(&self) -> bool {
         self.did_error.get()
     }
-    pub fn set_did_error(&mut self) {
+    pub fn set_did_error(&self) {
         self.did_error.set(true);
     }
 }

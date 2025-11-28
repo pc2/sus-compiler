@@ -274,13 +274,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │             ┬  
      │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:180:32 ]
-     │
- 180 │     reg int a, st[2], reg reg b = assignment_producer()
-     │                                   ─────────┬─────────  
-     │                                            ╰─────────── Error instantiating submodule
-─────╯
 Warning: Not Instantiating multiply_add_with_latencies #() due to abstract typing errors
      ╭─[ test.sus:217:8 ]
      │
@@ -1498,111 +1491,6 @@ Error: Some parameters of '_1' were still unknown: int #(FROM: ?, TO: ?)
  803 │        sum = values[0]
      │              ────┬────  
      │                  ╰────── Some parameters of '_1' were still unknown: int #(FROM: ?, TO: ?)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:806:33 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │                                      ──┬─  
-     │                                        ╰─── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:806:33 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │                                      ──┬─  
-     │                                        ╰─── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:806:33 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │                                      ──┬─  
-     │                                        ╰─── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:806:33 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │                                      ──┬─  
-     │                                        ╰─── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:806:33 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │                                      ──┬─  
-     │                                        ╰─── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:806:33 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │                                      ──┬─  
-     │                                        ╰─── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:806:33 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │                                      ──┬─  
-     │                                        ╰─── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:807:33 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │                                      ──┬──  
-     │                                        ╰──── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:807:33 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │                                      ──┬──  
-     │                                        ╰──── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:807:33 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │                                      ──┬──  
-     │                                        ╰──── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:807:33 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │                                      ──┬──  
-     │                                        ╰──── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:807:33 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │                                      ──┬──  
-     │                                        ╰──── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:807:33 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │                                      ──┬──  
-     │                                        ╰──── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:807:33 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │                                      ──┬──  
-     │                                        ╰──── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:831:26 ]
-     │
- 831 │     tree_add #(WIDTH: SIZE) tr
-     │                             ─┬  
-     │                              ╰── Error instantiating submodule
 ─────╯
 Error: Some submodule parameters of b were still unknown: replicate #(T: type int #(FROM: ?, TO: ?)[30], NUM_REPLS: 20)
 T can be inferred from:
@@ -3390,13 +3278,6 @@ If you do not wish to change your design, then 'virtually' connect this port to 
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-──────╯
-Error: Error instantiating submodule
-      ╭─[ test.sus:1548:12 ]
-      │
- 1548 │     make_when w
-      │               ┬  
-      │               ╰── Error instantiating submodule
 ──────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
