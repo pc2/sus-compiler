@@ -198,7 +198,8 @@ pub fn debugging_enabled() -> bool {
     })
 }
 
-pub fn setup_panic_handler() {
+/// Set up the hook to print spans. Uses [std::panic::set_hook] instead of [std::panic::catch_unwind] because this runs before my debugger "on panic" breakpoint.
+pub fn setup_span_panic_handler() {
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         default_hook(info);
@@ -245,7 +246,7 @@ pub fn create_dump_on_panic<R>(linker: &mut Linker, f: impl FnOnce(&mut Linker) 
         Ok(result) => return result,
         Err(panic_info) => panic_info,
     };
-    // Get ~/.sus/crash_dumps/{timestamp}
+    // Get ./sus_crash_dumps/{timestamp}
     let cur_time = chrono::Local::now()
         .format("_%Y-%m-%d_%H:%M:%S")
         .to_string();
@@ -258,7 +259,7 @@ pub fn create_dump_on_panic<R>(linker: &mut Linker, f: impl FnOnce(&mut Linker) 
         }) = history.debug_stack.last()
         {
             let global_obj_name = global_obj_name.replace(char::is_whitespace, "");
-            format!("{stage}_{global_obj_name}",)
+            format!("{stage}_{global_obj_name}")
         } else {
             "unknown".to_string()
         }
@@ -310,7 +311,7 @@ pub fn create_dump_on_panic<R>(linker: &mut Linker, f: impl FnOnce(&mut Linker) 
             let _ = f.write_all(file_data.file_text.file_text.as_bytes());
         }
     }
-    error!("Internal compiler error! All files dumped to {dump_dir:?}");
+    error!("Internal Compiler Error! All files dumped to {dump_dir:?}");
     std::panic::resume_unwind(panic_info);
 }
 

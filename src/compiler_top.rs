@@ -210,10 +210,6 @@ impl Linker {
             .find(|_id, f| f.file_identifier == file_identifier)
     }
 
-    pub fn recompile_all_report_panics(&mut self) {
-        crate::debug::create_dump_on_panic(self, |slf| slf.recompile_all())
-    }
-
     pub fn recompile_all(&mut self) {
         let config = config();
 

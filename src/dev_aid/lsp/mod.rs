@@ -89,7 +89,7 @@ impl Linker {
     fn update_text(&mut self, uri: &Url, new_file_text: String, manager: &mut LSPFileManager) {
         self.add_or_update_file(uri.as_str(), new_file_text, manager);
 
-        self.recompile_all_report_panics();
+        self.recompile_all();
     }
     fn ensure_contains_file(&mut self, uri: &Url, manager: &mut LSPFileManager) -> FileUUID {
         if let Some(found) = self.find_uri(uri) {
@@ -98,7 +98,7 @@ impl Linker {
             let file_text = std::fs::read_to_string(uri.to_file_path().unwrap()).unwrap();
 
             let file_uuid = self.add_file_text(uri.to_string(), file_text, manager);
-            self.recompile_all_report_panics();
+            self.recompile_all();
             file_uuid
         }
     }
@@ -201,8 +201,7 @@ impl LinkerExtraFileInfoManager for LSPFileManager {
     }
 }
 
-fn initialize_all_files(init_params: &InitializeParams) -> (Linker, LSPFileManager) {
-    let mut linker = Linker::new();
+fn initialize_all_files(linker: &mut Linker, init_params: &InitializeParams) -> LSPFileManager {
     let mut manager = LSPFileManager {};
 
     linker.add_standard_library(&mut manager);
@@ -229,8 +228,8 @@ fn initialize_all_files(init_params: &InitializeParams) -> (Linker, LSPFileManag
         }
     }
 
-    linker.recompile_all_report_panics();
-    (linker, manager)
+    linker.recompile_all();
+    manager
 }
 
 fn gather_completions(linker: &Linker, file_id: FileUUID, position: usize) -> Vec<CompletionItem> {
@@ -564,7 +563,8 @@ fn handle_notification(
         }
         notification::DidChangeWatchedFiles::METHOD => {
             info!("Workspace Files modified");
-            (*linker, *manager) = initialize_all_files(initialize_params);
+            *linker = Linker::new();
+            *manager = initialize_all_files(linker, initialize_params);
 
             push_all_errors(connection, linker)?;
         }
@@ -584,52 +584,55 @@ fn main_loop(
 
     let initialize_params: InitializeParams = serde_json::from_value(initialize_params).unwrap();
 
-    let (mut linker, mut manager) = initialize_all_files(&initialize_params);
+    let mut linker = Linker::new();
+    crate::debug::create_dump_on_panic(&mut linker, |linker| {
+        let mut manager = initialize_all_files(linker, &initialize_params);
 
-    push_all_errors(&connection, &linker)?;
+        push_all_errors(&connection, &*linker)?;
 
-    info!("starting LSP main loop");
-    for msg in &connection.receiver {
-        match msg {
-            lsp_server::Message::Request(req) => {
-                if connection.handle_shutdown(&req)? {
-                    info!("Shutdown request");
-                    return Ok(());
+        info!("starting LSP main loop");
+        for msg in &connection.receiver {
+            match msg {
+                lsp_server::Message::Request(req) => {
+                    if connection.handle_shutdown(&req)? {
+                        info!("Shutdown request");
+                        return Ok(());
+                    }
+
+                    let response_value =
+                        handle_request(&req.method, req.params, linker, &mut manager);
+
+                    let result = response_value.unwrap();
+                    let response = lsp_server::Response {
+                        id: req.id,
+                        result: Some(result),
+                        error: None,
+                    };
+                    connection
+                        .sender
+                        .send(lsp_server::Message::Response(response))?;
                 }
-
-                let response_value =
-                    handle_request(&req.method, req.params, &mut linker, &mut manager);
-
-                let result = response_value.unwrap();
-                let response = lsp_server::Response {
-                    id: req.id,
-                    result: Some(result),
-                    error: None,
-                };
-                connection
-                    .sender
-                    .send(lsp_server::Message::Response(response))?;
+                lsp_server::Message::Response(resp) => {
+                    info!("got response: {resp:?}");
+                }
+                lsp_server::Message::Notification(notification) => {
+                    handle_notification(
+                        &connection,
+                        notification,
+                        linker,
+                        &mut manager,
+                        &initialize_params,
+                    )?;
+                }
             }
-            lsp_server::Message::Response(resp) => {
-                info!("got response: {resp:?}");
-            }
-            lsp_server::Message::Notification(notification) => {
-                handle_notification(
-                    &connection,
-                    notification,
-                    &mut linker,
-                    &mut manager,
-                    &initialize_params,
-                )?;
+
+            info!("All loaded files:");
+            for (_id, file) in &linker.files {
+                info!("File: {}", &file.file_identifier);
             }
         }
-
-        info!("All loaded files:");
-        for (_id, file) in &linker.files {
-            info!("File: {}", &file.file_identifier);
-        }
-    }
-    Ok(())
+        Ok(())
+    })
 }
 
 pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {

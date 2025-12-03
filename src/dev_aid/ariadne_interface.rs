@@ -76,8 +76,7 @@ impl LinkerExtraFileInfoManager for FileSourcesManager {
     }
 }
 
-pub fn compile_all(file_paths: Vec<PathBuf>) -> (Linker, FileSourcesManager) {
-    let mut linker = Linker::new();
+pub fn compile_all(linker: &mut Linker, file_paths: Vec<PathBuf>) -> FileSourcesManager {
     let mut file_source_manager = FileSourcesManager {
         file_sources: ArenaVector::new(),
     };
@@ -101,9 +100,9 @@ pub fn compile_all(file_paths: Vec<PathBuf>) -> (Linker, FileSourcesManager) {
         );
     }
 
-    linker.recompile_all_report_panics();
+    linker.recompile_all();
 
-    (linker, file_source_manager)
+    file_source_manager
 }
 
 fn ariadne_config() -> Config {

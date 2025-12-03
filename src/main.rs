@@ -33,6 +33,8 @@ use dev_aid::ariadne_interface::*;
 use instantiation::InstantiatedModule;
 
 fn main() -> ExitCode {
+    crate::debug::setup_span_panic_handler();
+
     env_logger::builder()
         .filter_level(log::LevelFilter::Info)
         .init();
@@ -52,10 +54,11 @@ fn main() -> ExitCode {
         };
     }
 
-    debug::setup_panic_handler();
+    let mut linker = Linker::new();
+    crate::debug::create_dump_on_panic(&mut linker, |linker| {
+        let mut paths_arena = compile_all(linker, file_paths);
+        print_all_errors(&*linker, &mut paths_arena.file_sources);
 
-    let (linker, mut paths_arena) = compile_all(file_paths);
-    print_all_errors(&linker, &mut paths_arena.file_sources);
-
-    crate::codegen::codegen(&linker)
+        crate::codegen::codegen(&*linker)
+    })
 }
