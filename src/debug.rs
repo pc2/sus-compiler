@@ -1,4 +1,4 @@
-use crate::{prelude::*, to_string::sanitize_filename};
+use crate::prelude::*;
 
 use std::{
     cell::RefCell,
@@ -16,6 +16,7 @@ use circular_buffer::CircularBuffer;
 use colored::Colorize;
 
 use crate::{
+    codegen::sanitize_filename,
     config::config,
     linker::{FileData, Linker},
     prelude::Span,

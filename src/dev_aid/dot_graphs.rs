@@ -1,3 +1,4 @@
+use crate::codegen::sanitize_filename;
 use crate::linker::LinkerGlobals;
 use crate::prelude::*;
 
@@ -8,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use crate::alloc::UUID;
 use crate::instantiation::IsPort;
-use crate::to_string::{FmtWrapper, sanitize_filename};
+use crate::to_string::FmtWrapper;
 use crate::{
     alloc::FlatAlloc,
     flattening::Direction,

@@ -1415,36 +1415,6 @@ pub fn display_if(b: bool, func: impl Fn(&mut Formatter<'_>) -> std::fmt::Result
     FmtWrapper(move |f| if b { func(f) } else { Ok(()) })
 }
 
-// Limit total folder/file name byte size to 255, which is the maximum on just about every platform
-const MAX_FILENAME_LEN: usize = 255;
-
-#[cfg(target_os = "linux")]
-const INVALID_CHARS: &[char] = &['/'];
-#[cfg(not(target_os = "linux"))]
-const INVALID_CHARS: &[char] = &['\\', '/', ':', '*', '?', '"', '<', '>', '|']; // Mostly for windows. 
-
-/// Shorten the total string (name + postfix) such that `format!("{name}{postfix}").len() <= MAX_FILENAME_LEN`
-pub fn sanitize_filename(name: &str, postfix: &str) -> String {
-    let max_len = MAX_FILENAME_LEN - postfix.len();
-    if name.len() <= max_len {
-        format!("{name}{postfix}")
-    } else {
-        let mut shortened = String::with_capacity(name.len() + postfix.len() + 1); // One for CString \0
-        for c in name.chars() {
-            if shortened.len() + c.len_utf8() >= max_len {
-                break;
-            }
-            let new_c = if INVALID_CHARS.contains(&c) { ' ' } else { c };
-            shortened.push(new_c);
-        }
-        let result = format!("{shortened}{postfix}");
-        warn!(
-            "Filename {name}{postfix} was shortened to {result} to avoid too long filenames on some platforms"
-        );
-        result
-    }
-}
-
 pub struct FmtWrapper<F: Fn(&mut Formatter<'_>) -> std::fmt::Result>(pub F);
 
 impl<F: Fn(&mut Formatter<'_>) -> std::fmt::Result> Display for FmtWrapper<F> {
