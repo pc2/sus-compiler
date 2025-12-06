@@ -33,7 +33,7 @@ use dev_aid::ariadne_interface::*;
 use instantiation::InstantiatedModule;
 
 fn main() -> ExitCode {
-    crate::debug::setup_span_panic_handler();
+    crate::debug::setup_panic_handler();
 
     env_logger::builder()
         .filter_level(log::LevelFilter::Info)

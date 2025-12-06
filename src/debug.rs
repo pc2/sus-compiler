@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     ops::Range,
     path::PathBuf,
     sync::{
@@ -198,11 +198,17 @@ pub fn debugging_enabled() -> bool {
     })
 }
 
+thread_local! {
+    static STORED_LINKER: Cell<*mut Linker> = const { Cell::new(std::ptr::null_mut()) };
+}
 /// Set up the hook to print spans. Uses [std::panic::set_hook] instead of [std::panic::catch_unwind] because this runs before my debugger "on panic" breakpoint.
-pub fn setup_span_panic_handler() {
+/// Use together with [create_dump_on_panic].
+pub fn setup_panic_handler() {
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         default_hook(info);
+
+        // === Display last touched spans ===
 
         DEBUG_STACK.with_borrow(|history| {
             if let Some(last_stack_elem) = history.debug_stack.last() {
@@ -229,90 +235,113 @@ pub fn setup_span_panic_handler() {
                     eprintln!("{}", format!("(no SpanDebugger Context) --debug {d}").red());
                 }
             }
-        })
-    }));
-}
+        });
 
-pub fn create_dump_on_panic<R>(linker: &mut Linker, f: impl FnOnce(&mut Linker) -> R) -> R {
-    if crate::config::config().no_redump {
-        // Run without protection, don't create a dump on panic
-        return f(linker);
-    }
+        // === Create Dump on Panic ===
 
-    use std::fs;
-    use std::io::Write;
+        let config = crate::config();
 
-    let panic_info = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(linker))) {
-        Ok(result) => return result,
-        Err(panic_info) => panic_info,
-    };
-    // Get ./sus_crash_dumps/{timestamp}
-    let cur_time = chrono::Local::now()
-        .format("_%Y-%m-%d_%H:%M:%S")
-        .to_string();
-
-    let failure_name = DEBUG_STACK.with_borrow(|history| {
-        if let Some(SpanDebuggerStackElement {
-            stage,
-            global_obj_name,
-            ..
-        }) = history.debug_stack.last()
-        {
-            let global_obj_name = global_obj_name.replace(char::is_whitespace, "");
-            format!("{stage}_{global_obj_name}")
-        } else {
-            "unknown".to_string()
+        if config.no_redump {
+            return;
         }
-    });
 
-    let dump_name = sanitize_filename(&failure_name, &cur_time);
-    let mut dump_dir = config().sus_home.join("crash_dumps").join(&dump_name);
+        let linker: *mut Linker = STORED_LINKER.get();
+        if linker.is_null() {
+            error!("sus_compiler crashed outside of an area protected by create_dump_on_panic");
+            return;
+        }
+        // SAFETY: Since we're currently panicing, and the &mut we're shadowing is the one passed to [create_dump_on_panic], we know we have a unique reference to it.
+        let linker: &mut Linker = unsafe { &mut *linker };
 
-    if let Err(err) = fs::create_dir_all(&dump_dir) {
-        let new_dump_dir = PathBuf::from("sus_crash_dumps").join(&dump_name);
-        error!(
-            "Could not create {} in the SUS install directory: {err} Trying to save it locally to {}",
-            dump_dir.to_string_lossy(),
-            new_dump_dir.to_string_lossy()
-        );
+        use std::fs;
+        use std::io::Write;
 
-        if let Err(err) = fs::create_dir_all(&new_dump_dir) {
+        // Get ./sus_crash_dumps/{timestamp}
+        let cur_time = chrono::Local::now()
+            .format("_%Y-%m-%d_%H:%M:%S")
+            .to_string();
+
+        let failure_name = DEBUG_STACK.with_borrow(|history| {
+            if let Some(SpanDebuggerStackElement {
+                stage,
+                global_obj_name,
+                ..
+            }) = history.debug_stack.last()
+            {
+                let global_obj_name = global_obj_name.replace(char::is_whitespace, "");
+                format!("{stage}_{global_obj_name}")
+            } else {
+                "unknown".to_string()
+            }
+        });
+
+        let dump_name = sanitize_filename(&failure_name, &cur_time);
+        let mut dump_dir = config.sus_home.join("crash_dumps").join(&dump_name);
+
+        if let Err(err) = fs::create_dir_all(&dump_dir) {
+            let new_dump_dir = PathBuf::from("sus_crash_dumps").join(&dump_name);
             error!(
-                "Could not create {} locally either: {err} Giving up on dumping the error",
+                "Could not create {} in the SUS install directory: {err} Trying to save it locally to {}",
+                dump_dir.to_string_lossy(),
                 new_dump_dir.to_string_lossy()
             );
 
-            std::panic::resume_unwind(panic_info);
+            if let Err(err) = fs::create_dir_all(&new_dump_dir) {
+                error!(
+                    "Could not create {} locally either: {err} Giving up on dumping the error",
+                    new_dump_dir.to_string_lossy()
+                );
+
+                return;
+            }
+
+            dump_dir = new_dump_dir;
         }
 
-        dump_dir = new_dump_dir;
+        // Write reproduce.sh with compiler args
+        let args: Vec<String> = std::env::args().collect();
+        let reproduce_path = dump_dir.join("reproduce.sh");
+        if let Ok(mut f) = fs::File::create(&reproduce_path) {
+            use crate::config::VERSION_INFO;
+            let cmd = format!(
+                "#!/bin/sh\n#SUS Compiler Version: {VERSION_INFO}\n{}\n",
+                args.join(" ")
+            );
+            let _ = f.write_all(cmd.as_bytes());
+        }
+
+        for (_id, file_data) in &linker.files {
+            // Exclude files from the standard library directory
+            if file_data.is_std {
+                continue;
+            }
+            let filename = file_data.file_identifier.replace("/", "_");
+            let path = dump_dir.join(&filename);
+            if let Ok(mut f) = fs::File::create(&path) {
+                let _ = f.write_all(file_data.file_text.file_text.as_bytes());
+            }
+        }
+        error!("Internal Compiler Error! All files dumped to {dump_dir:?}");
+    }));
+}
+
+/// [setup_panic_handler] must be called before this
+pub fn create_dump_on_panic<R>(linker: &mut Linker, f: impl FnOnce(&mut Linker) -> R) -> R {
+    let linker_ptr: *mut Linker = linker as *mut Linker;
+    let old_stored_linker = STORED_LINKER.replace(linker_ptr);
+    if !old_stored_linker.is_null() {
+        panic!("create_dump_on_panic is re-entrant? This is a logic error!");
     }
 
-    // Write reproduce.sh with compiler args
-    let args: Vec<String> = std::env::args().collect();
-    let reproduce_path = dump_dir.join("reproduce.sh");
-    if let Ok(mut f) = fs::File::create(&reproduce_path) {
-        use crate::config::VERSION_INFO;
-        let cmd = format!(
-            "#!/bin/sh\n#SUS Compiler Version: {VERSION_INFO}\n{}\n",
-            args.join(" ")
-        );
-        let _ = f.write_all(cmd.as_bytes());
-    }
+    // SAFETY: STORED_LINKER will only point to linker for the duration of the `f` function call. On a panic (and so when setup_panic_handler's handler runs),
+    // the &mut Linker is no longer in scope, therefore STORED_LINKER is the only reference to it (disregarding the reborrow of `linker`).
+    // The &mut passed to f must be derived from linker_ptr, passing linker directly would mean linker_ptr is an invalid reborrow
+    // See https://users.rust-lang.org/t/how-to-report-extra-information-on-crashes-from-global-state-without-invalidating-a-pointer/136699
+    let r = f(unsafe { &mut *linker_ptr });
 
-    for (_id, file_data) in &linker.files {
-        // Exclude files from the standard library directory
-        if file_data.is_std {
-            continue;
-        }
-        let filename = file_data.file_identifier.replace("/", "_");
-        let path = dump_dir.join(&filename);
-        if let Ok(mut f) = fs::File::create(&path) {
-            let _ = f.write_all(file_data.file_text.file_text.as_bytes());
-        }
-    }
-    error!("Internal Compiler Error! All files dumped to {dump_dir:?}");
-    std::panic::resume_unwind(panic_info);
+    assert_eq!(STORED_LINKER.replace(std::ptr::null_mut()), linker_ptr);
+
+    r
 }
 
 struct TimerEntry {
@@ -417,4 +446,39 @@ macro_rules! __debug_dbg {
             dbg!($($arg)*);
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// This is just to test that my implementation of storing pointers is safe WRT miri.
+    #[test]
+    #[should_panic(expected = "OOPS")]
+    fn test_miri_panic_handler() {
+        crate::config::init_cfg_for_test();
+        setup_panic_handler();
+        let mut linker = Linker::new();
+
+        create_dump_on_panic(&mut linker, |linker| {
+            let fd_id = linker.add_file_text(
+                "/non_existent/test/file/path.sus".to_string(),
+                "non_extistent file text".to_string(),
+                &mut (),
+            );
+            let fd = &linker.files[fd_id];
+
+            debug_context("test_context", "test_obj".to_string(), fd, || {
+                let my_span = Span::from(3..10);
+                my_span.debug();
+                if !linker.files.is_empty() {
+                    panic!("OOPS");
+                }
+
+                let linker_two = &*linker;
+
+                println!("{}", linker_two.files[fd_id].is_std);
+            });
+        })
+    }
 }

@@ -31,6 +31,12 @@ pub trait LinkerExtraFileInfoManager {
     fn before_file_remove(&mut self, _file_id: FileUUID, _linker: &Linker) {}
 }
 
+impl LinkerExtraFileInfoManager for () {
+    fn convert_filename(&self, path: &Path) -> String {
+        path.to_string_lossy().to_string()
+    }
+}
+
 impl Linker {
     pub fn add_standard_library<ExtraInfoManager: LinkerExtraFileInfoManager>(
         &mut self,

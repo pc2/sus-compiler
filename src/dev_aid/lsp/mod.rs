@@ -637,9 +637,6 @@ fn main_loop(
 
 pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let cfg = lsp_config();
-    unsafe {
-        std::env::set_var("RUST_BACKTRACE", "1");
-    } // Enable backtrace because I can't set it in VSCode Env vars
 
     info!("starting LSP server");
 

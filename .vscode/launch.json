@@ -15,6 +15,7 @@
             "args": [
                 "--debug-whitelist", "TEST",
                 "--debug", "TEST", // Temporary to add in code when debugging
+                "--no-redump",
                 "tinyTestFile.sus",
             ],
             "cwd": "${workspaceFolder}",
@@ -42,67 +43,12 @@
                 "--debug-whitelist", "TEST",
                 "tinyTestFile.sus",
                 "-o", "/dev/null",
-                "--no-redump",
                 "--debug", "TEST", // Temporary to add in code when debugging
                 "--debug", "print-abstract-pre-typecheck",
                 "--debug", "print-abstract",
                 "--debug", "print-concrete-pre-typecheck",
                 "--debug", "print-concrete",
-            ],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug BitSerialMatrixMultiply in 'sus_compiler'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--no-default-features",
-                    "--bin=sus_compiler",
-                    "--package=sus_compiler"
-                ],
-                "filter": {
-                    "name": "sus_compiler",
-                    "kind": "bin"
-                }
-            },
-            "sourceLanguages": ["rust"],
-            "args": [
-                "--top",
-                "BitSerialMatrixMultiply",
-            ],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug Mandelbrot in 'sus_compiler'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--no-default-features",
-                    "--bin=sus_compiler",
-                    "--package=sus_compiler"
-                ],
-                "filter": {
-                    "name": "sus_compiler",
-                    "kind": "bin"
-                }
-            },
-            "sourceLanguages": ["rust"],
-            "args": [
-                "/home/lennart/Desktop/Projects/mandelbrotFPGA/mandelbrot.sus",
-                "/home/lennart/Desktop/Projects/mandelbrotFPGA/float.sus",
-                "/home/lennart/Desktop/sus-compiler/platform/xilinx/xpm.sus",
-                "--debug-whitelist", "WholeMandelbrotComputer",
-                "--debug", "dot-latency-infer",
-                "--debug", "dot-latency-problem",
-                "--debug", "dot-latency-solution",
-                "--debug", "print-abstract-pre-typecheck",
-                "--debug", "print-abstract",
-                "--debug", "print-concrete",
-                "--top", "MandelbrotSlowIter2"
+                "--no-redump",
             ],
             "cwd": "${workspaceFolder}"
         },
@@ -124,28 +70,9 @@
             },
             "sourceLanguages": ["rust"],
             "args": [
-                "-o", "/dev/null"
+                "-o", "/dev/null",
+                "--no-redump",
             ],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug 'sus_compiler' with arguments",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--no-default-features",
-                    "--bin=sus_compiler",
-                    "--package=sus_compiler"
-                ],
-                "filter": {
-                    "name": "sus_compiler",
-                    "kind": "bin",
-                }
-            },
-            "sourceLanguages": ["rust"],
-            "args": ["bad_syntax.sus", "test.sus", "slidesExampleCode.sus", "tinyTestFile.sus", "stl/core.sus"],
             "cwd": "${workspaceFolder}"
         },
         {

@@ -234,6 +234,14 @@ fn command_builder() -> Command {
             }))
 }
 
+fn get_env_sus_home() -> PathBuf {
+    if let Some(override_path) = std::env::var_os("SUS_HOME") {
+        PathBuf::from(override_path) // Runtime env variable
+    } else {
+        PathBuf::from(env!("INSTALL_SUS_HOME")) // Compiletime env while building, this is baked into the compiler
+    }
+}
+
 pub fn parse_args() {
     assert!(CONFIG.get().is_none(), "parse_args() used twice!");
 
@@ -297,10 +305,8 @@ pub fn parse_args() {
     // Compute sus_home based on priorities: --sus-home explicit override, then $SUS_HOME env var, then $INSTALL_SUS_HOME that was set while compiling
     let sus_home = if let Some(override_path) = sus_home_override {
         override_path
-    } else if let Some(override_path) = std::env::var_os("SUS_HOME") {
-        PathBuf::from(override_path) // Runtime env variable
     } else {
-        PathBuf::from(env!("INSTALL_SUS_HOME")) // Compiletime env while building, this is baked into the compiler
+        get_env_sus_home()
     };
 
     let sus_home = match sus_home.canonicalize() {
@@ -366,6 +372,28 @@ pub fn parse_args() {
         no_redump: matches.get_flag("no-redump"),
         kill_timeout: *matches.get_one::<Duration>("kill-timeout").unwrap(),
         recursion_limit,
+    };
+    CONFIG.set(cfg).unwrap();
+}
+
+#[cfg(test)]
+pub fn init_cfg_for_test() {
+    let cfg = ConfigStruct {
+        lsp_settings: None,
+        sus_home: get_env_sus_home(),
+        files: Vec::new(),
+        codegen_file: None,
+        codegen_separate_folder: None,
+        top_modules: Vec::new(),
+        target_language: TargetLanguage::SystemVerilog,
+        use_color: true,
+        ci: false,
+        debug_whitelist: Vec::new(),
+        enabled_debug_paths: HashSet::new(),
+        early_exit: EarlyExitUpTo::CodeGen,
+        no_redump: true,
+        kill_timeout: Duration::from_secs(0),
+        recursion_limit: 1000,
     };
     CONFIG.set(cfg).unwrap();
 }
