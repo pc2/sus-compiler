@@ -7,25 +7,25 @@ use crate::prelude::FileUUID;
 
 /// [Span] is defined as byte-byte idx. Start inclusive, end exclusive
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Span(usize, usize);
-
-impl From<Range<usize>> for Span {
-    #[track_caller]
-    fn from(value: Range<usize>) -> Self {
-        assert!(value.end >= value.start);
-        Span(value.start, value.end).debug()
-    }
-}
+pub struct Span(usize, usize, FileUUID);
 
 impl Span {
+    pub fn from_range(range: Range<usize>, file: FileUUID) -> Span {
+        assert!(range.end >= range.start);
+        Span(range.start, range.end, file).debug()
+    }
     /// Register that we have visited this span. Eases debugging when errors occur
     pub fn debug(&self) -> Span {
         crate::debug::add_debug_span(*self);
         *self
     }
 
+    pub const PLACEHOLDER: Span = Span(0, usize::MAX, FileUUID::PLACEHOLDER);
+
     /// Only really used for having a span with the maximum size.
-    pub const MAX_POSSIBLE_SPAN: Span = Span(0, usize::MAX);
+    pub fn make_max_possible_span(file: FileUUID) -> Span {
+        Span(0, usize::MAX, file)
+    }
 
     pub fn as_range(&self) -> Range<usize> {
         self.0..self.1
@@ -36,7 +36,8 @@ impl Span {
         right.debug();
         assert!(left.0 <= right.0);
         assert!(left.1 <= right.1);
-        Span(left.0, right.1).debug()
+        assert_eq!(left.2, right.2);
+        Span(left.0, right.1, left.2).debug()
     }
     pub fn contains_pos(&self, pos: usize) -> bool {
         self.debug();
@@ -49,11 +50,11 @@ impl Span {
     }
     pub fn empty_span_at_front(self) -> Span {
         self.debug();
-        Span(self.0, self.0).debug()
+        Span(self.0, self.0, self.2).debug()
     }
     pub fn empty_span_at_end(self) -> Span {
         self.debug();
-        Span(self.1, self.1).debug()
+        Span(self.1, self.1, self.2).debug()
     }
     pub fn sub_span<R: RangeBounds<usize>>(&self, bound: R) -> Span {
         let start = match bound.start_bound() {
@@ -66,7 +67,7 @@ impl Span {
             std::ops::Bound::Excluded(to) => self.0 + to,
             std::ops::Bound::Unbounded => self.1,
         };
-        Span(start, end)
+        Span(start, end, self.2)
     }
 }
 
@@ -77,6 +78,7 @@ impl PartialOrd for Span {
 }
 impl Ord for Span {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        assert_eq!(self.2, other.2);
         self.0.cmp(&other.0)
     }
 }
@@ -100,7 +102,7 @@ impl BracketSpan {
     }
     pub fn inner_span(&self) -> Span {
         self.0.debug();
-        Span(self.0.0 + 1, self.0.1 - 1).debug()
+        Span(self.0.0 + 1, self.0.1 - 1, self.0.2).debug()
     }
     pub fn outer_span(&self) -> Span {
         self.0.debug();
@@ -108,11 +110,11 @@ impl BracketSpan {
     }
     pub fn open_bracket(&self) -> Span {
         self.0.debug();
-        Span(self.0.0, self.0.0 + 1).debug()
+        Span(self.0.0, self.0.0 + 1, self.0.2).debug()
     }
     pub fn close_bracket(&self) -> Span {
         self.0.debug();
-        Span(self.0.1 - 1, self.0.1).debug()
+        Span(self.0.1 - 1, self.0.1, self.0.2).debug()
     }
 }
 

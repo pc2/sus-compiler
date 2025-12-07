@@ -469,7 +469,7 @@ mod tests {
             let fd = &linker.files[fd_id];
 
             debug_context("test_context", "test_obj".to_string(), fd, || {
-                let my_span = Span::from(3..10);
+                let my_span = Span::from_range(3..10, fd_id);
                 my_span.debug();
                 if !linker.files.is_empty() {
                     panic!("OOPS");

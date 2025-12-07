@@ -13,7 +13,7 @@ use super::*;
 pub fn gather_initial_file_data(mut builder: FileBuilder) {
     assert!(builder.file_data.associated_values.is_empty());
 
-    let mut cursor = match Cursor::new_at_root(builder.file_data) {
+    let mut cursor = match Cursor::new_at_root(builder.file_id, builder.file_data) {
         Ok(cursor) => cursor,
         Err(file_span) => {
             builder

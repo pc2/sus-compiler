@@ -1323,8 +1323,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     is_generative: expects_generative,
                     then_block: FlatIDRange::PLACEHOLDER,
                     else_block: FlatIDRange::PLACEHOLDER,
-                    then_span: Span::MAX_POSSIBLE_SPAN,
-                    else_span: Some(Span::MAX_POSSIBLE_SPAN),
+                    then_span: Span::PLACEHOLDER,
+                    else_span: Some(Span::PLACEHOLDER),
                     bindings_read_only: Vec::new(),
                     bindings_writable: Vec::new(),
                     conditional_bindings_span: None,
@@ -1538,8 +1538,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 domain: DomainType::Physical(self.current_domain),
                 then_block: FlatIDRange::PLACEHOLDER,
                 else_block: FlatIDRange::PLACEHOLDER,
-                then_span: Some(Span::MAX_POSSIBLE_SPAN),
-                else_span: Some(Span::MAX_POSSIBLE_SPAN),
+                then_span: Some(Span::PLACEHOLDER),
+                else_span: Some(Span::PLACEHOLDER),
             }),
         );
 
@@ -1908,8 +1908,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 pub fn flatten_all_globals(linker: &mut Linker) {
     let linker_files: *const ArenaAllocator<FileData, FileUUIDMarker> = &linker.files;
     // SAFETY we won't be touching the files anywere. This is just to get the compiler to stop complaining about linker going into the closure.
-    for (_file_id, file) in unsafe { &*linker_files } {
-        let Ok(mut cursor) = Cursor::new_at_root(file) else {
+    for (file_id, file) in unsafe { &*linker_files } {
+        let Ok(mut cursor) = Cursor::new_at_root(file_id, file) else {
             assert!(file.associated_values.is_empty());
             continue; // Error already handled in initialization
         };

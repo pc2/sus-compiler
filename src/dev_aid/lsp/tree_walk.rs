@@ -170,7 +170,7 @@ pub fn get_selected_object<'linker>(
     let file_data = &linker.files[file];
 
     let mut best_object: Option<LocationInfo<'linker>> = None;
-    let mut best_span: Span = Span::MAX_POSSIBLE_SPAN;
+    let mut best_span: Span = Span::make_max_possible_span(file);
 
     let mut walker = TreeWalker {
         linker,

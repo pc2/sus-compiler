@@ -17,11 +17,15 @@ pub fn get_readable_node_name(file_text: &FileText, kind: u16, span: Span) -> &s
     }
 }
 
-fn print_current_node_indented<'ft>(file_text: &'ft FileText, cursor: &TreeCursor) -> &'ft str {
+fn print_current_node_indented<'ft>(
+    file_id: FileUUID,
+    file_text: &'ft FileText,
+    cursor: &TreeCursor,
+) -> &'ft str {
     let indent = "  ".repeat(cursor.depth() as usize);
     let n = cursor.node();
     let kind = n.kind_id();
-    let cursor_span = Span::from(n.byte_range());
+    let cursor_span = Span::from_range(n.byte_range(), file_id);
     let node_name = get_readable_node_name(file_text, kind, cursor_span);
     if let Some(field_name) = cursor.field_name() {
         error!("{indent} {field_name}: {node_name} [{cursor_span:?}]");
@@ -39,15 +43,17 @@ fn print_current_node_indented<'ft>(file_text: &'ft FileText, cursor: &TreeCurso
 #[derive(Clone)]
 pub struct Cursor<'t> {
     cursor: TreeCursor<'t>,
+    pub file_id: FileUUID,
     pub file_data: &'t FileData,
     gathered_comments: Vec<Span>,
     current_field_was_already_consumed: bool,
 }
 
 impl<'t> Cursor<'t> {
-    pub fn new_at_root(file_data: &'t FileData) -> Result<Self, Span> {
+    pub fn new_at_root(file_id: FileUUID, file_data: &'t FileData) -> Result<Self, Span> {
         let result = Self {
             cursor: file_data.tree.walk(),
+            file_id,
             file_data,
             gathered_comments: Vec::new(),
             current_field_was_already_consumed: false,
@@ -55,7 +61,7 @@ impl<'t> Cursor<'t> {
 
         let root_node = result.cursor.node();
         if root_node.is_error() || root_node.is_missing() {
-            Err(Span::from(root_node.byte_range()))
+            Err(Span::from_range(root_node.byte_range(), file_id))
         } else {
             assert!(root_node.kind_id() == kind!("source_file"));
             Ok(result)
@@ -64,7 +70,10 @@ impl<'t> Cursor<'t> {
 
     pub fn kind_span(&self) -> (u16, Span) {
         let node = self.cursor.node();
-        (node.kind_id(), node.byte_range().into())
+        (
+            node.kind_id(),
+            Span::from_range(node.byte_range(), self.file_id),
+        )
     }
 
     pub fn kind(&self) -> u16 {
@@ -74,7 +83,7 @@ impl<'t> Cursor<'t> {
 
     pub fn span(&self) -> Span {
         let node = self.cursor.node();
-        node.byte_range().into()
+        Span::from_range(node.byte_range(), self.file_id)
     }
 
     #[track_caller]
@@ -83,7 +92,7 @@ impl<'t> Cursor<'t> {
         let this_node_span = self.span();
         error!("Stack:");
         loop {
-            print_current_node_indented(&self.file_data.file_text, &self.cursor);
+            print_current_node_indented(self.file_id, &self.file_data.file_text, &self.cursor);
             if !self.cursor.goto_parent() {
                 break;
             }
@@ -149,7 +158,7 @@ impl<'t> Cursor<'t> {
     fn get_span_check_kind(&mut self, expected_kind: u16) -> Span {
         let node = self.cursor.node();
         let kind = node.kind_id();
-        let span = node.byte_range().into();
+        let span = Span::from_range(node.byte_range(), self.file_id);
         if kind != expected_kind {
             self.print_stack();
             panic!(
@@ -302,7 +311,8 @@ impl<'t> Cursor<'t> {
         if kind == kind!("doc_comment") {
             let mut range = node.byte_range();
             range.start += 3; // skip '///'
-            self.gathered_comments.push(Span::from(range));
+            self.gathered_comments
+                .push(Span::from_range(range, self.file_id));
         } else if kind == kind!("single_line_comment") || kind == kind!("multi_line_comment") {
             self.clear_gathered_comments();
         }
@@ -324,7 +334,7 @@ impl<'t> Cursor<'t> {
         let is_error = node.is_error() || node.is_missing();
         if is_error {
             let node_name = node.kind();
-            let span = Span::from(node.byte_range());
+            let span = Span::from_range(node.byte_range(), self.file_id);
             let of_name = if let Some(field) = self.cursor.field_name() {
                 format!("in the field '{field}' of type '{node_name}'")
             } else {
@@ -344,7 +354,7 @@ impl<'t> Cursor<'t> {
                     ),
                 )
                 .info_same_file(
-                    Span::from(parent_node.byte_range()),
+                    Span::from_range(parent_node.byte_range(), self.file_id),
                     format!("Parent node '{parent_node_name}'"),
                 );
         }

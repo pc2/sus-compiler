@@ -95,7 +95,9 @@ impl<'l> TypeCheckingContext<'l> {
                             .unwrap_or(DomainType::Generative);
                         (domain, wire_ref.root_span)
                     } else {
-                        (DomainType::Generative, Span::MAX_POSSIBLE_SPAN)
+                        // Return placeholder span. Span not used, because
+                        // generative won't cause a domain conflict.
+                        (DomainType::Generative, Span::PLACEHOLDER)
                     };
 
                 expression.source.for_each_input_wire(&mut |id| {
