@@ -247,7 +247,7 @@ impl Linker {
                 if crate::debug::is_enabled("print-abstract") {
                     let (md, globals) = pass.get_with_context();
                     if let GlobalObj::Module(md) = md {
-                        md.print_flattened_module(&files[md.link_info.file], globals.globals);
+                        md.print_flattened_module(&files[md.link_info.get_file()], globals.globals);
                     }
                 }
             });
@@ -308,7 +308,7 @@ impl Linker {
                             );
                         } else {
                             let md_with_args = md.link_info.display_full_name_and_args(
-                                &self.files[md.link_info.file].file_text,
+                                &self.files[md.link_info.get_file()].file_text,
                             );
                             fatal_exit!(
                                 "Can't instantiate module {md_with_args} as top-level module, because it has parameters"

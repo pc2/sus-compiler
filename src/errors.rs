@@ -23,8 +23,7 @@ pub enum ErrorLevel {
 /// Multiple infos can be attached to a single [CompileError]
 #[derive(Debug, Clone)]
 pub struct ErrorInfo {
-    pub position: Span,
-    pub file: FileUUID,
+    pub span: Span,
     pub info: String,
 }
 
@@ -128,19 +127,17 @@ impl<'e> IntoIterator for &'e ErrorStore {
 pub struct ErrorCollector<'linker> {
     errors: AppendOnlyVec<CompileError>,
     did_error: Cell<bool>,
-    /// Main file of this collector. Makes creating errors easier
-    pub file: FileUUID,
-    /// Only used for debugging, to see no invalid errors are produced
-    file_len: usize,
+    /// All errors & warnings must be within this span. Of course their infos can point outside it.
+    pub context_span: Span,
     pub files: &'linker ArenaAllocator<FileData, FileUUIDMarker>,
 }
 
 impl<'linker> ErrorCollector<'linker> {
     pub fn new_empty(
-        file: FileUUID,
+        context_span: Span,
         files: &'linker ArenaAllocator<FileData, FileUUIDMarker>,
     ) -> Self {
-        Self::from_storage(ErrorStore::new(), file, files)
+        Self::from_storage(ErrorStore::new(), context_span, files)
     }
 
     /// Turn the collector back into a [ErrorStore]
@@ -153,39 +150,37 @@ impl<'linker> ErrorCollector<'linker> {
     /// Turn an [ErrorStore] into [ErrorCollector]
     pub fn from_storage(
         error_store: ErrorStore,
-        file: FileUUID,
+        context_span: Span,
         files: &'linker ArenaAllocator<FileData, FileUUIDMarker>,
     ) -> Self {
         Self {
             errors: AppendOnlyVec::from(error_store.errors),
             did_error: Cell::new(error_store.did_error),
-            file,
-            file_len: files[file].file_text.len(),
+            context_span,
             files,
         }
     }
 
-    fn assert_span_good(&self, span: Span) {
-        span.debug();
-        let rng = span.as_range();
-        assert!(rng.end <= self.file_len); // Don't need to verify start, since Span already enforces start <= end
-    }
     fn push_diagnostic(
         &self,
         position: Span,
         reason: String,
         level: ErrorLevel,
     ) -> ErrorReference<'_> {
-        self.assert_span_good(position);
+        assert!(
+            self.context_span.contains(position),
+            "Base error span must be within the context span. Error: {position:?}, Context: {:?}",
+            self.context_span
+        );
 
         ErrorReference {
             err_collector: self,
-            built_error: Some(CompileError {
+            built_error: CompileError {
                 position,
                 reason,
                 infos: Vec::new(),
                 level,
-            }),
+            },
         }
     }
 
@@ -252,16 +247,22 @@ impl Drop for ErrorCollector<'_> {
 ///
 /// Use as:
 ///
-///     errors.warn(span, "Unused Variable").info(span2, file2, "In module").info(blablabla)
+///     errors.warn(span, "Unused Variable").info(span2, "In module").info(blablabla)
 pub struct ErrorReference<'ec> {
     err_collector: &'ec ErrorCollector<'ec>,
-    built_error: Option<CompileError>,
+    built_error: CompileError,
 }
 
 // This is the trick, the error is only added to the ErrorCollector when the ErrorReference is dropped.
 impl<'ec> Drop for ErrorReference<'ec> {
     fn drop(&mut self) {
-        let built_error = self.built_error.take().unwrap();
+        let default_err = CompileError {
+            position: Span::PLACEHOLDER,
+            reason: String::new(),
+            infos: Vec::new(),
+            level: ErrorLevel::Error,
+        };
+        let built_error = std::mem::replace(&mut self.built_error, default_err);
         self.err_collector
             .did_error
             .set(self.err_collector.did_error.get() | (built_error.level == ErrorLevel::Error));
@@ -271,109 +272,83 @@ impl<'ec> Drop for ErrorReference<'ec> {
 }
 
 impl ErrorReference<'_> {
-    pub fn existing_info(mut self, error_info: ErrorInfo) -> Self {
-        assert!(
-            error_info.position.debug().as_range().end
-                <= self.err_collector.files[error_info.file].file_text.len()
-        );
-        self.built_error.as_mut().unwrap().infos.push(error_info);
+    pub fn info<S: Into<String>>(&mut self, span: Span, reason: S) -> &mut Self {
+        self.built_error.infos.push(ErrorInfo {
+            span,
+            info: reason.into(),
+        });
         self
     }
-    pub fn info<S: Into<String>>(self, (span, file): SpanFile, reason: S) -> Self {
-        self.existing_info(ErrorInfo {
-            position: span,
-            file,
-            info: reason.into(),
-        })
-    }
-    pub fn info_same_file<S: Into<String>>(self, span: Span, reason: S) -> Self {
-        let span_file = (span, self.err_collector.file);
-        self.info(span_file, reason)
-    }
-    pub fn info_obj<Obj: FileKnowingErrorInfoObject>(self, obj: &Obj) -> Self {
-        let info = obj.make_global_info(self.err_collector.files);
-        self.existing_info(info)
-    }
-    pub fn info_obj_same_file<Obj: ErrorInfoObject>(self, obj: &Obj) -> Self {
-        if let Some(info) = obj.make_info(self.err_collector.file) {
-            self.existing_info(info)
-        } else {
-            self
+    pub fn info_obj<Obj: ErrorInfoObject>(&mut self, obj: Obj) -> &mut Self {
+        if let Some(info) = obj.make_info() {
+            self.built_error.infos.push(info);
         }
-    }
-    pub fn info_obj_different_file<Obj: ErrorInfoObject>(self, obj: &Obj, file: FileUUID) -> Self {
-        if let Some(info) = obj.make_info(file) {
-            self.existing_info(info)
-        } else {
-            self
-        }
+
+        self
     }
     pub fn add_info_list(&mut self, mut info_list: Vec<ErrorInfo>) {
-        self.built_error
-            .as_mut()
-            .unwrap()
-            .infos
-            .append(&mut info_list);
+        self.built_error.infos.append(&mut info_list);
     }
-    pub fn suggest_replace<S: Into<String>>(self, replace_span: Span, replace_with: S) -> Self {
-        self.info_same_file(
+    pub fn suggest_replace<S: Into<String>>(
+        &mut self,
+        replace_span: Span,
+        replace_with: S,
+    ) -> &mut Self {
+        self.info(
             replace_span,
             format!("SUGGEST: Replace this with \"{}\"", replace_with.into()),
         )
     }
-    pub fn suggest_remove(self, remove_span: Span) -> Self {
-        self.info_same_file(remove_span, "SUGGEST: Remove this")
+    pub fn suggest_remove(&mut self, remove_span: Span) -> &mut Self {
+        self.info(remove_span, "SUGGEST: Remove this")
     }
 }
 
 /// This represents objects that can be given as info to an error in a straight-forward way.
 pub trait ErrorInfoObject {
-    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo>;
+    fn make_info(self) -> Option<ErrorInfo>;
 }
 
-/// This represents objects that can be given as info to an error in a straight-forward way.
-pub trait FileKnowingErrorInfoObject {
-    fn make_global_info(&self, files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo;
+/// Simplify [ErrorReference::info_obj]
+impl ErrorInfoObject for ErrorInfo {
+    fn make_info(self) -> Option<ErrorInfo> {
+        Some(self)
+    }
 }
 
-// Trait implementations in the compiler
-
-impl ErrorInfoObject for Declaration {
-    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+impl ErrorInfoObject for &Declaration {
+    fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
-            position: self.name_span,
-            file,
+            span: self.name_span,
             info: format!("'{}' declared here", &self.name),
         })
     }
 }
 
-impl ErrorInfoObject for SubModuleInstance {
-    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+impl ErrorInfoObject for &SubModuleInstance {
+    fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
-            position: self.name_span,
-            file,
+            span: self.name_span,
             info: format!("{} declared here", self.name),
         })
     }
 }
 
-impl ErrorInfoObject for InterfaceDeclaration {
-    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+impl ErrorInfoObject for &InterfaceDeclaration {
+    fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
-            position: self.name_span,
-            file,
+            span: self.name_span,
             info: format!("'{}' declared here", &self.name),
         })
     }
 }
 
-impl ErrorInfoObject for Instruction {
-    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+impl ErrorInfoObject for &Instruction {
+    fn make_info(self) -> Option<ErrorInfo> {
         match self {
-            Instruction::SubModule(decl) => decl.make_info(file),
-            Instruction::Declaration(decl) => decl.make_info(file),
-            Instruction::Interface(decl) => decl.make_info(file),
+            Instruction::SubModule(decl) => decl.make_info(),
+            Instruction::Declaration(decl) => decl.make_info(),
+            Instruction::Interface(decl) => decl.make_info(),
             Instruction::Expression(_) => None,
             _ => unreachable!(
                 "At least there shouldn't be cases where we're referring to something other than SubModule or Declaration"
@@ -382,66 +357,61 @@ impl ErrorInfoObject for Instruction {
     }
 }
 
-impl ErrorInfoObject for DomainInfo {
-    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+impl ErrorInfoObject for &DomainInfo {
+    fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
-            position: self.name_span?,
-            file,
+            span: self.name_span?,
             info: format!("Domain '{}' declared here", self.name),
         })
     }
 }
 
-impl ErrorInfoObject for Parameter {
-    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+impl ErrorInfoObject for &Parameter {
+    fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
-            position: self.name_span,
-            file,
+            span: self.name_span,
             info: format!("Parameter '{}' declared here", self.name),
         })
     }
 }
 
-impl ErrorInfoObject for Port {
-    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+impl ErrorInfoObject for &Port {
+    fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
-            position: self.name_span,
-            file,
+            span: self.name_span,
             info: format!("Port '{}' declared here", &self.name),
         })
     }
 }
-impl ErrorInfoObject for Interface {
-    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+impl ErrorInfoObject for &Interface {
+    fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
-            position: self.name_span,
-            file,
+            span: self.name_span,
             info: format!("Interface '{}' declared here", &self.name),
         })
     }
 }
 
-impl FileKnowingErrorInfoObject for LinkInfo {
-    fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
-        ErrorInfo {
-            position: self.name_span,
-            file: self.file,
+impl ErrorInfoObject for &LinkInfo {
+    fn make_info(self) -> Option<ErrorInfo> {
+        Some(ErrorInfo {
+            span: self.name_span,
             info: format!("'{}' defined here", &self.name),
-        }
+        })
     }
 }
 
-impl FileKnowingErrorInfoObject for Module {
-    fn make_global_info(&self, files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
-        let ports_str = self.display_all_ports_info(&files[self.link_info.file].file_text, None);
+impl ErrorInfoObject for (&Module, &ArenaAllocator<FileData, FileUUIDMarker>) {
+    fn make_info(self) -> Option<ErrorInfo> {
+        let (md, files) = self;
+        let ports_str = md.display_all_ports_info(&files[md.link_info.get_file()].file_text, None);
 
-        ErrorInfo {
-            position: self.link_info.name_span,
-            file: self.link_info.file,
+        Some(ErrorInfo {
+            span: md.link_info.name_span,
             info: format!(
                 "Module '{}' defined here. {}",
-                &self.link_info.name, ports_str
+                &md.link_info.name, ports_str
             ),
-        }
+        })
     }
 }

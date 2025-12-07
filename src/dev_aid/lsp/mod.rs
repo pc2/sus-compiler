@@ -48,11 +48,11 @@ fn span_to_lsp_range(file_text: &FileText, ch_sp: Span) -> lsp_types::Range {
         end: to_position(rng.end),
     }
 }
-fn cvt_location_list(location_vec: Vec<SpanFile>, linker: &Linker) -> Vec<Location> {
+fn cvt_location_list(location_vec: Vec<Span>, linker: &Linker) -> Vec<Location> {
     location_vec
         .into_iter()
-        .map(|(span, file_id)| {
-            let file = &linker.files[file_id];
+        .map(|span| {
+            let file = &linker.files[span.get_file()];
             let uri = Url::parse(&file.file_identifier).unwrap();
             let range = span_to_lsp_range(&file.file_text, span);
             Location { uri, range }
@@ -133,8 +133,8 @@ fn convert_diagnostic(err: CompileError, main_file_text: &FileText, linker: &Lin
     };
     let mut related_info = Vec::new();
     for info in err.infos {
-        let info_file = &linker.files[info.file];
-        let info_span = info.position;
+        let info_file = &linker.files[info.span.get_file()];
+        let info_span = info.span;
         assert!(
             info_file.file_text.is_span_valid(info_span),
             "bad info in {}:\n{}; in err: {}.\nSpan is {info_span:?}, but file length is {}",
@@ -232,7 +232,7 @@ fn initialize_all_files(linker: &mut Linker, init_params: &InitializeParams) -> 
     manager
 }
 
-fn gather_completions(linker: &Linker, file_id: FileUUID, position: usize) -> Vec<CompletionItem> {
+fn gather_completions(linker: &Linker, position: usize) -> Vec<CompletionItem> {
     let mut result = Vec::new();
 
     for (_, m) in &linker.modules {
@@ -242,7 +242,7 @@ fn gather_completions(linker: &Linker, file_id: FileUUID, position: usize) -> Ve
             ..Default::default()
         });
 
-        if m.link_info.file == file_id && m.link_info.span.contains_pos(position) {
+        if m.link_info.span.contains_pos(position) {
             for (_id, v) in &m.link_info.instructions {
                 if let Instruction::Declaration(d) = v {
                     result.push(CompletionItem {
@@ -364,33 +364,33 @@ fn gather_all_references_across_all_files(
     ref_locations
 }
 
-fn goto_definition(linker: &mut Linker, file_uuid: FileUUID, pos: usize) -> Vec<(Span, FileUUID)> {
-    let mut goto_definition_list: Vec<SpanFile> = Vec::new();
+fn goto_definition(linker: &mut Linker, file_uuid: FileUUID, pos: usize) -> Vec<Span> {
+    let mut goto_definition_list: Vec<Span> = Vec::new();
 
     let Some((_location, info)) = get_selected_object(linker, file_uuid, pos) else {
         return Vec::new();
     };
     match info {
-        LocationInfo::InGlobal(_obj_id, link_info, _, InGlobal::NamedLocal(decl)) => {
-            goto_definition_list.push((decl.name_span, link_info.file));
+        LocationInfo::InGlobal(_obj_id, _link_info, _, InGlobal::NamedLocal(decl)) => {
+            goto_definition_list.push(decl.name_span);
         }
-        LocationInfo::InGlobal(_obj_id, link_info, _, InGlobal::NamedSubmodule(submod_decl)) => {
-            goto_definition_list.push((submod_decl.name_span, link_info.file))
+        LocationInfo::InGlobal(_obj_id, _link_info, _, InGlobal::NamedSubmodule(submod_decl)) => {
+            goto_definition_list.push(submod_decl.name_span);
         }
-        LocationInfo::InGlobal(_obj_id, link_info, _, InGlobal::LocalInterface(interface)) => {
-            goto_definition_list.push((interface.name_span, link_info.file))
+        LocationInfo::InGlobal(_obj_id, _link_info, _, InGlobal::LocalInterface(interface)) => {
+            goto_definition_list.push(interface.name_span);
         }
         LocationInfo::InGlobal(_, _, _, InGlobal::Temporary(_)) => {}
         LocationInfo::Type(_, _) => {}
-        LocationInfo::Parameter(_, link_info, _, template_arg) => {
-            goto_definition_list.push((template_arg.name_span, link_info.file))
+        LocationInfo::Parameter(_, _link_info, _, template_arg) => {
+            goto_definition_list.push(template_arg.name_span);
         }
         LocationInfo::Global(id) => {
             let link_info = &linker.globals[id];
-            goto_definition_list.push((link_info.name_span, link_info.file));
+            goto_definition_list.push(link_info.name_span);
         }
-        LocationInfo::Interface(_md_uuid, md, _interface_id, interface) => {
-            goto_definition_list.push((interface.name_span, md.link_info.file));
+        LocationInfo::Interface(_md_uuid, _md, _interface_id, interface) => {
+            goto_definition_list.push(interface.name_span);
         }
     }
 
@@ -526,11 +526,11 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("Completion");
 
-            let (file_uuid, position) =
+            let (_file_uuid, position) =
                 linker.location_in_file(&params.text_document_position, manager);
 
             serde_json::to_value(CompletionResponse::Array(gather_completions(
-                linker, file_uuid, position,
+                linker, position,
             )))
         }
         req => {

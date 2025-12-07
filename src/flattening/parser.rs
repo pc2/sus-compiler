@@ -353,7 +353,7 @@ impl<'t> Cursor<'t> {
                         "While parsing '{parent_node_name}', parser found a {error_type} {of_name}"
                     ),
                 )
-                .info_same_file(
+                .info(
                     Span::from_range(parent_node.byte_range(), self.file_id),
                     format!("Parent node '{parent_node_name}'"),
                 );

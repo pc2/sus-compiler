@@ -30,6 +30,9 @@ impl Span {
     pub fn as_range(&self) -> Range<usize> {
         self.0..self.1
     }
+    pub fn get_file(&self) -> FileUUID {
+        self.2
+    }
     #[track_caller]
     pub fn new_overarching(left: Span, right: Span) -> Span {
         left.debug();
@@ -38,6 +41,9 @@ impl Span {
         assert!(left.1 <= right.1);
         assert_eq!(left.2, right.2);
         Span(left.0, right.1, left.2).debug()
+    }
+    pub fn contains(self, other: Span) -> bool {
+        self.0 <= other.0 && self.1 >= other.1 && self.2 == other.2
     }
     pub fn contains_pos(&self, pos: usize) -> bool {
         self.debug();
@@ -133,8 +139,6 @@ impl Ord for LineCol {
         self.line.cmp(&other.line).then(self.col.cmp(&other.col))
     }
 }
-
-pub type SpanFile = (Span, FileUUID);
 
 pub struct FileText {
     pub file_text: String,

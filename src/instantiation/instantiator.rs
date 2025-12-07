@@ -107,7 +107,7 @@ impl Instantiator {
             let name = global_ref.display(globals).to_string();
 
             let md = &globals.modules[global_ref.id];
-            let file = &linker_files[md.link_info.file];
+            let file = &linker_files[md.link_info.get_file()];
             let result = crate::debug::debug_context("instantiating", name, file, || {
                 match start_instantiation(globals, linker_files, global_ref.clone()) {
                     Ok(mut context) => {
@@ -198,7 +198,7 @@ impl Executed {
         global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
         name: String,
     ) -> (ModuleTypingContext<'l>, ValueUnifierAlloc) {
-        let errors = ErrorCollector::new_empty(md.link_info.file, linker_files);
+        let errors = ErrorCollector::new_empty(md.link_info.span, linker_files);
         if let Err((position, reason)) = self.execution_status {
             errors.error(position, reason);
         }
@@ -250,7 +250,7 @@ fn start_instantiation<'l>(
 
     // Don't instantiate modules that already errored. Otherwise instantiator may crash
     if md.link_info.errors.did_error {
-        let errors = ErrorCollector::new_empty(md.link_info.file, linker_files);
+        let errors = ErrorCollector::new_empty(md.link_info.span, linker_files);
         errors.set_did_error();
         let msg = format!("Not Instantiating {name} due to abstract typing errors");
         errors.warn(md.link_info.name_span, msg);
@@ -284,7 +284,7 @@ fn start_instantiation<'l>(
         .collect();
 
     if !submodules_with_abs_type_errors.is_empty() {
-        let errors = ErrorCollector::new_empty(md.link_info.file, linker_files);
+        let errors = ErrorCollector::new_empty(md.link_info.span, linker_files);
         errors.set_did_error();
         let mut msg =
             format!("Not Instantiating {name} due to abstract typing errors of submodules:\n");

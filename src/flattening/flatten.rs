@@ -196,17 +196,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         }
                         Some(NamedLocal::SubModule(sm)) => {
                             self.errors.error(name_span, format!("{name} does not name a Type or a Value. Local submodules are not allowed!"))
-                                .info_obj_same_file(self.instructions[sm].unwrap_submodule());
+                                .info_obj(self.instructions[sm].unwrap_submodule());
                             None
                         }
                         Some(NamedLocal::DomainDecl(dom)) => {
                             self.errors.error(name_span, format!("{name} does not name a Type or a Value. Domains are not allowed!"))
-                                .info_obj_same_file(&self.domains[dom]);
+                                .info_obj(&self.domains[dom]);
                             None
                         }
                         Some(NamedLocal::LocalInterface(interf)) => {
                             self.errors.error(name_span, format!("{name} does not name a Type or a Value. Local Interfaces are not allowed!"))
-                                .info_obj_same_file(self.instructions[interf].unwrap_interface());
+                                .info_obj(self.instructions[interf].unwrap_interface());
                             None
                         }
                         None => {
@@ -344,7 +344,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                     "This is not a {accepted_text}, it is a local variable instead!"
                                 ),
                             )
-                            .info_obj_same_file(&self.instructions[instr]);
+                            .info_obj(&self.instructions[instr]);
 
                         ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
                     }
@@ -354,7 +354,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 span,
                                 format!("This is not a {accepted_text}, it is a domain instead!"),
                             )
-                            .info_obj_same_file(&self.domains[domain_id]);
+                            .info_obj(&self.domains[domain_id]);
 
                         ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
                     }
@@ -403,26 +403,26 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             .local_variable_context
             .add_declaration(name, named_local)
         {
-            let err_ref = self.errors.error(
+            let mut err_ref = self.errors.error(
                 name_span,
                 "This declaration conflicts with a previous declaration in the same scope",
             );
 
             match conflict {
                 NamedLocal::Declaration(decl_id) => {
-                    err_ref.info_obj_same_file(self.instructions[decl_id].unwrap_declaration());
+                    err_ref.info_obj(self.instructions[decl_id].unwrap_declaration());
                 }
                 NamedLocal::SubModule(submod_id) => {
-                    err_ref.info_obj_same_file(self.instructions[submod_id].unwrap_submodule());
+                    err_ref.info_obj(self.instructions[submod_id].unwrap_submodule());
                 }
                 NamedLocal::LocalInterface(interf_id) => {
-                    err_ref.info_obj_same_file(self.instructions[interf_id].unwrap_interface());
+                    err_ref.info_obj(self.instructions[interf_id].unwrap_interface());
                 }
                 NamedLocal::TemplateType(template_id) => {
-                    err_ref.info_obj_same_file(&self.parameters[template_id]);
+                    err_ref.info_obj(&self.parameters[template_id]);
                 }
                 NamedLocal::DomainDecl(domain_id) => {
-                    err_ref.info_obj_same_file(&self.domains[domain_id]);
+                    err_ref.info_obj(&self.domains[domain_id]);
                 }
             }
         }
@@ -463,7 +463,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     if let Some(prev_span) = *selected_kw {
                         self.errors
                             .error(span, "Duplicate keyword!")
-                            .info_same_file(prev_span, "Previously used here");
+                            .info(prev_span, "Previously used here");
                     }
                     *selected_kw = Some(span);
                 })
@@ -1118,7 +1118,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                         self.parameters[template_id].name
                                     ),
                                 )
-                                .info_obj_same_file(&self.parameters[template_id]);
+                                .info_obj(&self.parameters[template_id]);
                             self.new_error(expr_span)
                         }
                         NamedLocal::DomainDecl(domain_id) => {
@@ -1131,10 +1131,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                         domain.name
                                     ),
                                 )
-                                .info_same_file(
-                                    span,
-                                    format!("Domain {} declared here", domain.name),
-                                );
+                                .info(span, format!("Domain {} declared here", domain.name));
                             self.new_error(expr_span)
                         }
                     },
@@ -1624,7 +1621,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         {
             // Sad Path: Having ports on the implicit clk domain is not allowed.
             self.errors.error(domain_name_span, "When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.")
-                        .info_same_file(existing_port.1.decl_span, "A domain should be explicitly defined before this port");
+                        .info(existing_port.1.decl_span, "A domain should be explicitly defined before this port");
         }
         let domain_id = self.domains.alloc(DomainInfo {
             name: domain_name.to_owned(),

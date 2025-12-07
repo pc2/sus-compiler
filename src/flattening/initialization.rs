@@ -28,7 +28,9 @@ pub fn gather_initial_file_data(mut builder: FileBuilder) {
         kind!("source_file"),
         builder.other_parsing_errors,
         |cursor| {
-            let parsing_errors = ErrorCollector::new_empty(builder.file_id, builder.files);
+            let whole_file_span =
+                Span::from_range(0..builder.file_data.file_text.len(), builder.file_id);
+            let parsing_errors = ErrorCollector::new_empty(whole_file_span, builder.files);
             cursor.report_all_decendant_errors(&parsing_errors);
 
             let span = cursor.span();
@@ -75,7 +77,6 @@ fn initialize_global_object(
         parameters: FlatAlloc::new(),
         instructions: FlatAlloc::new(),
         documentation: cursor.extract_gathered_comments(),
-        file: builder.file_id,
         name,
         name_span,
         span,

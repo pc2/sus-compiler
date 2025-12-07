@@ -563,11 +563,7 @@ impl ModuleTypingContext<'_> {
                         });
                     let hit_names_error_infos: Vec<_> = connected_ports
                         .iter()
-                        .map(|instr| {
-                            self.md.link_info.instructions[*instr]
-                                .make_info(self.md.link_info.file)
-                                .unwrap()
-                        })
+                        .map(|instr| self.md.link_info.instructions[*instr].make_info().unwrap())
                         .collect();
 
                     for non_hit in ports_not_in_group {
@@ -601,7 +597,7 @@ impl ModuleTypingContext<'_> {
                 let end_name = &end_wire.name;
                 let specified_end_latency = end_wire.specified_latency.unwrap();
                 error(end_latency_decl.span, format!("Conflicting specified latency\n\n{path_message}\nBut this was specified as {end_name}'{specified_end_latency}"))
-                    .info_obj_same_file(start_decl);
+                    .info_obj(start_decl);
             }
         }
         assert!(error_placed_successfully);

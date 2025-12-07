@@ -286,7 +286,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                             .error(left.get_span(self.link_info), format!("Incompatible multi-rank for higher-rank operator: Found {} but output is {}",
                             left.typ.display_substitute(self.globals, substitutor),
                             out.typ.display_substitute(self.globals, substitutor))
-                        ).info_same_file(right.get_span(self.link_info), format!("Right argument has type {}", right.typ.display_substitute(self.globals, substitutor)));
+                        ).info(right.get_span(self.link_info), format!("Right argument has type {}", right.typ.display_substitute(self.globals, substitutor)));
                     });
                 }
                 if !unify_rank(rank, &right.typ, unifier) {
@@ -295,7 +295,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                             .error(right.get_span(self.link_info), format!("Incompatible multi-rank for higher-rank operator: Found {} but output is {}",
                             right.typ.display_substitute(self.globals, substitutor),
                             out.typ.display_substitute(self.globals, substitutor))
-                        ).info_same_file(left.get_span(self.link_info), format!("Left argument has type {}", left.typ.display_substitute(self.globals, substitutor)));
+                        ).info(left.get_span(self.link_info), format!("Left argument has type {}", left.typ.display_substitute(self.globals, substitutor)));
                     });
                 }
                 self.typecheck_binop(unifier, errors, span, *op, out_root, left_root, right_root);
@@ -957,8 +957,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         );
                         self.errors
                             .error(*span, err)
-                            .info_obj_different_file(source_code_port, sub_module.link_info.file)
-                            .info_obj_same_file(submod_instr);
+                            .info_obj(source_code_port)
+                            .info_obj(submod_instr);
                     }
                 }
                 (Some(_concrete_port), None) => {
@@ -968,8 +968,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                             submod_instr.get_span(),
                             format!("Unused port '{}'", source_code_port.name),
                         )
-                        .info_obj_different_file(source_code_port, sub_module.link_info.file)
-                        .info_obj_same_file(submod_instr);
+                        .info_obj(source_code_port)
+                        .info_obj(submod_instr);
                 }
                 (Some(concrete_port), Some(connecting_wire)) => {
                     let wire = &self.wires[connecting_wire.maps_to_wire];
@@ -1083,7 +1083,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                                         poison_sm.refers_to.display(self.globals);
                                     let from_port_name = &poison_submod_md.ports[*port_from].name;
                                     let to_port_name = &poison_submod_md.ports[*port_to].name;
-                                    err = err.info_same_file(
+                                    err.info(
                                         poison_sm.get_span(self.link_info),
                                         format!("{sm_name}.{template_name} could not be resolved due to the unknown latency from {poison_sm_name}.{from_port_name} to {poison_sm_name}.{to_port_name}. ({poison_sm_refer_to} {poison_sm_name})"),
                                     );

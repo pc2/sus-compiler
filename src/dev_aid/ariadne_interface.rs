@@ -139,11 +139,12 @@ pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
     );
 
     for info in error.infos {
-        let info_span = info.position.as_range();
+        let info_span = info.span.as_range();
+        let info_file = info.span.get_file();
         // Assert that span is in file
-        let _ = &linker.files[info.file].file_text[info.position];
+        let _ = &linker.files[info_file].file_text[info.span];
         report = report.with_label(
-            Label::new((info.file, info_span))
+            Label::new((info_file, info_span))
                 .with_message(info.info)
                 .with_color(info_color),
         )

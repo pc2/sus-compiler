@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    errors::{ErrorInfoObject, FileKnowingErrorInfoObject},
+    errors::ErrorInfoObject,
     flattening::{Declaration, GlobalReference, InterfaceDeclaration, Port, SubModuleInstance},
     linker::checkpoint::ResolvedGlobalsCheckpoint,
     typing::{
@@ -32,14 +32,14 @@ impl Linker {
     ) {
         let working_on_mut = &mut self.globals[global_id];
         let error_store = std::mem::take(&mut working_on_mut.errors);
-        let errors = ErrorCollector::from_storage(error_store, working_on_mut.file, &self.files);
+        let errors = ErrorCollector::from_storage(error_store, working_on_mut.span, &self.files);
         let resolved_globals = std::mem::take(&mut working_on_mut.resolved_globals);
 
         debug!("{pass_name} {}", &working_on_mut.name);
         crate::debug::debug_context(
             pass_name,
             working_on_mut.name.clone(),
-            &self.files[working_on_mut.file],
+            &self.files[working_on_mut.get_file()],
             || {
                 let mut linker_pass = LinkerPass {
                     resolved_globals,
@@ -158,11 +158,12 @@ impl<'linker, 'from> GlobalResolver<'linker, 'from> {
         let link_info = self.get(global).get_link_info();
         let name = link_info.display_full_name();
         let global_type = global.get_kind_name();
-        let err_ref = errors.error(
-            global_ref.name_span,
-            format!("{name} is not a {expected}, it is a {global_type} instead!"),
-        );
-        err_ref.info_obj(link_info);
+        errors
+            .error(
+                global_ref.name_span,
+                format!("{name} is not a {expected}, it is a {global_type} instead!"),
+            )
+            .info_obj(link_info);
     }
 
     pub fn get(&self, id: GlobalUUID) -> GlobalRef<'linker> {
@@ -298,17 +299,12 @@ pub struct RemoteFn<'l, TemplateT> {
     pub fn_decl: &'l InterfaceDeclaration,
 }
 /// For interfaces of this module
-impl<TemplateT> FileKnowingErrorInfoObject for RemoteFn<'_, TemplateT> {
-    fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
-        let link_info = match &self.parent {
-            LocalOrRemoteParentModule::Remote(remote_sub_module) => &remote_sub_module.md.link_info,
-            LocalOrRemoteParentModule::Local(link_info) => link_info,
-        };
-        ErrorInfo {
-            position: self.fn_decl.name_span,
-            file: link_info.file,
+impl<TemplateT> ErrorInfoObject for &RemoteFn<'_, TemplateT> {
+    fn make_info(self) -> Option<ErrorInfo> {
+        Some(ErrorInfo {
+            span: self.fn_decl.name_span,
             info: format!("Interface '{}' defined here", &self.fn_decl.name),
-        }
+        })
     }
 }
 
@@ -325,13 +321,10 @@ impl<'l, TemplateT: Copy> RemotePort<'l, TemplateT> {
             Some(self.parent.template_args),
         )
     }
-    pub fn make_info(&self) -> ErrorInfo {
-        self.get_decl().make_info()
-    }
 }
-impl<TemplateT: Copy> FileKnowingErrorInfoObject for RemotePort<'_, TemplateT> {
-    fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
-        self.make_info()
+impl<TemplateT: Copy> ErrorInfoObject for &RemotePort<'_, TemplateT> {
+    fn make_info(self) -> Option<ErrorInfo> {
+        Some(self.get_decl().make_info().unwrap())
     }
 }
 
@@ -350,12 +343,9 @@ impl<'l, TemplateT> RemoteDeclaration<'l, TemplateT> {
             template_args,
         }
     }
-    pub fn make_info(&self) -> ErrorInfo {
-        self.remote_decl.make_info(self.link_info.file).unwrap()
-    }
 }
-impl<TemplateT> FileKnowingErrorInfoObject for RemoteDeclaration<'_, TemplateT> {
-    fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
-        self.make_info()
+impl<TemplateT> ErrorInfoObject for &RemoteDeclaration<'_, TemplateT> {
+    fn make_info(self) -> Option<ErrorInfo> {
+        Some(self.remote_decl.make_info().unwrap())
     }
 }

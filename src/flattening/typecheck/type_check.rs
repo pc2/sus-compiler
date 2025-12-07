@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
 use crate::errors::ErrorInfo;
+use crate::errors::ErrorInfoObject;
 use crate::linker::passes::{LocalOrRemoteParentModule, RemoteDeclaration, RemoteFn};
 use crate::prelude::*;
 use crate::to_string::display_join;
@@ -160,7 +161,7 @@ impl<'l> TypeCheckingContext<'l> {
                                         template_arg.name
                                     ),
                                 )
-                                .info_obj_same_file(template_arg);
+                                .info_obj(template_arg);
                             self.type_checker.alloc_unknown()
                         }
                         AbstractInnerType::LocalInterface(interface_id) => {
@@ -174,7 +175,7 @@ impl<'l> TypeCheckingContext<'l> {
                                         interface_decl.name
                                     ),
                                 )
-                                .info_obj_same_file(interface_decl);
+                                .info_obj(interface_decl);
                             self.type_checker.alloc_unknown()
                         }
                         AbstractInnerType::Named(_) => {
@@ -209,18 +210,18 @@ impl<'l> TypeCheckingContext<'l> {
                                     }
                                 }
                             } else {
-                                let obj = self.globals.get_module(md_ref.id);
-                                let obj_name = md_ref.display(self.globals.globals, self.link_info);
+                                let md = self.globals.get_module(md_ref.id);
+                                let md_name = md_ref.display(self.globals.globals, self.link_info);
                                 let field_names =
-                                    display_join(", ", obj.interfaces.iter(), |f, (_, v)| {
+                                    display_join(", ", md.interfaces.iter(), |f, (_, v)| {
                                         write!(f, "'{}'", v.name)
                                     });
                                 self.errors
                                     .error(
                                         *name_span,
-                                        format!("No such field '{name}' on {obj_name}. Available fields are {field_names}"),
+                                        format!("No such field '{name}' on {md_name}. Available fields are {field_names}"),
                                     )
-                                    .info_obj(obj);
+                                    .info_obj((md, self.errors.files));
 
                                 self.type_checker.alloc_unknown()
                             }
@@ -490,7 +491,7 @@ impl<'l> TypeCheckingContext<'l> {
                     );
                     self.errors
                         .error(wire_ref.get_total_span(), err_text)
-                        .info_obj_different_file(interface, submod.md.link_info.file);
+                        .info_obj(interface);
                     return None;
                 };
                 let_unwrap!(InterfaceDeclKind::Interface(interface), interface);
@@ -529,7 +530,10 @@ impl<'l> TypeCheckingContext<'l> {
 
             self.type_checker
                 .unify_report_error(from.typ, &port_type, from.span, || {
-                    ("function argument".to_string(), vec![port_decl.make_info()])
+                    (
+                        "function argument".to_string(),
+                        vec![port_decl.make_info().unwrap()],
+                    )
                 });
         }
     }
@@ -607,8 +611,7 @@ impl<'l> TypeCheckingContext<'l> {
                             elem_expr.span,
                             || {
                                 let first_elem_info = ErrorInfo {
-                                    position: first_elem_expr.span,
-                                    file: self.errors.file,
+                                    span: first_elem_expr.span,
                                     info: "First array element defined here".to_owned(),
                                 };
                                 ("array construction types".to_owned(), vec![first_elem_info])
@@ -672,7 +675,12 @@ impl<'l> TypeCheckingContext<'l> {
                             &to.to.output_typ,
                             &port_type,
                             to.to_span,
-                            || ("function output".to_string(), vec![port_decl.make_info()]),
+                            || {
+                                (
+                                    "function output".to_string(),
+                                    vec![port_decl.make_info().unwrap()],
+                                )
+                            },
                         );
                     }
                 }
@@ -811,7 +819,12 @@ impl<'l> TypeCheckingContext<'l> {
                     &binding_decl.typ,
                     &port_type,
                     binding_decl.decl_span,
-                    || (binding_name.to_string(), vec![port_decl.make_info()]),
+                    || {
+                        (
+                            binding_name.to_string(),
+                            vec![port_decl.make_info().unwrap()],
+                        )
+                    },
                 );
             }
         }

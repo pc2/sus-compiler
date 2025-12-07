@@ -797,12 +797,12 @@ impl<ID: Copy> GlobalReference<ID> {
                                 "'{name}' is not a value. `type` keyword cannot be used for values"
                             ),
                             )
-                            .info((param.name_span, target.file), "Declared here");
+                            .info(param.name_span, "Declared here");
                     }
                     (TemplateKind::Type(_), Some(TemplateKind::Value(_))) => {
                         errors
                             .error(arg.name_span, format!("'{name}' is not a type. To use template type arguments use the `type` keyword like `T: type int[123]`"))
-                            .info((param.name_span, target.file), "Declared here");
+                            .info(param.name_span, "Declared here");
                     }
                     _ => {}
                 }
@@ -813,7 +813,7 @@ impl<ID: Copy> GlobalReference<ID> {
                             arg.name_span,
                             format!("'{name}' has already been defined previously"),
                         )
-                        .info_same_file(prev_use, format!("'{name}' specified here previously"));
+                        .info(prev_use, format!("'{name}' specified here previously"));
                 } else {
                     previous_uses[refer_to] = Some(arg.name_span);
                 }

@@ -26,7 +26,7 @@ pub fn perform_lints(
         working_on,
         errors,
         globals,
-        file_data: &files[working_on.get_span_file().1],
+        file_data: &files[working_on.get_file()],
     };
     ctx.extern_may_not_have_type_template_args();
     ctx.extern_must_declare_abs_lats();
@@ -52,7 +52,7 @@ impl LintContext<'_> {
                 if is_writing_to && decl.decl_kind.is_read_only() {
                     self.errors
                         .error(wire_ref.root_span, format!("'{}' is read-only", decl.name))
-                        .info_obj_same_file(decl);
+                        .info_obj(decl);
                 }
             }
             WireReferenceRoot::LocalInterface(interface_decl_id) => {
@@ -205,14 +205,14 @@ impl LintContext<'_> {
 
                         if *parent_condition != to_decl.parent_condition {
                             let mut err_ref = self.errors.error(wr.to_span, "Cannot write to compiletime variable through runtime 'when' blocks");
-                            err_ref = err_ref.info_obj_same_file(decl);
+                            err_ref.info_obj(decl);
 
                             let mut cur = *parent_condition;
 
                             while cur != decl.parent_condition {
                                 match &self.working_on.instructions[cur.unwrap().parent_when] {
                                     Instruction::IfStatement(parent_when) => {
-                                        err_ref = err_ref.info_same_file(
+                                        err_ref.info(
                                             parent_when.if_keyword_span,
                                             "Assignment passes through this 'when'",
                                         );
@@ -229,10 +229,7 @@ impl LintContext<'_> {
                                                 "Assignment passes through this 'trigger'"
                                             }
                                         };
-                                        err_ref = err_ref.info_same_file(
-                                            interface_declaration.interface_kw_span,
-                                            msg,
-                                        );
+                                        err_ref.info(interface_declaration.interface_kw_span, msg);
 
                                         cur = interface_declaration.parent_condition;
                                     }
@@ -250,7 +247,7 @@ impl LintContext<'_> {
                             initial_kw_span,
                             "'initial' cannot be used with generative variables! Just assign a generative value as normal",
                         )
-                        .info_obj_same_file(decl);
+                        .info_obj(decl);
                 }
 
                 if !decl.decl_kind.is_state() {
@@ -259,7 +256,7 @@ impl LintContext<'_> {
                             initial_kw_span,
                             "Initial values can only be given to state registers",
                         )
-                        .info_obj_same_file(decl);
+                        .info_obj(decl);
                 }
             }
         }
@@ -527,7 +524,7 @@ impl LintContext<'_> {
                     let (existing_span, existing_kind) = occupied_entry.get();
                     self.errors
                         .error(span, format!("Duplicate {kind} '{name}' declaration"))
-                        .info_same_file(
+                        .info(
                             *existing_span,
                             format!("{existing_kind} '{name}' declared here"),
                         );
@@ -607,7 +604,7 @@ impl LintContext<'_> {
                             fc_func_wireref.root_span,
                             format!("Cannot call local {}s", interface_instr.interface_kind),
                         )
-                        .info_same_file(
+                        .info(
                             interface_instr.name_span,
                             format!("{kind_capitalized} {} declared here", interface_instr.name),
                         );

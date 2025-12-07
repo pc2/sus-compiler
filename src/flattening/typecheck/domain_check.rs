@@ -165,7 +165,7 @@ impl<'l> TypeCheckingContext<'l> {
                             let expr_domain = (expr.domain, expr.span);
                             if expr_domain.0 != DomainType::Generative {
                                 if target_domain.0 == DomainType::Generative {
-                                    self.errors.error(expr_domain.1, "Attempting to write from a non-generative value to a generative value").info_same_file(target_domain.1, "This is a generative value");
+                                    self.errors.error(expr_domain.1, "Attempting to write from a non-generative value to a generative value").info(target_domain.1, "This is a generative value");
                                 } else {
                                     self.unify_physicals(target_domain, expr_domain, "assignment");
                                 }
@@ -174,7 +174,7 @@ impl<'l> TypeCheckingContext<'l> {
                         let expr_domain = (expression.domain.get(), expression.span);
                         if expr_domain.0 != DomainType::Generative {
                             if target_domain.0 == DomainType::Generative {
-                                self.errors.error(expr_domain.1, "Attempting to write from a non-generative value to a generative value").info_same_file(target_domain.1, "This is a generative value");
+                                self.errors.error(expr_domain.1, "Attempting to write from a non-generative value to a generative value").info(target_domain.1, "This is a generative value");
                             } else {
                                 self.unify_physicals(target_domain, expr_domain, "assignment");
                             }
@@ -315,8 +315,7 @@ impl<'l> TypeCheckingContext<'l> {
             (
                 context.to_string(),
                 vec![ErrorInfo {
-                    position: a.1,
-                    file: self.errors.file,
+                    span: a.1,
                     info: "Conflicting with".to_string(),
                 }],
             )

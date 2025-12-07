@@ -84,7 +84,6 @@ pub enum IsExtern {
 /// Base class for [Module], [StructType], [NamedConstant]
 #[derive(Debug)]
 pub struct LinkInfo {
-    pub file: FileUUID,
     pub span: Span,
     pub name: String,
     pub name_span: Span,
@@ -107,8 +106,8 @@ pub struct LinkInfo {
 }
 
 impl LinkInfo {
-    pub fn get_span_file(&self) -> SpanFile {
-        (self.name_span, self.file)
+    pub fn get_file(&self) -> FileUUID {
+        self.span.get_file()
     }
     pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
         match &self.instructions[instr_id] {
@@ -414,8 +413,7 @@ impl<'globals> GetGlobalByNameError<'globals> {
                             collider_global.get_kind_name(),
                             link_info.name
                         ),
-                        position: link_info.span,
-                        file: link_info.file,
+                        span: link_info.span,
                     }
                 })
                 .collect(),
@@ -520,15 +518,14 @@ impl Linker {
                 let infos = conflict_infos
                     .iter()
                     .map(|conf_info| ErrorInfo {
-                        position: conf_info.name_span,
-                        file: conf_info.file,
+                        span: conf_info.name_span,
                         info: "Conflicts with".to_owned(),
                     })
                     .collect();
 
                 let reason = format!("'{this_object_name}' conflicts with other declarations:");
 
-                all_errors[info.file].push(CompileError {
+                all_errors[info.get_file()].push(CompileError {
                     position: info.name_span,
                     reason,
                     infos,
@@ -543,10 +540,10 @@ impl Linker {
         all_errs: &mut ArenaAllocator<ErrorStore, FileUUIDMarker>,
     ) {
         for (_id, link_info) in self.iter_link_infos() {
-            all_errs[link_info.file].append(&link_info.errors);
+            all_errs[link_info.get_file()].append(&link_info.errors);
         }
         for (_id, inst) in self.instantiator.iter() {
-            let file_id = self.modules[inst.global_ref.id].link_info.file;
+            let file_id = self.modules[inst.global_ref.id].link_info.get_file();
             all_errs[file_id].append(&inst.errors);
         }
     }
@@ -611,10 +608,12 @@ impl Linker {
 
     pub fn with_file_builder(&mut self, file_id: FileUUID, f: impl FnOnce(FileBuilder<'_>)) {
         let mut associated_values = Vec::new();
-        let mut parsing_errors = std::mem::take(&mut self.files[file_id].parsing_errors);
+        let file_data = &mut self.files[file_id];
+        let mut parsing_errors = std::mem::take(&mut file_data.parsing_errors);
         let file_data = &self.files[file_id];
+        let whole_file_span = Span::from_range(0..file_data.file_text.len(), file_id);
         let other_parsing_errors =
-            ErrorCollector::from_storage(parsing_errors.take(), file_id, &self.files);
+            ErrorCollector::from_storage(parsing_errors.take(), whole_file_span, &self.files);
 
         f(FileBuilder {
             file_id,

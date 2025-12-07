@@ -1299,7 +1299,7 @@ pub fn gen_verilog_code(instance: &InstantiatedModule, linker: &Linker) -> Strin
     crate::debug::debug_context(
         "codegen",
         instance.name.clone(),
-        &linker.files[ctx.md.link_info.file],
+        &linker.files[ctx.md.link_info.get_file()],
         || {
             ctx.write_verilog_code();
         },

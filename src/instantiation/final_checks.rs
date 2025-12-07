@@ -176,7 +176,7 @@ impl<'l> ModuleTypingContext<'l> {
                                 found_output_typ.display(self.globals),
                                 w.typ.display(self.globals),
                             )
-                            .info_same_file(
+                            .info(
                                 root_wire.get_span(self.link_info),
                                 format!(
                                     "{} declared here of type {}",
@@ -198,12 +198,12 @@ impl<'l> ModuleTypingContext<'l> {
                     for s in sources {
                         self.check_wire_ref_bounds(&w.typ, &s.to_path);
                         let target_typ = make_output_typ(&w.typ, &s.to_path);
-                        if let Some(e) = self.wire_must_be_subtype(
+                        if let Some(mut e) = self.wire_must_be_subtype(
                             "multiplexer",
                             &self.wires[s.from],
                             &target_typ,
                         ) {
-                            e.info_same_file(
+                            e.info(
                                 s.write_span,
                                 format!(
                                     "Writing to this, which has type {}",

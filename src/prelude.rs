@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 // public imports
 pub use crate::alloc::FlatAlloc;
 pub use crate::errors::ErrorCollector;
-pub use crate::file_position::{BracketSpan, Span, SpanFile};
+pub use crate::file_position::{BracketSpan, Span};
 pub use crate::linker::Linker;
 
 #[allow(unused_imports)]
