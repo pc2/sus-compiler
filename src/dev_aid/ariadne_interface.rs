@@ -1,86 +1,60 @@
-use std::path::Path;
-use std::{ops::Range, path::PathBuf};
-
-use crate::compiler_top::LinkerExtraFileInfoManager;
-use crate::linker::FileData;
+use crate::{linker::LinkerFiles, prelude::*};
+use ariadne::*;
+// disambiguate Span - it's ours, from ariadne's
 use crate::prelude::Span;
-use crate::prelude::*;
+
+use std::path::PathBuf;
 
 use crate::{
-    alloc::ArenaVector,
+    compiler_top::LinkerExtraFileInfoManager,
     config::config,
     errors::{CompileError, ErrorLevel},
 };
 
-use ariadne::*;
-
-impl Cache<FileUUID> for (&Linker, &mut ArenaVector<Source<String>, FileUUIDMarker>) {
+impl Cache<FileUUID> for &LinkerFiles {
     type Storage = String;
 
-    fn fetch(&mut self, id: &FileUUID) -> Result<&Source<String>, impl std::fmt::Debug> {
-        Result::<&Source<String>, ()>::Ok(&self.1[*id])
+    fn fetch(&mut self, file_id: &FileUUID) -> Result<&Source<String>, impl std::fmt::Debug> {
+        let file_data = &self[*file_id];
+        let result = file_data
+            .ariadne_source
+            .get_or_init(|| Source::from(file_data.file_text.file_text.clone()));
+
+        Result::<&Source<String>, ()>::Ok(result)
     }
-    fn display<'a>(&self, id: &'a FileUUID) -> Option<impl std::fmt::Display + 'a> {
+    fn display<'a>(&self, file_id: &'a FileUUID) -> Option<impl std::fmt::Display + 'a> {
+        let file_data = &self[*file_id];
         if config().ci {
-            let filename = self.0.files[*id]
+            let filename = file_data
                 .file_identifier
                 .rsplit("/")
                 .next()
-                .unwrap_or(self.0.files[*id].file_identifier.as_str());
+                .unwrap_or(file_data.file_identifier.as_str());
             Some(filename.to_string())
         } else {
-            Some(self.0.files[*id].file_identifier.clone())
+            Some(file_data.file_identifier.clone())
         }
     }
 }
 
-struct NamedSource<'s> {
-    source: Source,
-    name: &'s str,
-}
+impl ariadne::Span for Span {
+    type SourceId = FileUUID;
 
-impl Cache<()> for NamedSource<'_> {
-    type Storage = String;
-
-    fn fetch(&mut self, _id: &()) -> Result<&Source<String>, impl std::fmt::Debug> {
-        Result::<&Source<String>, ()>::Ok(&self.source)
-    }
-    fn display<'a>(&self, _id: &'a ()) -> Option<impl std::fmt::Display + 'a> {
-        Some(self.name.to_owned())
-    }
-}
-
-pub struct FileSourcesManager {
-    pub file_sources: ArenaVector<Source, FileUUIDMarker>,
-}
-
-impl LinkerExtraFileInfoManager for FileSourcesManager {
-    fn convert_filename(&self, path: &Path) -> String {
-        path.canonicalize().unwrap().to_string_lossy().to_string()
+    fn source(&self) -> &Self::SourceId {
+        self.get_file_ref()
     }
 
-    fn on_file_added(&mut self, file_id: FileUUID, linker: &Linker) {
-        let source = Source::from(linker.files[file_id].file_text.file_text.clone());
-
-        self.file_sources.insert(file_id, source);
+    fn start(&self) -> usize {
+        self.as_range().start
     }
 
-    fn on_file_updated(&mut self, file_id: FileUUID, linker: &Linker) {
-        let source = Source::from(linker.files[file_id].file_text.file_text.clone());
-
-        self.file_sources[file_id] = source;
-    }
-
-    fn before_file_remove(&mut self, file_id: FileUUID, _linker: &Linker) {
-        self.file_sources.remove(file_id)
+    fn end(&self) -> usize {
+        self.as_range().end
     }
 }
 
-pub fn compile_all(linker: &mut Linker, file_paths: Vec<PathBuf>) -> FileSourcesManager {
-    let mut file_source_manager = FileSourcesManager {
-        file_sources: ArenaVector::new(),
-    };
-    linker.add_standard_library(&mut file_source_manager);
+pub fn compile_all(linker: &mut Linker, file_paths: Vec<PathBuf>) {
+    linker.add_standard_library(&mut ());
 
     for file_path in file_paths {
         let file_text = match std::fs::read_to_string(&file_path) {
@@ -93,16 +67,10 @@ pub fn compile_all(linker: &mut Linker, file_paths: Vec<PathBuf>) -> FileSources
             }
         };
 
-        linker.add_file_text(
-            file_source_manager.convert_filename(&file_path),
-            file_text,
-            &mut file_source_manager,
-        );
+        linker.add_file_text(().convert_filename(&file_path), file_text, &mut ());
     }
 
     linker.recompile_all();
-
-    file_source_manager
 }
 
 fn ariadne_config() -> Config {
@@ -113,8 +81,6 @@ fn ariadne_config() -> Config {
 
 pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
     error: CompileError,
-    file: FileUUID,
-    linker: &Linker,
     file_cache: &mut AriadneCache,
 ) {
     // Generate & choose some colours for each of our elements
@@ -124,27 +90,18 @@ pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
     };
     let info_color = Color::Blue;
 
-    // Assert that span is in file
-    let _ = &linker.files[file].file_text[error.position];
-
-    let error_span = error.position.as_range();
-
     let config = ariadne_config();
-    let mut report: ReportBuilder<'_, (FileUUID, Range<usize>)> =
-        Report::build(report_kind, (file, error_span.clone())).with_config(config);
+    let mut report: ReportBuilder<'_, Span> =
+        Report::build(report_kind, error.position).with_config(config);
     report = report.with_message(&error.reason).with_label(
-        Label::new((file, error_span))
+        Label::new(error.position)
             .with_message(error.reason)
             .with_color(err_color),
     );
 
     for info in error.infos {
-        let info_span = info.span.as_range();
-        let info_file = info.span.get_file();
-        // Assert that span is in file
-        let _ = &linker.files[info_file].file_text[info.span];
         report = report.with_label(
-            Label::new((info_file, info_span))
+            Label::new(info.span)
                 .with_message(info.info)
                 .with_color(info_color),
         )
@@ -153,113 +110,38 @@ pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
     report.finish().eprint(file_cache).unwrap();
 }
 
-pub fn print_all_errors(
-    linker: &Linker,
-    ariadne_sources: &mut ArenaVector<Source, FileUUIDMarker>,
-) {
-    let mut source_cache = (linker, ariadne_sources);
+pub fn print_all_errors(linker: &Linker) {
     let errors = linker.collect_all_errors();
-    for (file_uuid, errs) in errors {
+    for (_file_uuid, errs) in errors {
         for err in errs {
-            pretty_print_error(err, file_uuid, linker, &mut source_cache);
+            pretty_print_error(err, &mut &linker.files);
         }
     }
 }
 
-pub fn pretty_print_spans_in_reverse_order(file_data: &FileData, spans: Vec<Range<usize>>) {
-    let text_len = file_data.file_text.len();
-    let mut source = NamedSource {
-        source: Source::from(file_data.file_text.file_text.clone()),
-        name: &file_data.file_identifier,
-    };
-
-    for span in spans.into_iter().rev() {
-        // If span not in file, just don't print it. This happens.
-        if span.end > text_len {
-            error!(
-                "Span({}, {}) certainly does not correspond to this file. ",
-                span.start, span.end
-            );
-            return;
-        }
-
-        let config = ariadne_config();
-
-        let mut report: ReportBuilder<'_, Range<usize>> =
-            Report::build(ReportKind::Advice, span.clone()).with_config(config);
-        report = report.with_label(
-            Label::new(span.clone())
-                .with_message(format!("Span({}, {})", span.start, span.end))
-                .with_color(Color::Blue),
-        );
-
-        report.finish().eprint(&mut source).unwrap();
-    }
+pub fn pretty_print_span(linker_files: &LinkerFiles, span: Span, label: String) {
+    pretty_print_many_spans(linker_files, [(span, label)].into_iter());
 }
 
-pub fn pretty_print_span(file_data: &FileData, span: Span, label: impl ToString) {
-    let text_len = file_data.file_text.len();
-    let mut source = NamedSource {
-        source: Source::from(file_data.file_text.file_text.clone()),
-        name: &file_data.file_identifier,
-    };
-
-    let span = span.as_range();
-
-    // If span not in file, just don't print it. This happens.
-    if span.end > text_len {
-        error!(
-            "Span({}, {}) certainly does not correspond to this file. ",
-            span.start, span.end
-        );
-        return;
-    }
-
+pub fn pretty_print_many_spans(
+    mut linker_files: &LinkerFiles,
+    mut spans_iter: impl Iterator<Item = (Span, String)>,
+) {
     let config = ariadne_config();
 
-    let mut report: ReportBuilder<'_, Range<usize>> =
-        Report::build(ReportKind::Advice, span.clone()).with_config(config);
-    report = report.with_label(
-        Label::new(span.clone())
-            .with_message(label)
-            .with_color(Color::Blue),
-    );
-
-    report.finish().eprint(&mut source).unwrap();
-}
-
-pub fn pretty_print_many_spans(file_data: &FileData, spans: &[(String, Span)]) {
-    let text_len = file_data.file_text.len();
-    let mut source = NamedSource {
-        source: Source::from(file_data.file_text.file_text.clone()),
-        name: &file_data.file_identifier,
+    let Some(first_span) = spans_iter.next() else {
+        return;
     };
 
-    let config = ariadne_config();
+    let mut report: ReportBuilder<'_, Span> =
+        Report::build(ReportKind::Advice, first_span.0).with_config(config);
 
-    if spans.is_empty() {
-        return;
-    }
-
-    let mut report: ReportBuilder<'_, Range<usize>> =
-        Report::build(ReportKind::Advice, spans[0].1.as_range()).with_config(config);
-
-    for (text, span) in spans.iter().rev() {
-        let span = span.as_range();
-        // If span not in file, just don't print it. This happens.
-        if span.end > text_len {
-            error!(
-                "Span({}, {}) certainly does not correspond to this file. ",
-                span.start, span.end
-            );
-            return;
-        }
-
+    for (span, label) in std::iter::once(first_span).chain(spans_iter) {
         report = report.with_label(
-            Label::new(span.clone())
-                .with_message(text)
+            Label::new(span)
+                .with_message(label)
                 .with_color(Color::Blue),
         );
     }
-    report.finish().eprint(&mut source).unwrap();
+    report.finish().eprint(&mut linker_files).unwrap();
 }

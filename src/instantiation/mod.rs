@@ -263,6 +263,7 @@ impl SubModuleOrWire {
         };
         *result
     }
+    #[allow(unused)]
     #[track_caller]
     pub fn unwrap_generation_value(&self) -> &Value {
         let Self::CompileTimeValue(result) = self else {

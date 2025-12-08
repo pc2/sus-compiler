@@ -13,7 +13,7 @@ pub mod checkpoint;
 pub mod passes;
 
 use std::{
-    cell::RefCell,
+    cell::{OnceCell, RefCell},
     collections::{HashMap, HashSet},
     ops::{Deref, DerefMut, Index, IndexMut},
 };
@@ -177,6 +177,8 @@ pub struct FileData {
     pub associated_values: Vec<GlobalUUID>,
     pub tree: Tree,
     pub is_std: bool,
+    /// Cached Source for ariadne. Initialized when [ariadne::Cache::fetch] is called
+    pub ariadne_source: OnceCell<ariadne::Source<String>>,
 }
 
 /// Globally references any [Module], [StructType], or [NamedConstant] in [Linker]
@@ -377,6 +379,7 @@ impl<'slf> LinkerGlobals {
 #[derive(Debug)]
 pub enum GetGlobalByNameError<'globals> {
     NotFound {
+        #[allow(unused)]
         globals: &'globals LinkerGlobals,
         name: &'globals str,
     },
@@ -431,11 +434,13 @@ impl<'globals> GetGlobalByNameError<'globals> {
 ///
 /// Incremental operations such as adding and removing files can be performed on this
 pub struct Linker {
-    pub files: ArenaAllocator<FileData, FileUUIDMarker>,
+    pub files: LinkerFiles,
     pub globals: LinkerGlobals,
     pub instantiator: Instantiator,
     global_namespace: HashMap<String, NamespaceElement>,
 }
+
+pub type LinkerFiles = ArenaAllocator<FileData, FileUUIDMarker>;
 
 impl Default for Linker {
     fn default() -> Self {
@@ -617,7 +622,6 @@ impl Linker {
 
         f(FileBuilder {
             file_id,
-            tree: &file_data.tree,
             file_data,
             files: &self.files,
             other_parsing_errors: &other_parsing_errors,
@@ -632,15 +636,15 @@ impl Linker {
         let file_data = &mut self.files[file_id];
         file_data.parsing_errors = parsing_errors;
         file_data.associated_values = associated_values;
+        file_data.ariadne_source = OnceCell::new();
     }
 }
 
 /// Temporary builder for [crate::flattening::initialization]
 pub struct FileBuilder<'linker> {
     pub file_id: FileUUID,
-    pub tree: &'linker Tree,
     pub file_data: &'linker FileData,
-    pub files: &'linker ArenaAllocator<FileData, FileUUIDMarker>,
+    pub files: &'linker LinkerFiles,
     pub other_parsing_errors: &'linker ErrorCollector<'linker>,
     associated_values: &'linker mut Vec<GlobalUUID>,
     global_namespace: &'linker mut HashMap<String, NamespaceElement>,

@@ -27,7 +27,7 @@ use crate::typing::value_unifier::UnifyableValue;
 use crate::value::Value;
 
 use crate::flattening::*;
-use crate::linker::{FileData, GlobalUUID, IsExtern, LinkInfo, LinkerGlobals};
+use crate::linker::{GlobalUUID, IsExtern, LinkInfo, LinkerFiles, LinkerGlobals};
 use crate::typing::{abstract_type::AbstractRankedType, concrete_type::ConcreteType};
 
 use std::fmt::{Display, Formatter, Write};
@@ -767,14 +767,14 @@ impl LinkInfo {
         &self,
         f: &mut Formatter<'_>,
         domains: &FlatAlloc<DomainInfo, DomainIDMarker>,
-        file_data: &FileData,
+        linker_files: &LinkerFiles,
         globals: &LinkerGlobals,
     ) -> std::fmt::Result {
         let mut spans_print = Vec::new();
         for (id, instr) in &self.instructions {
             let domain = self.display_domain_of(id, domains);
             let span = self.get_instruction_span(id);
-            spans_print.push((format!("{id:?} {domain}"), span));
+            spans_print.push((span, format!("{id:?} {domain}")));
 
             let parent = FmtWrapper(|f| {
                 if let Some(p) = instr.get_parent_condition() {
@@ -945,7 +945,7 @@ impl LinkInfo {
             }
             writeln!(f)?;
         }
-        pretty_print_many_spans(file_data, &spans_print);
+        pretty_print_many_spans(linker_files, spans_print.into_iter());
         Ok(())
     }
 }
@@ -1058,18 +1058,21 @@ impl Module {
         })
     }
 
-    pub fn print_flattened_module(&self, file_data: &FileData, globals: &LinkerGlobals) {
+    pub fn print_flattened_module(&self, linker_files: &LinkerFiles, globals: &LinkerGlobals) {
         let disp = FmtWrapper(|f| {
             writeln!(f, "[[{}]]:", self.link_info.name)?;
             writeln!(f, "Interface:")?;
             writeln!(
                 f,
                 "{}",
-                self.display_all_ports_info(&file_data.file_text, None)
+                self.display_all_ports_info(
+                    &linker_files[self.link_info.get_file()].file_text,
+                    None
+                )
             )?;
             writeln!(f, "Instructions:")?;
             self.link_info
-                .fmt_instructions(f, &self.domains, file_data, globals)
+                .fmt_instructions(f, &self.domains, linker_files, globals)
         });
 
         eprintln!("{disp}");

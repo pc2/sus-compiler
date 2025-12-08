@@ -4,10 +4,8 @@ use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::rc::Rc;
 
-use crate::alloc::ArenaAllocator;
 use crate::config::config;
-use crate::errors::CompileError;
-use crate::linker::{FileData, LinkerGlobals};
+use crate::linker::{LinkerFiles, LinkerGlobals};
 use crate::to_string::FmtWrapper;
 use crate::typing::concrete_type::ConcreteGlobalReference;
 
@@ -66,7 +64,7 @@ impl Instantiator {
     pub fn instantiate(
         &mut self,
         globals: &LinkerGlobals,
-        linker_files: &ArenaAllocator<FileData, FileUUIDMarker>,
+        linker_files: &LinkerFiles,
         object_id: ConcreteGlobalReference<ModuleUUID>,
     ) -> Result<Rc<InstantiatedModule>, InstantiateError> {
         let instance = if let Some(found) = self.cache.get(&object_id) {
@@ -106,9 +104,7 @@ impl Instantiator {
 
             let name = global_ref.display(globals).to_string();
 
-            let md = &globals.modules[global_ref.id];
-            let file = &linker_files[md.link_info.get_file()];
-            let result = crate::debug::debug_context("instantiating", name, file, || {
+            let result = crate::debug::debug_context("instantiating", name, || {
                 match start_instantiation(globals, linker_files, global_ref.clone()) {
                     Ok(mut context) => {
                         loop {
@@ -150,14 +146,6 @@ impl Instantiator {
         }
     }
 
-    pub fn for_each_error(&self, func: &mut impl FnMut(&CompileError)) {
-        for inst in self.cache.values() {
-            for err in &inst.unwrap().errors {
-                func(err)
-            }
-        }
-    }
-
     // Also passes over invalid instances. Instance validity should not be assumed!
     // Only used for things like syntax highlighting
     pub fn iter(
@@ -193,7 +181,7 @@ impl Executed {
     pub fn into_module_typing_context<'l>(
         self,
         globals: &'l LinkerGlobals,
-        linker_files: &'l ArenaAllocator<FileData, FileUUIDMarker>,
+        linker_files: &'l LinkerFiles,
         md: &'l Module,
         global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
         name: String,
@@ -241,7 +229,7 @@ fn mangle_name(str: &str) -> String {
 #[allow(clippy::result_large_err)]
 fn start_instantiation<'l>(
     linker_globals: &'l LinkerGlobals,
-    linker_files: &'l ArenaAllocator<FileData, FileUUIDMarker>,
+    linker_files: &'l LinkerFiles,
     global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
 ) -> Result<ModuleTypingSuperContext<'l>, InstantiatedModule> {
     let md = &linker_globals.modules[global_ref.id];

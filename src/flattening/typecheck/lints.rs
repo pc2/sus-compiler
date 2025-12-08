@@ -3,10 +3,9 @@ use std::collections::hash_map::Entry;
 
 use sus_proc_macro::{get_builtin_const, get_builtin_type};
 
-use crate::alloc::ArenaAllocator;
 use crate::dev_aid::ariadne_interface::pretty_print_many_spans;
 use crate::flattening::WriteModifiers;
-use crate::linker::{FileData, GlobalRef, IsExtern};
+use crate::linker::{GlobalRef, IsExtern, LinkerFiles};
 use crate::prelude::*;
 use crate::to_string::FmtWrapper;
 use crate::typing::abstract_type::AbstractInnerType;
@@ -16,17 +15,13 @@ use super::*;
 
 use super::{Expression, ExpressionOutput, ExpressionSource, Instruction, WireReferenceRoot};
 
-pub fn perform_lints(
-    pass: &mut LinkerPass,
-    errors: &ErrorCollector,
-    files: &ArenaAllocator<FileData, FileUUIDMarker>,
-) {
+pub fn perform_lints(pass: &mut LinkerPass, errors: &ErrorCollector, linker_files: &LinkerFiles) {
     let (working_on, globals) = pass.get_with_context();
     let ctx = LintContext {
         working_on,
         errors,
         globals,
-        file_data: &files[working_on.get_file()],
+        linker_files,
     };
     ctx.extern_may_not_have_type_template_args();
     ctx.extern_must_declare_abs_lats();
@@ -39,7 +34,7 @@ pub fn perform_lints(
 
 struct LintContext<'l> {
     working_on: GlobalRef<'l>,
-    file_data: &'l FileData,
+    linker_files: &'l LinkerFiles,
     errors: &'l ErrorCollector<'l>,
     globals: GlobalResolver<'l, 'l>,
 }
@@ -350,13 +345,12 @@ impl LintContext<'_> {
                     Ok(())
                 })
             );
-            let spans: Vec<_> = self
+            let spans = self
                 .working_on
                 .instructions
                 .iter()
-                .map(|(id, instr)| (format!("{id:?}"), instr.get_span()))
-                .collect();
-            pretty_print_many_spans(self.file_data, &spans);
+                .map(|(id, instr)| (instr.get_span(), format!("{id:?}")));
+            pretty_print_many_spans(self.linker_files, spans);
         }
 
         // All asserts and declarations starting with '_' are also terminals

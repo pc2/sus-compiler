@@ -1,16 +1,17 @@
 use crate::append_only_vec::AppendOnlyVec;
+use crate::linker::LinkerFiles;
 use crate::prelude::*;
 
 use std::cell::Cell;
 use std::fmt::Display;
 
-use crate::{alloc::ArenaAllocator, typing::template::Parameter};
+use crate::typing::template::Parameter;
 
 use crate::flattening::{
     Declaration, DomainInfo, Instruction, Interface, InterfaceDeclaration, Module, Port,
     SubModuleInstance,
 };
-use crate::linker::{FileData, LinkInfo, checkpoint::ErrorCheckpoint};
+use crate::linker::{LinkInfo, checkpoint::ErrorCheckpoint};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ErrorLevel {
@@ -129,14 +130,11 @@ pub struct ErrorCollector<'linker> {
     did_error: Cell<bool>,
     /// All errors & warnings must be within this span. Of course their infos can point outside it.
     pub context_span: Span,
-    pub files: &'linker ArenaAllocator<FileData, FileUUIDMarker>,
+    pub files: &'linker LinkerFiles,
 }
 
 impl<'linker> ErrorCollector<'linker> {
-    pub fn new_empty(
-        context_span: Span,
-        files: &'linker ArenaAllocator<FileData, FileUUIDMarker>,
-    ) -> Self {
+    pub fn new_empty(context_span: Span, files: &'linker LinkerFiles) -> Self {
         Self::from_storage(ErrorStore::new(), context_span, files)
     }
 
@@ -151,7 +149,7 @@ impl<'linker> ErrorCollector<'linker> {
     pub fn from_storage(
         error_store: ErrorStore,
         context_span: Span,
-        files: &'linker ArenaAllocator<FileData, FileUUIDMarker>,
+        files: &'linker LinkerFiles,
     ) -> Self {
         Self {
             errors: AppendOnlyVec::from(error_store.errors),
@@ -401,7 +399,7 @@ impl ErrorInfoObject for &LinkInfo {
     }
 }
 
-impl ErrorInfoObject for (&Module, &ArenaAllocator<FileData, FileUUIDMarker>) {
+impl ErrorInfoObject for (&Module, &LinkerFiles) {
     fn make_info(self) -> Option<ErrorInfo> {
         let (md, files) = self;
         let ports_str = md.display_all_ports_info(&files[md.link_info.get_file()].file_text, None);

@@ -33,6 +33,9 @@ impl Span {
     pub fn get_file(&self) -> FileUUID {
         self.2
     }
+    pub fn get_file_ref(&self) -> &FileUUID {
+        &self.2
+    }
     #[track_caller]
     pub fn new_overarching(left: Span, right: Span) -> Span {
         left.debug();

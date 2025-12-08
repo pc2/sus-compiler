@@ -57,8 +57,8 @@ fn main() -> ExitCode {
 
     let mut linker = Linker::new();
     crate::debug::create_dump_on_panic(&mut linker, |linker| {
-        let mut paths_arena = compile_all(linker, file_paths);
-        print_all_errors(&*linker, &mut paths_arena.file_sources);
+        compile_all(linker, file_paths);
+        print_all_errors(&*linker);
 
         crate::codegen::codegen(&*linker)
     })

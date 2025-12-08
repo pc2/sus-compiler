@@ -1296,14 +1296,9 @@ pub fn gen_verilog_code(instance: &InstantiatedModule, linker: &Linker) -> Strin
         needed_untils: instance.compute_needed_untils(),
     };
 
-    crate::debug::debug_context(
-        "codegen",
-        instance.name.clone(),
-        &linker.files[ctx.md.link_info.get_file()],
-        || {
-            ctx.write_verilog_code();
-        },
-    );
+    crate::debug::debug_context("codegen", instance.name.clone(), || {
+        ctx.write_verilog_code();
+    });
 
     ctx.program_text
 }

@@ -1,16 +1,9 @@
-use crate::{
-    dev_aid::ariadne_interface::{pretty_print_span, pretty_print_spans_in_reverse_order},
-    prelude::*,
-};
+use crate::{dev_aid::ariadne_interface::pretty_print_many_spans, linker::LinkerFiles, prelude::*};
 
 use std::{
     cell::{Cell, RefCell},
-    ops::Range,
     path::PathBuf,
-    sync::{
-        Arc, LazyLock, Mutex,
-        atomic::{AtomicBool, AtomicPtr},
-    },
+    sync::{Arc, LazyLock, Mutex, atomic::AtomicBool},
     thread,
     time::{Duration, Instant},
 };
@@ -19,10 +12,8 @@ use circular_buffer::CircularBuffer;
 use colored::Colorize;
 
 use crate::{
-    codegen::sanitize_filename,
-    config::config,
-    linker::{FileData, Linker},
-    prelude::Span,
+    codegen::sanitize_filename, config::config, dev_aid::ariadne_interface::pretty_print_span,
+    linker::Linker,
 };
 
 /// Many duplicates will be produced, and filtering them out in the code itself is inefficient. Therefore just keep a big buffer and deduplicate as needed
@@ -41,12 +32,11 @@ struct SpanDebuggerStackElement {
     global_obj_name: String,
     debugging_enabled: bool,
     span_history: CircularBuffer<SPAN_TOUCH_HISTORY_SIZE, Span>,
-    file_data: *const FileData,
 }
 
 thread_local! {
     static DEBUG_STACK : RefCell<PerThreadDebugInfo> = const { RefCell::new(PerThreadDebugInfo{debug_stack: Vec::new(), recent_debug_options: CircularBuffer::new()}) };
-    static MOST_RECENT_FILE_DATA: std::sync::atomic::AtomicPtr<FileData> = const {AtomicPtr::new(std::ptr::null_mut())}
+    static STORED_LINKER: Cell<*mut Linker> = const { Cell::new(std::ptr::null_mut()) };
 }
 
 /// Register a [crate::file_position::Span] for printing by [SpanDebugger] on panic.
@@ -61,13 +51,12 @@ pub fn add_debug_span(sp: Span) {
     });
 }
 
-fn print_most_recent_spans(file_data: &FileData, history: &SpanDebuggerStackElement) {
-    let mut spans_to_print: Vec<Range<usize>> = Vec::with_capacity(NUM_SPANS_TO_PRINT);
+fn print_most_recent_spans(linker_files: &LinkerFiles, history: &SpanDebuggerStackElement) {
+    let mut spans_to_print: Vec<Span> = Vec::with_capacity(NUM_SPANS_TO_PRINT);
 
     for sp in history.span_history.iter().rev() {
-        let as_range = sp.as_range();
-        if !spans_to_print.contains(&as_range) {
-            spans_to_print.push(as_range);
+        if !spans_to_print.contains(sp) {
+            spans_to_print.push(*sp);
         }
         if spans_to_print.len() >= NUM_SPANS_TO_PRINT {
             break;
@@ -75,23 +64,29 @@ fn print_most_recent_spans(file_data: &FileData, history: &SpanDebuggerStackElem
     }
 
     info!(
-        "Panic unwinding. Printing the last {} spans. BEWARE: These spans may not correspond to this file, thus incorrect spans are possible!",
+        "Panic unwinding. Printing the last {} spans.",
         spans_to_print.len()
     );
-    pretty_print_spans_in_reverse_order(file_data, spans_to_print);
+    pretty_print_many_spans(
+        linker_files,
+        spans_to_print.iter().rev().enumerate().map(|(idx, span)| {
+            let sp = span.as_range();
+            (*span, format!("-{idx}: Span({}, {})", sp.start, sp.end))
+        }),
+    );
 }
 
 #[allow(unused)]
 pub fn debug_print_span(span: Span, label: String) {
-    MOST_RECENT_FILE_DATA.with(|ptr| {
-        let ptr = ptr.load(std::sync::atomic::Ordering::SeqCst);
-        if ptr.is_null() {
-            error!("No FileData registered for Span Debugging!");
-        } else {
-            let fd: &FileData = unsafe { &*ptr };
-            pretty_print_span(fd, span, label);
-        }
-    })
+    let linker_ptr = STORED_LINKER.get();
+    if linker_ptr.is_null() {
+        error!("DEBUG: No Linker registered for Span Debugging!");
+    } else {
+        // SAFETY: Well actually this is totally not safe, since this could be called while a &mut Linker is held, and returned.
+        // But since this is exclusively for debugging (and therefore should never be part of a release), it doesn't matter.
+        let linker: &Linker = unsafe { &*linker_ptr };
+        pretty_print_span(&linker.files, span, label);
+    }
 }
 
 fn print_stack_top(enter_exit: &str) {
@@ -117,19 +112,7 @@ fn print_stack_top(enter_exit: &str) {
     })
 }
 
-pub fn debug_context<R>(
-    stage: &'static str,
-    global_obj_name: String,
-    file_data: &FileData,
-    f: impl FnOnce() -> R,
-) -> R {
-    MOST_RECENT_FILE_DATA.with(|ptr| {
-        let file_data = file_data as *const FileData;
-        ptr.store(
-            file_data as *mut FileData,
-            std::sync::atomic::Ordering::SeqCst,
-        )
-    });
+pub fn debug_context<R>(stage: &'static str, global_obj_name: String, f: impl FnOnce() -> R) -> R {
     let config = config();
 
     let oot_killer_str = format!("{stage} {global_obj_name}");
@@ -147,7 +130,6 @@ pub fn debug_context<R>(
             global_obj_name,
             debugging_enabled,
             span_history: CircularBuffer::new(),
-            file_data,
         });
     });
     print_stack_top("Enter ");
@@ -200,9 +182,6 @@ pub fn debugging_enabled() -> bool {
     })
 }
 
-thread_local! {
-    static STORED_LINKER: Cell<*mut Linker> = const { Cell::new(std::ptr::null_mut()) };
-}
 /// Set up the hook to print spans. Uses [std::panic::set_hook] instead of [std::panic::catch_unwind] because this runs before my debugger "on panic" breakpoint.
 /// Use together with [create_dump_on_panic].
 pub fn setup_panic_handler() {
@@ -223,9 +202,9 @@ pub fn setup_panic_handler() {
                     )
                     .red()
                 );
-                let file_data = unsafe { &*last_stack_elem.file_data };
+                let linker = unsafe { &*STORED_LINKER.get() };
                 //pretty_print_span(file_data, span, label);
-                print_most_recent_spans(file_data, last_stack_elem);
+                print_most_recent_spans(&linker.files, last_stack_elem);
             } else {
                 eprintln!("{}", "No Span-guarding context".red());
             }
@@ -372,7 +351,7 @@ fn spawn_watchdog_thread() {
             timers.retain(|entry| {
             let deadline = entry.started_at + duration;
             if deadline <= now && entry.alive.load(std::sync::atomic::Ordering::SeqCst) {
-                fatal_exit!("⏰⏰⏰⏰⏰⏰⏰⏰⏰\n⏰ OutOfTimeKiller triggered in {} after it took more than {:.2} seconds to execute ⏰\nProcess will now be terminated.", 
+                fatal_exit!("⏰⏰⏰⏰⏰⏰⏰⏰⏰\n⏰ OutOfTimeKiller triggered in {} after it took more than {:.2} seconds to execute ⏰\nProcess will now be terminated.",
                     entry.info,
                     (now - entry.started_at).as_secs_f64()); // To show in stdout when this happens too
             } else {
@@ -468,9 +447,8 @@ mod tests {
                 "non_extistent file text".to_string(),
                 &mut (),
             );
-            let fd = &linker.files[fd_id];
 
-            debug_context("test_context", "test_obj".to_string(), fd, || {
+            debug_context("test_context", "test_obj".to_string(), || {
                 let my_span = Span::from_range(3..10, fd_id);
                 my_span.debug();
                 if !linker.files.is_empty() {

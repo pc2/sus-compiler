@@ -1,7 +1,7 @@
 use std::cell::OnceCell;
 use std::num::NonZeroU16;
 
-use crate::alloc::{ArenaAllocator, UUID, UUIDRange};
+use crate::alloc::{UUID, UUIDRange};
 
 use crate::linker::passes::{GlobalResolver, LinkerPass};
 use crate::prelude::*;
@@ -10,7 +10,7 @@ use ibig::{IBig, UBig};
 use ordered_float::NotNan;
 use sus_proc_macro::{field, get_builtin_const, kind, kw};
 
-use crate::linker::{FileData, GlobalObj, GlobalUUID};
+use crate::linker::{GlobalObj, GlobalUUID, LinkerFiles};
 use crate::value::Value;
 
 use super::name_context::LocalVariableContext;
@@ -1903,7 +1903,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 ///
 /// Requires that first, all globals have been initialized.
 pub fn flatten_all_globals(linker: &mut Linker) {
-    let linker_files: *const ArenaAllocator<FileData, FileUUIDMarker> = &linker.files;
+    let linker_files: *const LinkerFiles = &linker.files as *const LinkerFiles;
     // SAFETY we won't be touching the files anywere. This is just to get the compiler to stop complaining about linker going into the closure.
     for (file_id, file) in unsafe { &*linker_files } {
         let Ok(mut cursor) = Cursor::new_at_root(file_id, file) else {
@@ -1919,15 +1919,20 @@ pub fn flatten_all_globals(linker: &mut Linker) {
                     .next()
                     .expect("Iterator cannot be exhausted");
 
-                linker.pass("Flattening", global_obj, |pass, errors, _files| {
-                    flatten_global(pass, errors, cursor);
+                linker.pass("Flattening", global_obj, |pass, errors, files| {
+                    flatten_global(pass, errors, cursor, files);
                 });
             });
         });
     }
 }
 
-fn flatten_global(pass: &mut LinkerPass, errors: &ErrorCollector, cursor: &mut Cursor) {
+fn flatten_global(
+    pass: &mut LinkerPass,
+    errors: &ErrorCollector,
+    cursor: &mut Cursor,
+    files: &LinkerFiles,
+) {
     let (working_on, globals) = pass.get_with_context();
 
     // Skip because we covered it in initialization.
@@ -2030,6 +2035,6 @@ fn flatten_global(pass: &mut LinkerPass, errors: &ErrorCollector, cursor: &mut C
     if let GlobalObj::Module(md) = md
         && crate::debug::is_enabled("print-abstract-pre-typecheck")
     {
-        md.print_flattened_module(cursor.file_data, globals.globals);
+        md.print_flattened_module(files, globals.globals);
     }
 }

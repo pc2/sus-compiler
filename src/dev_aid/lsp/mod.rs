@@ -317,16 +317,15 @@ fn gather_all_references_in_one_file(linker: &Linker, file_id: FileUUID, pos: us
     }
 }
 
-fn assert_all_refs_of_correct_length(
-    location: Span,
-    refs: &[Span],
-    location_file: &FileData,
-    other_spans_file: &FileData,
-) {
+fn assert_all_refs_of_correct_length(location: Span, refs: &[Span], linker: &Linker) {
     if refs.iter().any(|r| r.size() != location.size()) {
-        let refs_vec: Vec<_> = refs.iter().map(|r| (String::new(), *r)).collect();
-        pretty_print_span(location_file, location, "Original location Span");
-        pretty_print_many_spans(other_spans_file, &refs_vec);
+        let refs_vec: Vec<_> = refs.iter().map(|r| (*r, String::new())).collect();
+        pretty_print_span(
+            &linker.files,
+            location,
+            "Original location Span".to_string(),
+        );
+        pretty_print_many_spans(&linker.files, refs_vec.into_iter());
         panic!("One of the spans was not of the same size as the original span!")
     }
 }
@@ -338,20 +337,19 @@ fn gather_all_references_across_all_files(
 ) -> Vec<(FileUUID, Vec<Span>)> {
     let mut ref_locations = Vec::new();
 
-    let original_file = &linker.files[file_id];
     if let Some((location, hover_info)) = get_selected_object(linker, file_id, pos) {
         let refers_to = RefersTo::from(hover_info);
         if refers_to.is_global() {
             for (other_file_id, other_file) in &linker.files {
                 let found_refs = gather_references_in_file(linker, other_file, refers_to);
-                assert_all_refs_of_correct_length(location, &found_refs, original_file, other_file);
+                assert_all_refs_of_correct_length(location, &found_refs, linker);
                 if !found_refs.is_empty() {
                     ref_locations.push((other_file_id, found_refs))
                 }
             }
         } else if let Some(local) = refers_to.local {
             let found_refs = for_each_local_reference_in_global(linker, local.0, local.1);
-            assert_all_refs_of_correct_length(location, &found_refs, original_file, original_file);
+            assert_all_refs_of_correct_length(location, &found_refs, linker);
             if !found_refs.is_empty() {
                 ref_locations.push((file_id, found_refs))
             }

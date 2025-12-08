@@ -1,5 +1,6 @@
 use crate::prelude::*;
 
+use std::cell::OnceCell;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
@@ -28,6 +29,7 @@ pub trait LinkerExtraFileInfoManager {
     fn convert_filename(&self, path: &Path) -> String;
     fn on_file_added(&mut self, _file_id: FileUUID, _linker: &Linker) {}
     fn on_file_updated(&mut self, _file_id: FileUUID, _linker: &Linker) {}
+    #[allow(unused)]
     fn before_file_remove(&mut self, _file_id: FileUUID, _linker: &Linker) {}
 }
 
@@ -157,13 +159,13 @@ impl Linker {
             associated_values: Vec::new(),
             parsing_errors: ErrorStore::new(),
             is_std: false,
+            ariadne_source: OnceCell::new(),
         });
 
         self.with_file_builder(file_id, |builder| {
             crate::debug::debug_context(
                 "gather_initial_file_data in add_file",
                 builder.file_data.file_identifier.clone(),
-                builder.file_data,
                 || gather_initial_file_data(builder),
             );
         });
@@ -198,7 +200,6 @@ impl Linker {
                 crate::debug::debug_context(
                     "gather_initial_file_data in update_file",
                     builder.file_data.file_identifier.clone(),
-                    builder.file_data,
                     || gather_initial_file_data(builder),
                 );
             });
@@ -247,7 +248,7 @@ impl Linker {
                 if crate::debug::is_enabled("print-abstract") {
                     let (md, globals) = pass.get_with_context();
                     if let GlobalObj::Module(md) = md {
-                        md.print_flattened_module(&files[md.link_info.get_file()], globals.globals);
+                        md.print_flattened_module(files, globals.globals);
                     }
                 }
             });
