@@ -1,4 +1,7 @@
-use crate::prelude::*;
+use crate::{
+    dev_aid::ariadne_interface::{pretty_print_span, pretty_print_spans_in_reverse_order},
+    prelude::*,
+};
 
 use std::{
     cell::{Cell, RefCell},
@@ -20,7 +23,6 @@ use crate::{
     config::config,
     linker::{FileData, Linker},
     prelude::Span,
-    pretty_print_span, pretty_print_spans_in_reverse_order,
 };
 
 /// Many duplicates will be produced, and filtering them out in the code itself is inefficient. Therefore just keep a big buffer and deduplicate as needed

@@ -29,8 +29,9 @@ mod compiler_top;
 use std::process::ExitCode;
 
 use config::config;
-use dev_aid::ariadne_interface::*;
 use instantiation::InstantiatedModule;
+
+use crate::dev_aid::ariadne_interface::{compile_all, print_all_errors};
 
 fn main() -> ExitCode {
     crate::debug::setup_panic_handler();

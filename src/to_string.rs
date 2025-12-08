@@ -3,6 +3,7 @@ use ibig::IBig;
 use sus_proc_macro::kw;
 
 use crate::alloc::zip_eq;
+use crate::dev_aid::ariadne_interface::pretty_print_many_spans;
 use crate::flattening::typecheck::TyCell;
 use crate::instantiation::{
     InferenceResult, InstantiatedModule, IsPort, ModuleTypingContext, MultiplexerSource,
@@ -14,6 +15,7 @@ use crate::latency::port_latency_inference::{
 };
 use crate::prelude::*;
 
+use crate::file_position::FileText;
 use crate::typing::abstract_type::{AbstractGlobalReference, AbstractInnerType};
 use crate::typing::concrete_type::{ConcreteGlobalReference, SubtypeRelation};
 use crate::typing::domain_type::DomainType;
@@ -23,7 +25,6 @@ use crate::typing::template::{
 };
 use crate::typing::value_unifier::UnifyableValue;
 use crate::value::Value;
-use crate::{file_position::FileText, pretty_print_many_spans};
 
 use crate::flattening::*;
 use crate::linker::{FileData, GlobalUUID, IsExtern, LinkInfo, LinkerGlobals};
