@@ -28,7 +28,7 @@ impl HoverCollector<'_> {
         self.list.push(MarkedString::String(
             link_info
                 .documentation
-                .to_string(&self.linker.files[link_info.get_file()].file_text),
+                .to_string(&self.linker.files[link_info.span.file].file_text),
         ))
     }
     fn sus_code<Str: ToOwned<Owned = String>>(&mut self, text: Str) {
@@ -204,7 +204,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
         LocationInfo::Global(global) => {
             let link_info = &linker.globals[global];
             hover.documentation_link_info(link_info);
-            let file = &linker.files[link_info.get_file()];
+            let file = &linker.files[link_info.span.file];
             hover.sus_code(
                 link_info
                     .display_full_name_and_args(&file.file_text)
@@ -215,7 +215,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     let md = &linker.modules[md_uuid];
                     hover.sus_code(
                         md.display_all_ports_info(
-                            &linker.files[md.link_info.get_file()].file_text,
+                            &linker.files[md.link_info.span.file].file_text,
                             None,
                         )
                         .to_string(),
@@ -233,7 +233,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     hover.sus_code(
                         md.display_interface_info(
                             interface_decl,
-                            &linker.files[md.link_info.get_file()].file_text,
+                            &linker.files[md.link_info.span.file].file_text,
                             true,
                         )
                         .to_string(),
@@ -245,7 +245,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     hover.sus_code(
                         md.display_port_info(
                             port_decl,
-                            &linker.files[md.link_info.get_file()].file_text,
+                            &linker.files[md.link_info.span.file].file_text,
                         )
                         .to_string(),
                     );

@@ -106,9 +106,6 @@ pub struct LinkInfo {
 }
 
 impl LinkInfo {
-    pub fn get_file(&self) -> FileUUID {
-        self.span.file
-    }
     pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
         match &self.instructions[instr_id] {
             Instruction::SubModule(sm) => sm.module_ref.get_total_span(),
@@ -530,7 +527,7 @@ impl Linker {
 
                 let reason = format!("'{this_object_name}' conflicts with other declarations:");
 
-                all_errors[info.get_file()].push(CompileError {
+                all_errors[info.span.file].push(CompileError {
                     position: info.name_span,
                     reason,
                     infos,
@@ -545,10 +542,10 @@ impl Linker {
         all_errs: &mut ArenaAllocator<ErrorStore, FileUUIDMarker>,
     ) {
         for (_id, link_info) in self.iter_link_infos() {
-            all_errs[link_info.get_file()].append(&link_info.errors);
+            all_errs[link_info.span.file].append(&link_info.errors);
         }
         for (_id, inst) in self.instantiator.iter() {
-            let file_id = self.modules[inst.global_ref.id].link_info.get_file();
+            let file_id = self.modules[inst.global_ref.id].link_info.span.file;
             all_errs[file_id].append(&inst.errors);
         }
     }

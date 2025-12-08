@@ -1066,7 +1066,7 @@ impl Module {
                 f,
                 "{}",
                 self.display_all_ports_info(
-                    &linker_files[self.link_info.get_file()].file_text,
+                    &linker_files[self.link_info.span.file].file_text,
                     None
                 )
             )?;

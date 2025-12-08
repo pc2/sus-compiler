@@ -401,7 +401,7 @@ impl ErrorInfoObject for &LinkInfo {
 impl ErrorInfoObject for (&Module, &LinkerFiles) {
     fn make_info(self) -> Option<ErrorInfo> {
         let (md, files) = self;
-        let ports_str = md.display_all_ports_info(&files[md.link_info.get_file()].file_text, None);
+        let ports_str = md.display_all_ports_info(&files[md.link_info.span.file].file_text, None);
 
         Some(ErrorInfo {
             span: md.link_info.name_span,
