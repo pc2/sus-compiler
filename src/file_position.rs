@@ -7,76 +7,111 @@ use crate::prelude::FileUUID;
 
 /// [Span] is defined as byte-byte idx. Start inclusive, end exclusive
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Span(usize, usize, FileUUID);
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+    pub file: FileUUID,
+}
 
 impl Span {
     pub fn from_range(range: Range<usize>, file: FileUUID) -> Span {
         assert!(range.end >= range.start);
-        Span(range.start, range.end, file).debug()
+        Span {
+            start: range.start,
+            end: range.end,
+            file,
+        }
+        .debug()
+    }
+    pub fn to_range(self) -> Range<usize> {
+        assert!(self.end >= self.start);
+        self.debug();
+        Range {
+            start: self.start,
+            end: self.end,
+        }
     }
     /// Register that we have visited this span. Eases debugging when errors occur
-    pub fn debug(&self) -> Span {
-        crate::debug::add_debug_span(*self);
-        *self
+    pub fn debug(self) -> Span {
+        crate::debug::add_debug_span(self);
+        self
     }
 
-    pub const PLACEHOLDER: Span = Span(0, usize::MAX, FileUUID::PLACEHOLDER);
+    pub const PLACEHOLDER: Span = Span {
+        start: 0,
+        end: usize::MAX,
+        file: FileUUID::PLACEHOLDER,
+    };
 
     /// Only really used for having a span with the maximum size.
     pub fn make_max_possible_span(file: FileUUID) -> Span {
-        Span(0, usize::MAX, file)
+        Span {
+            start: 0,
+            end: usize::MAX,
+            file,
+        }
     }
 
-    pub fn as_range(&self) -> Range<usize> {
-        self.0..self.1
-    }
-    pub fn get_file(&self) -> FileUUID {
-        self.2
-    }
-    pub fn get_file_ref(&self) -> &FileUUID {
-        &self.2
-    }
     #[track_caller]
     pub fn new_overarching(left: Span, right: Span) -> Span {
         left.debug();
         right.debug();
-        assert!(left.0 <= right.0);
-        assert!(left.1 <= right.1);
-        assert_eq!(left.2, right.2);
-        Span(left.0, right.1, left.2).debug()
+        assert!(left.start <= right.start);
+        assert!(left.end <= right.end);
+        assert_eq!(left.file, right.file);
+        Span {
+            start: left.start,
+            end: right.end,
+            file: left.file,
+        }
+        .debug()
     }
     pub fn contains(self, other: Span) -> bool {
-        self.0 <= other.0 && self.1 >= other.1 && self.2 == other.2
+        self.start <= other.start && self.end >= other.end && self.file == other.file
     }
     pub fn contains_pos(&self, pos: usize) -> bool {
         self.debug();
-        pos >= self.0 && pos <= self.1
+        pos >= self.start && pos <= self.end
     }
     // Not really a useful quantity. Should only be used comparatively, find which is the nested-most span
-    pub fn size(&self) -> usize {
+    pub fn size(self) -> usize {
         self.debug();
-        self.1 - self.0
+        self.end - self.start
     }
     pub fn empty_span_at_front(self) -> Span {
         self.debug();
-        Span(self.0, self.0, self.2).debug()
+        Span {
+            start: self.start,
+            end: self.start,
+            file: self.file,
+        }
+        .debug()
     }
     pub fn empty_span_at_end(self) -> Span {
         self.debug();
-        Span(self.1, self.1, self.2).debug()
+        Span {
+            start: self.end,
+            end: self.end,
+            file: self.file,
+        }
+        .debug()
     }
-    pub fn sub_span<R: RangeBounds<usize>>(&self, bound: R) -> Span {
+    pub fn sub_span<R: RangeBounds<usize>>(self, bound: R) -> Span {
         let start = match bound.start_bound() {
-            std::ops::Bound::Included(from) => self.0 + from,
-            std::ops::Bound::Excluded(from) => self.0 + from + 1,
-            std::ops::Bound::Unbounded => self.0,
+            std::ops::Bound::Included(from) => self.start + from,
+            std::ops::Bound::Excluded(from) => self.start + from + 1,
+            std::ops::Bound::Unbounded => self.start,
         };
         let end = match bound.end_bound() {
-            std::ops::Bound::Included(to) => self.0 + to + 1,
-            std::ops::Bound::Excluded(to) => self.0 + to,
-            std::ops::Bound::Unbounded => self.1,
+            std::ops::Bound::Included(to) => self.start + to + 1,
+            std::ops::Bound::Excluded(to) => self.start + to,
+            std::ops::Bound::Unbounded => self.end,
         };
-        Span(start, end, self.2)
+        Span {
+            start,
+            end,
+            file: self.file,
+        }
     }
 }
 
@@ -87,15 +122,18 @@ impl PartialOrd for Span {
 }
 impl Ord for Span {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        assert_eq!(self.2, other.2);
-        self.0.cmp(&other.0)
+        assert_eq!(self.file, other.file);
+        self.start.cmp(&other.start)
     }
 }
 
 impl Debug for Span {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.debug();
-        f.debug_tuple("Span").field(&self.0).field(&self.1).finish()
+        f.debug_tuple("Span")
+            .field(&self.start)
+            .field(&self.end)
+            .finish()
     }
 }
 
@@ -109,21 +147,36 @@ impl BracketSpan {
     pub fn from_outer(span: Span) -> Self {
         Self(span.debug())
     }
-    pub fn inner_span(&self) -> Span {
+    pub fn inner_span(self) -> Span {
         self.0.debug();
-        Span(self.0.0 + 1, self.0.1 - 1, self.0.2).debug()
+        Span {
+            start: self.0.start + 1,
+            end: self.0.end - 1,
+            file: self.0.file,
+        }
+        .debug()
     }
-    pub fn outer_span(&self) -> Span {
+    pub fn outer_span(self) -> Span {
         self.0.debug();
         self.0
     }
-    pub fn open_bracket(&self) -> Span {
+    pub fn open_bracket(self) -> Span {
         self.0.debug();
-        Span(self.0.0, self.0.0 + 1, self.0.2).debug()
+        Span {
+            start: self.0.start,
+            end: self.0.start + 1,
+            file: self.0.file,
+        }
+        .debug()
     }
-    pub fn close_bracket(&self) -> Span {
+    pub fn close_bracket(self) -> Span {
         self.0.debug();
-        Span(self.0.1 - 1, self.0.1, self.0.2).debug()
+        Span {
+            start: self.0.end - 1,
+            end: self.0.end,
+            file: self.0.file,
+        }
+        .debug()
     }
 }
 
@@ -200,12 +253,12 @@ impl FileText {
     }
     pub fn get_span_linecol_range(&self, span: Span) -> Range<LineCol> {
         span.debug();
-        self.byte_to_linecol(span.0)..self.byte_to_linecol(span.1)
+        self.byte_to_linecol(span.start)..self.byte_to_linecol(span.end)
     }
 
     pub fn is_span_valid(&self, span: Span) -> bool {
         span.debug();
-        span.1 <= self.file_text.len()
+        span.end <= self.file_text.len()
     }
 
     pub fn len(&self) -> usize {
@@ -216,8 +269,8 @@ impl FileText {
 impl Index<Span> for FileText {
     type Output = str;
 
-    fn index(&self, index: Span) -> &str {
-        index.debug();
-        &self.file_text[index.as_range()]
+    fn index(&self, span: Span) -> &str {
+        span.debug();
+        &self.file_text[span.to_range()]
     }
 }

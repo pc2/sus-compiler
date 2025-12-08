@@ -41,15 +41,15 @@ impl ariadne::Span for Span {
     type SourceId = FileUUID;
 
     fn source(&self) -> &Self::SourceId {
-        self.get_file_ref()
+        &self.file
     }
 
     fn start(&self) -> usize {
-        self.as_range().start
+        self.start
     }
 
     fn end(&self) -> usize {
-        self.as_range().end
+        self.end
     }
 }
 
@@ -137,11 +137,7 @@ pub fn pretty_print_many_spans(
         Report::build(ReportKind::Advice, first_span.0).with_config(config);
 
     for (span, label) in std::iter::once(first_span).chain(spans_iter) {
-        report = report.with_label(
-            Label::new(span)
-                .with_message(label)
-                .with_color(Color::Blue),
-        );
+        report = report.with_label(Label::new(span).with_message(label).with_color(Color::Blue));
     }
     report.finish().eprint(&mut linker_files).unwrap();
 }

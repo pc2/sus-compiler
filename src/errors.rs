@@ -93,9 +93,8 @@ impl ErrorStore {
     pub fn sort(&mut self) {
         self.errors.sort_by(|a, b| {
             a.position
-                .as_range()
                 .start
-                .cmp(&b.position.as_range().start)
+                .cmp(&b.position.start)
                 .then_with(|| a.reason.cmp(&b.reason))
         });
     }

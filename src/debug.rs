@@ -69,10 +69,11 @@ fn print_most_recent_spans(linker_files: &LinkerFiles, history: &SpanDebuggerSta
     );
     pretty_print_many_spans(
         linker_files,
-        spans_to_print.iter().rev().enumerate().map(|(idx, span)| {
-            let sp = span.as_range();
-            (*span, format!("-{idx}: Span({}, {})", sp.start, sp.end))
-        }),
+        spans_to_print
+            .iter()
+            .rev()
+            .enumerate()
+            .map(|(idx, span)| (*span, format!("-{idx}: Span({}, {})", span.start, span.end))),
     );
 }
 

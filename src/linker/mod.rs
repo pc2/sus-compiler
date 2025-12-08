@@ -107,7 +107,7 @@ pub struct LinkInfo {
 
 impl LinkInfo {
     pub fn get_file(&self) -> FileUUID {
-        self.span.get_file()
+        self.span.file
     }
     pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
         match &self.instructions[instr_id] {

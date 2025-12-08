@@ -52,7 +52,7 @@ fn cvt_location_list(location_vec: Vec<Span>, linker: &Linker) -> Vec<Location> 
     location_vec
         .into_iter()
         .map(|span| {
-            let file = &linker.files[span.get_file()];
+            let file = &linker.files[span.file];
             let uri = Url::parse(&file.file_identifier).unwrap();
             let range = span_to_lsp_range(&file.file_text, span);
             Location { uri, range }
@@ -133,7 +133,7 @@ fn convert_diagnostic(err: CompileError, main_file_text: &FileText, linker: &Lin
     };
     let mut related_info = Vec::new();
     for info in err.infos {
-        let info_file = &linker.files[info.span.get_file()];
+        let info_file = &linker.files[info.span.file];
         let info_span = info.span;
         assert!(
             info_file.file_text.is_span_valid(info_span),
