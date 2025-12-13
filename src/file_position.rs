@@ -133,6 +133,7 @@ impl Debug for Span {
         f.debug_tuple("Span")
             .field(&self.start)
             .field(&self.end)
+            .field(&self.file)
             .finish()
     }
 }

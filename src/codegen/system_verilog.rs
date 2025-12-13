@@ -56,7 +56,7 @@ impl VariableAlloc {
 /// IE for `int[15] myVar` it creates `[31:0] myVar[14:0]`
 ///
 /// May return something with a leading space, to accomodate `logic`, `input`, etc.
-fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
+fn typ_to_declaration(mut typ: &ConcreteType, var_name: impl Display) -> String {
     let mut array_string = String::new();
 
     loop {
@@ -97,7 +97,8 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
     }
 }
 
-fn should_not_codegen(wire: &RealWire) -> bool {
+/// Zero-sized wires are not supported by SystemVerilog, therefore we don't generate them
+fn is_zero_sized(wire: &RealWire) -> bool {
     wire.typ.sizeof() == ibig::ubig!(0)
 }
 
@@ -109,37 +110,52 @@ fn should_not_codegen_assign(source: &MultiplexerSource) -> bool {
     })
 }
 
-fn get_zero_sized_type_inline_value(typ: &ConcreteType) -> Cow<'static, str> {
+fn display_zero_sized_type_inline_value(typ: &ConcreteType) -> impl Display {
     assert_eq!(typ.sizeof(), ibig::ubig!(0));
 
-    match typ {
-        ConcreteType::Named(global_ref) => match global_ref.id {
-            get_builtin_type!("int") => Cow::Borrowed("1'd0"),
-            _ => unreachable!("Unknown zero-sized type {:?}", global_ref.id),
-        },
-        ConcreteType::Array(_) => unreachable!(
-            "Since this is for inline values, and arrays cannot be used inline, they cannot appear in [get_zero_sized_type_inline_value]"
-        ),
-    }
-}
+    FmtWrapper(move |f| {
+        match typ {
+            ConcreteType::Named(global_ref) => match global_ref.id {
+                get_builtin_type!("int") => write!(f, "1'd0"),
+                _ => unreachable!("Unknown zero-sized type {:?}", global_ref.id),
+            },
+            ConcreteType::Array(_) => unreachable!(
+                "Since this is for inline values, and arrays cannot be used inline, they cannot appear in [get_zero_sized_type_inline_value]"
+            ),
+            /*// Turns out, totally possible: myFunc([0, 0, 0])
+            ConcreteType::Array(arr_typ) => {
+                let (content, sz) = arr_typ.deref();
 
-pub fn wire_name_with_latency(wire: &RealWire, target_abs_lat: AbsLat) -> Cow<'_, str> {
-    let wire_abs_lat = wire.absolute_latency.unwrap();
-    let target_abs_lat = target_abs_lat.unwrap();
-    assert!(wire_abs_lat <= target_abs_lat);
-    if wire_abs_lat != target_abs_lat {
-        if target_abs_lat < 0 {
-            Cow::Owned(format!("_{}_N{}", wire.name, -target_abs_lat))
-        } else {
-            Cow::Owned(format!("_{}_D{}", wire.name, target_abs_lat))
+                let content_str = display_zero_sized_type_inline_value(content);
+
+                let content_repeats = display_join(", ", 0..sz.unwrap_int(), |f, _| {
+                    f.write_str(content_str.as_ref())
+                });
+                write!(f, "'{{{content_repeats}}}")
+            }*/
         }
-    } else {
-        Cow::Borrowed(&wire.name)
-    }
+    })
 }
 
-pub fn wire_name_self_latency(wire: &RealWire) -> Cow<'_, str> {
-    wire_name_with_latency(wire, wire.absolute_latency)
+pub fn display_wire_name_with_latency(wire: &RealWire, target_abs_lat: AbsLat) -> impl Display {
+    FmtWrapper(move |f| {
+        let wire_abs_lat = wire.absolute_latency.unwrap();
+        let target_abs_lat = target_abs_lat.unwrap();
+        assert!(wire_abs_lat <= target_abs_lat);
+        if wire_abs_lat != target_abs_lat {
+            if target_abs_lat < 0 {
+                write!(f, "_{}_N{}", wire.name, -target_abs_lat)
+            } else {
+                write!(f, "_{}_D{}", wire.name, target_abs_lat)
+            }
+        } else {
+            write!(f, "{}", &wire.name)
+        }
+    })
+}
+
+pub fn display_wire_name_self_latency(wire: &RealWire) -> impl Display {
+    display_wire_name_with_latency(wire, wire.absolute_latency)
 }
 
 fn codegen_optimized_modulo(
@@ -204,6 +220,7 @@ enum ForEachPathElement<'g> {
     Array { var: Rc<str>, arr_size: &'g IBig },
 }
 
+#[derive(Clone, Copy)]
 struct ForEachPath<'g, 'p> {
     path: &'p [ForEachPathElement<'g>],
 }
@@ -243,7 +260,7 @@ impl<'t> ForEachPath<'_, '_> {
 }
 
 impl ForEachPath<'_, '_> {
-    fn to_bit_index_formula(&self) -> String {
+    fn to_bit_index_formula(self) -> String {
         let mut path_iter = self.path.iter();
         let mut result = match path_iter.next().unwrap() {
             ForEachPathElement::Array { var, arr_size: _ } => var.to_string(),
@@ -298,6 +315,193 @@ impl Display for CommaSeparatedList {
     }
 }
 
+struct WireName<'g> {
+    instance: &'g InstantiatedModule,
+    wire: &'g RealWire,
+    abs_lat: AbsLat,
+}
+impl<'g> WireName<'g> {
+    /// Creates a string representation of the wire name, useable in expressions. myArr[{}]
+    /// xyz, or zero-sized 1'b0, or inlining the constant 40'd545135135513...
+    fn display_inline(&self) -> impl Display {
+        FmtWrapper(|f| {
+            let Self {
+                instance,
+                wire,
+                abs_lat,
+            } = self;
+            if is_zero_sized(wire) {
+                write!(f, "{}", display_zero_sized_type_inline_value(&wire.typ))
+            } else {
+                match &wire.source {
+                    RealWireDataSource::Constant { value } if can_inline(wire) => {
+                        write!(f, "{}", display_constant(&wire.typ, value))
+                    }
+                    RealWireDataSource::Select { root, path } if path.is_empty() => {
+                        // Inline empty selects for readability.
+                        display_wire_name_with_latency(&instance.wires[*root], *abs_lat).fmt(f)
+                    }
+                    _other => display_wire_name_with_latency(wire, *abs_lat).fmt(f),
+                }
+            }
+        })
+    }
+    /*/// Creates a string representation of the wire name
+    /// xyz[a][b]...
+    /// May override the result if the wire is zero-sized.
+    fn display_with_path(&self, path: &ForEachPath) -> impl Display {
+        FmtWrapper(|f| {
+            let Self {
+                instance,
+                wire,
+                abs_lat,
+            } = self;
+            if is_zero_sized(wire) {
+                let inline_value_typ = path.walk_type(&wire.typ);
+                // No path added here, since we're just returning the zero-sized value for this type.
+                return display_zero_sized_type_inline_value(inline_value_typ);
+            }
+            let root_name = self.wire_name_inline(wire, requested_latency);
+            if path.is_empty() {
+                root_name
+            } else {
+                Cow::Owned(format!("{root_name}{path}"))
+            }
+        })
+    }*/
+}
+
+/// This is for making the resulting Verilog a little nicer to read
+fn can_inline(wire: &RealWire) -> bool {
+    match &wire.source {
+        RealWireDataSource::Constant { .. } => {
+            if let ConcreteType::Named(r) = &wire.typ {
+                matches!(
+                    r.id,
+                    get_builtin_type!("int")
+                        | get_builtin_type!("bool")
+                        | get_builtin_type!("float")
+                        | get_builtin_type!("double")
+                )
+            } else {
+                false
+            }
+        }
+        RealWireDataSource::Select { root: _, path } if path.is_empty() => true,
+        _other => false,
+    }
+}
+
+fn display_constant(typ: &ConcreteType, cst: &Value) -> impl Display {
+    FmtWrapper(move |f| match typ {
+        ConcreteType::Named(global_ref) => match global_ref.id {
+            get_builtin_type!("bool") => {
+                let b = match cst {
+                    Value::Bool(true) => "1'b1",
+                    Value::Bool(false) => "1'b0",
+                    Value::Unset => "1'bx",
+                    _ => unreachable!(),
+                };
+                f.write_str(b)
+            }
+            get_builtin_type!("int") => {
+                let bounds = global_ref.unwrap_int_bounds();
+
+                let bitwidth = bounds.bitwidth();
+
+                match cst {
+                    Value::Integer(v) => {
+                        if bounds.from < &IBig::from(0) {
+                            if v < &IBig::from(0) {
+                                write!(f, "-{bitwidth}'sd{}", -v)
+                            } else {
+                                write!(f, "{bitwidth}'sd{v}")
+                            }
+                        } else {
+                            write!(f, "{bitwidth}'d{v}")
+                        }
+                    }
+                    Value::Unset => {
+                        if bounds.from < &IBig::from(0) {
+                            write!(f, "{bitwidth}'sdx")
+                        } else {
+                            write!(f, "{bitwidth}'dx")
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            get_builtin_type!("float") => match cst {
+                Value::Float(fl32) => {
+                    let as_bits = fl32.to_bits();
+                    write!(f, "32'h{as_bits:08x} /* {cst} */")
+                }
+                Value::Unset => write!(f, "'x"),
+                _ => unreachable!(),
+            },
+            get_builtin_type!("double") => match cst {
+                Value::Double(fl64) => {
+                    let as_bits = fl64.to_bits();
+                    write!(f, "64'h{as_bits:16x} /* {cst} */")
+                }
+                Value::Unset => write!(f, "'x"),
+                _ => unreachable!(),
+            },
+            _ => todo!("Structs"),
+        },
+        ConcreteType::Array(arr_box) => {
+            let (content_typ, size) = arr_box.deref();
+
+            let size: usize = size.unwrap_int();
+            if let ConcreteType::Named(ConcreteGlobalReference {
+                id: get_builtin_type!("bool"),
+                ..
+            }) = content_typ
+            {
+                write!(f, "{size}'b")?;
+                match cst {
+                    Value::Array(values) => {
+                        assert_eq!(values.len(), size);
+                        for elem in values.iter().rev() {
+                            let b = match elem {
+                                Value::Bool(true) => '1',
+                                Value::Bool(false) => '0',
+                                Value::Unset => 'x',
+                                _ => unreachable!(),
+                            };
+                            f.write_char(b)?;
+                        }
+                    }
+                    Value::Unset => {
+                        for _ in 0..size {
+                            f.write_char('x')?;
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+                Ok(())
+            } else {
+                match cst {
+                    Value::Array(values) => {
+                        assert_eq!(values.len(), size);
+                        let content = display_join(", ", values.iter(), |f, v| {
+                            display_constant(content_typ, v).fmt(f)
+                        });
+                        write!(f, "'{{{content}}}")
+                    }
+                    Value::Unset => {
+                        let content = display_join(", ", 0..size, |f, _| {
+                            display_constant(content_typ, &Value::Unset).fmt(f)
+                        });
+                        write!(f, "'{{{content}}}")
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
+    })
+}
+
 struct CodeGenerationContext<'g> {
     /// Generate code to this variable
     program_text: String,
@@ -312,148 +516,11 @@ struct CodeGenerationContext<'g> {
 }
 
 impl<'g> CodeGenerationContext<'g> {
-    fn display_constant(typ: &ConcreteType, cst: &Value) -> impl Display {
-        FmtWrapper(move |f| match typ {
-            ConcreteType::Named(global_ref) => match global_ref.id {
-                get_builtin_type!("bool") => {
-                    let b = match cst {
-                        Value::Bool(true) => "1'b1",
-                        Value::Bool(false) => "1'b0",
-                        Value::Unset => "1'bx",
-                        _ => unreachable!(),
-                    };
-                    f.write_str(b)
-                }
-                get_builtin_type!("int") => {
-                    let bounds = global_ref.unwrap_int_bounds();
-
-                    let bitwidth = bounds.bitwidth();
-
-                    match cst {
-                        Value::Integer(v) => {
-                            if bounds.from < &IBig::from(0) {
-                                if v < &IBig::from(0) {
-                                    write!(f, "-{bitwidth}'sd{}", -v)
-                                } else {
-                                    write!(f, "{bitwidth}'sd{v}")
-                                }
-                            } else {
-                                write!(f, "{bitwidth}'d{v}")
-                            }
-                        }
-                        Value::Unset => {
-                            if bounds.from < &IBig::from(0) {
-                                write!(f, "{bitwidth}'sdx")
-                            } else {
-                                write!(f, "{bitwidth}'dx")
-                            }
-                        }
-                        _ => unreachable!(),
-                    }
-                }
-                get_builtin_type!("float") => match cst {
-                    Value::Float(fl32) => {
-                        let as_bits = fl32.to_bits();
-                        write!(f, "32'h{as_bits:08x} /* {cst} */")
-                    }
-                    Value::Unset => write!(f, "'x"),
-                    _ => unreachable!(),
-                },
-                get_builtin_type!("double") => match cst {
-                    Value::Double(fl64) => {
-                        let as_bits = fl64.to_bits();
-                        write!(f, "64'h{as_bits:16x} /* {cst} */")
-                    }
-                    Value::Unset => write!(f, "'x"),
-                    _ => unreachable!(),
-                },
-                _ => todo!("Structs"),
-            },
-            ConcreteType::Array(arr_box) => {
-                let (content_typ, size) = arr_box.deref();
-
-                let size: usize = size.unwrap_int();
-                if let ConcreteType::Named(ConcreteGlobalReference {
-                    id: get_builtin_type!("bool"),
-                    ..
-                }) = content_typ
-                {
-                    write!(f, "{size}'b")?;
-                    match cst {
-                        Value::Array(values) => {
-                            assert_eq!(values.len(), size);
-                            for elem in values.iter().rev() {
-                                let b = match elem {
-                                    Value::Bool(true) => '1',
-                                    Value::Bool(false) => '0',
-                                    Value::Unset => 'x',
-                                    _ => unreachable!(),
-                                };
-                                f.write_char(b)?;
-                            }
-                        }
-                        Value::Unset => {
-                            for _ in 0..size {
-                                f.write_char('x')?;
-                            }
-                        }
-                        _ => unreachable!(),
-                    }
-                    Ok(())
-                } else {
-                    match cst {
-                        Value::Array(values) => {
-                            assert_eq!(values.len(), size);
-                            let content = display_join(", ", values.iter(), |f, v| {
-                                Self::display_constant(content_typ, v).fmt(f)
-                            });
-                            write!(f, "'{{{content}}}")
-                        }
-                        Value::Unset => {
-                            let content = display_join(", ", 0..size, |f, _| {
-                                Self::display_constant(content_typ, &Value::Unset).fmt(f)
-                            });
-                            write!(f, "'{{{content}}}")
-                        }
-                        _ => unreachable!(),
-                    }
-                }
-            }
-        })
-    }
-    /// This is for making the resulting Verilog a little nicer to read
-    fn can_inline(&self, wire: &RealWire) -> bool {
-        match &wire.source {
-            RealWireDataSource::Constant { .. } => {
-                if let ConcreteType::Named(r) = &wire.typ {
-                    matches!(
-                        r.id,
-                        get_builtin_type!("int")
-                            | get_builtin_type!("bool")
-                            | get_builtin_type!("float")
-                            | get_builtin_type!("double")
-                    )
-                } else {
-                    false
-                }
-            }
-            RealWireDataSource::Select { root: _, path } if path.is_empty() => true,
-            _other => false,
-        }
-    }
-
-    fn wire_name(&self, wire: &'g RealWire, requested_latency: AbsLat) -> Cow<'g, str> {
-        if should_not_codegen(wire) {
-            return get_zero_sized_type_inline_value(&wire.typ);
-        }
-        match &wire.source {
-            RealWireDataSource::Constant { value } if self.can_inline(wire) => {
-                Cow::Owned(Self::display_constant(&wire.typ, value).to_string())
-            }
-            RealWireDataSource::Select { root, path } if path.is_empty() => {
-                wire_name_with_latency(&self.instance.wires[*root], requested_latency)
-            }
-            _other => wire_name_with_latency(wire, requested_latency),
+    fn wire_name(&self, wire: &'g RealWire, requested_latency: AbsLat) -> WireName<'g> {
+        WireName {
+            instance: self.instance,
+            wire,
+            abs_lat: requested_latency,
         }
     }
 
@@ -462,12 +529,12 @@ impl<'g> CodeGenerationContext<'g> {
         wire_id: WireID,
         w: &RealWire,
     ) -> Result<(), std::fmt::Error> {
-        assert!(!should_not_codegen(w));
+        assert!(!is_zero_sized(w));
 
         // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it's only needed this cycle
         for i in w.absolute_latency.unwrap()..self.needed_untils[wire_id] {
-            let from = wire_name_with_latency(w, AbsLat::new(i));
-            let to = wire_name_with_latency(w, AbsLat::new(i + 1));
+            let from = display_wire_name_with_latency(w, AbsLat::new(i));
+            let to = display_wire_name_with_latency(w, AbsLat::new(i + 1));
 
             let var_decl = typ_to_declaration(&w.typ, &to);
 
@@ -545,7 +612,8 @@ impl<'g> CodeGenerationContext<'g> {
             let IsPort::Port(_, direction) = port_wire.is_port else {
                 continue;
             };
-            if should_not_codegen(port_wire) {
+            port_wire.get_span(&self.md.link_info).debug();
+            if is_zero_sized(port_wire) {
                 port_list.commented(format!("{direction} {}", port_wire.name));
             } else {
                 let wire_or_reg = port_wire.source.wire_or_reg();
@@ -559,7 +627,7 @@ impl<'g> CodeGenerationContext<'g> {
                         is_state
                     }
                 };
-                let wire_name = wire_name_self_latency(port_wire);
+                let wire_name = display_wire_name_self_latency(port_wire);
                 let wire_decl = typ_to_declaration(&port_wire.typ, &wire_name);
                 let decl = Self::display_declaration(port_wire, wire_or_reg, wire_decl, is_state);
 
@@ -571,7 +639,8 @@ impl<'g> CodeGenerationContext<'g> {
         // Add latency registers for the interface declarations
         // Should not appear in the program text for extern modules
         for (port_wire_id, port_wire) in &self.instance.wires {
-            if should_not_codegen(port_wire) {
+            port_wire.get_span(&self.md.link_info).debug();
+            if is_zero_sized(port_wire) {
                 continue;
             }
             if matches!(port_wire.is_port, IsPort::Port(_, _)) {
@@ -688,12 +757,10 @@ impl<'g> CodeGenerationContext<'g> {
             match p {
                 RealWirePathElem::Index { idx_wire, .. } => {
                     typ = &typ.unwrap_array().0;
-                    write!(
-                        source_path,
-                        "[{}]",
-                        self.wire_name(&self.instance.wires[*idx_wire], requested_latency)
-                    )
-                    .unwrap();
+                    let idx_wire_name =
+                        self.wire_name(&self.instance.wires[*idx_wire], requested_latency);
+                    let idx_wire_name = idx_wire_name.display_inline();
+                    write!(source_path, "[{idx_wire_name}]",).unwrap();
                 }
                 RealWirePathElem::ConstIndex { idx, .. } => {
                     typ = &typ.unwrap_array().0;
@@ -714,6 +781,7 @@ impl<'g> CodeGenerationContext<'g> {
 
                     let wire_name =
                         self.wire_name(&self.instance.wires[*from_wire], requested_latency);
+                    let wire_name = wire_name.display_inline();
                     write!(target_path, "[{var}]").unwrap();
 
                     match direction {
@@ -752,30 +820,28 @@ impl<'g> CodeGenerationContext<'g> {
 
     fn write_wire_declarations(&mut self) {
         for (wire_id, w) in &self.instance.wires {
-            self.md
-                .link_info
-                .get_instruction_span(w.original_instruction)
-                .debug();
+            w.get_span(&self.md.link_info).debug();
             // For better readability of output Verilog
-            if self.can_inline(w) {
+            if can_inline(w) {
                 continue;
             }
 
             if matches!(w.is_port, IsPort::Port(_, _)) {
                 continue;
             }
-            if should_not_codegen(w) {
+            if is_zero_sized(w) {
                 writeln!(self.program_text, "// (zero sized) {}", w.name).unwrap();
                 continue;
             }
             let wire_or_reg = w.source.wire_or_reg();
-            let wire_name = wire_name_self_latency(w);
+            let wire_name = display_wire_name_self_latency(w).to_string();
             let wire_decl = typ_to_declaration(&w.typ, &wire_name);
 
             match &w.source {
                 RealWireDataSource::Select { root, path } => {
                     let root = &self.instance.wires[*root];
                     let root_name = self.wire_name(root, w.absolute_latency);
+                    let root_name = root_name.display_inline();
 
                     // Custom [Self::in_generate], to generate logic[31:0] my_val = 5 + other_val
                     self.genvars.reuse();
@@ -801,9 +867,9 @@ impl<'g> CodeGenerationContext<'g> {
                         )
                         .unwrap();
                     } else {
-                        // We're basically trimming "<assert wire_name>[...] = ..." off the string, so we can stitch it to the declaration
+                        // We're basically trimming "<assign wire_name>[...] = ..." off the string, so we can stitch it to the declaration
                         let content = content.strip_prefix("assign ").unwrap();
-                        let content = content.strip_prefix(wire_name.as_ref()).unwrap();
+                        let content = content.strip_prefix(&wire_name).unwrap();
                         write!(self.program_text, "{wire_or_reg}{wire_decl}{content}").unwrap();
                     }
                 }
@@ -812,6 +878,7 @@ impl<'g> CodeGenerationContext<'g> {
 
                     let right = &self.instance.wires[*right];
                     let right_name = self.wire_name(right, w.absolute_latency);
+                    let right_name = right_name.display_inline();
 
                     let for_var = match op {
                         UnaryOperator::Sum | UnaryOperator::Product => Some(self.for_vars.alloc()),
@@ -848,13 +915,15 @@ impl<'g> CodeGenerationContext<'g> {
                     let left = &self.instance.wires[*left];
                     let right = &self.instance.wires[*right];
                     let left_name = self.wire_name(left, w.absolute_latency);
+                    let left_name = left_name.display_inline();
                     let right_name = self.wire_name(right, w.absolute_latency);
+                    let right_name = right_name.display_inline();
                     self.in_generate(|slf| {
                         slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| {
                             let left_typ = path.walk_type(&left.typ);
                             let right_typ = path.walk_type(&right.typ);
 
-                            fn wrap_in_signed_if_needed(name: &str, path: &ForEachPath, require_signed: bool, bounds: IntBounds<&IBig>) -> impl Display {
+                            fn wrap_in_signed_if_needed(name: impl Display, path: &ForEachPath, require_signed: bool, bounds: IntBounds<&IBig>) -> impl Display {
                                 FmtWrapper(move |f| {
                                     if require_signed && !bounds.is_signed() {
                                         write!(f, "$signed({{1'b0, {name}{path}}})")
@@ -873,7 +942,7 @@ impl<'g> CodeGenerationContext<'g> {
                                         (BinaryOperator::ShiftLeft, true) => "<<<",
                                         (BinaryOperator::ShiftLeft, false) => "<<",
                                         (BinaryOperator::ShiftRight, true) => ">>>",
-                                        (BinaryOperator::ShiftRight, false) => ">>>",
+                                        (BinaryOperator::ShiftRight, false) => ">>",
                                         _ => unreachable!()
                                     };
 
@@ -925,7 +994,7 @@ impl<'g> CodeGenerationContext<'g> {
                     });
                 }
                 RealWireDataSource::Constant { value } => {
-                    let const_str = Self::display_constant(&w.typ, value);
+                    let const_str = display_constant(&w.typ, value);
                     writeln!(self.program_text, "{wire_or_reg}{wire_decl} = {const_str};").unwrap();
                 }
                 RealWireDataSource::ReadOnly => {
@@ -936,7 +1005,9 @@ impl<'g> CodeGenerationContext<'g> {
 
                     for (arr_idx, elem) in array_wires.iter().enumerate() {
                         let elem = &self.instance.wires[*elem];
+                        elem.get_span(&self.md.link_info).debug();
                         let element_wire_name = self.wire_name(elem, w.absolute_latency);
+                        let element_wire_name = element_wire_name.display_inline();
 
                         self.in_generate(|slf| {
                             slf.foreach_for_copy_unpacked(&elem.typ, false, |path, _| {
@@ -969,7 +1040,7 @@ impl<'g> CodeGenerationContext<'g> {
             write!(f, "{wire_or_reg}{wire_decl}")?;
             match is_state {
                 Some(initial_val) if !initial_val.is_unset() => {
-                    let cst_str = Self::display_constant(&w.typ, initial_val);
+                    let cst_str = display_constant(&w.typ, initial_val);
                     write!(f, " = {cst_str}")?;
                 }
                 _ => {}
@@ -1006,7 +1077,7 @@ impl<'g> CodeGenerationContext<'g> {
                     ""
                 };
                 let line = format!(".{port_name}({wire_name})");
-                if should_not_codegen(sm_port) {
+                if is_zero_sized(sm_port) {
                     port_list.commented(line);
                 } else {
                     port_list.line(line);
@@ -1050,12 +1121,17 @@ impl<'g> CodeGenerationContext<'g> {
         target: &'g RealWire,
     ) {
         let from = &self.instance.wires[s.from];
+        let sp = from.get_span(&self.md.link_info).debug();
+        __debug_span!(sp, "Wire {:?}", s.from);
         let from_name = self.wire_name(from, target.absolute_latency);
+        let from_name = from_name.display_inline();
         self.program_text.write_char('\t').unwrap();
         let mut if_stack = String::new();
         for cond in s.condition.iter() {
             let condition_wire = &self.instance.wires[cond.condition_wire];
+            condition_wire.get_span(&self.md.link_info).debug();
             let cond_name = self.wire_name(condition_wire, target.absolute_latency);
+            let cond_name = cond_name.display_inline();
             let invert = if cond.inverse { "!" } else { "" };
             write!(if_stack, "if({invert}{cond_name}) ").unwrap();
         }
@@ -1078,16 +1154,17 @@ impl<'g> CodeGenerationContext<'g> {
 
     fn write_multiplexers(&mut self) {
         for (_id, w) in &self.instance.wires {
-            self.md
-                .link_info
-                .get_instruction_span(w.original_instruction)
-                .debug();
-            if should_not_codegen(w) {
+            let w_span = w.get_span(&self.md.link_info).debug();
+
+            __debug_span!(w_span, "{w:?}, Span: {w_span:?}");
+            __debug_breakpoint_if!(w_span.start == 2577 && w_span.end == 2583);
+            if is_zero_sized(w) {
                 continue;
             }
+            w.get_span(&self.md.link_info).debug();
             match &w.source {
                 RealWireDataSource::Multiplexer { is_state, sources } => {
-                    let output_name = wire_name_self_latency(w);
+                    let output_name = display_wire_name_self_latency(w).to_string();
                     let arrow_str = if is_state.is_some() {
                         let clk_name = self.md.get_clock_name();
                         writeln!(
@@ -1098,7 +1175,7 @@ impl<'g> CodeGenerationContext<'g> {
                         "<="
                     } else {
                         writeln!(self.program_text, "always_comb begin // combinatorial {output_name}\n\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches").unwrap();
-                        let unset_str = Self::display_constant(&w.typ, &Value::Unset);
+                        let unset_str = display_constant(&w.typ, &Value::Unset);
                         writeln!(self.program_text, "\t{output_name} = {unset_str};").unwrap();
                         "="
                     };
@@ -1134,7 +1211,9 @@ impl<'g> CodeGenerationContext<'g> {
         }
     }
 
-    /// Returns true if all ports are of size 0, or false if none are. Panics otherwise
+    /// Check the generated ports of builtin modules against what is expected by the builtin codegen.
+    /// Returns true if all generated ports are of size 0. That means no implementation should be generated.
+    /// Returns false all ports are non-zero. Otherwise this panics, requiring us to implement the more complex combinations of zero/nonzero sized ports.
     fn check_ports<const N: usize>(&self, ports: [(Direction, &'static str); N]) -> bool {
         let actual_ports: &[Option<InstantiatedPort>; N] =
             self.instance.interface_ports.cast_to_array();
@@ -1144,9 +1223,10 @@ impl<'g> CodeGenerationContext<'g> {
             let actual_port = actual_ports[i].as_ref().unwrap();
             let (direction, name) = ports[i];
             let port_wire = &self.instance.wires[actual_port.wire];
+            port_wire.get_span(&self.md.link_info).debug();
             assert_eq!(&port_wire.name, name);
             assert_eq!(actual_port.direction, direction);
-            if should_not_codegen(port_wire) {
+            if is_zero_sized(port_wire) {
                 zero_size_count += 1;
             }
         }

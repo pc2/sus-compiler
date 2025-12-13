@@ -445,12 +445,12 @@ mod tests {
         create_dump_on_panic(&mut linker, |linker| {
             let fd_id = linker.add_file_text(
                 "/non_existent/test/file/path.sus".to_string(),
-                "non_extistent file text".to_string(),
+                "non extistent file text".to_string(),
                 &mut (),
             );
 
             debug_context("test_context", "test_obj".to_string(), || {
-                let my_span = Span::from_range(3..10, fd_id);
+                let my_span = Span::from_range(4..13, fd_id); // "existent"
                 my_span.debug();
                 if !linker.files.is_empty() {
                     panic!("OOPS");

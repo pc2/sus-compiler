@@ -147,7 +147,7 @@ pub struct RealWire {
     pub is_port: IsPort,
 }
 impl RealWire {
-    fn get_span(&self, link_info: &LinkInfo) -> Span {
+    pub fn get_span(&self, link_info: &LinkInfo) -> Span {
         link_info.instructions[self.original_instruction].get_span()
     }
 }
