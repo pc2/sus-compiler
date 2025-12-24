@@ -165,6 +165,8 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestGenArrayOps #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate NonGenerativeSliceBoundsMustNotICE #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate InstantiatesItself #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated ReceiveZerosArray #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TestZerosArrays #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -3790,6 +3792,48 @@ Current Instantiation Stack:
 Current Instantiation Stack:
 - InstantiatesItself #()
 - InstantiatesItself #()
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1731:56 ]
+      │
+ 1731 │     interface ReceiveZerosArray : int#(FROM: 0, TO: 1)[2] values
+      │                                                           ───┬──  
+      │                                                              ╰──── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1735:9 ]
+      │
+ 1735 │     int[2] zeros = [0, 0]
+      │            ──┬──  
+      │              ╰──── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1736:30 ]
+      │
+ 1736 │     int#(FROM: -5, TO: 6)[2] vs = [0, 0]
+      │                              ─┬  
+      │                               ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1739:19 ]
+      │
+ 1739 │     int[4][6][7][20] manyzeros
+      │                      ────┬────  
+      │                          ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1742:9 ]
+      │
+ 1742 │     int[2] nums = [5, 9]
+      │            ──┬─  
+      │              ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1743:9 ]
+      │
+ 1743 │     int[2] sums = nums + [0, 0] + zeros + manyzeros[1][5:7][4][3]
+      │            ──┬─  
+      │              ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!

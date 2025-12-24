@@ -6,7 +6,7 @@ use crate::{to_string::FmtWrapper, typing::concrete_type::ConcreteType, value::V
 
 pub fn patch_combinatorial_write_one_bit_dont_care(
     is_state: &Option<Value>,
-    name: &str,
+    name: impl Display,
     w_typ: &ConcreteType,
 ) -> impl Display {
     FmtWrapper(move |f| {

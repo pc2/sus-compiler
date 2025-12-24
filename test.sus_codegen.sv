@@ -1,3 +1,74 @@
+// TestZerosArrays #()
+module TestZerosArrays(
+	input clk
+);
+
+genvar _g0;
+// (zero sized) zeros
+// (zero sized) _1
+/*mux_wire*/ logic signed[3:0] vs[1:0];
+// (zero sized) _2
+// (zero sized) _ReceiveZerosArray_values
+// (zero sized) _3
+// (zero sized) manyzeros
+/*mux_wire*/ logic[3:0] nums[1:0];
+localparam[3:0] _5[1:0] = '{4'd5, 4'd9};
+/*mux_wire*/ logic[3:0] sums[1:0];
+// (zero sized) _7
+wire[3:0] _8[1:0];
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+assign _8[_g0] = nums[_g0] + 1'd0;
+end
+endgenerate
+wire[3:0] _10[1:0];
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+assign _10[_g0] = _8[_g0] + 1'd0;
+end
+endgenerate
+// (zero sized) _11
+wire[3:0] _12[1:0];
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+assign _12[_g0] = _10[_g0] + 1'd0;
+end
+endgenerate
+ReceiveZerosArray ReceiveZerosArray(
+	.clk(clk)
+	// (zero sized port) .values(_ReceiveZerosArray_values)
+);
+always_comb begin // combinatorial vs
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	vs = '{4'sdx, 4'sdx};
+	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
+vs[_v0] = 1'd0;
+end
+end
+always_comb begin // combinatorial nums
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	nums = '{4'dx, 4'dx};
+	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
+nums[_v0] = _5[_v0];
+end
+end
+always_comb begin // combinatorial sums
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums = '{4'dx, 4'dx};
+	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
+sums[_v0] = _12[_v0];
+end
+end
+endmodule
+
+// ReceiveZerosArray #()
+module ReceiveZerosArray(
+	input clk
+	// (zero sized) input values
+);
+
+endmodule
+
 // TestGenArrayOps #()
 module TestGenArrayOps(
 	input clk

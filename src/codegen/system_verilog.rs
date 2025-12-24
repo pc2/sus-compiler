@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -51,55 +50,48 @@ impl VariableAlloc {
     }
 }
 
-/// Creates the Verilog variable declaration for tbis variable.
-///
-/// IE for `int[15] myVar` it creates `[31:0] myVar[14:0]`
-///
-/// May return something with a leading space, to accomodate `logic`, `input`, etc.
-fn typ_to_declaration(mut typ: &ConcreteType, var_name: impl Display) -> String {
-    let mut array_string = String::new();
-
-    loop {
-        match typ {
-            ConcreteType::Named(content_typ) => match content_typ.id {
-                get_builtin_type!("int") => {
-                    let bounds = content_typ.unwrap_int_bounds();
-                    let bitwidth = bounds.bitwidth() - 1;
-                    if bounds.from < &IBig::from(0) {
-                        return format!(" signed[{bitwidth}:0] {var_name}{array_string}");
-                    } else {
-                        return format!("[{bitwidth}:0] {var_name}{array_string}");
-                    }
-                }
-                get_builtin_type!("bool") => return format!(" {var_name}{array_string}"),
-                get_builtin_type!("float") => {
-                    return format!("[31:0] {var_name}{array_string}");
-                }
-                get_builtin_type!("double") => {
-                    return format!("[63:0] {var_name}{array_string}");
-                }
-                _ => todo!("Structs"),
-            },
-            ConcreteType::Array(arr) => {
-                let (content_typ, size) = arr.deref();
-                let sz = size.unwrap_integer() - 1;
-                if let ConcreteType::Named(ConcreteGlobalReference {
-                    id: get_builtin_type!("bool"),
-                    ..
-                }) = content_typ
-                {
-                    return format!("[{sz}:0] {var_name}{array_string}");
-                }
-                write!(array_string, "[{sz}:0]").unwrap();
-                typ = content_typ;
-            }
-        }
+impl ConcreteType {
+    /// Zero-sized wires are not supported by SystemVerilog, therefore we don't generate them
+    fn is_zero_sized(&self) -> bool {
+        self.sizeof() == ibig::ubig!(0)
     }
-}
 
-/// Zero-sized wires are not supported by SystemVerilog, therefore we don't generate them
-fn is_zero_sized(wire: &RealWire) -> bool {
-    wire.typ.sizeof() == ibig::ubig!(0)
+    fn zero_sized_inline_value(&self) -> impl Display {
+        assert_eq!(self.sizeof(), ibig::ubig!(0));
+
+        FmtWrapper(move |f| {
+            match self {
+                ConcreteType::Named(global_ref) => match global_ref.id {
+                    get_builtin_type!("int") => write!(f, "1'd0"),
+                    _ => unreachable!("Unknown zero-sized type {:?}", global_ref.id),
+                },
+                ConcreteType::Array(_) => unreachable!(
+                    "Since this is for inline values, and arrays cannot be used inline, they cannot appear in [zero_sized_inline_value]"
+                ),
+                /*// Turns out, totally possible: myFunc([0, 0, 0])
+                ConcreteType::Array(arr_typ) => {
+                    let (content, sz) = arr_typ.deref();
+
+                    let content_str = display_zero_sized_type_inline_value(content);
+
+                    let content_repeats = display_join(", ", 0..sz.unwrap_int(), |f, _| {
+                        f.write_str(content_str.as_ref())
+                    });
+                    write!(f, "'{{{content_repeats}}}")
+                }*/
+            }
+        })
+    }
+
+    fn walk_path(&self, path: &[PathElem]) -> &ConcreteType {
+        let mut t = self;
+        for p in path {
+            t = match p {
+                PathElem::Array { .. } => &t.unwrap_array().0,
+            };
+        }
+        t
+    }
 }
 
 fn should_not_codegen_assign(source: &MultiplexerSource) -> bool {
@@ -107,33 +99,6 @@ fn should_not_codegen_assign(source: &MultiplexerSource) -> bool {
         RealWirePathElem::Index { .. } | RealWirePathElem::ConstIndex { .. } => false,
         RealWirePathElem::PartSelect { width, .. } => width == &IBig::from(0),
         RealWirePathElem::Slice { bounds, .. } => bounds.unwrap_valid().is_empty(),
-    })
-}
-
-fn display_zero_sized_type_inline_value(typ: &ConcreteType) -> impl Display {
-    assert_eq!(typ.sizeof(), ibig::ubig!(0));
-
-    FmtWrapper(move |f| {
-        match typ {
-            ConcreteType::Named(global_ref) => match global_ref.id {
-                get_builtin_type!("int") => write!(f, "1'd0"),
-                _ => unreachable!("Unknown zero-sized type {:?}", global_ref.id),
-            },
-            ConcreteType::Array(_) => unreachable!(
-                "Since this is for inline values, and arrays cannot be used inline, they cannot appear in [get_zero_sized_type_inline_value]"
-            ),
-            /*// Turns out, totally possible: myFunc([0, 0, 0])
-            ConcreteType::Array(arr_typ) => {
-                let (content, sz) = arr_typ.deref();
-
-                let content_str = display_zero_sized_type_inline_value(content);
-
-                let content_repeats = display_join(", ", 0..sz.unwrap_int(), |f, _| {
-                    f.write_str(content_str.as_ref())
-                });
-                write!(f, "'{{{content_repeats}}}")
-            }*/
-        }
     })
 }
 
@@ -152,10 +117,6 @@ pub fn display_wire_name_with_latency(wire: &RealWire, target_abs_lat: AbsLat) -
             write!(f, "{}", &wire.name)
         }
     })
-}
-
-pub fn display_wire_name_self_latency(wire: &RealWire) -> impl Display {
-    display_wire_name_with_latency(wire, wire.absolute_latency)
 }
 
 fn codegen_optimized_modulo(
@@ -216,62 +177,46 @@ fn codegen_optimized_modulo(
     }
 }
 
-enum ForEachPathElement<'g> {
-    Array { var: Rc<str>, arr_size: &'g IBig },
+/// Used as &[ForEachPathElement]
+enum PathElem {
+    Array { idx: String },
 }
 
-#[derive(Clone, Copy)]
-struct ForEachPath<'g, 'p> {
-    path: &'p [ForEachPathElement<'g>],
-}
-
-impl<'g, 'p> Deref for ForEachPath<'g, 'p> {
-    type Target = [ForEachPathElement<'g>];
-
-    fn deref(&self) -> &[ForEachPathElement<'g>] {
-        self.path
-    }
-}
-
-impl<'g, 'p> Display for ForEachPath<'g, 'p> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for p in self.path {
-            match p {
-                ForEachPathElement::Array { var, arr_size: _ } => {
-                    write!(f, "[{var}]")?;
+impl PathElem {
+    fn display_path(path: &[PathElem]) -> impl Display {
+        FmtWrapper(move |f| {
+            for p in path {
+                match p {
+                    PathElem::Array { idx } => {
+                        write!(f, "[{idx}]")?;
+                    }
                 }
             }
-        }
-        Ok(())
+            Ok(())
+        })
     }
-}
+    fn make_bit_index_formula(mut typ: &ConcreteType, path: &[PathElem]) -> String {
+        assert!(!path.is_empty());
 
-impl<'t> ForEachPath<'_, '_> {
-    fn walk_type(&self, mut t: &'t ConcreteType) -> &'t ConcreteType {
-        for p in self.path {
-            match p {
-                ForEachPathElement::Array { .. } => {
-                    t = &t.unwrap_array().0;
-                }
+        let mut path_iter = path.iter();
+        let first_path_elem = path_iter.next().unwrap(); // Path can't be empty, it's called by ToBits & FromBits.
+        let mut result = match first_path_elem {
+            PathElem::Array { idx } => {
+                typ = &typ.unwrap_array().0;
+                idx.clone()
             }
-        }
-        t
-    }
-}
-
-impl ForEachPath<'_, '_> {
-    fn to_bit_index_formula(self) -> String {
-        let mut path_iter = self.path.iter();
-        let mut result = match path_iter.next().unwrap() {
-            ForEachPathElement::Array { var, arr_size: _ } => var.to_string(),
         };
+
         for p in path_iter {
             match p {
-                ForEachPathElement::Array { var, arr_size } => {
-                    result = format!("({arr_size} * {result}) + {var}")
+                PathElem::Array { idx } => {
+                    let (content, arr_size) = typ.unwrap_array();
+                    typ = content;
+                    result = format!("({arr_size} * {result}) + {idx}");
                 }
             }
         }
+
         result
     }
 }
@@ -319,56 +264,112 @@ struct WireName<'g> {
     instance: &'g InstantiatedModule,
     wire: &'g RealWire,
     abs_lat: AbsLat,
+    no_inlining: bool,
 }
-impl<'g> WireName<'g> {
+impl<'g> Display for WireName<'g> {
     /// Creates a string representation of the wire name, useable in expressions. myArr[{}]
     /// xyz, or zero-sized 1'b0, or inlining the constant 40'd545135135513...
-    fn display_inline(&self) -> impl Display {
-        FmtWrapper(|f| {
-            let Self {
-                instance,
-                wire,
-                abs_lat,
-            } = self;
-            if is_zero_sized(wire) {
-                write!(f, "{}", display_zero_sized_type_inline_value(&wire.typ))
-            } else {
-                match &wire.source {
-                    RealWireDataSource::Constant { value } if can_inline(wire) => {
-                        write!(f, "{}", display_constant(&wire.typ, value))
-                    }
-                    RealWireDataSource::Select { root, path } if path.is_empty() => {
-                        // Inline empty selects for readability.
-                        display_wire_name_with_latency(&instance.wires[*root], *abs_lat).fmt(f)
-                    }
-                    _other => display_wire_name_with_latency(wire, *abs_lat).fmt(f),
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            instance,
+            wire,
+            abs_lat,
+            no_inlining,
+        } = self;
+        if *no_inlining {
+            display_wire_name_with_latency(wire, *abs_lat).fmt(f)
+        } else if wire.typ.is_zero_sized() {
+            wire.typ.zero_sized_inline_value().fmt(f)
+        } else {
+            match &wire.source {
+                RealWireDataSource::Constant { value } if can_inline(wire) => {
+                    display_constant(&wire.typ, value).fmt(f)
                 }
+                RealWireDataSource::Select { root, path } if path.is_empty() => {
+                    // Inline empty selects for readability.
+                    display_wire_name_with_latency(&instance.wires[*root], *abs_lat).fmt(f)
+                }
+                _other => display_wire_name_with_latency(wire, *abs_lat).fmt(f),
+            }
+        }
+    }
+}
+impl<'g> WireName<'g> {
+    /// Same as [Self::with_path], but with multiple
+    fn with_paths<const N: usize>(&self, paths: [&[PathElem]; N]) -> impl Display {
+        FmtWrapper(move |f| {
+            let wire = self.wire;
+            let mut final_value_typ = &wire.typ;
+            for path in paths {
+                final_value_typ = final_value_typ.walk_path(path);
+            }
+            if final_value_typ.is_zero_sized() {
+                // No path added here, since we're just returning the zero-sized value for this type.
+                final_value_typ.zero_sized_inline_value().fmt(f)
+            } else {
+                self.fmt(f)?;
+                for path in paths {
+                    let path = PathElem::display_path(path);
+                    path.fmt(f)?;
+                }
+                Ok(())
             }
         })
     }
-    /*/// Creates a string representation of the wire name
+    /// Creates a string representation of the wire name
     /// xyz[a][b]...
     /// May override the result if the wire is zero-sized.
-    fn display_with_path(&self, path: &ForEachPath) -> impl Display {
-        FmtWrapper(|f| {
-            let Self {
-                instance,
-                wire,
-                abs_lat,
-            } = self;
-            if is_zero_sized(wire) {
-                let inline_value_typ = path.walk_type(&wire.typ);
-                // No path added here, since we're just returning the zero-sized value for this type.
-                return display_zero_sized_type_inline_value(inline_value_typ);
+    fn with_path(&self, path: &[PathElem]) -> impl Display {
+        self.with_paths([path])
+    }
+
+    /// Creates the Verilog variable declaration for tbis variable.
+    ///
+    /// IE for `int[15] myVar` it creates `[31:0] myVar[14:0]`
+    ///
+    /// May return something with a leading space, to accomodate `logic`, `input`, etc.
+    fn make_declaration(&self) -> String {
+        assert!(self.no_inlining); // This means the wire must be declared somewhere
+        let mut typ = &self.wire.typ;
+        let mut array_string = String::new();
+
+        loop {
+            match typ {
+                ConcreteType::Named(content_typ) => match content_typ.id {
+                    get_builtin_type!("int") => {
+                        let bounds = content_typ.unwrap_int_bounds();
+                        let bitwidth = bounds.bitwidth() - 1;
+                        if bounds.from < &IBig::from(0) {
+                            return format!(" signed[{bitwidth}:0] {self}{array_string}");
+                        } else {
+                            return format!("[{bitwidth}:0] {self}{array_string}");
+                        }
+                    }
+                    get_builtin_type!("bool") => return format!(" {self}{array_string}"),
+                    get_builtin_type!("float") => {
+                        return format!("[31:0] {self}{array_string}");
+                    }
+                    get_builtin_type!("double") => {
+                        return format!("[63:0] {self}{array_string}");
+                    }
+                    _ => todo!("Structs"),
+                },
+                ConcreteType::Array(arr) => {
+                    let (content_typ, size) = arr.deref();
+                    let sz = size.unwrap_integer() - 1;
+                    if let ConcreteType::Named(ConcreteGlobalReference {
+                        id: get_builtin_type!("bool"),
+                        ..
+                    }) = content_typ
+                    {
+                        return format!("[{sz}:0] {self}{array_string}");
+                    }
+                    write!(array_string, "[{sz}:0]").unwrap();
+                    typ = content_typ;
+                }
             }
-            let root_name = self.wire_name_inline(wire, requested_latency);
-            if path.is_empty() {
-                root_name
-            } else {
-                Cow::Owned(format!("{root_name}{path}"))
-            }
-        })
-    }*/
+        }
+    }
 }
 
 /// This is for making the resulting Verilog a little nicer to read
@@ -521,6 +522,23 @@ impl<'g> CodeGenerationContext<'g> {
             instance: self.instance,
             wire,
             abs_lat: requested_latency,
+            no_inlining: false,
+        }
+    }
+    fn wire_name_no_inling(&self, wire: &'g RealWire, requested_latency: AbsLat) -> WireName<'g> {
+        WireName {
+            instance: self.instance,
+            wire,
+            abs_lat: requested_latency,
+            no_inlining: true,
+        }
+    }
+    fn output_wire_name(&self, wire: &'g RealWire) -> WireName<'g> {
+        WireName {
+            instance: self.instance,
+            wire,
+            abs_lat: wire.absolute_latency,
+            no_inlining: true,
         }
     }
 
@@ -529,19 +547,19 @@ impl<'g> CodeGenerationContext<'g> {
         wire_id: WireID,
         w: &RealWire,
     ) -> Result<(), std::fmt::Error> {
-        assert!(!is_zero_sized(w));
+        assert!(!w.typ.is_zero_sized());
 
-        // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it's only needed this cycle
+        // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it instantiates no registers
         for i in w.absolute_latency.unwrap()..self.needed_untils[wire_id] {
-            let from = display_wire_name_with_latency(w, AbsLat::new(i));
-            let to = display_wire_name_with_latency(w, AbsLat::new(i + 1));
+            let from = self.wire_name_no_inling(w, AbsLat::new(i));
+            let to = self.wire_name_no_inling(w, AbsLat::new(i + 1));
 
-            let var_decl = typ_to_declaration(&w.typ, &to);
+            let to_decl = to.make_declaration();
 
             let clk_name = self.md.get_clock_name();
             writeln!(
                 self.program_text,
-                "/*latency*/ logic{var_decl}; always_ff @(posedge {clk_name}) begin {to} <= {from}; end"
+                "/*latency*/ logic{to_decl}; always_ff @(posedge {clk_name}) begin {to} <= {from}; end"
             ).unwrap();
         }
         Ok(())
@@ -613,7 +631,7 @@ impl<'g> CodeGenerationContext<'g> {
                 continue;
             };
             port_wire.get_span(&self.md.link_info).debug();
-            if is_zero_sized(port_wire) {
+            if port_wire.typ.is_zero_sized() {
                 port_list.commented(format!("{direction} {}", port_wire.name));
             } else {
                 let wire_or_reg = port_wire.source.wire_or_reg();
@@ -627,9 +645,9 @@ impl<'g> CodeGenerationContext<'g> {
                         is_state
                     }
                 };
-                let wire_name = display_wire_name_self_latency(port_wire);
-                let wire_decl = typ_to_declaration(&port_wire.typ, &wire_name);
-                let decl = Self::display_declaration(port_wire, wire_or_reg, wire_decl, is_state);
+                let output_name = self.output_wire_name(port_wire);
+                let output_decl = output_name.make_declaration();
+                let decl = Self::display_declaration(port_wire, wire_or_reg, output_decl, is_state);
 
                 port_list.line(format!("{direction} {decl}"));
             }
@@ -640,7 +658,7 @@ impl<'g> CodeGenerationContext<'g> {
         // Should not appear in the program text for extern modules
         for (port_wire_id, port_wire) in &self.instance.wires {
             port_wire.get_span(&self.md.link_info).debug();
-            if is_zero_sized(port_wire) {
+            if port_wire.typ.is_zero_sized() {
                 continue;
             }
             if matches!(port_wire.is_port, IsPort::Port(_, _)) {
@@ -687,19 +705,19 @@ impl<'g> CodeGenerationContext<'g> {
     /// ```
     fn foreach_for_copy_unpacked(
         &mut self,
-        typ: &'g ConcreteType,
+        typ: &ConcreteType,
         in_always: bool,
-        mut operation: impl FnMut(ForEachPath<'g, '_>, u64) -> String,
+        mut operation: impl FnMut(&[PathElem], u64) -> String,
     ) -> String {
         fn foreach_for_copy_unpacked_recurse<'g>(
             slf: &mut CodeGenerationContext<'g>,
-            typ: &'g ConcreteType,
+            typ: &ConcreteType,
             in_always: bool,
-            mut path: Vec<ForEachPathElement<'g>>,
-            operation: &mut impl FnMut(ForEachPath<'g, '_>, u64) -> String,
+            mut path: Vec<PathElem>,
+            operation: &mut impl FnMut(&[PathElem], u64) -> String,
         ) -> String {
             if let Some(fundamental_size) = typ.can_be_represented_as_packed_bits() {
-                operation(ForEachPath { path: &path }, fundamental_size)
+                operation(&path, fundamental_size)
             } else {
                 match typ {
                     ConcreteType::Named(_) => {
@@ -708,8 +726,10 @@ impl<'g> CodeGenerationContext<'g> {
                     ConcreteType::Array(arr_box) => {
                         let (new_typ, sz) = arr_box.deref();
                         let arr_size = sz.unwrap_integer();
-                        let (for_stm, var) = slf.mk_for(arr_size, in_always);
-                        path.push(ForEachPathElement::Array { var, arr_size });
+                        let (for_stm, idx) = slf.mk_for(arr_size, in_always);
+                        path.push(PathElem::Array {
+                            idx: idx.to_string(),
+                        });
                         let content_str = foreach_for_copy_unpacked_recurse(
                             slf, new_typ, in_always, path, operation,
                         );
@@ -744,27 +764,32 @@ impl<'g> CodeGenerationContext<'g> {
         in_always: bool,
         operation: impl FnOnce(
             &mut CodeGenerationContext<'g>,
-            String,
-            String,
+            &[PathElem],
+            &[PathElem],
             &'g ConcreteType,
         ) -> String,
     ) -> String {
-        let mut source_path = String::new();
-        let mut target_path = String::new();
+        let mut source_path = Vec::new();
+        let mut target_path = Vec::new();
         let mut for_stack = String::new();
         let mut ends_stack = String::new();
         for p in path {
             match p {
                 RealWirePathElem::Index { idx_wire, .. } => {
-                    typ = &typ.unwrap_array().0;
+                    let (arr_content, _sz) = typ.unwrap_array();
+                    typ = arr_content;
                     let idx_wire_name =
                         self.wire_name(&self.instance.wires[*idx_wire], requested_latency);
-                    let idx_wire_name = idx_wire_name.display_inline();
-                    write!(source_path, "[{idx_wire_name}]",).unwrap();
+                    source_path.push(PathElem::Array {
+                        idx: idx_wire_name.to_string(),
+                    });
                 }
                 RealWirePathElem::ConstIndex { idx, .. } => {
-                    typ = &typ.unwrap_array().0;
-                    write!(source_path, "[{idx}]").unwrap();
+                    let (arr_content, _sz) = typ.unwrap_array();
+                    typ = arr_content;
+                    source_path.push(PathElem::Array {
+                        idx: idx.to_string(),
+                    });
                 }
                 RealWirePathElem::PartSelect {
                     from_wire,
@@ -772,30 +797,37 @@ impl<'g> CodeGenerationContext<'g> {
                     direction,
                     ..
                 } => {
-                    typ = &typ.unwrap_array().0;
+                    let (arr_content, _sz) = typ.unwrap_array();
+                    typ = arr_content;
+                    let from_wire = &self.instance.wires[*from_wire];
 
                     let (for_stm, var) = self.mk_for(width, in_always);
 
                     writeln!(for_stack, "{for_stm} begin").unwrap();
                     writeln!(ends_stack, "end").unwrap();
 
-                    let wire_name =
-                        self.wire_name(&self.instance.wires[*from_wire], requested_latency);
-                    let wire_name = wire_name.display_inline();
-                    write!(target_path, "[{var}]").unwrap();
+                    let wire_name = self.wire_name(from_wire, requested_latency);
+                    target_path.push(PathElem::Array {
+                        idx: var.to_string(),
+                    });
 
                     match direction {
                         PartSelectDirection::Up => {
-                            write!(source_path, "[{wire_name} + {var}]").unwrap();
+                            source_path.push(PathElem::Array {
+                                idx: format!("{wire_name} + {var}"),
+                            });
                         }
                         PartSelectDirection::Down => {
                             let sz_dec = width - 1;
-                            write!(source_path, "[{wire_name} - ({sz_dec} - {var})]").unwrap();
+                            source_path.push(PathElem::Array {
+                                idx: format!("{wire_name} - ({sz_dec} - {var})"),
+                            });
                         }
                     }
                 }
                 RealWirePathElem::Slice { bounds, .. } => {
-                    typ = &typ.unwrap_array().0;
+                    let (arr_content, _sz) = typ.unwrap_array();
+                    typ = arr_content;
 
                     let IntBounds { from, to } = bounds.unwrap_valid();
 
@@ -804,17 +836,23 @@ impl<'g> CodeGenerationContext<'g> {
                     writeln!(for_stack, "{for_stm} begin").unwrap();
                     writeln!(ends_stack, "end").unwrap();
 
-                    write!(target_path, "[{var}]").unwrap();
+                    target_path.push(PathElem::Array {
+                        idx: var.to_string(),
+                    });
                     if from == &IBig::from(0) {
-                        write!(source_path, "[{var}]").unwrap();
+                        source_path.push(PathElem::Array {
+                            idx: var.to_string(),
+                        });
                     } else {
-                        write!(source_path, "[{from} + {var}]").unwrap();
+                        source_path.push(PathElem::Array {
+                            idx: format!("{from} + {var}"),
+                        });
                     }
                 }
             }
         }
 
-        let content = operation(self, source_path, target_path, typ);
+        let content = operation(self, &source_path, &target_path, typ);
         format!("{for_stack}{content}{ends_stack}")
     }
 
@@ -829,19 +867,18 @@ impl<'g> CodeGenerationContext<'g> {
             if matches!(w.is_port, IsPort::Port(_, _)) {
                 continue;
             }
-            if is_zero_sized(w) {
+            if w.typ.is_zero_sized() {
                 writeln!(self.program_text, "// (zero sized) {}", w.name).unwrap();
                 continue;
             }
             let wire_or_reg = w.source.wire_or_reg();
-            let wire_name = display_wire_name_self_latency(w).to_string();
-            let wire_decl = typ_to_declaration(&w.typ, &wire_name);
+            let output_name = self.output_wire_name(w);
+            let output_decl = output_name.make_declaration();
 
             match &w.source {
                 RealWireDataSource::Select { root, path } => {
                     let root = &self.instance.wires[*root];
                     let root_name = self.wire_name(root, w.absolute_latency);
-                    let root_name = root_name.display_inline();
 
                     // Custom [Self::in_generate], to generate logic[31:0] my_val = 5 + other_val
                     self.genvars.reuse();
@@ -852,10 +889,10 @@ impl<'g> CodeGenerationContext<'g> {
                         w.absolute_latency,
                         false,
                         |slf, source_path, target_path, result_typ| {
-                            let source = format!("{root_name}{source_path}");
-                            let target = format!("{wire_name}{target_path}");
                             slf.foreach_for_copy_unpacked(result_typ, false, |path, _| {
-                                format!("assign {target}{path} = {source}{path};\n")
+                                let source = root_name.with_paths([source_path, path]);
+                                let target = output_name.with_paths([target_path, path]);
+                                format!("assign {target} = {source};\n")
                             })
                         },
                     );
@@ -863,46 +900,52 @@ impl<'g> CodeGenerationContext<'g> {
                     if self.genvars.currently_used != 0 {
                         write!(
                             self.program_text,
-                            "{wire_or_reg}{wire_decl};\ngenerate\n{content}endgenerate\n"
+                            "{wire_or_reg}{output_decl};\ngenerate\n{content}endgenerate\n"
                         )
                         .unwrap();
                     } else {
                         // We're basically trimming "<assign wire_name>[...] = ..." off the string, so we can stitch it to the declaration
                         let content = content.strip_prefix("assign ").unwrap();
-                        let content = content.strip_prefix(&wire_name).unwrap();
-                        write!(self.program_text, "{wire_or_reg}{wire_decl}{content}").unwrap();
+                        let out_name_string = output_name.to_string();
+                        let content = content.strip_prefix(&out_name_string).unwrap();
+                        write!(self.program_text, "{wire_or_reg}{output_decl}{content}").unwrap();
                     }
                 }
                 RealWireDataSource::UnaryOp { op, right, .. } => {
-                    writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
+                    writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
 
                     let right = &self.instance.wires[*right];
                     let right_name = self.wire_name(right, w.absolute_latency);
-                    let right_name = right_name.display_inline();
 
                     let for_var = match op {
                         UnaryOperator::Sum | UnaryOperator::Product => Some(self.for_vars.alloc()),
                         _ => None,
                     };
                     self.in_generate(|slf| {
-                        slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| match op {
-                            UnaryOperator::And
-                            | UnaryOperator::Or
-                            | UnaryOperator::Xor
-                            | UnaryOperator::Not
-                            | UnaryOperator::Negate => {
-                                format!("assign {wire_name}{path} = {op}{right_name}{path};\n")
-                            }
-                            UnaryOperator::Sum |
-                            UnaryOperator::Product => {
-                                let start_at = match op {
-                                    UnaryOperator::Sum => "0",
-                                    UnaryOperator::Product => "1",
-                                    _ => unreachable!()
-                                };
-                                let list_len = path.walk_type(&right.typ).unwrap_array().1.unwrap_integer();
-                                let for_var = for_var.clone().unwrap();
-                                format!("always_comb begin\n\t{wire_name}{path} = {start_at};\n\tfor(int {for_var} = 0; {for_var} < {list_len}; {for_var} += 1) {wire_name}{path} {op}= {right_name}{path}[{for_var}];\nend\n")
+                        slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| {
+                            let output = output_name.with_path(path);
+                            match op {
+                                UnaryOperator::And
+                                | UnaryOperator::Or
+                                | UnaryOperator::Xor
+                                | UnaryOperator::Not
+                                | UnaryOperator::Negate => {
+                                    let right_with_path = right_name.with_path(path);
+                                    format!("assign {output} = {op}{right_with_path};\n")
+                                }
+                                UnaryOperator::Sum |
+                                UnaryOperator::Product => {
+                                    let start_at = match op {
+                                        UnaryOperator::Sum => "0",
+                                        UnaryOperator::Product => "1",
+                                        _ => unreachable!()
+                                    };
+                                    let list_len = right.typ.walk_path(path).unwrap_array().1.unwrap_integer();
+                                    let for_var = for_var.clone().unwrap();
+                                    let for_var_path = [PathElem::Array { idx: for_var.to_string() }];
+                                    let right_with_paths = right_name.with_paths([path, &for_var_path]);
+                                    format!("always_comb begin\n\t{output} = {start_at};\n\tfor(int {for_var} = 0; {for_var} < {list_len}; {for_var} += 1) {output} {op}= {right_with_paths};\nend\n")
+                                }
                             }
                         })
                     })
@@ -910,25 +953,27 @@ impl<'g> CodeGenerationContext<'g> {
                 RealWireDataSource::BinaryOp {
                     op, left, right, ..
                 } => {
-                    writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
+                    writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
 
                     let left = &self.instance.wires[*left];
                     let right = &self.instance.wires[*right];
                     let left_name = self.wire_name(left, w.absolute_latency);
-                    let left_name = left_name.display_inline();
                     let right_name = self.wire_name(right, w.absolute_latency);
-                    let right_name = right_name.display_inline();
                     self.in_generate(|slf| {
                         slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| {
-                            let left_typ = path.walk_type(&left.typ);
-                            let right_typ = path.walk_type(&right.typ);
+                            let left_typ =  left.typ.walk_path(path);
+                            let right_typ = right.typ.walk_path(path);
 
-                            fn wrap_in_signed_if_needed(name: impl Display, path: &ForEachPath, require_signed: bool, bounds: IntBounds<&IBig>) -> impl Display {
+                            let output_with_path = output_name.with_path(path);
+                            let left_with_path = left_name.with_path(path);
+                            let right_with_path = right_name.with_path(path);
+
+                            fn wrap_in_signed_if_needed(name_with_path: impl Display, require_signed: bool, bounds: IntBounds<&IBig>) -> impl Display {
                                 FmtWrapper(move |f| {
                                     if require_signed && !bounds.is_signed() {
-                                        write!(f, "$signed({{1'b0, {name}{path}}})")
+                                        write!(f, "$signed({{1'b0, {name_with_path}}})")
                                     } else {
-                                        write!(f, "{name}{path}")
+                                        name_with_path.fmt(f)
                                     }
                                 })
                             }
@@ -948,12 +993,12 @@ impl<'g> CodeGenerationContext<'g> {
 
                                     assert!(!right_int_range.is_signed());
 
-                                    format!("assign {wire_name}{path} = {left_name}{path} {shift_op} {right_name}{path};\n")
+                                    format!("assign {output_with_path} = {left_with_path} {shift_op} {right_with_path};\n")
                                 }
                                 BinaryOperator::And |
                                 BinaryOperator::Or |
                                 BinaryOperator::Xor => {
-                                    format!("assign {wire_name}{path} = {left_name}{path} {op} {right_name}{path};\n")
+                                    format!("assign {output_with_path} = {left_with_path} {op} {right_with_path};\n")
                                 }
                                 BinaryOperator::Add |
                                 BinaryOperator::Subtract |
@@ -970,24 +1015,24 @@ impl<'g> CodeGenerationContext<'g> {
                                     let right_int_range = right_typ.unwrap_int_bounds();
 
                                     let op_is_signed = left_int_range.is_signed() | right_int_range.is_signed();
-                                    let left_arg = wrap_in_signed_if_needed(&left_name, &path, op_is_signed, left_int_range);
-                                    let right_arg = wrap_in_signed_if_needed(&right_name, &path, op_is_signed, right_int_range);
+                                    let left_arg = wrap_in_signed_if_needed(left_with_path, op_is_signed, left_int_range);
+                                    let right_arg = wrap_in_signed_if_needed(right_with_path, op_is_signed, right_int_range);
 
-                                    format!("assign {wire_name}{path} = {left_arg} {op} {right_arg};\n")
+                                    format!("assign {output_with_path} = {left_arg} {op} {right_arg};\n")
                                 }
                                 BinaryOperator::Modulo => {
                                     let left_int_range =
-                                        path.walk_type(&left.typ).unwrap_int_bounds();
+                                        left.typ.walk_path(path).unwrap_int_bounds();
                                     let right_int_range =
-                                        path.walk_type(&right.typ).unwrap_int_bounds();
+                                        right.typ.walk_path(path).unwrap_int_bounds();
 
                                     let content = codegen_optimized_modulo(
                                         left_int_range,
                                         right_int_range,
-                                        &format!("{left_name}{path}"),
-                                        &format!("{right_name}{path}"),
+                                        &format!("{left_with_path}"),
+                                        &format!("{right_with_path}"),
                                     );
-                                    format!("assign {wire_name}{path} = {content}\n")
+                                    format!("assign {output_with_path} = {content}\n")
                                 }
                             }
                         })
@@ -995,25 +1040,31 @@ impl<'g> CodeGenerationContext<'g> {
                 }
                 RealWireDataSource::Constant { value } => {
                     let const_str = display_constant(&w.typ, value);
-                    writeln!(self.program_text, "{wire_or_reg}{wire_decl} = {const_str};").unwrap();
+                    writeln!(
+                        self.program_text,
+                        "{wire_or_reg}{output_decl} = {const_str};"
+                    )
+                    .unwrap();
                 }
                 RealWireDataSource::ReadOnly => {
-                    writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
+                    writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
                 }
                 RealWireDataSource::ConstructArray { array_wires } => {
-                    writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
+                    writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
 
                     for (arr_idx, elem) in array_wires.iter().enumerate() {
                         let elem = &self.instance.wires[*elem];
                         elem.get_span(&self.md.link_info).debug();
                         let element_wire_name = self.wire_name(elem, w.absolute_latency);
-                        let element_wire_name = element_wire_name.display_inline();
 
+                        let idx_path = [PathElem::Array {
+                            idx: arr_idx.to_string(),
+                        }];
                         self.in_generate(|slf| {
                             slf.foreach_for_copy_unpacked(&elem.typ, false, |path, _| {
-                                format!(
-                                "assign {wire_name}[{arr_idx}]{path} = {element_wire_name}{path};\n"
-                            )
+                                let elem_with_path = element_wire_name.with_path(path);
+                                let output_with_path = output_name.with_paths([&idx_path, path]);
+                                format!("assign {output_with_path} = {elem_with_path};\n")
                             })
                         });
                     }
@@ -1022,7 +1073,7 @@ impl<'g> CodeGenerationContext<'g> {
                     is_state,
                     sources: _,
                 } => {
-                    let decl_stm = Self::display_declaration(w, wire_or_reg, wire_decl, is_state);
+                    let decl_stm = Self::display_declaration(w, wire_or_reg, output_decl, is_state);
                     writeln!(self.program_text, "{decl_stm};").unwrap();
                 }
             }
@@ -1077,7 +1128,7 @@ impl<'g> CodeGenerationContext<'g> {
                     ""
                 };
                 let line = format!(".{port_name}({wire_name})");
-                if is_zero_sized(sm_port) {
+                if sm_port.typ.is_zero_sized() {
                     port_list.commented(line);
                 } else {
                     port_list.line(line);
@@ -1115,23 +1166,20 @@ impl<'g> CodeGenerationContext<'g> {
 
     fn write_assign(
         &mut self,
-        output_name: &str,
+        output_name: &WireName,
         arrow_str: &'static str,
         s: &'g MultiplexerSource,
         target: &'g RealWire,
     ) {
         let from = &self.instance.wires[s.from];
-        let sp = from.get_span(&self.md.link_info).debug();
-        __debug_span!(sp, "Wire {:?}", s.from);
+        from.get_span(&self.md.link_info).debug();
         let from_name = self.wire_name(from, target.absolute_latency);
-        let from_name = from_name.display_inline();
         self.program_text.write_char('\t').unwrap();
         let mut if_stack = String::new();
         for cond in s.condition.iter() {
             let condition_wire = &self.instance.wires[cond.condition_wire];
             condition_wire.get_span(&self.md.link_info).debug();
             let cond_name = self.wire_name(condition_wire, target.absolute_latency);
-            let cond_name = cond_name.display_inline();
             let invert = if cond.inverse { "!" } else { "" };
             write!(if_stack, "if({invert}{cond_name}) ").unwrap();
         }
@@ -1142,10 +1190,10 @@ impl<'g> CodeGenerationContext<'g> {
             target.absolute_latency,
             true,
             |slf, source_path, target_path, copy_typ| {
-                let to_path = format!("{if_stack}{output_name}{source_path}");
-                let from_path = format!("{from_name}{target_path}");
                 slf.foreach_for_copy_unpacked(copy_typ, true, |path, _| {
-                    format!("{to_path}{path} {arrow_str} {from_path}{path};\n")
+                    let output_with_path = output_name.with_paths([source_path, path]);
+                    let from_with_path = from_name.with_paths([target_path, path]);
+                    format!("{if_stack}{output_with_path} {arrow_str} {from_with_path};\n")
                 })
             },
         );
@@ -1154,17 +1202,15 @@ impl<'g> CodeGenerationContext<'g> {
 
     fn write_multiplexers(&mut self) {
         for (_id, w) in &self.instance.wires {
-            let w_span = w.get_span(&self.md.link_info).debug();
+            w.get_span(&self.md.link_info).debug();
 
-            __debug_span!(w_span, "{w:?}, Span: {w_span:?}");
-            __debug_breakpoint_if!(w_span.start == 2577 && w_span.end == 2583);
-            if is_zero_sized(w) {
+            if w.typ.is_zero_sized() {
                 continue;
             }
             w.get_span(&self.md.link_info).debug();
             match &w.source {
                 RealWireDataSource::Multiplexer { is_state, sources } => {
-                    let output_name = display_wire_name_self_latency(w).to_string();
+                    let output_name = self.output_wire_name(w);
                     let arrow_str = if is_state.is_some() {
                         let clk_name = self.md.get_clock_name();
                         writeln!(
@@ -1226,7 +1272,7 @@ impl<'g> CodeGenerationContext<'g> {
             port_wire.get_span(&self.md.link_info).debug();
             assert_eq!(&port_wire.name, name);
             assert_eq!(actual_port.direction, direction);
-            if is_zero_sized(port_wire) {
+            if port_wire.typ.is_zero_sized() {
                 zero_size_count += 1;
             }
         }
@@ -1310,9 +1356,10 @@ impl<'g> CodeGenerationContext<'g> {
                 self.in_generate(|slf| {
                     slf.foreach_for_copy_unpacked(typ, false, |path, num_bits| {
                         if path.is_empty() {
-                            format!("assign bits = value{path};\n")
+                            "assign bits = value;\n".to_string()
                         } else {
-                            let path_formula = path.to_bit_index_formula();
+                            let path_formula = PathElem::make_bit_index_formula(typ, path);
+                            let path = PathElem::display_path(path);
                             format!("assign bits[({path_formula}) * {num_bits} +: {num_bits}] = value{path};\n")
                         }
                     })
@@ -1329,9 +1376,10 @@ impl<'g> CodeGenerationContext<'g> {
                 self.in_generate(|slf| {
                     slf.foreach_for_copy_unpacked(typ, false, |path, num_bits| {
                         if path.is_empty() {
-                            format!("assign value{path} = bits;\n")
+                            "assign value = bits;\n".to_string()
                         } else {
-                            let path_formula = path.to_bit_index_formula();
+                            let path_formula = PathElem::make_bit_index_formula(typ, path);
+                            let path = PathElem::display_path(path);
                             format!("assign value{path} = bits[({path_formula}) * {num_bits} +: {num_bits}];\n")
                         }
                     })
