@@ -508,7 +508,9 @@ impl InferenceTypeWalker<'_, '_> {
                 self.cur_path.pop().unwrap();
 
                 self.cur_path.push(SubtypeInferencePathElem::ArraySize);
-                self.try_add_infer_info(*sz, SubtypeRelation::Exact);
+                if let Some(sz) = *sz {
+                    self.try_add_infer_info(sz, SubtypeRelation::Exact);
+                }
                 self.cur_path.pop().unwrap();
             }
             WrittenType::Error(_) => {}

@@ -330,15 +330,17 @@ impl<'l> TypeCheckingContext<'l> {
                 self.typecheck_global_ref(global_ref);
             }
             WrittenType::Array(_, arr_box) => {
-                let (_content_typ, arr_idx, _bracket_span) = arr_box.deref();
+                let (_content_typ, arr_sz, _bracket_span) = arr_box.deref();
 
-                let idx_expr = self.instructions[*arr_idx].unwrap_subexpression();
-                self.type_checker.unify_report_error(
-                    idx_expr.typ,
-                    &INT_SCALAR,
-                    idx_expr.span,
-                    "array size",
-                );
+                if let Some(arr_sz) = *arr_sz {
+                    let sz_expr = self.instructions[arr_sz].unwrap_subexpression();
+                    self.type_checker.unify_report_error(
+                        sz_expr.typ,
+                        &INT_SCALAR,
+                        sz_expr.span,
+                        "array size",
+                    );
+                }
             }
         }
     }

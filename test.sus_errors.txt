@@ -167,6 +167,7 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate InstantiatesItself #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated ReceiveZerosArray #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestZerosArrays #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestUnknownArraySize #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -3835,6 +3836,27 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │            ──┬─  
       │              ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1747:8 ]
+      │
+ 1747 │     int[] a = [3, 6, 7]
+      │           ┬  
+      │           ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Some parameters of 'b' were still unknown: int #(FROM: 3, TO: 6)[_]
+      ╭─[ test.sus:1750:8 ]
+      │
+ 1750 │     int[] b
+      │           ┬  
+      │           ╰── Some parameters of 'b' were still unknown: int #(FROM: 3, TO: 6)[_]
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1750:8 ]
+      │
+ 1750 │     int[] b
+      │           ┬  
+      │           ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen test_various_assignments #() due to errors!
@@ -3909,3 +3931,4 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [ERROR sus_compiler::codegen] Cannot codegen use_module_taking_strings #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen NonGenerativeSliceBoundsMustNotICE #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen InstantiatesItself #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen TestUnknownArraySize #() due to errors!

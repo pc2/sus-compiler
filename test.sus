@@ -1743,3 +1743,12 @@ module TestZerosArrays {
 	int[2] sums = nums + [0, 0] + zeros + manyzeros[1][5:7][4][3]
 }
 
+module TestUnknownArraySize {
+	int[] a = [3, 6, 7]
+
+	// Can't figure this out yet, but it would be nice to be able to in the future
+	int[] b
+
+	b[2] = 5
+	b[1] = 3
+}

@@ -866,7 +866,7 @@ pub enum WrittenType {
     Error(Span),
     TemplateVariable(Span, TemplateID),
     Named(GlobalReference<TypeUUID>),
-    Array(Span, Box<(WrittenType, FlatID, BracketSpan)>),
+    Array(Span, Box<(WrittenType, Option<FlatID>, BracketSpan)>),
 }
 
 impl WrittenType {

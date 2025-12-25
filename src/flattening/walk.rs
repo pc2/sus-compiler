@@ -90,7 +90,9 @@ impl WrittenType {
             WrittenType::Named(name) => name.for_each_generative_input(f),
             WrittenType::Array(_span, arr_box) => {
                 use std::ops::Deref;
-                f(arr_box.deref().1)
+                if let Some(arr_sz) = arr_box.deref().1 {
+                    f(arr_sz)
+                }
             }
         }
     }

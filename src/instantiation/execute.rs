@@ -675,13 +675,15 @@ impl<'l> ExecutionContext<'l> {
                 let (new_wr_typ, size) = match wr_typ {
                     Some(WrittenType::Array(_span, arr)) => {
                         let (content, arr_size, _) = arr.deref();
-                        (
-                            Some(content),
+                        let sz = if let Some(arr_size) = arr_size {
                             self.generation_state
                                 .get_generation_value(*arr_size)?
                                 .clone()
-                                .into(),
-                        )
+                                .into()
+                        } else {
+                            self.type_substitutor.alloc_unknown()
+                        };
+                        (Some(content), sz)
                     }
                     None => (None, self.type_substitutor.alloc_unknown()),
                     Some(t) => unreachable!(

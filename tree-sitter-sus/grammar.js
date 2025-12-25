@@ -292,7 +292,6 @@ module.exports = grammar({
             sepSeq($._expression, $._comma),
             ')'
         ),
-        
 
         parenthesis_expression: $ => seq(
             '(',
@@ -302,7 +301,7 @@ module.exports = grammar({
 
         array_type_bracket: $ => seq(
             '[',
-            field('content', $._expression),
+            optional(field('content', $._expression)),
             ']',
         ),
 

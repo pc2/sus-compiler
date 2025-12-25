@@ -703,11 +703,15 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     }
 
     // function to flatten a straightforward xxx[size] array type expression (no slicing)
-    fn flatten_array_bracket(&mut self, cursor: &mut Cursor<'c>) -> (FlatID, BracketSpan) {
+    fn flatten_array_bracket(&mut self, cursor: &mut Cursor<'c>) -> (Option<FlatID>, BracketSpan) {
         let bracket_span = BracketSpan::from_outer(cursor.span());
-        cursor.go_down_content(kind!("array_type_bracket"), |cursor| {
-            let expr = self.flatten_subexpr(cursor);
-            (expr, bracket_span)
+        cursor.go_down(kind!("array_type_bracket"), |cursor| {
+            if cursor.optional_field(field!("content")) {
+                let expr = self.flatten_subexpr(cursor);
+                (Some(expr), bracket_span)
+            } else {
+                (None, bracket_span)
+            }
         })
     }
 
