@@ -5,10 +5,10 @@ use crate::{append_only_vec::AppendOnlyVec, let_unwrap, typing::type_inference::
 /// Basically a [std::cell::OnceCell] for type checking. We implement it safely by maintaining the following invariant:
 ///
 /// - [UniCell] starts out [UniCell::UNKNOWN]. No interior references can be taken in this state. (But the type variable we refer to *can* be updated)
-/// - At some point, it is set to some Known value. After this point references to this interior value can be taken.
-///   Afterwards, we can *never* reset a Known back to an Unknown, or mess with it in any mutable way. (Panics when trying otherwise)
-pub struct UniCell<T: Debug + Clone>(UnsafeCell<Interior<T>>);
-enum Interior<T: Debug + Clone> {
+/// - At some point, it is set to [Interior::Known]. After this point references to this interior value can be taken.
+///   Afterwards, we can *never* reset a [Interior::Known] back to an [Interior::Unallocated] or [Interior::SubstitutesTo], or mess with it in any mutable way. (Panics when trying otherwise)
+pub struct UniCell<T: Debug>(UnsafeCell<Interior<T>>);
+enum Interior<T: Debug> {
     Known(T),
     /// If no substitution is known yet, then this points to itself (may be in any cycle length, [Substitutor::resolve_substitution_chain] is there to contract it).
     SubstitutesTo(usize),
@@ -17,17 +17,19 @@ enum Interior<T: Debug + Clone> {
     Unallocated,
 }
 
-impl<T: Debug + Clone> UniCell<T> {
+impl<T: Debug> UniCell<T> {
     #[allow(clippy::declare_interior_mutable_const)]
     pub const UNKNOWN: Self = Self(UnsafeCell::new(Interior::Unallocated));
 
     pub fn get(&self) -> Option<&T> {
-        // We cast to a const pointer here instead, such that we never actually create a &mut that might conflict with another existing shared ref
-        let content_ptr: *const Interior<T> = self.0.get();
         // SAFETY: In shared context, once we're [Interior::Known] that reference will never be invalidated.
-        match unsafe { &*content_ptr } {
-            Interior::Known(known) => Some(known),
-            Interior::SubstitutesTo(_) | Interior::Unallocated => None,
+        unsafe {
+            // We never actually create a &mut that might conflict with another existing shared ref
+            let interior_ptr: *const Interior<T> = self.0.get();
+            match &*interior_ptr {
+                Interior::Known(known) => Some(known),
+                Interior::SubstitutesTo(_) | Interior::Unallocated => None,
+            }
         }
     }
     pub fn get_mut(&mut self) -> Option<&mut T> {
@@ -39,41 +41,68 @@ impl<T: Debug + Clone> UniCell<T> {
     }
 
     #[track_caller]
-    fn unwrap(&self) -> &T {
-        let content_ptr: *const Interior<T> = self.0.get();
+    pub fn unwrap(&self) -> &T {
         // SAFETY: In shared context, once we're [Interior::Known] that reference will never be invalidated.
-        let content = unsafe { &*content_ptr };
-        let_unwrap!(Interior::Known(v), content);
-        v
+        unsafe {
+            let interior_ptr: *const Interior<T> = self.0.get();
+            let_unwrap!(Interior::Known(v), &*interior_ptr);
+            v
+        }
     }
     #[track_caller]
-    fn unwrap_mut(&mut self) -> &mut T {
+    pub fn unwrap_mut(&mut self) -> &mut T {
         let_unwrap!(Interior::Known(v), self.0.get_mut());
         v
     }
 
-    /// Panics if this has ever been unified with anything else
-    pub fn set_initial(&self, v: T) {
-        let content_ptr_mut: *mut Interior<T> = self.0.get();
-        let context_ptr_while_maybe_shared: *const Interior<T> = content_ptr_mut;
-        {
-            // SAFETY: Either this is already Interior::Known, in which case we panic before messing with a shared ref, OR this is not Interior::Known, and therefore no interior shared references have been given out
-            //
-            // Careful here! If we use the &mut for the check, then we've technically created UB between here and the panic. That's why we have to use a *const _, and only create the mutable ref when we're sure no shares exist
-            let content = unsafe { &*context_ptr_while_maybe_shared };
-            if !matches!(content, Interior::Unallocated) {
-                unreachable!(
-                    "`set_initial({v:?})` on a UniCell that's not in the Unallocated state ({content:?})!"
-                );
+    pub fn is_unallocated(&self) -> bool {
+        // SAFETY: In shared context, once we're [Interior::Known] that reference will never be invalidated.
+        unsafe {
+            // We cast to a const pointer here instead, such that we never actually create a &mut that might conflict with another existing shared ref
+            let interior_ptr: *const Interior<T> = self.0.get();
+            match &*interior_ptr {
+                Interior::Known(_) | Interior::SubstitutesTo(_) => false,
+                Interior::Unallocated => true,
             }
         }
+    }
 
-        // SAFETY: Only now do we actually use the ptr mutably
-        unsafe { *content_ptr_mut = Interior::Known(v) }
+    /// Panics if [Substitutor::unify] has ever been called on this
+    ///
+    /// So only allowed if [Self::is_unallocated]
+    pub fn set_initial(&self, v: T) {
+        // SAFETY: Either this is already Interior::Known, in which case we panic before messing with a shared ref, OR this is not Interior::Known, and therefore no interior shared references have been given out
+        //
+        // Careful here! If we use the &mut for the check, then we've technically created UB between here and the panic. That's why we do a regular shared reborrow, and only create the mutable ref when we're sure no shares exist
+        unsafe {
+            let interior_ptr: *mut Interior<T> = self.0.get();
+
+            if !matches!(&*interior_ptr, Interior::Unallocated) {
+                unreachable!(
+                    "`set_initial({v:?})` on a UniCell that's not in the Unallocated state ({:?})!",
+                    &*interior_ptr
+                );
+            }
+
+            // SAFETY: Only now do we actually use the ptr mutably
+            *interior_ptr = Interior::Known(v)
+        }
+    }
+
+    /// Links a [Interior::Unallocated] to a given value.
+    fn init_uninit_to(&self, id: usize) {
+        // SAFETY: Shared references to &'s T can only exist when [Interior::Known] is selected.
+        // But for this call it must be [Interior::Unallocated].
+        // We are being very careful not to create a &mut before we've asserted we're [Interior::Unallocated]
+        unsafe {
+            let interior_ptr: *mut Interior<T> = self.0.get();
+            assert!(matches!(&*interior_ptr, Interior::Unallocated));
+            *interior_ptr = Interior::SubstitutesTo(id);
+        }
     }
 }
 
-impl<T: Debug + Clone> From<T> for UniCell<T> {
+impl<T: Debug> From<T> for UniCell<T> {
     fn from(known: T) -> Self {
         Self(UnsafeCell::new(Interior::Known(known)))
     }
@@ -81,31 +110,30 @@ impl<T: Debug + Clone> From<T> for UniCell<T> {
 
 impl<T: Debug + Clone> Clone for UniCell<T> {
     fn clone(&self) -> Self {
-        // We cast to a const pointer here instead, such that we never actually create a &mut that might conflict with another existing shared ref
-        let content_ptr: *const Interior<T> = self.0.get();
         // SAFETY: In shared context, once we're [Interior::Known] that reference will never be invalidated.
-        let result = match unsafe { &*content_ptr } {
-            Interior::Known(known) => {
-                let known_clone = known.clone();
-                Interior::Known(known_clone)
-            }
-            Interior::SubstitutesTo(id) => Interior::SubstitutesTo(*id),
-            Interior::Unallocated => {
-                panic!("Type Variables that aren't yet allocated cannot be cloned!")
-            }
-        };
-        Self(UnsafeCell::new(result))
+        unsafe {
+            // We cast to a const pointer here instead, such that we never actually create a &mut that might conflict with another existing shared ref
+            let interior_ptr: *const Interior<T> = self.0.get();
+            let Interior::Known(known) = &*interior_ptr else {
+                panic!(
+                    "Not fully known substitutables can't be Cloned at all! Use [Substitutor::clone_obj] or [Substitutor::clone_prototype] to make clones."
+                )
+            };
+            let known_clone = known.clone();
+            Self(UnsafeCell::new(Interior::Known(known_clone)))
+        }
     }
 }
 
-impl<T: Debug + Clone> Debug for UniCell<T> {
+impl<T: Debug> Debug for UniCell<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let inner_ptr: *const _ = self.0.get();
-        let inner_ref = unsafe { &*inner_ptr };
-        f.debug_tuple("UniCell").field(inner_ref).finish()
+        unsafe {
+            let interior_ptr: *const Interior<T> = self.0.get();
+            f.debug_tuple("UniCell").field(&*interior_ptr).finish()
+        }
     }
 }
-impl<T: Debug + Clone> Debug for Interior<T> {
+impl<T: Debug> Debug for Interior<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Known(known) => f.debug_tuple("Known").field(known).finish(),
@@ -115,9 +143,10 @@ impl<T: Debug + Clone> Debug for Interior<T> {
     }
 }
 
-pub enum ChainResolution<'s, T> {
-    Known(&'s T),
-    Unknown(usize),
+pub enum ChainResolution<T> {
+    Known(T),
+    /// If no ID is provided, then that means this chain is a [Interior::Unallocated], and is therefore globally unique.
+    Unknown(Option<usize>),
 }
 
 /// This struct bookkeeps the extra state for a Hindley Mindley Union-Find algorithm. It contains the counterparts to [UniCell]'s [Interior::SubstitutesTo]'s ID field.
@@ -127,9 +156,13 @@ pub enum ChainResolution<'s, T> {
 /// - [Self::unify]
 /// - [Self::get_with_substitution]
 /// - [Self::substitute]
-/// - [Self::clone_type]
+/// - [Self::clone_obj]
+/// - [Self::clone_prototype]
 ///
 /// For examples see `impl<'s> Substitutor<'s, PeanoType>`
+///
+/// The reason we don't do a custom trait, but rather require these wrappers, is that a trait makes using nested substitutors more cumbersome.
+/// We'd have to pass "extra data" (the nested substitutors) down the call hierarchy manually.
 pub struct Substitutor<'s, T: Clone + Debug>(AppendOnlyVec<&'s UniCell<T>>);
 
 impl<'s, T: Clone + Debug> Substitutor<'s, T> {
@@ -137,9 +170,11 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
         Self(AppendOnlyVec::new())
     }
 
-    fn alloc(&self, elem: &'s UniCell<T>) -> usize {
+    /// Creates a new substitution map that points to the passed-in object.
+    /// Returns the ID of this map.
+    fn alloc(&self, obj: &'s UniCell<T>) -> usize {
         let idx = self.0.len();
-        self.0.push(elem);
+        self.0.push(obj);
         idx
     }
 
@@ -148,7 +183,7 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
         unsafe {
             let target = self.0.copy_elem(ptr_target);
 
-            let target_ptr: *mut _ = target.0.get();
+            let target_ptr: *mut Interior<T> = target.0.get();
             match &*target_ptr {
                 Interior::Known(_) => ptr_target,
                 Interior::SubstitutesTo(targets_target) => {
@@ -166,7 +201,9 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
                         new_target
                     }
                 }
-                Interior::Unallocated => unreachable!(),
+                Interior::Unallocated => unreachable!(
+                    "Cannot be reached from get_with_subsitutution, it's in the SubstitutesTo branch"
+                ),
             }
         }
     }
@@ -176,28 +213,24 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
     /// Result is either:
     /// - [Interior::Known] is then of course a known value.
     /// - [Interior::SubstitutesTo] that points to itself, signifying no substitution known yet
-    pub fn get_with_substitution(&self, typ: &'s UniCell<T>) -> ChainResolution<'s, T> {
+    pub fn get_with_substitution(&self, obj: &'s UniCell<T>) -> ChainResolution<&'s T> {
         unsafe {
-            let ptr: *mut Interior<T> = typ.0.get();
-            match &*ptr {
+            let interior_ptr: *mut Interior<T> = obj.0.get();
+            match &*interior_ptr {
                 Interior::Known(known) => ChainResolution::Known(known),
                 Interior::SubstitutesTo(to_id) => {
-                    let final_target_id = self.resolve_chain_recurse(ptr, *to_id);
+                    let final_target_id = self.resolve_chain_recurse(interior_ptr, *to_id);
                     let final_target = self.0.copy_elem(final_target_id);
                     match &*final_target.0.get() {
                         Interior::Known(known) => ChainResolution::Known(known),
                         Interior::SubstitutesTo(final_target_id_copy) => {
                             assert_eq!(*final_target_id_copy, final_target_id);
-                            ChainResolution::Unknown(final_target_id)
+                            ChainResolution::Unknown(Some(final_target_id))
                         }
                         Interior::Unallocated => unreachable!(),
                     }
                 }
-                Interior::Unallocated => {
-                    let result_id = self.alloc(typ);
-                    *ptr = Interior::SubstitutesTo(result_id);
-                    ChainResolution::Unknown(result_id)
-                }
+                Interior::Unallocated => ChainResolution::Unknown(None),
             }
         }
     }
@@ -224,13 +257,19 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
         match (resol_a, resol_b) {
             (ChainResolution::Known(a), ChainResolution::Known(b)) => {
                 if std::ptr::eq(a, b) {
-                    UnifyResult::Success // Minor optimization, when we see referential equality
+                    UnifyResult::Success // Minor but common optimization, when we see referential equality we can immediately exit
                 } else {
                     unify_subtrees(a, b)
                 }
             }
             (ChainResolution::Known(known), ChainResolution::Unknown(id)) => {
+                let id = id.unwrap_or_else(|| {
+                    let id_b = self.alloc(b);
+                    b.init_uninit_to(id_b);
+                    id_b
+                });
                 if contains_subtree(known, id) {
+                    // Always have to check contains_subtree. Could be that a contains b which was uninit
                     UnifyResult::FailureInfiniteTypes
                 } else {
                     let _ = self.0.set_elem(id, a);
@@ -238,6 +277,11 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
                 }
             }
             (ChainResolution::Unknown(id), ChainResolution::Known(known)) => {
+                let id = id.unwrap_or_else(|| {
+                    let id_a = self.alloc(a);
+                    a.init_uninit_to(id_a);
+                    id_a
+                });
                 if contains_subtree(known, id) {
                     UnifyResult::FailureInfiniteTypes
                 } else {
@@ -245,20 +289,41 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
                     UnifyResult::Success
                 }
             }
-            (ChainResolution::Unknown(id), ChainResolution::Unknown(_)) => {
-                let _ = self.0.set_elem(id, b);
+            (ChainResolution::Unknown(id_a), ChainResolution::Unknown(id_b)) => {
+                match (id_a, id_b) {
+                    (None, None) => {
+                        let id_a = self.alloc(a);
+                        a.init_uninit_to(id_a);
+                        b.init_uninit_to(id_a);
+                    }
+                    (None, Some(id_b)) => {
+                        a.init_uninit_to(id_b);
+                    }
+                    (Some(id_a), None) => {
+                        b.init_uninit_to(id_a);
+                    }
+                    (Some(id_a), Some(_id_b)) => {
+                        let _ = self.0.set_elem(id_a, b);
+                    }
+                }
                 UnifyResult::Success
             }
         }
     }
 
     /// `recursively_subsitute` must call [Self::substitute] on every child [UniCell]
-    pub fn substitute(&self, typ: &'s UniCell<T>, recursively_subsitute: impl FnOnce(&'s T)) {
-        if let Some(known) = typ.get() {
-            recursively_subsitute(known);
+    ///
+    /// Returns `true` if substitution was successful (the resulting type is now fully known and clone-able)
+    pub fn substitute(
+        &self,
+        obj: &'s UniCell<T>,
+        recursively_subsitute: impl FnOnce(&'s T) -> bool,
+    ) -> bool {
+        if let Some(known) = obj.get() {
+            recursively_subsitute(known)
         } else {
-            match self.get_with_substitution(typ) {
-                ChainResolution::Known(known) => unsafe {
+            match self.get_with_substitution(obj) {
+                ChainResolution::Known(known) => {
                     recursively_subsitute(known);
 
                     // Because we've done the recusive_substitute,
@@ -266,29 +331,59 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
                     // `known` can safely be cloned, it can't contain any Unallocateds anymore
                     let known_clone = known.clone();
 
-                    *typ.0.get() = Interior::Known(known_clone);
-                },
-                ChainResolution::Unknown(_) => {}
+                    unsafe {
+                        *obj.0.get() = Interior::Known(known_clone);
+                    }
+
+                    true
+                }
+                ChainResolution::Unknown(_) => false,
             }
         }
     }
 
     /// When constructing types regular Clone is not a good option. It'll crash due to [Interior::Unallocated].
-    /// Instead this version either allocates a new variable for it, or copies the existing substitution
-    pub fn clone_type(&self, typ: &'s UniCell<T>) -> UniCell<T> {
-        let ptr: *mut _ = typ.0.get();
-        let new_id = match unsafe { &*ptr } {
-            Interior::Known(_) => self.alloc(typ),
-            Interior::SubstitutesTo(id) => *id,
-            Interior::Unallocated => {
-                let slf_id = self.alloc(typ);
-                unsafe {
-                    *ptr = Interior::SubstitutesTo(slf_id);
+    /// Instead this version either allocates a new variable for it, or copies the existing substitution.
+    pub fn clone_obj(&self, obj: &'s UniCell<T>) -> UniCell<T> {
+        unsafe {
+            let interior_ptr: *mut Interior<T> = obj.0.get();
+            let new_interior = match &*interior_ptr {
+                Interior::Known(_) => {
+                    let id = self.alloc(obj);
+                    Interior::SubstitutesTo(id)
                 }
-                slf_id
-            }
-        };
-        UniCell(UnsafeCell::new(Interior::SubstitutesTo(new_id)))
+                Interior::SubstitutesTo(id) => Interior::SubstitutesTo(*id),
+                Interior::Unallocated => {
+                    let slf_id = self.alloc(obj);
+                    *interior_ptr = Interior::SubstitutesTo(slf_id);
+                    Interior::SubstitutesTo(slf_id)
+                }
+            };
+            UniCell(UnsafeCell::new(new_interior))
+        }
+    }
+
+    /// Custom Clone function exclusively for cloning just-created types, that have no unification relations yet.
+    /// It means that any variables that have been created without being [UniCell::set_initial] will become new distinct variables from the original.
+    /// May panic if [Self::unify] has ever been called on it.
+    ///
+    /// `clone_recurse` must recursively call [Self::clone_prototype] on parts of T that it clones.
+    pub fn clone_prototype(
+        &self,
+        obj: &'s UniCell<T>,
+        clone_recurse: impl FnOnce(&'s T) -> T,
+    ) -> UniCell<T> {
+        unsafe {
+            let interior_ptr: *mut Interior<T> = obj.0.get();
+            let new_interior = match &*interior_ptr {
+                Interior::Known(known) => Interior::Known(clone_recurse(known)),
+                Interior::SubstitutesTo(_) => unreachable!(
+                    "[Substitutor::clone_prototype] on a type that has had [Substitutor::unify] called on it before"
+                ),
+                Interior::Unallocated => Interior::Unallocated,
+            };
+            UniCell(UnsafeCell::new(new_interior))
+        }
     }
 }
 
@@ -322,7 +417,7 @@ impl<'s> Substitutor<'s, PeanoType> {
             PeanoType::Zero => false,
             PeanoType::Succ(subtree_cell) => match self.get_with_substitution(subtree_cell) {
                 ChainResolution::Known(known) => self.contains_subtree(known, target),
-                ChainResolution::Unknown(var) => var == target,
+                ChainResolution::Unknown(var) => var == Some(target),
             },
         }
     }
@@ -338,9 +433,10 @@ impl<'s> Substitutor<'s, PeanoType> {
             },
         )
     }
-    fn fully_substitute(&self, typ: &'s UniCell<PeanoType>) {
-        self.substitute(typ, |inner| match inner {
-            PeanoType::Zero => {}
+    /// Returns `true` if fully_subsitutite succeeded, and thus the resulting type is now *known* and is clone-able.
+    fn fully_substitute(&self, obj: &'s UniCell<PeanoType>) -> bool {
+        self.substitute(obj, |inner| match inner {
+            PeanoType::Zero => true,
             PeanoType::Succ(inner) => self.fully_substitute(inner),
         })
     }
@@ -401,7 +497,7 @@ mod tests {
         let four = mk_peano_cell(4);
 
         let a = PeanoType::UNKNOWN;
-        let three_plus_a = add_to_cell(substitutor.clone_type(&a), 3);
+        let three_plus_a = add_to_cell(substitutor.clone_obj(&a), 3);
 
         substitutor.unify_peanos(&four, &three_plus_a);
 
@@ -415,7 +511,7 @@ mod tests {
         let substitutor = Substitutor::new();
 
         let a = PeanoType::UNKNOWN;
-        let a_plus_zero = add_to_cell(substitutor.clone_type(&a), 0);
+        let a_plus_zero = add_to_cell(substitutor.clone_obj(&a), 0);
 
         assert_eq!(
             substitutor.unify_peanos(&a, &a_plus_zero),
@@ -454,7 +550,7 @@ mod tests {
         let substitutor = Substitutor::new();
 
         let a = PeanoType::UNKNOWN;
-        let a_plus_one = add_to_cell(substitutor.clone_type(&a), 1);
+        let a_plus_one = add_to_cell(substitutor.clone_obj(&a), 1);
 
         assert_eq!(
             substitutor.unify_peanos(&a, &a_plus_one),
@@ -474,8 +570,8 @@ mod tests {
 
         let one = mk_peano_cell(1);
         let two = mk_peano_cell(2);
-        let one_plus_three = add_to_cell(substitutor.clone_type(&one), 3);
-        let two_plus_two = add_to_cell(substitutor.clone_type(&two), 2);
+        let one_plus_three = add_to_cell(substitutor.clone_obj(&one), 3);
+        let two_plus_two = add_to_cell(substitutor.clone_obj(&two), 2);
 
         // 2+2 == 1+3
         assert_eq!(
@@ -494,9 +590,9 @@ mod tests {
 
         // x = 2, y = x + 1, z = y + 1
         x.set_initial(PeanoType::Zero);
-        let x_plus_2 = add_to_cell(substitutor.clone_type(&x), 2);
-        let y_val = add_to_cell(substitutor.clone_type(&x), 1);
-        let z_val = add_to_cell(substitutor.clone_type(&y), 1);
+        let x_plus_2 = add_to_cell(substitutor.clone_obj(&x), 2);
+        let y_val = add_to_cell(substitutor.clone_obj(&x), 1);
+        let z_val = add_to_cell(substitutor.clone_obj(&y), 1);
 
         // Unify y with x+1, z with y+1, and z with x+2
         assert_eq!(substitutor.unify_peanos(&y, &y_val), UnifyResult::Success);
@@ -525,8 +621,8 @@ mod tests {
 
         // a = 2, b = a + 2, c = b + 1
         a.set_initial(PeanoType::Zero);
-        let b_val = add_to_cell(substitutor.clone_type(&a), 2);
-        let c_val = add_to_cell(substitutor.clone_type(&b), 1);
+        let b_val = add_to_cell(substitutor.clone_obj(&a), 2);
+        let c_val = add_to_cell(substitutor.clone_obj(&b), 1);
 
         assert_eq!(substitutor.unify_peanos(&b, &b_val), UnifyResult::Success);
         assert_eq!(substitutor.unify_peanos(&c, &c_val), UnifyResult::Success);
@@ -569,8 +665,7 @@ mod tests {
                     // Add a computed successor
                     let ontu = cells.choose(&mut rng).unwrap();
                     let add_count = rng.random_range(0..5);
-                    let new_cell =
-                        arena.alloc(add_to_cell(substitutor.clone_type(ontu), add_count));
+                    let new_cell = arena.alloc(add_to_cell(substitutor.clone_obj(ontu), add_count));
                     all_peanos_pool.push(&*new_cell);
                 }
                 1 => {
@@ -584,10 +679,10 @@ mod tests {
                     // Fully substitute something
                     let a = cells.choose(&mut rng).unwrap();
 
-                    substitutor.fully_substitute(a);
-
-                    // Can clone values after a fully_substitute
-                    let _a_clone = a.clone();
+                    if substitutor.fully_substitute(a) {
+                        // Can clone values after a successful fully_substitute
+                        let _a_clone = a.clone();
+                    }
                 }
                 _ => unreachable!(),
             }
