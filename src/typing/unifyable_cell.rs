@@ -2,6 +2,12 @@ use std::{cell::UnsafeCell, fmt::Debug};
 
 use crate::{append_only_vec::AppendOnlyVec, let_unwrap, typing::type_inference::UnifyResult};
 
+/// Basically a [std::cell::OnceCell] for type checking. We implement it safely by maintaining the following invariant:
+///
+/// - [UniCell] starts out [UniCell::UNKNOWN]. No interior references can be taken in this state. (But the type variable we refer to *can* be updated)
+/// - At some point, it is set to some Known value. After this point references to this interior value can be taken.
+///   Afterwards, we can *never* reset a Known back to an Unknown, or mess with it in any mutable way. (Panics when trying otherwise)
+pub struct UniCell<T: Debug + Clone>(UnsafeCell<Interior<T>>);
 enum Interior<T: Debug + Clone> {
     Known(T),
     /// If no substitution is known yet, then this points to itself (may be in any cycle length, [Substitutor::resolve_substitution_chain] is there to contract it).
@@ -9,45 +15,6 @@ enum Interior<T: Debug + Clone> {
     /// Default state of a new Type Variable. This means the variable is *unique*, and so we don't yet need an ID to track its Unification.
     /// CANNOT BE CLONED (panics)
     Unallocated,
-}
-
-impl<T: Debug + Clone> Clone for Interior<T> {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Known(arg0) => Self::Known(arg0.clone()),
-            Self::SubstitutesTo(var) => Self::SubstitutesTo(*var),
-            Self::Unallocated => {
-                unreachable!(
-                    "Cannot clone Unallocated! That would add an incorrect dependency! Use [Substitutor::clone_type] instead!"
-                )
-            }
-        }
-    }
-}
-
-impl<T: Debug + Clone> Debug for Interior<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Known(known) => f.debug_tuple("Known").field(known).finish(),
-            Self::SubstitutesTo(to) => f.debug_tuple("SubstitutesTo").field(to).finish(),
-            Self::Unallocated => write!(f, "Unallocated"),
-        }
-    }
-}
-
-/// Basically a [std::cell::OnceCell] for type checking. We implement it safely by maintaining the following invariant:
-///
-/// - [UniCell] starts out [UniCell::UNKNOWN]. No interior references can be taken in this state. (But the type variable we refer to *can* be updated)
-/// - At some point, it is set to some Known value. After this point references to this interior value can be taken.
-///   Afterwards, we can *never* reset a Known back to an Unknown, or mess with it in any mutable way. (Panics when trying otherwise)
-pub struct UniCell<T: Debug + Clone>(UnsafeCell<Interior<T>>);
-
-impl<T: Debug + Clone> Debug for UniCell<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let inner_ptr: *const _ = self.0.get();
-        let inner_ref = unsafe { &*inner_ptr };
-        f.debug_tuple("UniCell").field(inner_ref).finish()
-    }
 }
 
 impl<T: Debug + Clone> UniCell<T> {
@@ -131,20 +98,41 @@ impl<T: Debug + Clone> Clone for UniCell<T> {
     }
 }
 
+impl<T: Debug + Clone> Debug for UniCell<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let inner_ptr: *const _ = self.0.get();
+        let inner_ref = unsafe { &*inner_ptr };
+        f.debug_tuple("UniCell").field(inner_ref).finish()
+    }
+}
+impl<T: Debug + Clone> Debug for Interior<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Known(known) => f.debug_tuple("Known").field(known).finish(),
+            Self::SubstitutesTo(to) => f.debug_tuple("SubstitutesTo").field(to).finish(),
+            Self::Unallocated => write!(f, "Unallocated"),
+        }
+    }
+}
+
 pub enum ChainResolution<'s, T> {
     Known(&'s T),
     Unknown(usize),
 }
 
-pub struct Substitutor<'s, Typ: Debug + Clone>(AppendOnlyVec<&'s UniCell<Typ>>);
+/// This struct bookkeeps the extra state for a Hindley Mindley Union-Find algorithm. It contains the counterparts to [UniCell]'s [Interior::SubstitutesTo]'s ID field.
+/// All references are to [UniCell]s in the field. If a new value needs to be injected into the graph of [UniCell]s, then it should be [UniCell::set_initial].
+///
+/// To use, you should make custom wrappers around:
+/// - [Self::unify]
+/// - [Self::get_with_substitution]
+/// - [Self::substitute]
+/// - [Self::clone_type]
+///
+/// For examples see `impl<'s> Substitutor<'s, PeanoType>`
+pub struct Substitutor<'s, T: Clone + Debug>(AppendOnlyVec<&'s UniCell<T>>);
 
-impl<'s, Typ> Default for Substitutor<'s, Typ> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<'s, T: Debug + Clone> Substitutor<'s, T> {
+impl<'s, T: Clone + Debug> Substitutor<'s, T> {
     pub fn new() -> Self {
         Self(AppendOnlyVec::new())
     }
@@ -182,11 +170,12 @@ impl<'s, T: Debug + Clone> Substitutor<'s, T> {
             }
         }
     }
+
     /// Resolves a possibly extensive chain of substitutions to a single node.
     ///
     /// Result is either:
-    ///     [Interior::Known] is then of course a known value.
-    ///     [Interior::SubstitutesTo] that points to itself, signifying no substitution known yet
+    /// - [Interior::Known] is then of course a known value.
+    /// - [Interior::SubstitutesTo] that points to itself, signifying no substitution known yet
     pub fn get_with_substitution(&self, typ: &'s UniCell<T>) -> ChainResolution<'s, T> {
         unsafe {
             let ptr: *mut Interior<T> = typ.0.get();
@@ -272,7 +261,9 @@ impl<'s, T: Debug + Clone> Substitutor<'s, T> {
                 ChainResolution::Known(known) => unsafe {
                     recursively_subsitute(known);
 
-                    // Because we've done the recusive_substitute, that should've called `substitute` on every recursive [UniCell], `known` can safely be cloned, it can't contain any Unallocateds anymore
+                    // Because we've done the recusive_substitute,
+                    // that should've called `substitute` on every recursive [UniCell],
+                    // `known` can safely be cloned, it can't contain any Unallocateds anymore
                     let known_clone = known.clone();
 
                     *typ.0.get() = Interior::Known(known_clone);
@@ -282,7 +273,8 @@ impl<'s, T: Debug + Clone> Substitutor<'s, T> {
         }
     }
 
-    /// When constructing types regular Clone is not a good option. It'll crash due to [Interior::Unallocated]. Instead this version either allocates a new variable for it, or copies the existing substitution
+    /// When constructing types regular Clone is not a good option. It'll crash due to [Interior::Unallocated].
+    /// Instead this version either allocates a new variable for it, or copies the existing substitution
     pub fn clone_type(&self, typ: &'s UniCell<T>) -> UniCell<T> {
         let ptr: *mut _ = typ.0.get();
         let new_id = match unsafe { &*ptr } {
@@ -297,6 +289,12 @@ impl<'s, T: Debug + Clone> Substitutor<'s, T> {
             }
         };
         UniCell(UnsafeCell::new(Interior::SubstitutesTo(new_id)))
+    }
+}
+
+impl<'s, T: Clone + Debug> Default for Substitutor<'s, T> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
