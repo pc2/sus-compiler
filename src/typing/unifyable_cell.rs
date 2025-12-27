@@ -143,10 +143,13 @@ impl<T: Debug> Debug for Interior<T> {
     }
 }
 
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+pub struct VarID(usize);
+
 pub enum ChainResolution<T> {
     Known(T),
     /// If no ID is provided, then that means this chain is a [Interior::Unallocated], and is therefore globally unique.
-    Unknown(Option<usize>),
+    Unknown(Option<VarID>),
 }
 
 /// This struct bookkeeps the extra state for a Hindley Mindley Union-Find algorithm. It contains the counterparts to [UniCell]'s [Interior::SubstitutesTo]'s ID field.
@@ -225,7 +228,7 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
                         Interior::Known(known) => ChainResolution::Known(known),
                         Interior::SubstitutesTo(final_target_id_copy) => {
                             assert_eq!(*final_target_id_copy, final_target_id);
-                            ChainResolution::Unknown(Some(final_target_id))
+                            ChainResolution::Unknown(Some(VarID(final_target_id)))
                         }
                         Interior::Unallocated => unreachable!(),
                     }
@@ -248,7 +251,7 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
         &self,
         a: &'s UniCell<T>,
         b: &'s UniCell<T>,
-        contains_subtree: impl FnOnce(&'s T, usize) -> bool,
+        contains_subtree: impl FnOnce(&'s T, VarID) -> bool,
         unify_subtrees: impl FnOnce(&'s T, &'s T) -> UnifyResult,
     ) -> UnifyResult {
         let resol_a = self.get_with_substitution(a);
@@ -266,13 +269,13 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
                 let id = id.unwrap_or_else(|| {
                     let id_b = self.alloc(b);
                     b.init_uninit_to(id_b);
-                    id_b
+                    VarID(id_b)
                 });
                 if contains_subtree(known, id) {
                     // Always have to check contains_subtree. Could be that a contains b which was uninit
                     UnifyResult::FailureInfiniteTypes
                 } else {
-                    let _ = self.0.set_elem(id, a);
+                    let _ = self.0.set_elem(id.0, a);
                     UnifyResult::Success
                 }
             }
@@ -280,12 +283,12 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
                 let id = id.unwrap_or_else(|| {
                     let id_a = self.alloc(a);
                     a.init_uninit_to(id_a);
-                    id_a
+                    VarID(id_a)
                 });
                 if contains_subtree(known, id) {
                     UnifyResult::FailureInfiniteTypes
                 } else {
-                    let _ = self.0.set_elem(id, b);
+                    let _ = self.0.set_elem(id.0, b);
                     UnifyResult::Success
                 }
             }
@@ -297,13 +300,13 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
                         b.init_uninit_to(id_a);
                     }
                     (None, Some(id_b)) => {
-                        a.init_uninit_to(id_b);
+                        a.init_uninit_to(id_b.0);
                     }
                     (Some(id_a), None) => {
-                        b.init_uninit_to(id_a);
+                        b.init_uninit_to(id_a.0);
                     }
                     (Some(id_a), Some(_id_b)) => {
-                        let _ = self.0.set_elem(id_a, b);
+                        let _ = self.0.set_elem(id_a.0, b);
                     }
                 }
                 UnifyResult::Success
@@ -412,7 +415,7 @@ impl PeanoType {
 }
 
 impl<'s> Substitutor<'s, PeanoType> {
-    fn contains_subtree(&self, find_in: &'s PeanoType, target: usize) -> bool {
+    fn contains_subtree(&self, find_in: &'s PeanoType, target: VarID) -> bool {
         match find_in {
             PeanoType::Zero => false,
             PeanoType::Succ(subtree_cell) => match self.get_with_substitution(subtree_cell) {
