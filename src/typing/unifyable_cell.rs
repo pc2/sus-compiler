@@ -166,25 +166,35 @@ pub enum ChainResolution<T> {
 ///
 /// The reason we don't do a custom trait, but rather require these wrappers, is that a trait makes using nested substitutors more cumbersome.
 /// We'd have to pass "extra data" (the nested substitutors) down the call hierarchy manually.
-pub struct Substitutor<'s, T: Clone + Debug>(AppendOnlyVec<&'s UniCell<T>>);
+///
+/// [Substitutor] references are *shared* on purpose (I've tried to replace them with &mut many times before).
+/// The reason is that shared refs allow for more ergonomic recursive implementations of [Self::unify] and friends.
+/// If we're building a [Substitutor] wrapper that includes more data (like delayed constraints for instance), then
+/// going through the trouble with &mut refs is not worth it. Passing it along the call stack is also no bueno,
+/// we'd have to pass the unifier itself, plus whatever extra data the user wants to attach to it. Lots of complexity for nothing.
+pub struct Substitutor<'s, T: Clone + Debug> {
+    substitutor: AppendOnlyVec<&'s UniCell<T>>,
+}
 
 impl<'s, T: Clone + Debug> Substitutor<'s, T> {
     pub fn new() -> Self {
-        Self(AppendOnlyVec::new())
+        Self {
+            substitutor: AppendOnlyVec::new(),
+        }
     }
 
     /// Creates a new substitution map that points to the passed-in object.
     /// Returns the ID of this map.
     fn alloc(&self, obj: &'s UniCell<T>) -> usize {
-        let idx = self.0.len();
-        self.0.push(obj);
+        let idx = self.substitutor.len();
+        self.substitutor.push(obj);
         idx
     }
 
     /// `ptr` must be [Interior::SubstitutesTo]
     fn resolve_chain_recurse(&self, ptr: *mut Interior<T>, ptr_target: usize) -> usize {
         unsafe {
-            let target = self.0.copy_elem(ptr_target);
+            let target = self.substitutor.copy_elem(ptr_target);
 
             let target_ptr: *mut Interior<T> = target.0.get();
             match &*target_ptr {
@@ -223,7 +233,7 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
                 Interior::Known(known) => ChainResolution::Known(known),
                 Interior::SubstitutesTo(to_id) => {
                     let final_target_id = self.resolve_chain_recurse(interior_ptr, *to_id);
-                    let final_target = self.0.copy_elem(final_target_id);
+                    let final_target = self.substitutor.copy_elem(final_target_id);
                     match &*final_target.0.get() {
                         Interior::Known(known) => ChainResolution::Known(known),
                         Interior::SubstitutesTo(final_target_id_copy) => {
@@ -275,7 +285,7 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
                     // Always have to check contains_subtree. Could be that a contains b which was uninit
                     UnifyResult::FailureInfiniteTypes
                 } else {
-                    let _ = self.0.set_elem(id.0, a);
+                    let _ = self.substitutor.set_elem(id.0, a);
                     UnifyResult::Success
                 }
             }
@@ -288,7 +298,7 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
                 if contains_subtree(known, id) {
                     UnifyResult::FailureInfiniteTypes
                 } else {
-                    let _ = self.0.set_elem(id.0, b);
+                    let _ = self.substitutor.set_elem(id.0, b);
                     UnifyResult::Success
                 }
             }
@@ -306,7 +316,7 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
                         b.init_uninit_to(id_a.0);
                     }
                     (Some(id_a), Some(_id_b)) => {
-                        let _ = self.0.set_elem(id_a.0, b);
+                        let _ = self.substitutor.set_elem(id_a.0, b);
                     }
                 }
                 UnifyResult::Success
