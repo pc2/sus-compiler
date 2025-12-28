@@ -360,7 +360,6 @@ mod tests {
         let a = IBig::from(-7);
         let b = IBig::from(-5);
 
-        dbg!((-7) % (-5));
         assert!(a % b == IBig::from((-7) % (-5)))
     }
 }

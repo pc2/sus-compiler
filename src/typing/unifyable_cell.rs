@@ -1,6 +1,6 @@
 use std::{cell::UnsafeCell, fmt::Debug};
 
-use crate::{append_only_vec::AppendOnlyVec, let_unwrap, typing::type_inference::UnifyResult};
+use crate::{let_unwrap, typing::type_inference::UnifyResult};
 
 /// Basically a [std::cell::OnceCell] for type checking. We implement it safely by maintaining the following invariant:
 ///
@@ -100,6 +100,24 @@ impl<T: Debug> UniCell<T> {
             *interior_ptr = Interior::SubstitutesTo(id);
         }
     }
+    fn replace_substitution_with_known(&self, originally_substituted_to: Option<usize>, known: T) {
+        // SAFETY: We're currently not yet Interior::Known, so we can safely replace our internals with the new known value.
+        // To catch logic errors, we explicitly check that we did originally point to the given substitution
+        unsafe {
+            let interior_ptr: *mut Interior<T> = self.0.get();
+            match *interior_ptr {
+                Interior::Known(_) => unreachable!(),
+                Interior::SubstitutesTo(id) => {
+                    assert_eq!(Some(id), originally_substituted_to);
+                    *interior_ptr = Interior::Known(known);
+                }
+                Interior::Unallocated => {
+                    assert_eq!(None, originally_substituted_to);
+                    *interior_ptr = Interior::Known(known);
+                }
+            }
+        }
+    }
 }
 
 impl<T: Debug> From<T> for UniCell<T> {
@@ -116,7 +134,7 @@ impl<T: Debug + Clone> Clone for UniCell<T> {
             let interior_ptr: *const Interior<T> = self.0.get();
             let Interior::Known(known) = &*interior_ptr else {
                 panic!(
-                    "Not fully known substitutables can't be Cloned at all! Use [Substitutor::clone_obj] or [Substitutor::clone_prototype] to make clones."
+                    "Not fully known substitutables can't be Cloned at all! Use [Unifier::clone_obj] or [Unifier::clone_prototype] to make clones."
                 )
             };
             let known_clone = known.clone();
@@ -143,9 +161,10 @@ impl<T: Debug> Debug for Interior<T> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct VarID(usize);
 
+#[derive(Debug)]
 pub enum ChainResolution<T> {
     Known(T),
     /// If no ID is provided, then that means this chain is a [Interior::Unallocated], and is therefore globally unique.
@@ -155,46 +174,34 @@ pub enum ChainResolution<T> {
 /// This struct bookkeeps the extra state for a Hindley Mindley Union-Find algorithm. It contains the counterparts to [UniCell]'s [Interior::SubstitutesTo]'s ID field.
 /// All references are to [UniCell]s in the field. If a new value needs to be injected into the graph of [UniCell]s, then it should be [UniCell::set_initial].
 ///
-/// To use, you should make custom wrappers around:
-/// - [Self::unify]
-/// - [Self::get_with_substitution]
-/// - [Self::substitute]
-/// - [Self::clone_obj]
-/// - [Self::clone_prototype]
+/// To use, you should implement [Unifier], which should include a [Substitutor] field.
 ///
-/// For examples see `impl<'s> Substitutor<'s, PeanoType>`
+/// For examples see [PeanoUnifier]
 ///
-/// The reason we don't do a custom trait, but rather require these wrappers, is that a trait makes using nested substitutors more cumbersome.
-/// We'd have to pass "extra data" (the nested substitutors) down the call hierarchy manually.
-///
-/// [Substitutor] references are *shared* on purpose (I've tried to replace them with &mut many times before).
-/// The reason is that shared refs allow for more ergonomic recursive implementations of [Self::unify] and friends.
-/// If we're building a [Substitutor] wrapper that includes more data (like delayed constraints for instance), then
-/// going through the trouble with &mut refs is not worth it. Passing it along the call stack is also no bueno,
-/// we'd have to pass the unifier itself, plus whatever extra data the user wants to attach to it. Lots of complexity for nothing.
-pub struct Substitutor<'s, T: Clone + Debug> {
-    substitutor: AppendOnlyVec<&'s UniCell<T>>,
-}
+/// The [Unifier] trait gets a bit complicated, as it has many members that need to be implemented,
+/// but this complicatedness allows it to be able to be used for more complex multi-substitutor unifiers.
+/// `&mut self` is passed down manually, and so is able to be presented at the interface.
+/// Everything the user needs for unification should be part of their custom [Unifier]-implementing struct.
+#[derive(Debug)]
+pub struct Substitutor<'s, T: Debug>(Vec<&'s UniCell<T>>);
 
-impl<'s, T: Clone + Debug> Substitutor<'s, T> {
+impl<'s, T: Debug> Substitutor<'s, T> {
     pub fn new() -> Self {
-        Self {
-            substitutor: AppendOnlyVec::new(),
-        }
+        Self(Vec::new())
     }
 
     /// Creates a new substitution map that points to the passed-in object.
     /// Returns the ID of this map.
-    fn alloc(&self, obj: &'s UniCell<T>) -> usize {
-        let idx = self.substitutor.len();
-        self.substitutor.push(obj);
+    fn alloc(&mut self, obj: &'s UniCell<T>) -> usize {
+        let idx = self.0.len();
+        self.0.push(obj);
         idx
     }
 
     /// `ptr` must be [Interior::SubstitutesTo]
-    fn resolve_chain_recurse(&self, ptr: *mut Interior<T>, ptr_target: usize) -> usize {
+    fn resolve_chain_recurse(&mut self, ptr: *mut Interior<T>, ptr_target: usize) -> usize {
         unsafe {
-            let target = self.substitutor.copy_elem(ptr_target);
+            let target = self.0[ptr_target];
 
             let target_ptr: *mut Interior<T> = target.0.get();
             match &*target_ptr {
@@ -226,14 +233,14 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
     /// Result is either:
     /// - [Interior::Known] is then of course a known value.
     /// - [Interior::SubstitutesTo] that points to itself, signifying no substitution known yet
-    pub fn get_with_substitution(&self, obj: &'s UniCell<T>) -> ChainResolution<&'s T> {
+    pub fn resolve_substitution_chain(&mut self, obj: &'s UniCell<T>) -> ChainResolution<&'s T> {
         unsafe {
             let interior_ptr: *mut Interior<T> = obj.0.get();
             match &*interior_ptr {
                 Interior::Known(known) => ChainResolution::Known(known),
                 Interior::SubstitutesTo(to_id) => {
                     let final_target_id = self.resolve_chain_recurse(interior_ptr, *to_id);
-                    let final_target = self.substitutor.copy_elem(final_target_id);
+                    let final_target = self.0[final_target_id];
                     match &*final_target.0.get() {
                         Interior::Known(known) => ChainResolution::Known(known),
                         Interior::SubstitutesTo(final_target_id_copy) => {
@@ -247,65 +254,86 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
             }
         }
     }
+}
+
+/// By implementing [Unifier], you gain access to:
+/// - [Unifier::unify]
+/// - [Unifier::fully_substitute]
+/// - [Unifier::clone_obj]
+/// - [Unifier::clone_prototype]
+pub trait Unifier<'s, T: Debug> {
+    /// Your Unifier should have a field `substitutor: Substitutor<'s, T>`, return it here.
+    fn get_substitutor_mut(&mut self) -> &mut Substitutor<'s, T>;
 
     /// `contains_subtree` is used to prevent infinite types.
-    /// It must be implemented using [Self::get_with_substitution] to iterate through its subtrees.
+    /// It must be implemented using [Substitutor::resolve_substitution_chain] to iterate through its subtrees.
     /// If a subtree is found that contains the given pointer it must return true.
-    ///
-    /// `unify_subtrees` should recursively call [Self::unify] for every pair of subtrees.
+    fn contains_subtree(&mut self, in_obj: &'s T, subtree_var: VarID) -> bool;
+
+    /// `unify_subtrees` should recursively call [Unifier::unify] for every pair of subtrees.
     /// If some irreconcilable difference is found it should return [UnifyResult::Failure].
     /// Otherwise return the binary AND of subtree unifications.
     /// Regardless of failure, all subtrees should be unified for best possible type error information.
     /// You as the user should never return [UnifyResult::FailureInfiniteTypes]
-    pub fn unify(
-        &self,
-        a: &'s UniCell<T>,
-        b: &'s UniCell<T>,
-        contains_subtree: impl FnOnce(&'s T, VarID) -> bool,
-        unify_subtrees: impl FnOnce(&'s T, &'s T) -> UnifyResult,
-    ) -> UnifyResult {
-        let resol_a = self.get_with_substitution(a);
-        let resol_b = self.get_with_substitution(b);
+    fn unify_subtrees(&mut self, left: &'s T, right: &'s T) -> UnifyResult;
+
+    /// `recursively_subsitute` must call [Unifier::substitute] on every child [UniCell]
+    fn recursively_subsitute(&mut self, obj: &'s T) -> bool;
+
+    /// Should call [Unifier::clone_obj] on all the sub-fields of this object.
+    fn clone_obj_recurse(&mut self, obj: &'s T) -> T;
+
+    /// `clone_prototype_recurse` must recursively call [Unifier::clone_prototype] on parts of T that it clones.
+    fn clone_prototype_recurse(&mut self, obj: &'s T) -> T;
+
+    fn unify(&mut self, a: &'s UniCell<T>, b: &'s UniCell<T>) -> UnifyResult {
+        let subs = self.get_substitutor_mut();
+
+        let resol_a = subs.resolve_substitution_chain(a);
+        let resol_b = subs.resolve_substitution_chain(b);
 
         match (resol_a, resol_b) {
             (ChainResolution::Known(a), ChainResolution::Known(b)) => {
                 if std::ptr::eq(a, b) {
                     UnifyResult::Success // Minor but common optimization, when we see referential equality we can immediately exit
                 } else {
-                    unify_subtrees(a, b)
+                    self.unify_subtrees(a, b)
                 }
             }
             (ChainResolution::Known(known), ChainResolution::Unknown(id)) => {
-                let id = id.unwrap_or_else(|| {
-                    let id_b = self.alloc(b);
-                    b.init_uninit_to(id_b);
-                    VarID(id_b)
-                });
-                if contains_subtree(known, id) {
-                    // Always have to check contains_subtree. Could be that a contains b which was uninit
-                    UnifyResult::FailureInfiniteTypes
-                } else {
-                    let _ = self.substitutor.set_elem(id.0, a);
-                    UnifyResult::Success
+                if let Some(id) = id {
+                    if self.contains_subtree(known, id) {
+                        // Always have to check contains_subtree. Could be that a contains b which was uninit
+                        return UnifyResult::FailureInfiniteTypes;
+                    }
                 }
+                let known_clone = self.clone_obj_recurse(known);
+                b.replace_substitution_with_known(id.map(|v| v.0), known_clone);
+                if let Some(id) = id {
+                    let subs = self.get_substitutor_mut();
+                    subs.0[id.0] = a;
+                }
+                UnifyResult::Success
             }
             (ChainResolution::Unknown(id), ChainResolution::Known(known)) => {
-                let id = id.unwrap_or_else(|| {
-                    let id_a = self.alloc(a);
-                    a.init_uninit_to(id_a);
-                    VarID(id_a)
-                });
-                if contains_subtree(known, id) {
-                    UnifyResult::FailureInfiniteTypes
-                } else {
-                    let _ = self.substitutor.set_elem(id.0, b);
-                    UnifyResult::Success
+                if let Some(id) = id {
+                    if self.contains_subtree(known, id) {
+                        // Always have to check contains_subtree. Could be that a contains b which was uninit
+                        return UnifyResult::FailureInfiniteTypes;
+                    }
                 }
+                let known_clone = self.clone_obj_recurse(known);
+                a.replace_substitution_with_known(id.map(|v| v.0), known_clone);
+                if let Some(id) = id {
+                    let subs = self.get_substitutor_mut();
+                    subs.0[id.0] = b;
+                }
+                UnifyResult::Success
             }
             (ChainResolution::Unknown(id_a), ChainResolution::Unknown(id_b)) => {
                 match (id_a, id_b) {
                     (None, None) => {
-                        let id_a = self.alloc(a);
+                        let id_a = subs.alloc(a);
                         a.init_uninit_to(id_a);
                         b.init_uninit_to(id_a);
                     }
@@ -316,7 +344,7 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
                         b.init_uninit_to(id_a.0);
                     }
                     (Some(id_a), Some(_id_b)) => {
-                        let _ = self.substitutor.set_elem(id_a.0, b);
+                        subs.0[id_a.0] = b;
                     }
                 }
                 UnifyResult::Success
@@ -324,25 +352,20 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
         }
     }
 
-    /// `recursively_subsitute` must call [Self::substitute] on every child [UniCell]
-    ///
     /// Returns `true` if substitution was successful (the resulting type is now fully known and clone-able)
-    pub fn substitute(
-        &self,
-        obj: &'s UniCell<T>,
-        recursively_subsitute: impl FnOnce(&'s T) -> bool,
-    ) -> bool {
+    fn fully_substitute(&mut self, obj: &'s UniCell<T>) -> bool {
         if let Some(known) = obj.get() {
-            recursively_subsitute(known)
+            self.recursively_subsitute(known)
         } else {
-            match self.get_with_substitution(obj) {
+            let subs = self.get_substitutor_mut();
+            match subs.resolve_substitution_chain(obj) {
                 ChainResolution::Known(known) => {
-                    recursively_subsitute(known);
+                    self.recursively_subsitute(known);
 
                     // Because we've done the recusive_substitute,
                     // that should've called `substitute` on every recursive [UniCell],
                     // `known` can safely be cloned, it can't contain any Unallocateds anymore
-                    let known_clone = known.clone();
+                    let known_clone = self.clone_obj_recurse(known);
 
                     unsafe {
                         *obj.0.get() = Interior::Known(known_clone);
@@ -357,17 +380,18 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
 
     /// When constructing types regular Clone is not a good option. It'll crash due to [Interior::Unallocated].
     /// Instead this version either allocates a new variable for it, or copies the existing substitution.
-    pub fn clone_obj(&self, obj: &'s UniCell<T>) -> UniCell<T> {
+    fn clone_obj(&mut self, obj: &'s UniCell<T>) -> UniCell<T> {
         unsafe {
+            let subs = self.get_substitutor_mut();
             let interior_ptr: *mut Interior<T> = obj.0.get();
             let new_interior = match &*interior_ptr {
-                Interior::Known(_) => {
-                    let id = self.alloc(obj);
-                    Interior::SubstitutesTo(id)
+                Interior::Known(known) => {
+                    let known_clone = self.clone_obj_recurse(known);
+                    Interior::Known(known_clone)
                 }
                 Interior::SubstitutesTo(id) => Interior::SubstitutesTo(*id),
                 Interior::Unallocated => {
-                    let slf_id = self.alloc(obj);
+                    let slf_id = subs.alloc(obj);
                     *interior_ptr = Interior::SubstitutesTo(slf_id);
                     Interior::SubstitutesTo(slf_id)
                 }
@@ -378,18 +402,12 @@ impl<'s, T: Clone + Debug> Substitutor<'s, T> {
 
     /// Custom Clone function exclusively for cloning just-created types, that have no unification relations yet.
     /// It means that any variables that have been created without being [UniCell::set_initial] will become new distinct variables from the original.
-    /// May panic if [Self::unify] has ever been called on it.
-    ///
-    /// `clone_recurse` must recursively call [Self::clone_prototype] on parts of T that it clones.
-    pub fn clone_prototype(
-        &self,
-        obj: &'s UniCell<T>,
-        clone_recurse: impl FnOnce(&'s T) -> T,
-    ) -> UniCell<T> {
+    /// May panic if [Unifier::unify] has ever been called on it.
+    fn clone_prototype(&mut self, obj: &'s UniCell<T>) -> UniCell<T> {
         unsafe {
             let interior_ptr: *mut Interior<T> = obj.0.get();
             let new_interior = match &*interior_ptr {
-                Interior::Known(known) => Interior::Known(clone_recurse(known)),
+                Interior::Known(known) => Interior::Known(self.clone_prototype_recurse(known)),
                 Interior::SubstitutesTo(_) => unreachable!(
                     "[Substitutor::clone_prototype] on a type that has had [Substitutor::unify] called on it before"
                 ),
@@ -424,34 +442,63 @@ impl PeanoType {
     }
 }
 
-impl<'s> Substitutor<'s, PeanoType> {
-    fn contains_subtree(&self, find_in: &'s PeanoType, target: VarID) -> bool {
-        match find_in {
-            PeanoType::Zero => false,
-            PeanoType::Succ(subtree_cell) => match self.get_with_substitution(subtree_cell) {
-                ChainResolution::Known(known) => self.contains_subtree(known, target),
-                ChainResolution::Unknown(var) => var == Some(target),
-            },
+#[derive(Debug, Default)]
+struct PeanoUnifier<'inst> {
+    substitutor: Substitutor<'inst, PeanoType>,
+}
+
+impl<'inst> PeanoUnifier<'inst> {
+    pub fn new() -> Self {
+        Self {
+            substitutor: Substitutor::new(),
         }
     }
-    fn unify_peanos(&self, l: &'s UniCell<PeanoType>, r: &'s UniCell<PeanoType>) -> UnifyResult {
-        self.unify(
-            l,
-            r,
-            |known, to_find| self.contains_subtree(known, to_find),
-            |lc, rc| match (lc, rc) {
-                (PeanoType::Zero, PeanoType::Zero) => UnifyResult::Success,
-                (PeanoType::Succ(lc), PeanoType::Succ(rc)) => self.unify_peanos(lc, rc),
-                _ => UnifyResult::Failure,
-            },
-        )
+}
+
+impl<'inst> Unifier<'inst, PeanoType> for PeanoUnifier<'inst> {
+    fn get_substitutor_mut(&mut self) -> &mut Substitutor<'inst, PeanoType> {
+        &mut self.substitutor
     }
-    /// Returns `true` if fully_subsitutite succeeded, and thus the resulting type is now *known* and is clone-able.
-    fn fully_substitute(&self, obj: &'s UniCell<PeanoType>) -> bool {
-        self.substitute(obj, |inner| match inner {
+
+    fn contains_subtree(&mut self, in_obj: &'inst PeanoType, target: VarID) -> bool {
+        match in_obj {
+            PeanoType::Zero => false,
+            PeanoType::Succ(subtree_cell) => {
+                match self.substitutor.resolve_substitution_chain(subtree_cell) {
+                    ChainResolution::Known(known) => self.contains_subtree(known, target),
+                    ChainResolution::Unknown(var) => var == Some(target),
+                }
+            }
+        }
+    }
+
+    fn unify_subtrees(&mut self, lc: &'inst PeanoType, rc: &'inst PeanoType) -> UnifyResult {
+        match (lc, rc) {
+            (PeanoType::Zero, PeanoType::Zero) => UnifyResult::Success,
+            (PeanoType::Succ(lc), PeanoType::Succ(rc)) => self.unify(lc, rc),
+            _ => UnifyResult::Failure,
+        }
+    }
+
+    fn recursively_subsitute(&mut self, inner: &'inst PeanoType) -> bool {
+        match inner {
             PeanoType::Zero => true,
             PeanoType::Succ(inner) => self.fully_substitute(inner),
-        })
+        }
+    }
+
+    fn clone_obj_recurse(&mut self, inner: &'inst PeanoType) -> PeanoType {
+        match inner {
+            PeanoType::Zero => PeanoType::Zero,
+            PeanoType::Succ(succ) => PeanoType::Succ(Box::new(self.clone_obj(succ))),
+        }
+    }
+
+    fn clone_prototype_recurse(&mut self, inner: &'inst PeanoType) -> PeanoType {
+        match inner {
+            PeanoType::Zero => PeanoType::Zero,
+            PeanoType::Succ(succ) => PeanoType::Succ(Box::new(self.clone_prototype(succ))),
+        }
     }
 }
 
@@ -505,14 +552,14 @@ mod tests {
     }
     #[test]
     fn test_peano_unify() {
-        let substitutor = Substitutor::new();
+        let mut substitutor = PeanoUnifier::new();
 
         let four = mk_peano_cell(4);
 
         let a = PeanoType::UNKNOWN;
         let three_plus_a = add_to_cell(substitutor.clone_obj(&a), 3);
 
-        substitutor.unify_peanos(&four, &three_plus_a);
+        substitutor.unify(&four, &three_plus_a);
 
         substitutor.fully_substitute(&a);
 
@@ -521,38 +568,26 @@ mod tests {
 
     #[test]
     fn test_non_infinite_peano() {
-        let substitutor = Substitutor::new();
+        let mut substitutor = PeanoUnifier::new();
 
         let a = PeanoType::UNKNOWN;
         let a_plus_zero = add_to_cell(substitutor.clone_obj(&a), 0);
 
-        assert_eq!(
-            substitutor.unify_peanos(&a, &a_plus_zero),
-            UnifyResult::Success
-        );
-        assert_eq!(
-            substitutor.unify_peanos(&a_plus_zero, &a),
-            UnifyResult::Success
-        );
+        assert_eq!(substitutor.unify(&a, &a_plus_zero), UnifyResult::Success);
+        assert_eq!(substitutor.unify(&a_plus_zero, &a), UnifyResult::Success);
 
         substitutor.fully_substitute(&a);
     }
 
     #[test]
     fn test_invalid_unification() {
-        let substitutor = Substitutor::default();
+        let mut substitutor = PeanoUnifier::new();
 
         let three = mk_peano_cell(3);
         let four = mk_peano_cell(4);
 
-        assert_eq!(
-            substitutor.unify_peanos(&three, &four),
-            UnifyResult::Failure
-        );
-        assert_eq!(
-            substitutor.unify_peanos(&four, &three),
-            UnifyResult::Failure
-        );
+        assert_eq!(substitutor.unify(&three, &four), UnifyResult::Failure);
+        assert_eq!(substitutor.unify(&four, &three), UnifyResult::Failure);
 
         substitutor.fully_substitute(&three);
         substitutor.fully_substitute(&four);
@@ -560,17 +595,17 @@ mod tests {
 
     #[test]
     fn test_infinite_peano() {
-        let substitutor = Substitutor::new();
+        let mut substitutor = PeanoUnifier::new();
 
         let a = PeanoType::UNKNOWN;
         let a_plus_one = add_to_cell(substitutor.clone_obj(&a), 1);
 
         assert_eq!(
-            substitutor.unify_peanos(&a, &a_plus_one),
+            substitutor.unify(&a, &a_plus_one),
             UnifyResult::FailureInfiniteTypes
         );
         assert_eq!(
-            substitutor.unify_peanos(&a_plus_one, &a),
+            substitutor.unify(&a_plus_one, &a),
             UnifyResult::FailureInfiniteTypes
         );
 
@@ -579,7 +614,7 @@ mod tests {
 
     #[test]
     fn test_peano_equivalence_simple() {
-        let substitutor = Substitutor::new();
+        let mut substitutor = PeanoUnifier::new();
 
         let one = mk_peano_cell(1);
         let two = mk_peano_cell(2);
@@ -588,14 +623,14 @@ mod tests {
 
         // 2+2 == 1+3
         assert_eq!(
-            substitutor.unify_peanos(&two_plus_two, &one_plus_three),
+            substitutor.unify(&two_plus_two, &one_plus_three),
             UnifyResult::Success
         );
     }
 
     #[test]
     fn test_peano_multiple_variables_chain() {
-        let substitutor = Substitutor::new();
+        let mut substitutor = PeanoUnifier::new();
 
         let x = PeanoType::UNKNOWN;
         let y = PeanoType::UNKNOWN;
@@ -608,12 +643,9 @@ mod tests {
         let z_val = add_to_cell(substitutor.clone_obj(&y), 1);
 
         // Unify y with x+1, z with y+1, and z with x+2
-        assert_eq!(substitutor.unify_peanos(&y, &y_val), UnifyResult::Success);
-        assert_eq!(substitutor.unify_peanos(&z, &z_val), UnifyResult::Success);
-        assert_eq!(
-            substitutor.unify_peanos(&z, &x_plus_2),
-            UnifyResult::Success
-        );
+        assert_eq!(substitutor.unify(&y, &y_val), UnifyResult::Success);
+        assert_eq!(substitutor.unify(&z, &z_val), UnifyResult::Success);
+        assert_eq!(substitutor.unify(&z, &x_plus_2), UnifyResult::Success);
 
         substitutor.fully_substitute(&x);
         substitutor.fully_substitute(&y);
@@ -626,7 +658,7 @@ mod tests {
 
     #[test]
     fn test_peano_complex_substitution_graph() {
-        let substitutor = Substitutor::new();
+        let mut substitutor = PeanoUnifier::new();
 
         let a = PeanoType::UNKNOWN;
         let b = PeanoType::UNKNOWN;
@@ -637,8 +669,8 @@ mod tests {
         let b_val = add_to_cell(substitutor.clone_obj(&a), 2);
         let c_val = add_to_cell(substitutor.clone_obj(&b), 1);
 
-        assert_eq!(substitutor.unify_peanos(&b, &b_val), UnifyResult::Success);
-        assert_eq!(substitutor.unify_peanos(&c, &c_val), UnifyResult::Success);
+        assert_eq!(substitutor.unify(&b, &b_val), UnifyResult::Success);
+        assert_eq!(substitutor.unify(&c, &c_val), UnifyResult::Success);
 
         substitutor.fully_substitute(&a);
         substitutor.fully_substitute(&b);
@@ -665,7 +697,7 @@ mod tests {
 
         let mut all_peanos_pool: Vec<&UniCell<PeanoType>> = cells.iter().collect();
 
-        let substitutor = Substitutor::new();
+        let mut substitutor = PeanoUnifier::new();
 
         // Randomly set some initial values
         for cell in cells.iter().take(10) {
@@ -686,14 +718,14 @@ mod tests {
                     let a = cells.choose(&mut rng).unwrap();
                     let b = cells.choose(&mut rng).unwrap();
 
-                    let _ = substitutor.unify_peanos(a, b);
+                    let _ = substitutor.unify(a, b);
                 }
                 2 => {
                     // Fully substitute something
                     let a = cells.choose(&mut rng).unwrap();
 
                     if substitutor.fully_substitute(a) {
-                        // Can clone values after a successful fully_substitute
+                        // Can clone values after a successful substitute
                         let _a_clone = a.clone();
                     }
                 }
