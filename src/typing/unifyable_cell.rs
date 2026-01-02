@@ -110,7 +110,7 @@ impl<T: Debug> From<T> for UniCell<T> {
 impl<T: Debug + Clone> Clone for UniCell<T> {
     fn clone(&self) -> Self {
         // We cast to a const pointer here instead, such that we never actually create a &mut that might conflict with another existing shared ref
-        let known = self.get_interior().expect("Not fully known substitutables can't be Cloned at all! Use [Unifier::clone_cell] or [Unifier::clone_prototype_step] to make clones.");
+        let known = self.get_interior().expect("Not fully known substitutables can't be Cloned at all! Use [Unifier::clone_unify] or [Unifier::clone_prototype_step] to make clones.");
         let known_clone = known.clone();
         Self(UnsafeCell::new(Interior::Known(known_clone)))
     }
@@ -278,60 +278,72 @@ impl<'s, T: Debug> SubstitutorIntern<'s, T> {
 #[derive(Debug, Clone, Copy)]
 pub struct SubTree(usize);
 
-impl<'s, T: Debug + Clone> Substitutor<'s, T> {
+fn retry_constraints<'s>(mut constraints: Option<Box<DelayedConstraint<'s>>>) {
+    while let Some(mut c) = constraints {
+        constraints = c.next.take(); // Already separate the rest of the constraints from this one, so we re-add it individually
+        if let Err(not_found_var) = (c.f)() {
+            // May be a not_found_var from a different Substitutor
+            not_found_var.add_delayed_constraint(c);
+        }
+    }
+}
+pub trait Unifier<'s, T: Debug + Clone + 's> {
+    fn get_substitutor(&self) -> &Substitutor<'s, T>;
+    fn unify_subtrees(&self, a: &'s T, b: &'s T) -> Result<(), UnifyError>;
+    fn set_subtrees(&self, a: &'s T, b: T) -> Result<(), UnifyError>;
+    fn contains_subtree(&self, in_obj: &T, subtree: SubTree) -> bool;
+    fn fully_substitute_recurse(&self, known: &'s T) -> Result<(), ResolutionError<'s>>;
+
     /// `unify_subtrees` should recursively call [Substitutor::unify] for every pair of subtrees.
-    /// If some irreconcilable difference is found it should return [Err(UnifyError::Failure)].
+    /// If some irreconcilable difference is found it should return [UnifyError::Failure].
     /// Otherwise return the binary AND of subtree unifications.
     /// Regardless of failure, all subtrees should be unified for best possible type error information.
-    /// You as the user should never return [Err(UnifyError::FailureInfiniteTypes)]
+    /// You as the user should never return [UnifyError::FailureInfiniteTypes]
     /// `contains_subtree` is used to prevent infinite types.
     /// It must be implemented using [Substitutor::resolve_substitution_chain] to iterate through its subtrees.
     /// If a subtree is found that contains the given pointer it must return true.
-    fn unify(
-        &self,
-        a: &'s UniCell<T>,
-        b: &'s UniCell<T>,
-        unify_subtrees: impl FnOnce(&'s T, &'s T) -> Result<(), UnifyError>,
-        contains_subtree: impl FnOnce(&T, SubTree) -> bool,
-    ) -> Result<(), UnifyError> {
-        let mut subs = self.substitutor.borrow_mut();
+    fn unify(&self, a: &'s UniCell<T>, b: &'s UniCell<T>) -> Result<(), UnifyError> {
+        let subs = &self.get_substitutor().substitutor;
+        let mut subs_borrow = subs.borrow_mut();
 
-        match (subs.try_get(a), subs.try_get(b)) {
+        match (subs_borrow.try_get(a), subs_borrow.try_get(b)) {
             ((Ok(a), _), (Ok(b), _)) => {
-                std::mem::drop(subs);
+                std::mem::drop(subs_borrow);
                 // Simple optimization. Unification will often create referential identity.
                 if std::ptr::eq(a, b) {
                     Ok(())
                 } else {
-                    unify_subtrees(a, b)
+                    self.unify_subtrees(a, b)
                 }
             }
             ((Ok(known), known_cell), (Err(Some(var_id)), _))
             | ((Err(Some(var_id)), _), (Ok(known), known_cell)) => {
-                std::mem::drop(subs); // contains_subtree will need its own mutable borrows
-                if contains_subtree(known, SubTree(var_id)) {
+                std::mem::drop(subs_borrow); // contains_subtree will need its own mutable borrows
+                if self.contains_subtree(known, SubTree(var_id)) {
                     // Always have to check contains_subtree. Could be that a contains b which was uninit
                     return Err(UnifyError::FailureInfiniteTypes);
                 }
-                let removing_var = &mut self.substitutor.borrow_mut().0[var_id];
+                let mut subs_borrow = subs.borrow_mut();
+                let removing_var = &mut subs_borrow.0[var_id];
                 removing_var.substitute_to = known_cell;
                 let constraints = removing_var.constraint_waiting_for.take();
-                self.retry_constraints(constraints);
+                std::mem::drop(subs_borrow);
+                retry_constraints(constraints);
                 Ok(())
             }
             ((Ok(_known), known_cell), (Err(None), unknown_cell))
             | ((Err(None), unknown_cell), (Ok(_known), known_cell)) => {
-                let unknown_id = subs.alloc(unknown_cell, unknown_cell);
+                let unknown_id = subs_borrow.alloc(unknown_cell, unknown_cell);
                 // New var cannot already have constraints attached to it.
-                subs.0[unknown_id].substitute_to = known_cell;
+                subs_borrow.0[unknown_id].substitute_to = known_cell;
                 Ok(())
             }
             ((Err(Some(a_id)), a_cell), (Err(Some(b_id)), _)) => {
-                let b = &mut subs.0[b_id];
+                let b = &mut subs_borrow.0[b_id];
                 let constraints_to_move = b.constraint_waiting_for.take();
                 b.substitute_to = a_cell;
                 if let Some(constraints_to_move) = constraints_to_move {
-                    subs.add_constraints(a_id, constraints_to_move);
+                    subs_borrow.add_constraints(a_id, constraints_to_move);
                 }
                 Ok(())
             }
@@ -341,35 +353,30 @@ impl<'s, T: Debug + Clone> Substitutor<'s, T> {
                 Ok(())
             }
             ((Err(None), a_cell), (Err(None), b_cell)) => {
-                let a_id = subs.alloc(a_cell, a_cell);
+                let a_id = subs_borrow.alloc(a_cell, a_cell);
                 b_cell.set_interior(None, Interior::SubstitutesTo(a_id));
                 Ok(())
             }
         }
     }
-    fn set(
-        &self,
-        cell: &'s UniCell<T>,
-        to: UniCell<T>,
-        set_subtrees: impl FnOnce(&'s T, T) -> Result<(), UnifyError>,
-        unify_subtrees: impl FnOnce(&'s T, &'s T) -> Result<(), UnifyError>,
-        contains_subtree: impl FnOnce(&T, SubTree) -> bool,
-    ) -> Result<(), UnifyError> {
+    fn set(&self, cell: &'s UniCell<T>, to: UniCell<T>) -> Result<(), UnifyError> {
+        let subs = &self.get_substitutor().substitutor;
         match to.0.into_inner() {
             Interior::Known(to) => match cell.get_interior() {
-                Ok(known) => set_subtrees(known, to),
+                Ok(known) => self.set_subtrees(known, to),
                 Err(Some(id)) => {
-                    let (known, last_cell, last_id) =
-                        self.substitutor.borrow_mut().resolve_chain(id);
+                    let mut subs_borrow = subs.borrow_mut();
+                    let (known, last_cell, last_id) = subs_borrow.resolve_chain(id);
+                    std::mem::drop(subs_borrow);
                     if let Some(known) = known {
-                        set_subtrees(known, to)
-                    } else if contains_subtree(&to, SubTree(id)) {
+                        self.set_subtrees(known, to)
+                    } else if self.contains_subtree(&to, SubTree(id)) {
                         Err(UnifyError::FailureInfiniteTypes)
                     } else {
-                        let constraints = self.substitutor.borrow_mut().0[id]
-                            .constraint_waiting_for
-                            .take();
-                        self.retry_constraints(constraints);
+                        let mut subs_borrow = subs.borrow_mut();
+                        let constraints = subs_borrow.0[id].constraint_waiting_for.take();
+                        std::mem::drop(subs_borrow);
+                        retry_constraints(constraints);
                         last_cell.set_interior(Some(last_id), Interior::Known(to));
                         Ok(())
                     }
@@ -380,9 +387,10 @@ impl<'s, T: Debug + Clone> Substitutor<'s, T> {
                 }
             },
             Interior::SubstitutesTo(to_id) => {
-                let (_known, last_cell, _last_id) =
-                    self.substitutor.borrow_mut().resolve_chain(to_id);
-                self.unify(cell, last_cell, unify_subtrees, contains_subtree)
+                let mut subs_borrow = subs.borrow_mut();
+                let (_known, last_cell, _last_id) = subs_borrow.resolve_chain(to_id);
+                std::mem::drop(subs_borrow);
+                self.unify(cell, last_cell)
             }
             // Unifying with an anonymous variable always succeeds, of course
             Interior::Unallocated => Ok(()),
@@ -393,27 +401,18 @@ impl<'s, T: Debug + Clone> Substitutor<'s, T> {
     /// For clones after successful typechecking, use the regular [std::clone::Clone]
     ///
     /// For clones that *don't* unify type variables, use [UniCell::clone_prototype_step]
-    pub fn clone_unify(&self, to_clone: &'s UniCell<T>) -> UniCell<T> {
-        let mut subs = self.substitutor.borrow_mut();
+    fn clone_unify(&self, to_clone: &'s UniCell<T>) -> UniCell<T> {
+        let mut subs_borrow = self.get_substitutor().substitutor.borrow_mut();
         match to_clone.get_interior() {
             Ok(_known) => {
                 let new_cell = UniCell::UNKNOWN;
-                let _id = subs.alloc(to_clone, &new_cell);
+                let _id = subs_borrow.alloc(to_clone, &new_cell);
                 new_cell
             }
             Err(Some(id)) => UniCell(UnsafeCell::new(Interior::SubstitutesTo(id))),
             Err(None) => {
-                let id = subs.alloc(to_clone, to_clone);
+                let id = subs_borrow.alloc(to_clone, to_clone);
                 UniCell(UnsafeCell::new(Interior::SubstitutesTo(id)))
-            }
-        }
-    }
-    fn retry_constraints(&self, mut constraints: Option<Box<DelayedConstraint<'s>>>) {
-        while let Some(mut c) = constraints {
-            constraints = c.next.take(); // Already separate the rest of the constraints from this one, so we re-add it individually
-            if let Err(not_found_var) = (c.f)() {
-                // May be a not_found_var from a different Substitutor
-                not_found_var.add_delayed_constraint(c);
             }
         }
     }
@@ -421,72 +420,64 @@ impl<'s, T: Debug + Clone> Substitutor<'s, T> {
     /// Walks the substitution chains to determine if it ends in a Known. If it does, then it clones the Known value into `obj` using the provided clone function.
     ///
     /// Use this for resolving delayed constraints ([delayed_constraint]), and to implement `resolve`
-    pub fn resolve(&self, obj: &'s UniCell<T>) -> Result<&'s T, ResolutionError<'s>> {
-        let mut subs = self.substitutor.borrow_mut();
+    fn resolve(&self, obj: &'s UniCell<T>) -> Result<&'s T, ResolutionError<'s>> {
+        let subs = self.get_substitutor();
+        let mut subs_borrow = subs.substitutor.borrow_mut();
         match obj.get_interior() {
             Ok(known) => Ok(known),
             Err(Some(id)) => {
-                let (known, _last, id) = subs.resolve_chain(id);
+                let (known, _last, id) = subs_borrow.resolve_chain(id);
                 if let Some(known) = known {
                     Ok(known)
                 } else {
-                    Err(ResolutionError { subs: self, id })
+                    Err(ResolutionError { subs, id })
                 }
             }
             Err(None) => {
                 // We must have a valid substitution table entry, to be able to add constraints to it.
-                let id = subs.alloc(obj, obj);
-                Err(ResolutionError { subs: self, id })
+                let id = subs_borrow.alloc(obj, obj);
+                Err(ResolutionError { subs, id })
             }
         }
     }
 
-    pub fn contains_subtree(
-        &self,
-        obj: &UniCell<T>,
-        subtree: SubTree,
-        contains_subtree_recurse: impl FnOnce(&T, SubTree) -> bool,
-    ) -> bool {
-        let mut subs = self.substitutor.borrow_mut();
-        match subs.try_get(obj).0 {
+    fn contains_subtree_recurse(&self, obj: &UniCell<T>, subtree: SubTree) -> bool {
+        let subs = self.get_substitutor();
+        let mut subs_borrow = subs.substitutor.borrow_mut();
+        match subs_borrow.try_get(obj).0 {
             Ok(known) => {
-                std::mem::drop(subs);
-                contains_subtree_recurse(known, subtree)
+                std::mem::drop(subs_borrow);
+                self.contains_subtree(known, subtree)
             }
             Err(Some(id)) => id == subtree.0,
             Err(None) => false,
         }
     }
 
-    pub fn fully_substitute(
-        &self,
-        obj: &'s UniCell<T>,
-        fully_substitute_recurse: impl FnOnce(&'s T) -> Result<(), ResolutionError<'s>>,
-    ) -> Result<&'s T, ResolutionError<'s>> {
+    fn fully_substitute(&self, obj: &'s UniCell<T>) -> Result<&'s T, ResolutionError<'s>> {
+        let subs = self.get_substitutor();
         match obj.get_interior() {
             Ok(known) => {
-                fully_substitute_recurse(known)?;
+                self.fully_substitute_recurse(known)?;
                 Ok(known)
             }
             Err(Some(id)) => {
-                let mut subs = self.substitutor.borrow_mut();
-                let (known, _last_cell, last_id) = subs.resolve_chain(id);
-                std::mem::drop(subs);
+                let mut subs_borrow = subs.substitutor.borrow_mut();
+                let (known, _last_cell, last_id) = subs_borrow.resolve_chain(id);
+                std::mem::drop(subs_borrow);
                 if let Some(known) = known {
-                    fully_substitute_recurse(known)?;
+                    self.fully_substitute_recurse(known)?;
                     // At this point it's safe to clone, because known (should) have no more type variables.
                     obj.set_interior(Some(id), Interior::Known(known.clone()));
                     Ok(obj.unwrap())
                 } else {
-                    Err(ResolutionError {
-                        subs: self,
-                        id: last_id,
-                    })
+                    Err(ResolutionError { subs, id: last_id })
                 }
             }
             Err(None) => {
-                let id = self.substitutor.borrow_mut().alloc(obj, obj);
-                Err(ResolutionError { subs: self, id })
+                let mut subs_borrow = subs.substitutor.borrow_mut();
+                let id = subs_borrow.alloc(obj, obj);
+                Err(ResolutionError { subs, id })
             }
         }
     }
@@ -588,69 +579,36 @@ impl<'s> PeanoUnifier<'s> {
     }
 }
 
-impl<'s> PeanoUnifier<'s> {
-    fn resolve(&self, obj: &'s UniCell<PeanoType>) -> Result<&'s PeanoType, ResolutionError<'s>> {
-        self.substitutor.resolve(obj)
+impl<'s> Unifier<'s, PeanoType> for PeanoUnifier<'s> {
+    fn get_substitutor(&self) -> &Substitutor<'s, PeanoType> {
+        &self.substitutor
     }
-    /// Returns Ok(obj) if there are no Unknowns left
-    fn fully_substitute(
-        &self,
-        obj: &'s UniCell<PeanoType>,
-    ) -> Result<&'s PeanoType, ResolutionError<'s>> {
-        self.substitutor.fully_substitute(obj, |known| match known {
-            PeanoType::Zero => Ok(()),
-            PeanoType::Succ(succ) => {
-                self.fully_substitute(succ)?;
-                Ok(())
-            }
-        })
-    }
-    fn clone_cell(&self, obj: &'s UniCell<PeanoType>) -> UniCell<PeanoType> {
-        self.substitutor.clone_unify(obj)
-    }
-    fn mk_unify_subtrees(
-        &self,
-    ) -> impl FnOnce(&'s PeanoType, &'s PeanoType) -> Result<(), UnifyError> {
-        |lc, rc| match (lc, rc) {
+    fn unify_subtrees(&self, a: &'s PeanoType, b: &'s PeanoType) -> Result<(), UnifyError> {
+        match (a, b) {
             (PeanoType::Zero, PeanoType::Zero) => Ok(()),
-            (PeanoType::Succ(lc), PeanoType::Succ(rc)) => self.unify(lc, rc),
+            (PeanoType::Succ(a), PeanoType::Succ(b)) => self.unify(a, b),
             _ => Err(UnifyError::Failure),
         }
     }
-    fn mk_set_subtrees(&self) -> impl FnOnce(&'s PeanoType, PeanoType) -> Result<(), UnifyError> {
-        |lc, rc| match (lc, rc) {
+    fn set_subtrees(&self, a: &'s PeanoType, b: PeanoType) -> Result<(), UnifyError> {
+        match (a, b) {
             (PeanoType::Zero, PeanoType::Zero) => Ok(()),
-            (PeanoType::Succ(lc), PeanoType::Succ(rc)) => self.set(lc, *rc),
+            (PeanoType::Succ(a), PeanoType::Succ(b)) => self.set(a, *b),
             _ => Err(UnifyError::Failure),
         }
-    }
-    fn unify(
-        &self,
-        a: &'s UniCell<PeanoType>,
-        b: &'s UniCell<PeanoType>,
-    ) -> Result<(), UnifyError> {
-        self.substitutor
-            .unify(a, b, self.mk_unify_subtrees(), |in_obj, subtree| {
-                self.contains_subtree(in_obj, subtree)
-            })
-    }
-    fn set(&self, cell: &'s UniCell<PeanoType>, to: UniCell<PeanoType>) -> Result<(), UnifyError> {
-        self.substitutor.set(
-            cell,
-            to,
-            self.mk_set_subtrees(),
-            self.mk_unify_subtrees(),
-            |in_obj, target| self.contains_subtree(in_obj, target),
-        )
     }
     fn contains_subtree(&self, in_obj: &PeanoType, subtree: SubTree) -> bool {
         match in_obj {
             PeanoType::Zero => false,
-            PeanoType::Succ(succ_cell) => {
-                self.substitutor
-                    .contains_subtree(succ_cell, subtree, |known, subtree| {
-                        self.contains_subtree(known, subtree)
-                    })
+            PeanoType::Succ(succ) => self.contains_subtree_recurse(succ, subtree),
+        }
+    }
+    fn fully_substitute_recurse(&self, known: &'s PeanoType) -> Result<(), ResolutionError<'s>> {
+        match known {
+            PeanoType::Zero => Ok(()),
+            PeanoType::Succ(succ) => {
+                self.fully_substitute(succ)?;
+                Ok(())
             }
         }
     }
@@ -722,7 +680,7 @@ mod tests {
 
         let substitutor = PeanoUnifier::new();
         substitutor
-            .set(&three_plus_a, add_to_cell(substitutor.clone_cell(&a), 3))
+            .set(&three_plus_a, add_to_cell(substitutor.clone_unify(&a), 3))
             .unwrap();
 
         substitutor.unify(&four, &three_plus_a).unwrap();
@@ -739,7 +697,7 @@ mod tests {
 
         let substitutor = PeanoUnifier::new();
         substitutor
-            .set(&a_plus_zero, add_to_cell(substitutor.clone_cell(&a), 0))
+            .set(&a_plus_zero, add_to_cell(substitutor.clone_unify(&a), 0))
             .unwrap();
 
         substitutor.unify(&a, &a_plus_zero).unwrap();
@@ -772,7 +730,7 @@ mod tests {
 
         let substitutor = PeanoUnifier::new();
         substitutor
-            .set(&a_plus_one, add_to_cell(substitutor.clone_cell(&a), 1))
+            .set(&a_plus_one, add_to_cell(substitutor.clone_unify(&a), 1))
             .unwrap();
 
         // Both of these try to unify a = a + 1, which would lead to an infinite tower of +1s
@@ -800,11 +758,11 @@ mod tests {
         substitutor
             .set(
                 &one_plus_three,
-                add_to_cell(substitutor.clone_cell(&one), 3),
+                add_to_cell(substitutor.clone_unify(&one), 3),
             )
             .unwrap();
         substitutor
-            .set(&two_plus_two, add_to_cell(substitutor.clone_cell(&two), 2))
+            .set(&two_plus_two, add_to_cell(substitutor.clone_unify(&two), 2))
             .unwrap();
         // 2+2 == 1+3
         substitutor.unify(&two_plus_two, &one_plus_three).unwrap();
@@ -825,13 +783,13 @@ mod tests {
 
         let substitutor = PeanoUnifier::new();
         substitutor
-            .set(&x_plus_2, add_to_cell(substitutor.clone_cell(&x), 2))
+            .set(&x_plus_2, add_to_cell(substitutor.clone_unify(&x), 2))
             .unwrap();
         substitutor
-            .set(&y_val, add_to_cell(substitutor.clone_cell(&x), 1))
+            .set(&y_val, add_to_cell(substitutor.clone_unify(&x), 1))
             .unwrap();
         substitutor
-            .set(&z_val, add_to_cell(substitutor.clone_cell(&y), 1))
+            .set(&z_val, add_to_cell(substitutor.clone_unify(&y), 1))
             .unwrap();
 
         // Unify y with x+1, z with y+1, and z with x+2
@@ -861,10 +819,10 @@ mod tests {
 
         let substitutor = PeanoUnifier::new();
         substitutor
-            .set(&b_val, add_to_cell(substitutor.clone_cell(&a), 2))
+            .set(&b_val, add_to_cell(substitutor.clone_unify(&a), 2))
             .unwrap();
         substitutor
-            .set(&c_val, add_to_cell(substitutor.clone_cell(&b), 1))
+            .set(&c_val, add_to_cell(substitutor.clone_unify(&b), 1))
             .unwrap();
 
         substitutor.unify(&b, &b_val).unwrap();
@@ -903,7 +861,7 @@ mod tests {
                     // Add a computed successor
                     let ontu = cells.choose(&mut rng).unwrap();
                     let add_count = rng.random_range(0..5);
-                    let new_cell = add_to_cell(substitutor.clone_cell(ontu), add_count);
+                    let new_cell = add_to_cell(substitutor.clone_unify(ontu), add_count);
                     // May fail, may not fail
                     let _ = substitutor.set(cells.choose(&mut rng).unwrap(), new_cell);
                 }
