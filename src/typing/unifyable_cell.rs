@@ -243,13 +243,15 @@ impl<'s, T: Debug, Unif: UnifierTop> Substitutor<'s, T, Unif> {
     }
 }
 
-impl<'s, T: Debug, Unif: UnifierTop> SubstitutorInterior<'s, T, Unif> {
+impl<'s, T: Debug, Unif: UnifierTop> Substitutor<'s, T, Unif> {
     /// Creates a new substitution map that points to the passed-in object. The passed-in object must be [Interior::Unallocated].
     /// Edits the passed-in object to also point to the newly created ID.
     /// Returns the ID of this map.
-    fn alloc(&mut self, point_to: &'s UniCell<T>, obj: &UniCell<T>) -> usize {
-        let idx = self.substitutions.len();
-        self.substitutions.push(SubstitutorElem {
+    fn alloc(&self, point_to: &'s UniCell<T>, obj: &UniCell<T>) -> usize {
+        let mut subs = self.substitutor.borrow_mut();
+
+        let idx = subs.substitutions.len();
+        subs.substitutions.push(SubstitutorElem {
             substitute_to: point_to,
             constraint_waiting_for: None,
         });
@@ -265,9 +267,10 @@ impl<'s, T: Debug, Unif: UnifierTop> SubstitutorInterior<'s, T, Unif> {
     /// - &'s T [Interior::Known] if known
     /// - the last [UniCell] in the chain
     /// - the last ID in the chain (corresponds to this [UniCell]). If no Known is given, then this is the final substitution ID that can be pointed to.
-    fn resolve_chain(&mut self, mut ptr_target: usize) -> (Option<&'s T>, &'s UniCell<T>, usize) {
+    fn resolve_chain(&self, mut ptr_target: usize) -> (Option<&'s T>, &'s UniCell<T>, usize) {
+        let subs = self.substitutor.borrow_mut();
         loop {
-            let target = &self.substitutions[ptr_target];
+            let target = &subs.substitutions[ptr_target];
 
             match target.substitute_to.get_interior() {
                 Ok(known) => break (Some(known), target.substitute_to, ptr_target),
@@ -286,7 +289,7 @@ impl<'s, T: Debug, Unif: UnifierTop> SubstitutorInterior<'s, T, Unif> {
 
     /// Walks the substitution chain until either finding a Known value (returned on [Ok()]), or the substitution [Err()] ID (if it exists))
     fn try_get<'out, 'in_cell>(
-        &mut self,
+        &self,
         obj: &'in_cell UniCell<T>,
     ) -> (Result<&'out T, Option<usize>>, &'out UniCell<T>)
     where
@@ -307,15 +310,31 @@ impl<'s, T: Debug, Unif: UnifierTop> SubstitutorInterior<'s, T, Unif> {
         }
     }
 
-    fn add_constraints(
-        &mut self,
-        id: usize,
-        constraints: Option<Box<DelayedConstraint<'s, Unif>>>,
-    ) {
-        let working_on = &mut self.substitutions[id];
+    fn add_constraints(&self, id: usize, constraints: Option<Box<DelayedConstraint<'s, Unif>>>) {
+        let mut subs = self.substitutor.borrow_mut();
+
+        let working_on = &mut subs.substitutions[id];
 
         let old = working_on.constraint_waiting_for.take();
         working_on.constraint_waiting_for = DelayedConstraint::add_to_list(old, constraints);
+    }
+
+    fn take_constraints_from(&self, id: usize) -> Option<Box<DelayedConstraint<'s, Unif>>> {
+        let mut subs = self.substitutor.borrow_mut();
+        subs.substitutions[id].constraint_waiting_for.take()
+    }
+
+    /// Returns the constraints this substitution had
+    fn replace_substitution(
+        &self,
+        id: usize,
+        to: &'s UniCell<T>,
+    ) -> Option<Box<DelayedConstraint<'s, Unif>>> {
+        let mut subs = self.substitutor.borrow_mut();
+
+        let removing_var = &mut subs.substitutions[id];
+        removing_var.substitute_to = to;
+        removing_var.constraint_waiting_for.take()
     }
 }
 
@@ -329,6 +348,7 @@ pub struct SubTree<T>(usize, PhantomData<T>);
 /// - [Unifier::contains_subtree]
 /// - [Unifier::fully_substitute_recurse]
 /// - [Unifier::clone_known]
+/// - [UnifierTop::execute_ready_constraints]
 ///
 /// The trait will then give you access to the following methods you can use to use:
 /// - [UniCell::clone_prototype_step]
@@ -337,7 +357,6 @@ pub struct SubTree<T>(usize, PhantomData<T>);
 /// - [Unifier::clone_unify]
 /// - [Unifier::resolve]
 /// - [UnifierTop::delayed_constraint]
-/// - [Unifier::execute_ready_constraints]
 ///
 /// For examples see [PeanoUnifier]
 ///
@@ -385,11 +404,9 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop + Sized + '
     /// For unifying a [UniCell] already in the graph (and thus not mutably accessible), with a new owned [UniCell], see [Unifier::set] and [Unifier::set_cell]
     fn unify(&'slf self, a: &'s UniCell<T>, b: &'s UniCell<T>) -> UnifyResult {
         let subs = self.get_substitutor();
-        let mut subs_borrow = subs.substitutor.borrow_mut();
 
-        match (subs_borrow.try_get(a), subs_borrow.try_get(b)) {
+        match (subs.try_get(a), subs.try_get(b)) {
             ((Ok(a), _), (Ok(b), _)) => {
-                std::mem::drop(subs_borrow);
                 // Simple optimization. Unification will often create referential identity.
                 if std::ptr::eq(a, b) {
                     UnifyResult::Success
@@ -399,30 +416,24 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop + Sized + '
             }
             ((Ok(known), known_cell), (Err(Some(var_id)), _))
             | ((Err(Some(var_id)), _), (Ok(known), known_cell)) => {
-                std::mem::drop(subs_borrow); // contains_subtree will need its own mutable borrows
                 if self.contains_subtree(known, SubTree(var_id, PhantomData)) {
                     // Always have to check contains_subtree. Could be that a contains b which was uninit
                     return UnifyResult::FailureInfiniteTypes;
                 }
-                let mut subs_borrow = subs.substitutor.borrow_mut();
-                let removing_var = &mut subs_borrow.substitutions[var_id];
-                removing_var.substitute_to = known_cell;
-                let constraints = removing_var.constraint_waiting_for.take();
+                let constraints = subs.replace_substitution(var_id, known_cell);
                 subs.add_ready_constraints(constraints);
                 UnifyResult::Success
             }
             ((Ok(_known), known_cell), (Err(None), unknown_cell))
             | ((Err(None), unknown_cell), (Ok(_known), known_cell)) => {
-                let unknown_id = subs_borrow.alloc(unknown_cell, unknown_cell);
+                let unknown_id = subs.alloc(unknown_cell, unknown_cell);
                 // New var cannot already have constraints attached to it.
-                subs_borrow.substitutions[unknown_id].substitute_to = known_cell;
+                assert!(subs.replace_substitution(unknown_id, known_cell).is_none());
                 UnifyResult::Success
             }
             ((Err(Some(a_id)), a_cell), (Err(Some(b_id)), _)) => {
-                let b = &mut subs_borrow.substitutions[b_id];
-                let constraints_to_move = b.constraint_waiting_for.take();
-                b.substitute_to = a_cell;
-                subs_borrow.add_constraints(a_id, constraints_to_move);
+                let constraints = subs.replace_substitution(b_id, a_cell);
+                subs.add_constraints(a_id, constraints);
                 UnifyResult::Success
             }
             ((Err(Some(id)), _), (Err(None), unalloc_cell))
@@ -431,7 +442,7 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop + Sized + '
                 UnifyResult::Success
             }
             ((Err(None), a_cell), (Err(None), b_cell)) => {
-                let a_id = subs_borrow.alloc(a_cell, a_cell);
+                let a_id = subs.alloc(a_cell, a_cell);
                 b_cell.set_interior(None, Interior::SubstitutesTo(a_id));
                 UnifyResult::Success
             }
@@ -445,19 +456,14 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop + Sized + '
             Interior::Known(to) => match cell.get_interior() {
                 Ok(known) => self.set_subtrees(known, to),
                 Err(Some(id)) => {
-                    let mut subs_borrow = subs.substitutor.borrow_mut();
-                    let (known, last_cell, last_id) = subs_borrow.resolve_chain(id);
-                    std::mem::drop(subs_borrow);
+                    let (known, last_cell, last_id) = subs.resolve_chain(id);
                     if let Some(known) = known {
                         self.set_subtrees(known, to)
                     } else if self.contains_subtree(&to, SubTree(last_id, PhantomData)) {
                         UnifyResult::FailureInfiniteTypes
                     } else {
                         last_cell.set_interior(Some(last_id), Interior::Known(to));
-                        let mut subs_borrow = subs.substitutor.borrow_mut();
-                        let constraints = subs_borrow.substitutions[last_id]
-                            .constraint_waiting_for
-                            .take();
+                        let constraints = subs.take_constraints_from(last_id);
                         dbg!(last_id, DelayedConstraint::count(&constraints));
                         subs.add_ready_constraints(constraints);
                         UnifyResult::Success
@@ -469,9 +475,7 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop + Sized + '
                 }
             },
             Interior::SubstitutesTo(to_id) => {
-                let mut subs_borrow = subs.substitutor.borrow_mut();
-                let (_known, last_cell, _last_id) = subs_borrow.resolve_chain(to_id);
-                std::mem::drop(subs_borrow);
+                let (_known, last_cell, _last_id) = subs.resolve_chain(to_id);
                 self.unify(cell, last_cell)
             }
             // Unifying with an anonymous variable always succeeds, of course
@@ -488,16 +492,16 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop + Sized + '
     ///
     /// For clones that *don't* unify type variables, use [UniCell::clone_prototype_step]
     fn clone_unify(&'slf self, to_clone: &'s UniCell<T>) -> UniCell<T> {
-        let mut subs_borrow = self.get_substitutor().substitutor.borrow_mut();
+        let subs = self.get_substitutor();
         match to_clone.get_interior() {
             Ok(_known) => {
                 let new_cell = UniCell::UNKNOWN;
-                let _id = subs_borrow.alloc(to_clone, &new_cell);
+                let _id = subs.alloc(to_clone, &new_cell);
                 new_cell
             }
             Err(Some(id)) => UniCell(UnsafeCell::new(Interior::SubstitutesTo(id))),
             Err(None) => {
-                let id = subs_borrow.alloc(to_clone, to_clone);
+                let id = subs.alloc(to_clone, to_clone);
                 UniCell(UnsafeCell::new(Interior::SubstitutesTo(id)))
             }
         }
@@ -508,11 +512,10 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop + Sized + '
     /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
     fn resolve(&'slf self, obj: &'s UniCell<T>) -> Result<&'s T, ResolveError<'slf, 's, Self>> {
         let subs = self.get_substitutor();
-        let mut subs_borrow = subs.substitutor.borrow_mut();
         match obj.get_interior() {
             Ok(known) => Ok(known),
             Err(Some(id)) => {
-                let (known, _last, id) = subs_borrow.resolve_chain(id);
+                let (known, _last, id) = subs.resolve_chain(id);
                 if let Some(known) = known {
                     Ok(known)
                 } else {
@@ -521,7 +524,7 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop + Sized + '
             }
             Err(None) => {
                 // We must have a valid substitution table entry, to be able to add constraints to it.
-                let id = subs_borrow.alloc(obj, obj);
+                let id = subs.alloc(obj, obj);
                 Err(ResolveError { subs, id })
             }
         }
@@ -542,9 +545,7 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop + Sized + '
         let known = match obj.get_interior() {
             Ok(known) => known,
             Err(Some(id)) => {
-                let mut subs_borrow = subs.substitutor.borrow_mut();
-                let (known, _last_cell, last_id) = subs_borrow.resolve_chain(id);
-                std::mem::drop(subs_borrow);
+                let (known, _last_cell, last_id) = subs.resolve_chain(id);
                 if let Some(known) = known {
                     obj.set_interior(Some(id), Interior::Known(self.clone_known(known)));
                     obj.unwrap()
@@ -553,8 +554,7 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop + Sized + '
                 }
             }
             Err(None) => {
-                let mut subs_borrow = subs.substitutor.borrow_mut();
-                let id = subs_borrow.alloc(obj, obj);
+                let id = subs.alloc(obj, obj);
                 return Err(ResolveError { subs, id });
             }
         };
@@ -569,12 +569,8 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop + Sized + '
     /// Complete this by implementing [Unifier::contains_subtree]
     fn contains_subtree_recurse(&'slf self, obj: &UniCell<T>, subtree: SubTree<T>) -> bool {
         let subs = self.get_substitutor();
-        let mut subs_borrow = subs.substitutor.borrow_mut();
-        match subs_borrow.try_get(obj).0 {
-            Ok(known) => {
-                std::mem::drop(subs_borrow);
-                self.contains_subtree(known, subtree)
-            }
+        match subs.try_get(obj).0 {
+            Ok(known) => self.contains_subtree(known, subtree),
             Err(Some(id)) => id == subtree.0,
             Err(None) => false,
         }
@@ -677,8 +673,7 @@ impl<'s, T: Debug, Unif: UnifierTop> DelayedConstraintAcceptor<'s, Unif>
             constraint.next.is_none(),
             "DelayedConstraintAcceptor::add_delayed_constraint can only ever accept a single constraint at a time, because it should be called when a single constraint failed to resolve"
         );
-        let mut subs = self.substitutor.borrow_mut();
-        subs.add_constraints(id, Some(constraint));
+        self.add_constraints(id, Some(constraint));
     }
 }
 
