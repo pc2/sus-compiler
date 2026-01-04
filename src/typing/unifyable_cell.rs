@@ -201,7 +201,7 @@ impl<'s, T: Debug, Unif: UnifierTop> Drop for Substitutor<'s, T, Unif> {
     fn drop(&mut self) {
         if !std::thread::panicking() && self.ready_constraints.take().is_some() {
             panic!(
-                "Substitutor dropped while still holding Ready Constraints! These should have been resolved using [Unifier::execute_ready_constraints]"
+                "Substitutor dropped while still holding Ready Constraints! These should have been resolved using [Substitutor::execute_ready_constraints]"
             );
         }
     }
@@ -221,6 +221,25 @@ impl<'s, T: Debug, Unif: UnifierTop> Substitutor<'s, T, Unif> {
         let long_list = self.ready_constraints.take();
         self.ready_constraints
             .set(DelayedConstraint::add_to_list(long_list, constraints));
+    }
+
+    /// See [UnifierTop::delayed_constraint]
+    ///
+    /// We bubble delayed constraints up to the top of the call stack,
+    /// because if we immediately execute any delayed constraint that becomes ready,
+    /// we might blow out the stack.
+    ///
+    /// You may call [Substitutor::execute_ready_constraints] multiple times, but certainly you must make sure to call it before the [UnifierTop] is dropped.
+    fn execute_ready_constraints(&self, unif: &Unif) {
+        // During of a delayed constraint, other constraints may of course become ready.
+        // We retry delayed constraints in a stack-like manner, as my intuition tells me this is more efficient.
+        while let Some(mut first_constraint) = self.ready_constraints.take() {
+            self.ready_constraints.set(first_constraint.next.take());
+
+            if let Err(resolution_err) = (first_constraint.f)(unif) {
+                resolution_err.add_delayed_constraint(first_constraint);
+            }
+        }
     }
 }
 
@@ -328,7 +347,7 @@ pub struct SubTree<T>(usize, PhantomData<T>);
 /// going through the trouble with &mut refs is not worth it. Passing it along the call stack is also no bueno,
 /// we'd have to pass the unifier itself, plus whatever extra data the user wants to attach to it. Lots of complexity for nothing.
 ///
-/// Times we've been through the `&mut Substitutor` dead-end thus far: 3
+/// Times we've been through the `&mut Substitutor` dead-end thus far: 4
 pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop + Sized + 's {
     /// You should declare a [Substitutor] field for each [UniCell]`<T>` you wish to support. Return it here.
     fn get_substitutor(&'slf self) -> &'slf Substitutor<'s, T, Self>;
@@ -560,38 +579,24 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop + Sized + '
             Err(None) => false,
         }
     }
-
-    /// See [UnifierTop::delayed_constraint]
-    ///
-    /// We bubble delayed constraints up to the top of the call stack,
-    /// because if we immediately execute any delayed constraint that becomes ready,
-    /// we might blow out the stack.
-    fn execute_ready_constraints(&'slf self) {
-        let subs = self.get_substitutor();
-        // During of a delayed constraint, other constraints may of course become ready.
-        // We retry delayed constraints in a stack-like manner, as my intuition tells me this is more efficient.
-        while let Some(mut first_constraint) = subs.ready_constraints.take() {
-            subs.ready_constraints.set(first_constraint.next.take());
-
-            if let Err(resolution_err) = (first_constraint.f)(self) {
-                resolution_err.add_delayed_constraint(first_constraint);
-            }
-        }
-    }
 }
 
 pub trait UnifierTop: Sized {
-    /// When using [UnifierTop::delayed_constraint],
-    /// you must also call [Unifier::execute_ready_constraints] once, or multiple times.
-    fn delayed_constraint<'slf2, 's: 'slf2>(
-        &'slf2 self,
-        mut f: impl for<'slf> FnMut(&'slf Self) -> Result<(), ResolveError<'slf, 's, Self>> + 's,
+    /// You must call [UnifierTop::execute_ready_constraints] after creating delayed_constraints,
+    /// as not immediately resolved delayed constraints don't immediately get resolved the moment they become eligible.
+    fn delayed_constraint<'slf, 's: 'slf>(
+        &'slf self,
+        mut f: impl for<'fn_slf> FnMut(&'fn_slf Self) -> Result<(), ResolveError<'fn_slf, 's, Self>>
+        + 's,
     ) {
         if let Err(not_found_var) = f(self) {
             // May be a not_found_var from a different Substitutor
             not_found_var.add_delayed_constraint(Box::new(DelayedConstraint { next: None, f }));
         }
     }
+    /// This method is provided as a reminder that [Substitutor::execute_ready_constraints] must be called for all [Substitutor]s that are part of this [UnifierTop].
+    /// You may call [UnifierTop::execute_ready_constraints] multiple times, but certainly you must make sure to call it before the [UnifierTop] is dropped.
+    fn execute_ready_constraints(&self);
 }
 
 /// Fancy trick! [Rust Forum - Creating a DST struct with a dyn FnMut](https://users.rust-lang.org/t/creating-a-dst-struct-with-a-dyn-fnmut/137256/3).
@@ -701,23 +706,42 @@ impl PeanoType {
     }
 }
 
+#[derive(Debug, Clone)]
+enum SecondType {
+    None,
+    OnePeano(UniCell<PeanoType>),
+    TwoPeano(UniCell<PeanoType>, UniCell<PeanoType>),
+}
+
+impl SecondType {
+    #[allow(clippy::declare_interior_mutable_const)]
+    pub const UNKNOWN: UniCell<SecondType> = UniCell::<SecondType>::UNKNOWN;
+}
+
 #[derive(Debug)]
 struct PeanoUnifier<'s> {
-    substitutor: Substitutor<'s, PeanoType, Self>,
+    peano_subs: Substitutor<'s, PeanoType, Self>,
+    second_subs: Substitutor<'s, SecondType, Self>,
 }
 
 impl<'s> PeanoUnifier<'s> {
     pub fn new() -> Self {
         Self {
-            substitutor: Substitutor::new(),
+            peano_subs: Substitutor::new(),
+            second_subs: Substitutor::new(),
         }
     }
 }
 
-impl<'s> UnifierTop for PeanoUnifier<'s> {}
+impl<'s> UnifierTop for PeanoUnifier<'s> {
+    fn execute_ready_constraints(&self) {
+        self.peano_subs.execute_ready_constraints(self);
+        self.second_subs.execute_ready_constraints(self);
+    }
+}
 impl<'slf, 's: 'slf> Unifier<'slf, 's, PeanoType> for PeanoUnifier<'s> {
     fn get_substitutor(&'slf self) -> &'slf Substitutor<'s, PeanoType, Self> {
-        &self.substitutor
+        &self.peano_subs
     }
     fn unify_subtrees(&'slf self, a: &'s PeanoType, b: &'s PeanoType) -> UnifyResult {
         match (a, b) {
@@ -752,6 +776,57 @@ impl<'slf, 's: 'slf> Unifier<'slf, 's, PeanoType> for PeanoUnifier<'s> {
         match known {
             PeanoType::Zero => PeanoType::Zero,
             PeanoType::Succ(succ) => PeanoType::Succ(Box::new(self.clone_unify(succ))),
+        }
+    }
+}
+impl<'slf, 's: 'slf> Unifier<'slf, 's, SecondType> for PeanoUnifier<'s> {
+    fn get_substitutor(&'slf self) -> &'slf Substitutor<'s, SecondType, Self> {
+        &self.second_subs
+    }
+    fn unify_subtrees(&'slf self, a: &'s SecondType, b: &'s SecondType) -> UnifyResult {
+        match (a, b) {
+            (SecondType::None, SecondType::None) => UnifyResult::Success,
+            (SecondType::OnePeano(a), SecondType::OnePeano(b)) => self.unify(a, b),
+            (SecondType::TwoPeano(a1, a2), SecondType::TwoPeano(b1, b2)) => {
+                self.unify(a1, b1) & self.unify(a2, b2)
+            }
+            _ => UnifyResult::Failure,
+        }
+    }
+    fn set_subtrees(&'slf self, a: &'s SecondType, b: SecondType) -> UnifyResult {
+        match (a, b) {
+            (SecondType::None, SecondType::None) => UnifyResult::Success,
+            (SecondType::OnePeano(a), SecondType::OnePeano(b)) => self.set_cell(a, b),
+            (SecondType::TwoPeano(a1, a2), SecondType::TwoPeano(b1, b2)) => {
+                self.set_cell(a1, b1) & self.set_cell(a2, b2)
+            }
+            _ => UnifyResult::Failure,
+        }
+    }
+    fn contains_subtree(&'slf self, _in_obj: &SecondType, _subtree: SubTree<SecondType>) -> bool {
+        false // SecondType doesn't recurse
+    }
+    fn fully_substitute_recurse(
+        &'slf self,
+        known: &'s SecondType,
+    ) -> Option<ResolveError<'slf, 's, Self>> {
+        match known {
+            SecondType::None => None,
+            SecondType::OnePeano(a) => self.fully_substitute(a).err(),
+            SecondType::TwoPeano(a, b) => {
+                let a = self.fully_substitute(a).err();
+                let b = self.fully_substitute(b).err();
+                a.or(b)
+            }
+        }
+    }
+    fn clone_known(&'slf self, known: &'s SecondType) -> SecondType {
+        match known {
+            SecondType::None => SecondType::None,
+            SecondType::OnePeano(a) => SecondType::OnePeano(self.clone_unify(a)),
+            SecondType::TwoPeano(a, b) => {
+                SecondType::TwoPeano(self.clone_unify(a), self.clone_unify(b))
+            }
         }
     }
 }
@@ -1178,6 +1253,40 @@ mod tests {
                 assert_eq!(substitutor.resolve(p).unwrap().count(), 0);
             }
         }
+    }
+
+    #[test]
+    fn test_multi_substitutor() {
+        let a = SecondType::UNKNOWN;
+        let b = SecondType::UNKNOWN;
+
+        let substitutor = PeanoUnifier::new();
+
+        substitutor
+            .set(
+                &a,
+                SecondType::TwoPeano(mk_peano_cell(1), PeanoType::UNKNOWN),
+            )
+            .unwrap();
+        substitutor
+            .set(
+                &b,
+                SecondType::TwoPeano(PeanoType::UNKNOWN, mk_peano_cell(2)),
+            )
+            .unwrap();
+
+        substitutor.unify(&a, &b).unwrap();
+
+        let a = substitutor.fully_substitute(&a).unwrap();
+        let b = substitutor.fully_substitute(&b).unwrap();
+
+        let_unwrap!(SecondType::TwoPeano(a1, a2), a);
+        let_unwrap!(SecondType::TwoPeano(b1, b2), b);
+
+        assert_eq!(a1.unwrap().count(), 1);
+        assert_eq!(a2.unwrap().count(), 2);
+        assert_eq!(b1.unwrap().count(), 1);
+        assert_eq!(b2.unwrap().count(), 2);
     }
 
     /// Just a stress test to cover all possible code paths. To check under miri that everything is alright.
