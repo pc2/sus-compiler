@@ -69,6 +69,11 @@ pub enum UnifyResult {
     Failure,
     FailureInfiniteTypes,
 }
+impl UnifyResult {
+    pub fn unwrap(&self) {
+        assert_eq!(*self, UnifyResult::Success)
+    }
+}
 impl BitAnd for UnifyResult {
     type Output = UnifyResult;
 
