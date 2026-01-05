@@ -44,7 +44,7 @@ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
     CrossDomain cross_write_addr
     cross_write_addr.in = write_addr
 
-	int space_remaining = cross_read_addr.out - write_addr mod DEPTH
+	int space_remaining = cross_read_addr.out - (write_addr + 1) mod DEPTH
 
     domain write
     output bool may_push'-MAY_PUSH_LATENCY = LatencyOffset #(OFFSET: -MAY_PUSH_LATENCY)(space_remaining > MAY_PUSH_LATENCY)
