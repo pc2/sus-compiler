@@ -19,6 +19,7 @@ use crate::typing::abstract_type::{
 use crate::typing::concrete_type::ConcreteTemplateArg;
 use crate::typing::domain_type::DomainType;
 use crate::typing::template::TVec;
+use crate::typing::unifyable_cell::UniCell;
 use crate::util::{unwrap_single_element, zip_eq};
 
 use ibig::{IBig, UBig};
@@ -44,7 +45,6 @@ pub fn execute(
                 .instructions
                 .map(|(_, _)| SubModuleOrWire::Unassigned),
         },
-        type_substitutor: Default::default(),
         //type_value_substitutor: Default::default(),
         condition_stack: Vec::new(),
         wires: FlatAlloc::new(),
@@ -60,7 +60,6 @@ pub fn execute(
     Executed {
         wires: context.wires,
         submodules: context.submodules,
-        type_var_alloc: context.type_substitutor,
         generation_state: context.generation_state.generation_state,
         execution_status,
     }
@@ -70,7 +69,6 @@ pub fn execute(
 struct ExecutionContext<'l> {
     wires: FlatAlloc<RealWire, WireIDMarker>,
     submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
-    type_substitutor: ValueUnifierAlloc,
 
     /// Used for Execution
     generation_state: GenerationState<'l>,
@@ -616,7 +614,7 @@ impl<'l> ExecutionContext<'l> {
                                 .clone()
                                 .into()
                         } else {
-                            self.type_substitutor.alloc_unknown()
+                            UniCell::UNKNOWN
                         },
                     ),
                 })
@@ -652,9 +650,7 @@ impl<'l> ExecutionContext<'l> {
                                 TemplateKind::Type(_) => {
                                     todo!("Abstract Type Args aren't yet supported!")
                                 }
-                                TemplateKind::Value(_) => {
-                                    TemplateKind::Value(self.type_substitutor.alloc_unknown())
-                                }
+                                TemplateKind::Value(_) => TemplateKind::Value(UniCell::UNKNOWN),
                             }),
                         },
                         Some(t) => unreachable!(
@@ -681,11 +677,11 @@ impl<'l> ExecutionContext<'l> {
                                 .clone()
                                 .into()
                         } else {
-                            self.type_substitutor.alloc_unknown()
+                            UniCell::UNKNOWN
                         };
                         (Some(content), sz)
                     }
-                    None => (None, self.type_substitutor.alloc_unknown()),
+                    None => (None, UniCell::UNKNOWN),
                     Some(t) => unreachable!(
                         "Expected an Array Written type (PeanoType is Succ(_)), but found {t:?}"
                     ),
@@ -867,7 +863,7 @@ impl<'l> ExecutionContext<'l> {
                 let [t, size, v] = cst_ref.template_args.cast_to_array();
 
                 let t = t.unwrap_type().clone();
-                let v = v.unwrap_value().unwrap_set();
+                let v = v.unwrap_value().unwrap();
                 let size = must_be_small_uint::<usize>(
                     size.unwrap_value().unwrap_integer(),
                     "V",
@@ -1220,12 +1216,7 @@ impl<'l> ExecutionContext<'l> {
 
         Ok(self.wires.alloc(RealWire {
             typ: value
-                .concretize_type(
-                    self.globals,
-                    abs_typ,
-                    self.working_on_template_args,
-                    &mut self.type_substitutor,
-                )
+                .concretize_type(self.globals, abs_typ, self.working_on_template_args)
                 .map_err(|msg| (const_span, msg))?,
             source: RealWireDataSource::Constant { value },
             original_instruction,
@@ -1503,9 +1494,7 @@ impl<'l> ExecutionContext<'l> {
     }
 
     fn alloc_array_dimensions_stack(&mut self, peano_type: &PeanoType) -> Vec<UnifyableValue> {
-        (0..peano_type.count().unwrap())
-            .map(|_| self.type_substitutor.alloc_unknown())
-            .collect()
+        vec![UniCell::UNKNOWN; peano_type.count().unwrap()]
     }
     fn expression_to_real_wire(
         &mut self,
@@ -1621,7 +1610,7 @@ impl<'l> ExecutionContext<'l> {
                     // Only for template arguments, we must initialize their value to the value they've been assigned in the template instantiation
                     self.working_on_template_args[template_id]
                         .unwrap_value()
-                        .unwrap_set()
+                        .unwrap()
                         .clone()
                 } else {
                     // Empty initial value

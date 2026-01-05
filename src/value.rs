@@ -9,7 +9,7 @@ use sus_proc_macro::get_builtin_type;
 use crate::flattening::{BinaryOperator, UnaryOperator};
 
 use crate::typing::concrete_type::{ConcreteTemplateArg, ConcreteType};
-use crate::typing::set_unifier::Unifyable;
+use crate::typing::unifyable_cell::UniCell;
 
 /// Top type for any kind of compiletime value while executing.
 ///
@@ -335,19 +335,19 @@ impl From<Vec<Value>> for Value {
 
 impl From<IBig> for ConcreteTemplateArg {
     fn from(value: IBig) -> Self {
-        ConcreteTemplateArg::Value(Unifyable::Set(Value::Integer(value)))
+        ConcreteTemplateArg::Value(UniCell::from(Value::Integer(value)))
     }
 }
 
 impl From<bool> for ConcreteTemplateArg {
     fn from(value: bool) -> Self {
-        ConcreteTemplateArg::Value(Unifyable::Set(Value::Bool(value)))
+        ConcreteTemplateArg::Value(UniCell::from(Value::Bool(value)))
     }
 }
 
 impl From<Vec<Value>> for ConcreteTemplateArg {
     fn from(value: Vec<Value>) -> Self {
-        ConcreteTemplateArg::Value(Unifyable::Set(Value::Array(value)))
+        ConcreteTemplateArg::Value(UniCell::from(Value::Array(value)))
     }
 }
 

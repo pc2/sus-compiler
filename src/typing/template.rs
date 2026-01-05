@@ -2,7 +2,6 @@ use crate::prelude::*;
 use ibig::IBig;
 
 use super::{concrete_type::ConcreteTemplateArg, value_unifier::UnifyableValue};
-use crate::{typing::set_unifier::Unifyable, value::Value};
 
 /// See [TVec]. All circumstances handling Templates need to handle both Types and Values.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -123,21 +122,9 @@ impl TVec<ConcreteTemplateArg> {
     pub fn cast_to_unifyable_array<const N: usize>(&self) -> [&UnifyableValue; N] {
         self.cast_to_array().each_ref().map(|v| v.unwrap_value())
     }
-    pub fn cast_to_unifyable_array_mut<const N: usize>(&mut self) -> [&mut UnifyableValue; N] {
-        self.cast_to_array_mut()
-            .each_mut()
-            .map(|v| v.unwrap_value_mut())
-    }
     pub fn cast_to_int_array<const N: usize>(&self) -> [&IBig; N] {
-        self.cast_to_array().each_ref().map(|v| {
-            let_unwrap!(TemplateKind::Value(Unifyable::Set(Value::Integer(i))), v);
-            i
-        })
-    }
-    pub fn cast_to_int_array_mut<const N: usize>(&mut self) -> [&mut IBig; N] {
-        self.cast_to_array_mut().each_mut().map(|v| {
-            let_unwrap!(TemplateKind::Value(Unifyable::Set(Value::Integer(i))), v);
-            i
-        })
+        self.cast_to_array()
+            .each_ref()
+            .map(|v| v.unwrap_value().unwrap().unwrap_integer())
     }
 }

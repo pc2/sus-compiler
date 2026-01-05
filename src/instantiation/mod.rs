@@ -15,7 +15,7 @@ use crate::instantiation::concrete_typecheck::ModuleTypingSuperContext;
 use crate::latency::{AbsLat, InferenceFailure};
 use crate::linker::{LinkInfo, LinkerGlobals};
 use crate::typing::template::TVec;
-use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
+use crate::typing::value_unifier::UnifyableValue;
 
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashSet;
@@ -219,7 +219,6 @@ pub struct InstantiatedPort {
     pub wire: WireID,
     pub direction: Direction,
     pub absolute_latency: AbsLat,
-    pub typ: ConcreteType,
     pub domain: DomainID,
 }
 
@@ -393,7 +392,6 @@ pub enum InferenceResult {
 struct Executed {
     wires: FlatAlloc<RealWire, WireIDMarker>,
     submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
-    type_var_alloc: ValueUnifierAlloc,
     generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
     execution_status: Result<(), (Span, String)>,
 }
@@ -441,7 +439,6 @@ impl<'l> ModuleTypingContext<'l> {
                 wire: *wire_id,
                 direction: port.direction,
                 absolute_latency: wire.absolute_latency,
-                typ: wire.typ.clone(),
                 domain: wire.domain,
             })
         });

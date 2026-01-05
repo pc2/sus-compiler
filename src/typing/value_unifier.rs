@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    ops::{Deref, DerefMut},
-};
+use std::{collections::HashMap, ops::Deref};
 
 use ibig::IBig;
 use sus_proc_macro::get_builtin_type;
@@ -14,6 +11,10 @@ use crate::{
         abstract_type::{AbstractGlobalReference, AbstractInnerType},
         concrete_type::SubtypeRelation,
         template::TVec,
+        type_inference::UnifyResult,
+        unifyable_cell::{
+            ResolveError, SubTree, Substitutor, UniCell, Unifier, UnifierTop, UnifierTopInfo,
+        },
     },
     value::Value,
 };
@@ -21,58 +22,117 @@ use crate::{
 use super::{
     abstract_type::AbstractRankedType,
     concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg, ConcreteType},
-    set_unifier::{
-        DelayedErrorCollector, FullySubstitutable, SetUnifier, SetUnifierStore, Unifyable,
-        UnifyableAlloc,
-    },
     template::TemplateKind,
-    type_inference::ConcreteTypeVariableIDMarker,
 };
 
-pub type UnifyableValue = Unifyable<Value, ConcreteTypeVariableIDMarker>;
-pub type ValueUnifierAlloc = UnifyableAlloc<Value, ConcreteTypeVariableIDMarker>;
-pub type ValueUnifierStore = SetUnifierStore<Value, ConcreteTypeVariableIDMarker>;
-pub type ValueUnifier<'inst> = SetUnifier<'inst, Value, ConcreteTypeVariableIDMarker>;
-pub type ValueErrorReporter<'inst> =
-    DelayedErrorCollector<'inst, Value, ConcreteTypeVariableIDMarker>;
+pub type UnifyableValue = UniCell<Value>;
+#[derive(Default)]
+pub struct ValueUnifier<'inst> {
+    value_substitutor: Substitutor<'inst, Value, Self>,
+    unifier_top_info: UnifierTopInfo<'inst, Self>,
+}
 
-impl From<Value> for UnifyableValue {
-    fn from(val: Value) -> Self {
-        assert!(
-            !matches!(val, Value::Unset),
-            "Compiletime Value MUST be set before use in Type Unification"
-        );
-        Unifyable::Set(val)
+impl<'inst> ValueUnifier<'inst> {
+    pub fn new() -> Self {
+        Self {
+            value_substitutor: Substitutor::new(),
+            unifier_top_info: UnifierTopInfo::new(),
+        }
+    }
+}
+
+impl<'inst> UnifierTop<'inst> for ValueUnifier<'inst> {
+    fn execute_ready_constraints(&self) {
+        self.value_substitutor.execute_ready_constraints(self);
+    }
+    fn get_unifier_info(&self) -> &UnifierTopInfo<'inst, Self> {
+        &self.unifier_top_info
+    }
+}
+
+fn check_values_equal(a: &Value, b: &Value) -> UnifyResult {
+    assert!(!a.contains_unset());
+    assert!(!b.contains_unset());
+    let eq = match (a, b) {
+        (Value::Bool(a), Value::Bool(b)) => a == b,
+        (Value::Integer(a), Value::Integer(b)) => a == b,
+        (Value::Float(a), Value::Float(b)) => a == b,
+        (Value::Double(a), Value::Double(b)) => a == b,
+        (Value::String(a), Value::String(b)) => a == b,
+        (Value::Array(a), Value::Array(b)) => a == b,
+        (Value::Unset, _) | (_, Value::Unset) => {
+            unreachable!("Unsets can never make it into the type checker!")
+        }
+        _ => unreachable!(
+            "Abstract Typing Error in Unifier? Should have been caught by Abstract Type Checker!"
+        ),
+    };
+    if eq {
+        UnifyResult::Success
+    } else {
+        UnifyResult::Failure
+    }
+}
+impl<'slf, 'inst: 'slf> Unifier<'slf, 'inst, Value> for ValueUnifier<'inst> {
+    fn get_substitutor(&'slf self) -> &'slf Substitutor<'inst, Value, Self> {
+        &self.value_substitutor
+    }
+
+    fn unify_subtrees(&'slf self, a: &'inst Value, b: &'inst Value) -> UnifyResult {
+        check_values_equal(a, b)
+    }
+
+    fn set_subtrees(&'slf self, a: &'inst Value, b: Value) -> UnifyResult {
+        check_values_equal(a, &b)
+    }
+
+    fn contains_subtree(&'slf self, _: &Value, _: SubTree<Value>) -> bool {
+        false // No recursion
+    }
+
+    fn fully_substitute_recurse(
+        &'slf self,
+        _: &'inst Value,
+    ) -> Result<(), ResolveError<'slf, 'inst, Self>> {
+        Ok(()) // No recursion
+    }
+
+    fn clone_known(&'slf self, known: &'inst Value) -> Value {
+        known.clone() // No recursion
     }
 }
 
 impl<'inst> ValueUnifier<'inst> {
     /// Unifies all [UnifyableValue] parameters contained in the [ConcreteType]. This includes values in subtyping relations [SubtypeRelation::Min] and [SubtypeRelation::Max].
-    pub fn unify_concrete_all(&mut self, from: &ConcreteType, to: &ConcreteType) -> bool {
+    pub fn unify_concrete_all(&self, from: &'inst ConcreteType, to: &'inst ConcreteType) -> bool {
         let mut success = true;
         ConcreteType::co_iterate_parameters(from, to, &mut |f, t, _relation| {
-            success &= self.unify(f, t);
+            success &= self.unify(f, t) == UnifyResult::Success;
         });
         success
     }
 
     /// Unifies all [UnifyableValue] parameters contained in the [ConcreteType]. This only includes [SubtypeRelation::Exact]
-    pub fn unify_concrete_only_exact(&mut self, from: &ConcreteType, to: &ConcreteType) -> bool {
+    pub fn unify_concrete_only_exact(
+        &self,
+        from: &'inst ConcreteType,
+        to: &'inst ConcreteType,
+    ) -> bool {
         let mut success = true;
         ConcreteType::co_iterate_parameters(from, to, &mut |f, t, relation| {
             if relation == SubtypeRelation::Exact {
-                success &= self.unify(f, t);
+                success &= self.unify(f, t) == UnifyResult::Success;
             }
         });
         success
     }
 
     /// Gathers values for subtype relations for a's parameters
-    fn unify_gather_subtype_relations<'a>(
-        &mut self,
-        a: &'a ConcreteType,
-        b: &'a ConcreteType,
-        source_gather: &mut SubTypeSourceGatherer<'_, 'a>,
+    fn unify_gather_subtype_relations(
+        &self,
+        a: &'inst ConcreteType,
+        b: &'inst ConcreteType,
+        source_gather: &mut SubTypeSourceGatherer<'_, 'inst>,
     ) {
         ConcreteType::co_iterate_parameters(a, b, &mut |a, b, relation| match relation {
             SubtypeRelation::Exact => {
@@ -86,7 +146,7 @@ impl<'inst> ValueUnifier<'inst> {
 
     /// In type_iter: The first type represents the target, the second type represents the source
     pub fn create_subtype_constraint(
-        &mut self,
+        &self,
         type_iter: impl IntoIterator<Item = (&'inst ConcreteType, &'inst ConcreteType)>,
     ) {
         let type_iter = type_iter.into_iter();
@@ -104,30 +164,31 @@ impl<'inst> ValueUnifier<'inst> {
         }
 
         for var_sources in source_gather_hashmap.into_values() {
-            match var_sources.target {
-                // Set means that it's specified! Because it was placed there directly by execute. Known values due to unifying are [Unifyable::Unknown] pointing to [KnownValue::Known]
-                // Errors are reported by final_checks
-                Unifyable::Set(_) => {}
-                Unifyable::Unknown(_) => {
-                    let reservation = self.reserve_constraint(var_sources.sources.iter().copied());
-                    self.place_reserved_constraint(reservation, move |unifier| {
-                        let source_iter = var_sources
-                            .sources
-                            .into_iter()
-                            .map(|src| unifier.unwrap_known(src).unwrap_integer());
+            // Set means that it's specified! Because it was placed there directly by execute. Known values due to unifying are [Unifyable::Unknown] pointing to [KnownValue::Known]
+            // Errors are reported by final_checks
+            if var_sources.target.get().is_none() {
+                self.delayed_constraint(move |unifier| {
+                    let mut source_iter = var_sources.sources.iter();
+                    let mut common_subtype = unifier.resolve(source_iter.next().unwrap())?.unwrap_integer();
 
-                        let common_subtype = match var_sources.relation {
-                            ValueUnificationRelation::Min => source_iter.min(),
-                            ValueUnificationRelation::Max => source_iter.max(),
-                        };
-                        // We can simply unwrap, because a source only appears in the HashMap if it's actually encountered, and thus at least one other var matches with it!
-                        let common_subtype = common_subtype.unwrap().clone();
+                    for source in source_iter {
+                        let v = unifier.resolve(*source)?.unwrap_integer();
+                        match var_sources.relation {
+                            ValueUnificationRelation::Min if v < common_subtype => {
+                                common_subtype = v;
+                            }
+                            ValueUnificationRelation::Max if v > common_subtype => {
+                                common_subtype = v;
+                            }
+                            _ => {}
+                        }
+                    }
 
-                        unifier
-                            .set(var_sources.target, Value::Integer(common_subtype))
-                            .expect("Values used in subtyping relations are always resolved in a forward direction (so a value b that depends on value a only gets resolved after a is resolved) That's why we can safely assert");
-                    });
-                }
+                    unifier
+                        .set(var_sources.target, Value::Integer(common_subtype.clone()))
+                        .expect("Values used in subtyping relations are always resolved in a forward direction (so a value b that depends on value a only gets resolved after a is resolved) That's why we can safely assert");
+                    Ok(())
+                });
             }
         }
     }
@@ -150,7 +211,6 @@ impl Value {
         _linker: &LinkerGlobals,
         abs_typ: &AbstractRankedType,
         template_args: &TVec<ConcreteTemplateArg>,
-        value_alloc: &mut ValueUnifierAlloc,
     ) -> Result<ConcreteType, String> {
         let array_depth = abs_typ.rank.count().unwrap();
         let mut tensor_sizes = Vec::with_capacity(array_depth);
@@ -303,8 +363,8 @@ impl Value {
                         ]
                     } else {
                         vec![
-                            TemplateKind::Value(value_alloc.alloc_unknown()),
-                            TemplateKind::Value(value_alloc.alloc_unknown()),
+                            TemplateKind::Value(UnifyableValue::UNKNOWN),
+                            TemplateKind::Value(UnifyableValue::UNKNOWN),
                         ]
                     });
                 ConcreteType::Named(ConcreteGlobalReference {
@@ -331,7 +391,7 @@ impl Value {
         // Because we might encounter zero sized arrays, we don't actually know sizes under there
         // Fill remaining array slots with Unknown
         while array_size_vars.len() < array_depth {
-            array_size_vars.push(value_alloc.alloc_unknown());
+            array_size_vars.push(UnifyableValue::UNKNOWN);
         }
         Ok(content_typ.stack_arrays(array_size_vars))
     }
@@ -364,43 +424,45 @@ impl Value {
     }
 }
 
-impl FullySubstitutable<Value, ConcreteTypeVariableIDMarker> for ConcreteType {
-    fn fully_substitute(&mut self, substitutor: &ValueUnifierStore) -> bool {
+impl ConcreteType {
+    pub fn fully_substitute<'unif, 'inst: 'unif>(
+        &'inst self,
+        unifier: &'unif ValueUnifier<'inst>,
+    ) -> Result<(), ResolveError<'unif, 'inst, ValueUnifier<'inst>>> {
         match self {
-            ConcreteType::Named(global_ref) => {
-                global_ref.template_args.fully_substitute(substitutor)
-            }
-            ConcreteType::Array(arr) => {
-                let (content, sz) = arr.deref_mut();
-                content.fully_substitute(substitutor) & sz.fully_substitute(substitutor)
-            }
-        }
-    }
-    fn can_fully_substitute(&self, substitutor: &ValueUnifierStore) -> bool {
-        match self {
-            ConcreteType::Named(global_ref) => {
-                global_ref.template_args.can_fully_substitute(substitutor)
-            }
+            ConcreteType::Named(global_ref) => global_ref.template_args.fully_substitute(unifier),
             ConcreteType::Array(arr) => {
                 let (content, sz) = arr.deref();
-                content.can_fully_substitute(substitutor) & sz.can_fully_substitute(substitutor)
+                content
+                    .fully_substitute(unifier)
+                    .and(sz.fully_substitute(unifier))
             }
         }
     }
 }
 
-impl FullySubstitutable<Value, ConcreteTypeVariableIDMarker> for TVec<ConcreteTemplateArg> {
-    fn fully_substitute(&mut self, substitutor: &ValueUnifierStore) -> bool {
-        self.iter_mut().all(|(_, arg)| match arg {
-            TemplateKind::Type(t) => t.fully_substitute(substitutor),
-            TemplateKind::Value(v) => v.fully_substitute(substitutor),
-        })
+impl TVec<ConcreteTemplateArg> {
+    pub fn fully_substitute<'unif, 'inst: 'unif>(
+        &'inst self,
+        unifier: &'unif ValueUnifier<'inst>,
+    ) -> Result<(), ResolveError<'unif, 'inst, ValueUnifier<'inst>>> {
+        let mut total_result = Ok(());
+        for (_, arg) in self {
+            total_result = total_result.and(match arg {
+                TemplateKind::Type(t) => t.fully_substitute(unifier),
+                TemplateKind::Value(v) => v.fully_substitute(unifier),
+            })
+        }
+        total_result
     }
-    fn can_fully_substitute(&self, substitutor: &ValueUnifierStore) -> bool {
-        self.iter().all(|(_, arg)| match arg {
-            TemplateKind::Type(t) => t.can_fully_substitute(substitutor),
-            TemplateKind::Value(v) => v.can_fully_substitute(substitutor),
-        })
+}
+
+impl<ID> ConcreteGlobalReference<ID> {
+    pub fn fully_substitute<'unif, 'inst: 'unif>(
+        &'inst self,
+        unifier: &'unif ValueUnifier<'inst>,
+    ) -> Result<(), ResolveError<'unif, 'inst, ValueUnifier<'inst>>> {
+        self.template_args.fully_substitute(unifier)
     }
 }
 
@@ -413,14 +475,13 @@ impl ConcreteType {
             .each_ref()
             .map(|v| v.unwrap_value())
     }
-    pub fn display_substitute(
-        &self,
+    pub fn display_substitute<'inst>(
+        &'inst self,
         globals: &LinkerGlobals,
-        substitutor: &ValueUnifierStore,
+        unifier: &ValueUnifier<'inst>,
     ) -> String {
-        let mut typ_copy = self.clone();
-        typ_copy.fully_substitute(substitutor);
-        let as_display = typ_copy.display(globals);
+        let _ = self.fully_substitute(unifier);
+        let as_display = self.display(globals);
         as_display.to_string()
     }
 }

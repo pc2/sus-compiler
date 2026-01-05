@@ -1,12 +1,13 @@
 use std::cell::UnsafeCell;
 
-/// An append-only Vector. The contents cannot be looked at, unless the vector is explicitly consumed. This allows us to present a const-ref [Self::push], which has nice ergonomics
+/// An append-only Vector. The contents cannot be looked at, unless the vector is explicitly consumed, or taken using [Self::take]. This allows us to present a const-ref [Self::push], which has nice ergonomics
 ///
-/// Basically a "vector" variant of [std::cell::Cell]
+/// Basically a "vector" variant of [std::cell::Cell].
+///
+/// For all `unsafe` blocks:
+/// SAFETY: Vector elements cannot be looked at. They can only be added or removed. The whole vector can be extracted with [Self::take].
 #[derive(Debug)]
-pub struct AppendOnlyVec<T> {
-    v: UnsafeCell<Vec<T>>,
-}
+pub struct AppendOnlyVec<T>(UnsafeCell<Vec<T>>);
 
 impl<T> Default for AppendOnlyVec<T> {
     fn default() -> Self {
@@ -16,26 +17,31 @@ impl<T> Default for AppendOnlyVec<T> {
 
 impl<T> From<Vec<T>> for AppendOnlyVec<T> {
     fn from(existing_vec: Vec<T>) -> Self {
-        Self {
-            v: UnsafeCell::new(existing_vec),
-        }
+        Self(UnsafeCell::new(existing_vec))
+    }
+}
+
+impl<T> From<AppendOnlyVec<T>> for Vec<T> {
+    fn from(v: AppendOnlyVec<T>) -> Self {
+        v.0.into_inner()
     }
 }
 
 impl<T> AppendOnlyVec<T> {
     pub fn new() -> Self {
-        Self {
-            v: UnsafeCell::new(Vec::new()),
-        }
+        Self(UnsafeCell::new(Vec::new()))
     }
     pub fn push(&self, data: T) {
-        // SAFETY: AppendOnlyVec is made such that references to the content can only be made from exclusive references. Hence, no reference can be taken and then invalidated by a push
-        unsafe {
-            (*self.v.get()).push(data);
-        }
+        unsafe { (*self.0.get()).push(data) }
+    }
+    pub fn pop(&self) -> Option<T> {
+        unsafe { (*self.0.get()).pop() }
+    }
+    pub fn clear(&self) {
+        unsafe { (*self.0.get()).clear() }
     }
     pub fn len(&self) -> usize {
-        unsafe { (*self.v.get()).len() }
+        unsafe { (*self.0.get()).len() }
     }
     pub fn is_empty(&self) -> bool {
         self.len() == 0
@@ -46,19 +52,21 @@ impl<T> AppendOnlyVec<T> {
     where
         T: Copy,
     {
-        unsafe { (&*self.v.get())[idx] }
+        unsafe { (&*self.0.get())[idx] }
     }
 
     pub fn set_elem(&self, idx: usize, v: T) -> T {
         unsafe {
-            let vec = &mut *self.v.get();
-            std::mem::replace(&mut vec[idx], v)
+            let vec = self.0.get();
+            std::mem::replace(&mut (&mut *vec)[idx], v)
         }
     }
-}
 
-impl<T> From<AppendOnlyVec<T>> for Vec<T> {
-    fn from(val: AppendOnlyVec<T>) -> Self {
-        val.v.into_inner()
+    /// Takes the current contents of the vector, and resets the vector to empty
+    pub fn take(&self) -> Vec<T> {
+        unsafe {
+            let vec = self.0.get();
+            std::mem::take(&mut *vec)
+        }
     }
 }

@@ -41,14 +41,6 @@ pub fn zip_eq<OA, OB>(
     }
 }
 
-/// Merges a and b, order is unimportant
-pub fn merge_vec_into<T>(a: &mut Vec<T>, mut b: Vec<T>) {
-    if a.len() < b.len() {
-        std::mem::swap(a, &mut b);
-    }
-    a.append(&mut b);
-}
-
 pub fn contains_duplicates<T: Eq + std::hash::Hash>(iter: impl IntoIterator<Item = T>) -> bool {
     let mut seen = HashSet::new();
     for item in iter {

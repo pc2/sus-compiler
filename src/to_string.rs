@@ -19,7 +19,6 @@ use crate::file_position::FileText;
 use crate::typing::abstract_type::{AbstractGlobalReference, AbstractInnerType};
 use crate::typing::concrete_type::{ConcreteGlobalReference, SubtypeRelation};
 use crate::typing::domain_type::DomainType;
-use crate::typing::set_unifier::Unifyable;
 use crate::typing::template::{
     GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind,
 };
@@ -224,8 +223,10 @@ impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
                     TemplateKind::Type(typ_arg) => {
                         write!(f, "type {}", typ_arg.display(globals))
                     }
-                    TemplateKind::Value(Unifyable::Set(value)) => write!(f, "{value}"),
-                    TemplateKind::Value(Unifyable::Unknown(_)) => write!(f, "?"),
+                    TemplateKind::Value(cell) => match cell.get() {
+                        Some(value) => write!(f, "{value}"),
+                        None => write!(f, "?"),
+                    },
                 }
             },
         )
@@ -309,12 +310,12 @@ impl ConcreteType {
                 let (elem_typ, arr_size) = arr_box.deref();
                 write!(f, "{}[", elem_typ.display(globals))?;
                 // arr_size is Unifyable<Value, ...>, which implements Display for Unifyable, not Value
-                match arr_size {
-                    Unifyable::Set(val) => {
+                match arr_size.get() {
+                    Some(val) => {
                         // Value does not implement Display, so use Debug
                         write!(f, "{val}")?;
                     }
-                    Unifyable::Unknown(_) => {
+                    None => {
                         write!(f, "_")?;
                     }
                 }
@@ -1337,7 +1338,8 @@ impl ModuleTypingContext<'_> {
                 write!(f, "    {direction} .{remote_name}({local_name})")?;
                 if let Some(instance) = instance.get() {
                     let typ_str = if let Some(port) = &instance.interface_ports[port_id] {
-                        port.typ.display(self.globals).to_string()
+                        let port_wire = &instance.wires[port.wire];
+                        port_wire.typ.display(self.globals).to_string()
                     } else {
                         "/".into()
                     }

@@ -12,7 +12,6 @@ use crate::typing::abstract_type::AbstractRankedType;
 use crate::typing::abstract_type::PeanoType;
 use crate::util::all_equal;
 use std::ops::Deref;
-use std::ops::DerefMut;
 
 use super::template::TVec;
 
@@ -21,7 +20,7 @@ use super::value_unifier::UnifyableValue;
 
 pub type ConcreteTemplateArg = TemplateKind<ConcreteType, UnifyableValue>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ConcreteGlobalReference<ID> {
     pub id: ID,
     pub template_args: TVec<ConcreteTemplateArg>,
@@ -31,7 +30,7 @@ impl ConcreteTemplateArg {
     pub fn contains_unknown(&self) -> bool {
         match self {
             TemplateKind::Type(t) => t.contains_unknown(),
-            TemplateKind::Value(v) => v.is_unknown(),
+            TemplateKind::Value(v) => v.get().is_none(),
         }
     }
 }
@@ -127,7 +126,7 @@ impl ConcreteType {
                 .any(|concrete_template_arg| concrete_template_arg.1.contains_unknown()),
             ConcreteType::Array(arr_box) => {
                 let (arr_arr, arr_size) = arr_box.deref();
-                arr_arr.contains_unknown() || arr_size.is_unknown()
+                arr_arr.contains_unknown() || arr_size.get().is_none()
             }
         }
     }
@@ -167,40 +166,6 @@ impl ConcreteType {
             ),
         }
     }
-    pub fn co_iterate_parameters_mut<'a>(
-        a: &'a mut Self,
-        b: &'a Self,
-        f: &mut impl FnMut(&'a mut UnifyableValue, &'a UnifyableValue, SubtypeRelation),
-    ) {
-        match (a, b) {
-            (ConcreteType::Named(a), ConcreteType::Named(b)) => match all_equal([a.id, b.id]) {
-                get_builtin_type!("int") => {
-                    let a_bounds = a.unwrap_int_bounds_unknown_mut();
-                    let b_bounds = b.unwrap_int_bounds_unknown();
-
-                    f(a_bounds.from, b_bounds.from, SubtypeRelation::Min);
-                    f(a_bounds.to, b_bounds.to, SubtypeRelation::Max);
-                }
-                _ => {
-                    for (_, a, b) in crate::alloc::zip_eq(&mut a.template_args, &b.template_args) {
-                        match a.and_by_ref_mut(b) {
-                            TemplateKind::Type((a, b)) => Self::co_iterate_parameters_mut(a, b, f),
-                            TemplateKind::Value((a, b)) => f(a, b, SubtypeRelation::Exact),
-                        }
-                    }
-                }
-            },
-            (ConcreteType::Array(arr_a), ConcreteType::Array(arr_b)) => {
-                let (a, sz_a) = arr_a.deref_mut();
-                let (b, sz_b) = arr_b.deref();
-
-                f(sz_a, sz_b, SubtypeRelation::Exact);
-
-                Self::co_iterate_parameters_mut(a, b, f);
-            }
-            (a, b) => unreachable!("{a:?}, {b:?}"),
-        }
-    }
     /// Requires all parameters to be known and already substituted!
     ///
     /// a return value of true means that `self` can be assigned to `other`
@@ -208,7 +173,7 @@ impl ConcreteType {
         let mut total_is_subtype = true;
         Self::co_iterate_parameters(self, other, &mut |a, b, relation| match relation {
             SubtypeRelation::Exact => {
-                total_is_subtype &= a.unwrap_set() == b.unwrap_set();
+                total_is_subtype &= a == b;
             }
             SubtypeRelation::Min => {
                 if a.unwrap_integer() < b.unwrap_integer() {
@@ -229,7 +194,7 @@ impl ConcreteType {
     pub fn is_identical_to(&self, other: &Self) -> bool {
         let mut total_is_identical = true;
         Self::co_iterate_parameters(self, other, &mut |a, b, _relation| {
-            total_is_identical &= a.unwrap_set() == b.unwrap_set()
+            total_is_identical &= a == b
         });
         total_is_identical
     }
@@ -331,7 +296,7 @@ impl ConcreteType {
             ConcreteType::Array(arr_box) => {
                 let (content, size) = arr_box.deref();
 
-                if size.is_unknown() {
+                if size.get().is_none() {
                     return false;
                 }
 
@@ -435,13 +400,6 @@ impl ConcreteGlobalReference<TypeUUID> {
         let [from, to] = self.template_args.cast_to_unifyable_array();
         IntBounds { from, to }
     }
-
-    #[track_caller]
-    pub fn unwrap_int_bounds_unknown_mut(&mut self) -> IntBounds<&mut UnifyableValue> {
-        assert_eq!(self.id, get_builtin_type!("int"));
-        let [from, to] = self.template_args.cast_to_unifyable_array_mut();
-        IntBounds { from, to }
-    }
 }
 
 impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
@@ -450,7 +408,7 @@ impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
         for (id, arg) in &self.template_args {
             let is_okay = match arg {
                 TemplateKind::Type(t) => t.is_valid(),
-                TemplateKind::Value(v) => !v.is_unknown(),
+                TemplateKind::Value(v) => v.get().is_some(),
             };
             if !is_okay {
                 failures.push(id);

@@ -33,13 +33,6 @@ impl UUIDMarker for DomainVariableIDMarker {
 }
 pub type DomainVariableID = UUID<DomainVariableIDMarker>;
 
-pub struct ConcreteTypeVariableIDMarker;
-impl UUIDMarker for ConcreteTypeVariableIDMarker {
-    const DISPLAY_NAME: &'static str = "concrete_type_variable_";
-}
-#[allow(unused)]
-pub type ConcreteTypeVariableID = UUID<ConcreteTypeVariableIDMarker>;
-
 /// Implements Hindley-Milner type inference
 ///
 /// It actually already does eager inference where possible (through [Self::unify])
@@ -71,7 +64,10 @@ pub enum UnifyResult {
 }
 impl UnifyResult {
     pub fn unwrap(&self) {
-        assert_eq!(*self, UnifyResult::Success)
+        assert_eq!(*self, UnifyResult::Success);
+    }
+    pub fn expect(&self, msg: &str) {
+        assert_eq!(*self, UnifyResult::Success, "{msg}");
     }
 }
 impl BitAnd for UnifyResult {

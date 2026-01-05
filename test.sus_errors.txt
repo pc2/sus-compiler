@@ -320,6 +320,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                           ──┬─  
      │                                             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: Some parameters of 'first' were still unknown: int #(FROM: ?, TO: ?)
+     ╭─[ test.sus:224:55 ]
+     │
+ 224 │     interface first_bit_idx_24 : bool[24] bits -> int first
+     │                                                       ──┬──  
+     │                                                         ╰──── Some parameters of 'first' were still unknown: int #(FROM: ?, TO: ?)
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:225:9 ]
      │
@@ -498,6 +505,20 @@ a'0
 
 But this was specified as x'1
 ─────╯
+Error: Some parameters of 'r' were still unknown: int #(FROM: ?, TO: ?)
+     ╭─[ test.sus:331:59 ]
+     │
+ 331 │     interface bad_cycle : int#(FROM: 0, TO: 100) a -> int r
+     │                                                           ┬  
+     │                                                           ╰── Some parameters of 'r' were still unknown: int #(FROM: ?, TO: ?)
+─────╯
+Error: Some parameters of 'state_reg' were still unknown: int #(FROM: ?, TO: ?)
+     ╭─[ test.sus:332:12 ]
+     │
+ 332 │     state int state_reg
+     │               ────┬────  
+     │                   ╰────── Some parameters of 'state_reg' were still unknown: int #(FROM: ?, TO: ?)
+─────╯
 Error: This instruction is part of a net-positive latency cycle of +1
 
 state_reg'0
@@ -514,6 +535,27 @@ state_reg'0
 -> state_reg'1 (+1)
 
 Which conflicts with the starting latency
+─────╯
+Error: Some parameters of '_1' were still unknown: int #(FROM: ?, TO: ?)
+     ╭─[ test.sus:335:6 ]
+     │
+ 335 │     r = state_reg
+     │         ────┬────  
+     │             ╰────── Some parameters of '_1' were still unknown: int #(FROM: ?, TO: ?)
+─────╯
+Error: Some parameters of '_2' were still unknown: int #(FROM: ?, TO: ?)
+     ╭─[ test.sus:337:18 ]
+     │
+ 337 │     reg state_reg = state_reg + a
+     │                     ────┬────  
+     │                         ╰────── Some parameters of '_2' were still unknown: int #(FROM: ?, TO: ?)
+─────╯
+Error: Some parameters of '_4' were still unknown: int #(FROM: ?, TO: ?)
+     ╭─[ test.sus:337:18 ]
+     │
+ 337 │     reg state_reg = state_reg + a
+     │                     ──────┬──────  
+     │                           ╰──────── Some parameters of '_4' were still unknown: int #(FROM: ?, TO: ?)
 ─────╯
 Error: This instruction is part of a net-positive latency cycle of +5
 

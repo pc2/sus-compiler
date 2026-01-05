@@ -185,12 +185,12 @@ impl Executed {
         md: &'l Module,
         global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
         name: String,
-    ) -> (ModuleTypingContext<'l>, ValueUnifierAlloc) {
+    ) -> ModuleTypingContext<'l> {
         let errors = ErrorCollector::new_empty(md.link_info.span, linker_files);
         if let Err((position, reason)) = self.execution_status {
             errors.error(position, reason);
         }
-        let ctx = ModuleTypingContext {
+        ModuleTypingContext {
             mangled_name: mangle_name(&name),
             name,
             global_ref,
@@ -201,8 +201,7 @@ impl Executed {
             link_info: &md.link_info,
             globals,
             errors,
-        };
-        (ctx, self.type_var_alloc)
+        }
     }
 }
 
@@ -299,8 +298,7 @@ fn start_instantiation<'l>(
     debug!("Executing {name}");
     let exec = execute::execute(&md.link_info, linker_globals, &global_ref.template_args);
 
-    let (typed, type_var_alloc) =
-        exec.into_module_typing_context(linker_globals, linker_files, md, global_ref, name);
+    let typed = exec.into_module_typing_context(linker_globals, linker_files, md, global_ref, name);
     let name = &typed.name;
 
     if typed.errors.did_error() {
@@ -313,10 +311,7 @@ fn start_instantiation<'l>(
     }
 
     debug!("Concrete Typechecking {name}");
-    Ok(ModuleTypingSuperContext::start_typechecking(
-        typed,
-        type_var_alloc,
-    ))
+    Ok(ModuleTypingSuperContext::start_typechecking(typed))
 }
 fn finish_instantiation(context: ModuleTypingSuperContext) -> InstantiatedModule {
     let typed = context.finish();

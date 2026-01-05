@@ -11,26 +11,15 @@ use crate::latency::port_latency_inference::{
 };
 use crate::to_string::display_all_infer_params;
 use crate::typing::concrete_type::SubtypeRelation;
-use crate::typing::set_unifier::{DelayedErrorCollector, FullySubstitutable, Unifyable};
 use crate::typing::template::TemplateKind;
-use crate::typing::value_unifier::{ValueErrorReporter, ValueUnifierStore};
+use crate::typing::type_inference::UnifyResult;
 use crate::typing::{concrete_type::ConcreteType, value_unifier::ValueUnifier};
 use crate::util::{all_equal, ceil_div, floor_div};
 use crate::value::MAX_SHIFT;
 
-use crate::typing::set_unifier::SetUnifier;
-use crate::typing::type_inference::ConcreteTypeVariableIDMarker;
+use crate::typing::unifyable_cell::{Unifier, UnifierTop};
 
 use super::*;
-
-macro_rules! unifier_constraint_ints {
-    ($unifier:ident, [$($var:ident),+], $body:block) => {
-        $unifier.add_constraint([$($var),+], move |$unifier| {
-            $(let $var = $unifier.unwrap_known($var).unwrap_integer();)+
-            $body
-        })
-    };
-}
 
 macro_rules! assert_due_to_variable_clones {
     ($cond:expr) => {
@@ -41,12 +30,12 @@ macro_rules! assert_due_to_variable_clones {
 fn unify_rank<'inst>(
     rank: &'inst [UnifyableValue],
     mut typ: &'inst ConcreteType,
-    unifier: &mut ValueUnifier<'inst>,
+    unifier: &ValueUnifier<'inst>,
 ) -> bool {
     rank.iter().all(|r| {
         let_unwrap!(ConcreteType::Array(arr), typ);
         typ = &arr.0;
-        unifier.unify(r, &arr.1)
+        unifier.unify(r, &arr.1) == UnifyResult::Success
     })
 }
 
@@ -55,7 +44,7 @@ pub fn co_walk_path<'inst>(
     mut a: &'inst ConcreteType,
     mut b: &'inst ConcreteType,
     path: &'inst [RealWirePathElem],
-    unifier: &mut ValueUnifier<'inst>,
+    unifier: &ValueUnifier<'inst>,
 ) -> (&'inst ConcreteType, &'inst ConcreteType) {
     for p in path {
         match p {
@@ -82,11 +71,13 @@ pub fn co_walk_path<'inst>(
                         let _ = unifier.set(b_sz, to - from);
                     }
                     PartialBound::From(from) => {
-                        unifier_constraint_ints!(unifier, [a_sz], {
+                        unifier.delayed_constraint(move |unifier| {
+                            let a_sz = unifier.resolve(a_sz)?.unwrap_integer();
                             // TODO #88, Slices of variable base offset
                             // Is checked in final_checks
                             let _ = unifier.set(b_sz, a_sz - from);
-                        })
+                            Ok(())
+                        });
                     }
                     PartialBound::To(to) => {
                         // TODO #88, Slices of variable base offset
@@ -107,8 +98,8 @@ pub fn co_walk_path<'inst>(
 
 /// Panics if `potentials.len() < 2`
 fn set_min_max_with_min_max<'inst>(
-    unifier: &mut ValueUnifier<'inst>,
-    out_bounds: IntBounds<&UnifyableValue>,
+    unifier: &ValueUnifier<'inst>,
+    out_bounds: IntBounds<&'inst UnifyableValue>,
     potentials: impl IntoIterator<Item = IBig>,
 ) {
     let mut potentials = potentials.into_iter();
@@ -129,9 +120,8 @@ fn set_min_max_with_min_max<'inst>(
 }
 
 /// Combine both mutable context elements into a single struct, to avoid <https://github.com/someguynamedjosh/ouroboros/issues/138>
-pub struct MutableContext<'th> {
-    unifier: SetUnifier<'th, Value, ConcreteTypeVariableIDMarker>,
-    error_reporter: DelayedErrorCollector<'th, Value, ConcreteTypeVariableIDMarker>,
+pub struct MutableContext<'inst> {
+    unifier: ValueUnifier<'inst>,
     all_submod_ids: Vec<SubModuleID>,
 }
 
@@ -139,20 +129,16 @@ pub struct MutableContext<'th> {
 pub struct ModuleTypingSuperContext<'l> {
     ctx: ModuleTypingContext<'l>,
     #[borrows(ctx)]
-    #[covariant]
+    #[not_covariant]
     mutable_state: MutableContext<'this>,
 }
 
 impl<'l> ModuleTypingSuperContext<'l> {
-    pub fn start_typechecking(
-        ctx: ModuleTypingContext<'l>,
-        type_substitutor_alloc: ValueUnifierAlloc,
-    ) -> Self {
+    pub fn start_typechecking(ctx: ModuleTypingContext<'l>) -> Self {
         let mut result: ModuleTypingSuperContext<'l> = ModuleTypingSuperContextBuilder {
             ctx,
             mutable_state_builder: move |ctx| MutableContext {
-                unifier: ValueUnifier::from_alloc(type_substitutor_alloc),
-                error_reporter: DelayedErrorCollector::new(),
+                unifier: ValueUnifier::new(),
                 all_submod_ids: ctx.submodules.id_range().iter().collect(),
             },
         }
@@ -163,14 +149,12 @@ impl<'l> ModuleTypingSuperContext<'l> {
             for (_, sm) in &result.ctx.submodules {
                 result
                     .ctx
-                    .add_submodule_subtype_constraints(sm, &mut result.mutable_state.unifier);
+                    .add_submodule_subtype_constraints(sm, &result.mutable_state.unifier);
             }
             for (_, wire) in &result.ctx.wires {
-                result.ctx.add_wire_subtype_constraints(
-                    wire,
-                    &mut result.mutable_state.unifier,
-                    &mut result.mutable_state.error_reporter,
-                );
+                result
+                    .ctx
+                    .add_wire_subtype_constraints(wire, &result.mutable_state.unifier);
             }
         });
 
@@ -185,7 +169,7 @@ impl<'l> ModuleTypingSuperContext<'l> {
         self.with_mut(|self_mut| {
             self_mut.mutable_state.unifier.execute_ready_constraints();
             self_mut.ctx.try_infer_submodule_params(
-                &mut self_mut.mutable_state.unifier,
+                &self_mut.mutable_state.unifier,
                 &mut self_mut.mutable_state.all_submod_ids,
             )
         })
@@ -196,31 +180,25 @@ impl<'l> ModuleTypingSuperContext<'l> {
         sm_id: SubModuleID,
         instance: Result<Rc<InstantiatedModule>, InstantiateError>,
     ) {
-        self.with_mut(|self_mut| {
-            self_mut.ctx.apply_instantiated_submodule(
-                sm_id,
-                instance,
-                &mut self_mut.mutable_state.unifier,
-            );
+        self.with(|slf| {
+            slf.ctx
+                .apply_instantiated_submodule(sm_id, instance, &slf.mutable_state.unifier);
         })
     }
 
-    pub fn finish(mut self) -> ModuleTypingContext<'l> {
-        let substitutor = self.with_mut(|self_mut| {
-            let unifier = std::mem::take(&mut self_mut.mutable_state.unifier);
-            let substitutor = unifier.decomission();
-            let error_reporter = std::mem::take(&mut self_mut.mutable_state.error_reporter);
-            error_reporter.report(&substitutor);
-            substitutor
+    pub fn finish(self) -> ModuleTypingContext<'l> {
+        self.with(|fields| {
+            fields
+                .ctx
+                .fully_substitute_everything(&fields.mutable_state.unifier);
+            fields.mutable_state.unifier.decomission();
         });
 
-        let mut slf = self.into_heads();
+        let mut ctx = self.into_heads().ctx;
 
-        slf.ctx.compute_latencies();
-
-        slf.ctx.finalize(&substitutor);
-
-        slf.ctx
+        ctx.compute_latencies();
+        ctx.finalize();
+        ctx
     }
 }
 
@@ -228,8 +206,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
     fn add_wire_subtype_constraints(
         &'inst self,
         out: &'inst RealWire,
-        unifier: &mut ValueUnifier<'inst>,
-        errors: &mut ValueErrorReporter<'inst>,
+        unifier: &ValueUnifier<'inst>,
     ) {
         let original_instr = &self.link_info.instructions[out.original_instruction];
         let span = original_instr.get_span();
@@ -256,11 +233,11 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 let right = &self.wires[*right];
                 assert_due_to_variable_clones!(unify_rank(rank, &out.typ, unifier));
                 if !unify_rank(rank, &right.typ, unifier) {
-                    errors.error(|substitutor| {
+                    unifier.delayed_error(|unifier| {
                         self.errors
                             .error(right.get_span(self.link_info), format!("Incompatible multi-rank for higher-rank operator: Found {} but output is {}",
-                            right.typ.display_substitute(self.globals, substitutor),
-                            out.typ.display_substitute(self.globals, substitutor))
+                            right.typ.display_substitute(self.globals, unifier),
+                            out.typ.display_substitute(self.globals, unifier))
                         );
                     });
                 }
@@ -281,24 +258,24 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 let right_root = right.typ.walk_rank(rank.len());
                 assert_due_to_variable_clones!(unify_rank(rank, &out.typ, unifier));
                 if !unify_rank(rank, &left.typ, unifier) {
-                    errors.error(|substitutor| {
+                    unifier.delayed_error(|unifier| {
                         self.errors
                             .error(left.get_span(self.link_info), format!("Incompatible multi-rank for higher-rank operator: Found {} but output is {}",
-                            left.typ.display_substitute(self.globals, substitutor),
-                            out.typ.display_substitute(self.globals, substitutor))
-                        ).info(right.get_span(self.link_info), format!("Right argument has type {}", right.typ.display_substitute(self.globals, substitutor)));
+                            left.typ.display_substitute(self.globals, unifier),
+                            out.typ.display_substitute(self.globals, unifier))
+                        ).info(right.get_span(self.link_info), format!("Right argument has type {}", right.typ.display_substitute(self.globals, unifier)));
                     });
                 }
                 if !unify_rank(rank, &right.typ, unifier) {
-                    errors.error(|substitutor| {
+                    unifier.delayed_error(|unifier| {
                         self.errors
                             .error(right.get_span(self.link_info), format!("Incompatible multi-rank for higher-rank operator: Found {} but output is {}",
-                            right.typ.display_substitute(self.globals, substitutor),
-                            out.typ.display_substitute(self.globals, substitutor))
-                        ).info(left.get_span(self.link_info), format!("Left argument has type {}", left.typ.display_substitute(self.globals, substitutor)));
+                            right.typ.display_substitute(self.globals, unifier),
+                            out.typ.display_substitute(self.globals, unifier))
+                        ).info(left.get_span(self.link_info), format!("Left argument has type {}", left.typ.display_substitute(self.globals, unifier)));
                     });
                 }
-                self.typecheck_binop(unifier, errors, span, *op, out_root, left_root, right_root);
+                self.typecheck_binop(unifier, span, *op, out_root, left_root, right_root);
             }
             RealWireDataSource::Select { root, path } => {
                 let root_wire = &self.wires[*root];
@@ -327,7 +304,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
     /// TODO overloading
     fn typecheck_unary(
         &'inst self,
-        unifier: &mut ValueUnifier<'inst>,
+        unifier: &ValueUnifier<'inst>,
         op: UnaryOperator,
         out_root: &'inst ConcreteType,
         right_root: &'inst ConcreteType,
@@ -349,11 +326,15 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 let IntBounds { from, to } = right_root.unwrap_int_bounds_unknown();
 
                 // 4:7 -> -6:-3
-                unifier_constraint_ints!(unifier, [to], {
+                unifier.delayed_constraint(|unifier| {
+                    let to = unifier.resolve(to)?.unwrap_integer();
                     unifier.set(out.from, 1 - to).unwrap();
+                    Ok(())
                 });
-                unifier_constraint_ints!(unifier, [from], {
+                unifier.delayed_constraint(|unifier| {
+                    let from = unifier.resolve(from)?.unwrap_integer();
                     unifier.set(out.to, 1 - from).unwrap();
+                    Ok(())
                 });
             }
             UnaryOperator::Sum => {
@@ -361,11 +342,17 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 let (content, sz) = right_root.unwrap_array();
                 let IntBounds { from, to } = content.unwrap_int_bounds_unknown();
 
-                unifier_constraint_ints!(unifier, [from, sz], {
+                unifier.delayed_constraint(|unifier| {
+                    let from = unifier.resolve(from)?.unwrap_integer();
+                    let sz = unifier.resolve(sz)?.unwrap_integer();
                     unifier.set(out.from, from * sz).unwrap();
+                    Ok(())
                 });
-                unifier_constraint_ints!(unifier, [to, sz], {
+                unifier.delayed_constraint(|unifier| {
+                    let to = unifier.resolve(to)?.unwrap_integer();
+                    let sz = unifier.resolve(sz)?.unwrap_integer();
                     unifier.set(out.to, (to - 1) * sz + 1).unwrap();
+                    Ok(())
                 });
             }
             UnaryOperator::Product => {
@@ -373,14 +360,20 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 let (content, sz) = right_root.unwrap_array();
                 let IntBounds { from, to } = content.unwrap_int_bounds_unknown();
 
-                unifier_constraint_ints!(unifier, [from, sz], {
+                unifier.delayed_constraint(|unifier| {
+                    let from = unifier.resolve(from)?.unwrap_integer();
+                    let sz = unifier.resolve(sz)?.unwrap_integer();
                     let sz = usize::try_from(sz).unwrap();
                     unifier.set(out.from, from.pow(sz)).unwrap();
+                    Ok(())
                 });
-                unifier_constraint_ints!(unifier, [to, sz], {
+                unifier.delayed_constraint(|unifier| {
+                    let to = unifier.resolve(to)?.unwrap_integer();
+                    let sz = unifier.resolve(sz)?.unwrap_integer();
                     let sz = usize::try_from(sz).unwrap();
                     let max: IBig = to - 1;
                     unifier.set(out.to, max.pow(sz) + 1).unwrap();
+                    Ok(())
                 });
             }
         }
@@ -389,8 +382,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
     /// TODO overloading
     fn typecheck_binop(
         &'inst self,
-        unifier: &mut ValueUnifier<'inst>,
-        errors: &mut ValueErrorReporter<'inst>,
+        unifier: &ValueUnifier<'inst>,
         span: Span,
         op: BinaryOperator,
         out_root: &'inst ConcreteType,
@@ -407,45 +399,66 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
                 let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
                 let out = out_root.unwrap_int_bounds_unknown();
-                unifier_constraint_ints!(unifier, [lf, rf], {
+                unifier.delayed_constraint(move |unifier| {
+                    let lf = unifier.resolve(lf)?.unwrap_integer();
+                    let rf = unifier.resolve(rf)?.unwrap_integer();
                     unifier.set(out.from, lf + rf).unwrap();
+                    Ok(())
                 });
-                unifier_constraint_ints!(unifier, [lt, rt], {
+                unifier.delayed_constraint(move |unifier| {
+                    let lt = unifier.resolve(lt)?.unwrap_integer();
+                    let rt = unifier.resolve(rt)?.unwrap_integer();
                     unifier.set(out.to, lt + rt - 1).unwrap();
+                    Ok(())
                 });
             }
             BinaryOperator::Subtract => {
                 let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
                 let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
                 let out = out_root.unwrap_int_bounds_unknown();
-                unifier_constraint_ints!(unifier, [lf, rt], {
+                unifier.delayed_constraint(move |unifier| {
+                    let lf = unifier.resolve(lf)?.unwrap_integer();
+                    let rt = unifier.resolve(rt)?.unwrap_integer();
                     unifier.set(out.from, lf - (rt - 1)).unwrap();
+                    Ok(())
                 });
-                unifier_constraint_ints!(unifier, [lt, rf], {
+                unifier.delayed_constraint(move |unifier| {
+                    let lt = unifier.resolve(lt)?.unwrap_integer();
+                    let rf = unifier.resolve(rf)?.unwrap_integer();
                     unifier.set(out.to, lt - rf).unwrap();
+                    Ok(())
                 });
             }
             BinaryOperator::Multiply => {
                 let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
                 let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
                 let out = out_root.unwrap_int_bounds_unknown();
-                unifier_constraint_ints!(unifier, [lf, lt, rf, rt], {
+                unifier.delayed_constraint(move |unifier| {
+                    let lf = unifier.resolve(lf)?.unwrap_integer();
+                    let lt = unifier.resolve(lt)?.unwrap_integer();
+                    let rf = unifier.resolve(rf)?.unwrap_integer();
+                    let rt = unifier.resolve(rt)?.unwrap_integer();
                     let lmax = lt - 1;
                     let rmax = rt - 1;
 
                     let potentials = [lf * rf, &lmax * &rmax, lf * rmax, lmax * rf];
                     set_min_max_with_min_max(unifier, out, potentials);
+                    Ok(())
                 });
             }
             BinaryOperator::Divide => {
                 let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
                 let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
                 let out = out_root.unwrap_int_bounds_unknown();
-                unifier_constraint_ints!(unifier, [lf, lt, rf, rt], {
+                unifier.delayed_constraint(move |unifier| {
+                    let lf = unifier.resolve(lf)?.unwrap_integer();
+                    let lt = unifier.resolve(lt)?.unwrap_integer();
+                    let rf = unifier.resolve(rf)?.unwrap_integer();
+                    let rt = unifier.resolve(rt)?.unwrap_integer();
                     let right_bounds = IntBounds { from: rf, to: rt };
 
                     if !right_bounds.is_valid_non_empty() {
-                        return; // Invalid bounds errors are reported by final_checks.rs
+                        return Ok(()); // Invalid bounds errors are reported by final_checks.rs
                     }
                     if right_bounds.contains(&IBig::from(0)) {
                         self.errors.error(
@@ -454,24 +467,29 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                                 "Possible divide by 0, right argument bounds are {right_bounds}"
                             ),
                         );
-                        return;
+                        return Ok(());
                     }
                     let lmax = lt - 1;
                     let rmax = rt - 1;
 
                     let potentials = [lf / rf, &lmax / &rmax, lf / rmax, lmax / rf];
                     set_min_max_with_min_max(unifier, out, potentials);
+                    Ok(())
                 });
             }
             BinaryOperator::Remainder => {
                 let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
                 let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
                 let out = out_root.unwrap_int_bounds_unknown();
-                unifier_constraint_ints!(unifier, [lf, lt, rf, rt], {
+                unifier.delayed_constraint(move |unifier| {
+                    let lf = unifier.resolve(lf)?.unwrap_integer();
+                    let lt = unifier.resolve(lt)?.unwrap_integer();
+                    let rf = unifier.resolve(rf)?.unwrap_integer();
+                    let rt = unifier.resolve(rt)?.unwrap_integer();
                     let right_bounds = IntBounds { from: rf, to: rt };
 
                     if !right_bounds.is_valid_non_empty() {
-                        return; // Invalid bounds errors are reported by final_checks.rs
+                        return Ok(()); // Invalid bounds errors are reported by final_checks.rs
                     }
                     if right_bounds.contains(&IBig::from(0)) {
                         self.errors.error(
@@ -480,7 +498,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                                 "Possible divide by 0, right argument bounds are {right_bounds}"
                             ),
                         );
-                        return;
+                        return Ok(());
                     }
                     let remainder_max = if rf >= &IBig::from(0) { rt - 1 } else { -rf };
 
@@ -488,6 +506,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     let of = lf.clone().clamp(-remainder_max + 1, IBig::from(0));
                     unifier.set(out.from, of).unwrap();
                     unifier.set(out.to, ot).unwrap();
+                    Ok(())
                 });
             }
             BinaryOperator::Modulo => {
@@ -495,26 +514,33 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
                 let out = out_root.unwrap_int_bounds_unknown();
                 unifier.set(out.from, IBig::from(0)).unwrap();
-                unifier_constraint_ints!(unifier, [rf, rt], {
+                unifier.delayed_constraint(move |unifier| {
+                    let rf = unifier.resolve(rf)?.unwrap_integer();
+                    let rt = unifier.resolve(rt)?.unwrap_integer();
                     let right_bounds = IntBounds { from: rf, to: rt };
                     if !right_bounds.is_valid_non_empty() {
-                        return; // Invalid bounds errors are reported by final_checks.rs
+                        return Ok(()); // Invalid bounds errors are reported by final_checks.rs
                     }
                     if rf <= &IBig::from(0) {
                         self.errors.error(span, format!("Modulus must be strictly positive, right argument bounds are {right_bounds}"));
-                        return;
+                        return Ok(());
                     }
                     unifier.set(out.to, rt - 1).unwrap();
+                    Ok(())
                 });
             }
             BinaryOperator::ShiftLeft => {
                 let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
                 let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
                 let out = out_root.unwrap_int_bounds_unknown();
-                unifier_constraint_ints!(unifier, [lf, lt, rf, rt], {
+                unifier.delayed_constraint(move |unifier| {
+                    let lf = unifier.resolve(lf)?.unwrap_integer();
+                    let lt = unifier.resolve(lt)?.unwrap_integer();
+                    let rf = unifier.resolve(rf)?.unwrap_integer();
+                    let rt = unifier.resolve(rt)?.unwrap_integer();
                     let right_bounds = IntBounds { from: rf, to: rt };
                     if !right_bounds.is_valid_non_empty() {
-                        return; // Invalid bounds errors are reported by final_checks.rs
+                        return Ok(()); // Invalid bounds errors are reported by final_checks.rs
                     }
                     if rf < &IBig::from(0) {
                         self.errors.error(
@@ -523,14 +549,14 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                                 "Shifts must be positive, right argument bounds are {right_bounds}"
                             ),
                         );
-                        return;
+                        return Ok(());
                     }
                     if rt > &IBig::from(MAX_SHIFT) {
                         self.errors.error(
                             span,
                             format!("The top bound of this shift is too large: {right_bounds}"),
                         );
-                        return;
+                        return Ok(());
                     }
                     let min_shift = usize::try_from(rf).unwrap();
                     let max_shift = usize::try_from(rt - 1).unwrap();
@@ -545,16 +571,21 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         lmax << max_shift,
                     ];
                     set_min_max_with_min_max(unifier, out, potentials);
+                    Ok(())
                 });
             }
             BinaryOperator::ShiftRight => {
                 let IntBounds { from: lf, to: lt } = left_root.unwrap_int_bounds_unknown();
                 let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
                 let out = out_root.unwrap_int_bounds_unknown();
-                unifier_constraint_ints!(unifier, [lf, lt, rf, rt], {
+                unifier.delayed_constraint(move |unifier| {
+                    let lf = unifier.resolve(lf)?.unwrap_integer();
+                    let lt = unifier.resolve(lt)?.unwrap_integer();
+                    let rf = unifier.resolve(rf)?.unwrap_integer();
+                    let rt = unifier.resolve(rt)?.unwrap_integer();
                     let right_bounds = IntBounds { from: rf, to: rt };
                     if !right_bounds.is_valid_non_empty() {
-                        return; // Invalid bounds errors are reported by final_checks.rs
+                        return Ok(()); // Invalid bounds errors are reported by final_checks.rs
                     }
                     if rf < &IBig::from(0) {
                         self.errors.error(
@@ -563,14 +594,14 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                                 "Shifts must be positive, right argument bounds are {right_bounds}"
                             ),
                         );
-                        return;
+                        return Ok(());
                     }
                     if rt > &IBig::from(MAX_SHIFT) {
                         self.errors.error(
                             span,
                             format!("The top bound of this shift is too large: {right_bounds}"),
                         );
-                        return;
+                        return Ok(());
                     }
                     let min_shift = usize::try_from(rf).unwrap();
                     let max_shift = usize::try_from(rt - 1).unwrap();
@@ -585,16 +616,17 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         lmax >> max_shift,
                     ];
                     set_min_max_with_min_max(unifier, out, potentials);
+                    Ok(())
                 });
             }
             BinaryOperator::Equals | BinaryOperator::NotEquals => {
                 if !unifier.unify_concrete_only_exact(left_root, right_root) {
-                    errors.error(move |substitutor| {
+                    unifier.delayed_error(move |unifier| {
                         self.errors.type_error(
                             "operator ==",
                             span,
-                            right_root.display_substitute(self.globals, substitutor),
-                            left_root.display_substitute(self.globals, substitutor),
+                            right_root.display_substitute(self.globals, unifier),
+                            left_root.display_substitute(self.globals, unifier),
                         );
                     });
                 }
@@ -630,7 +662,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
     fn add_submodule_subtype_constraints(
         &'inst self,
         sm: &'inst SubModule,
-        unifier: &mut ValueUnifier<'inst>,
+        unifier: &ValueUnifier<'inst>,
     ) {
         assert!(sm.instance.get().is_none());
 
@@ -671,10 +703,9 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         let Some(target_value) = &self.get_port_value(sm, target_path) else {
                             continue;
                         };
-                        assert!(
-                            unifier.unify(v_param, target_value),
-                            "Since this is the first time values are unified, this cannot fail"
-                        )
+                        unifier.unify(v_param, target_value).expect(
+                            "Since this is the first time values are unified, this cannot fail",
+                        );
                     }
                 }
             }
@@ -685,7 +716,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         &'inst self,
         sm: &SubModule,
         candidate: &InferenceCandidate,
-        unifier: &'inst ValueUnifier<'inst>,
+        unifier: &ValueUnifier<'inst>,
         latency_infer_problem: &mut LatencyInferenceProblem,
     ) -> InferenceResult {
         match &candidate.target {
@@ -695,7 +726,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 };
                 let port_wire = &self.wires[port.maps_to_wire];
                 let v = path.follow_value_path(&port_wire.typ);
-                let Some(v) = unifier.store.get_substitution(v) else {
+                let Ok(v) = unifier.resolve(v) else {
                     return InferenceResult::NotFound;
                 };
                 InferenceResult::Found(v.unwrap_integer().clone())
@@ -744,7 +775,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
 
     fn try_infer_submodule_params(
         &'inst self,
-        unifier: &mut ValueUnifier<'inst>,
+        unifier: &ValueUnifier<'inst>,
         sm_ids: &mut Vec<SubModuleID>,
     ) -> Vec<(SubModuleID, ConcreteGlobalReference<ModuleUUID>)> {
         let mut lat_inf = LatencyInferenceProblem::new(self);
@@ -788,7 +819,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         }
                     }
                 }
-                if unifier.store.get_substitution(concrete_param).is_some() {
+                if unifier.resolve(concrete_param).is_ok() {
                     continue;
                 }
                 let value_iter = crate::util::zip_eq(
@@ -893,19 +924,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
             let sm = &self.submodules[*id];
 
             // Doing can_fully_substitute first saves on quite a few clones. TODO remove once we switch to unifyable_cell.rs, as that can do fully_substitute without needing &mut.
-            if sm
-                .refers_to
-                .template_args
-                .can_fully_substitute(&unifier.store)
-            {
-                let mut refers_to_clone = sm.refers_to.clone();
-                assert!(
-                    refers_to_clone
-                        .template_args
-                        .fully_substitute(&unifier.store)
-                );
-
-                recursive_submodules_to_instantiate.push((*id, refers_to_clone));
+            if sm.refers_to.fully_substitute(unifier).is_ok() {
+                recursive_submodules_to_instantiate.push((*id, sm.refers_to.clone()));
 
                 false
             } else {
@@ -919,7 +939,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         &'inst self,
         sm_id: SubModuleID,
         instance: Result<Rc<InstantiatedModule>, InstantiateError>,
-        unifier: &mut ValueUnifier<'inst>,
+        unifier: &ValueUnifier<'inst>,
     ) {
         let sm = &self.submodules[sm_id];
         let submod_instr = &self.link_info.instructions[sm.original_instruction];
@@ -940,6 +960,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         };
         let sub_module = &self.globals.modules[sm.refers_to.id];
 
+        sm.instance.set(instance).unwrap();
+        let instance = sm.instance.get().unwrap();
         for (_port_id, concrete_port, source_code_port, connecting_wire) in
             zip_eq3(&instance.interface_ports, &sub_module.ports, &sm.port_map)
         {
@@ -973,30 +995,30 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 }
                 (Some(concrete_port), Some(connecting_wire)) => {
                     let wire = &self.wires[connecting_wire.maps_to_wire];
+                    let instance_wire = &instance.wires[concrete_port.wire];
+                    assert!(instance_wire.typ.is_valid());
                     // Failures are reported in final_checks
                     let _ = match source_code_port.direction {
                         // Subtype relations always flow FORWARD.
                         Direction::Input => {
-                            unifier.unify_concrete_only_exact(&wire.typ, &concrete_port.typ)
+                            unifier.unify_concrete_only_exact(&wire.typ, &instance_wire.typ)
                         }
                         Direction::Output => {
-                            unifier.unify_concrete_all(&wire.typ, &concrete_port.typ)
+                            unifier.unify_concrete_all(&wire.typ, &instance_wire.typ)
                         }
                     };
                 }
             }
         }
-        sm.instance.set(instance).unwrap();
     }
-    /// Calls [FullySubstitutable::fully_substitute] on everything. From this point on the substitutor is unneccesary
-    fn finalize(&mut self, substitutor: &ValueUnifierStore) {
-        let mut selects_to_check = Vec::new();
+    /// Calls [ConcreteType::fully_substitute] on everything. After this the unifier may be decomissioned
+    fn fully_substitute_everything(&'inst self, unifier: &ValueUnifier<'inst>) {
         // Don't report "could not figure out" errors if *any* other error has been reported before, because it confuses the user. Fixing the other error may resolve this one.
         // This is mostly from my own experience chasing down "could not infer latency parameter" errors, that were due to a bad problem -_-
         let did_already_error = self.errors.did_error();
 
-        for (w_id, w) in &mut self.wires {
-            if !w.typ.fully_substitute(substitutor) {
+        for (_, w) in &self.wires {
+            if w.typ.fully_substitute(unifier).is_err() {
                 let span = w.get_span(self.link_info);
                 span.debug();
                 if !did_already_error {
@@ -1019,39 +1041,23 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     ),
                 );
             }
-            match &mut w.source {
+            match &w.source {
                 RealWireDataSource::UnaryOp { rank, .. }
                 | RealWireDataSource::BinaryOp { rank, .. } => {
                     for r in rank {
                         // Rank not fully substituting is caught by the fully_substitute calls on w
-                        let _ = r.fully_substitute(substitutor);
+                        let _ = r.fully_substitute(unifier);
                     }
                 }
-                RealWireDataSource::Multiplexer { sources, .. } => {
-                    for s in sources {
-                        Self::finalize_partial_bounds(&mut s.to_path, &w.typ);
-                    }
-                }
-                RealWireDataSource::Select { root, .. } => selects_to_check.push((w_id, *root)),
                 _ => {}
             }
         }
 
-        for (target, root) in selects_to_check {
-            let [target, root] = self.wires.get_disjoint_mut([target, root]).unwrap();
-            let_unwrap!(
-                RealWireDataSource::Select { root: _, path },
-                &mut target.source
-            );
-            Self::finalize_partial_bounds(path, &root.typ);
-        }
-
         for sm_id in self.submodules.id_range() {
-            let sm = &mut self.submodules[sm_id];
-            let failed_to_substitute = !sm.refers_to.template_args.fully_substitute(substitutor);
-            let sm = &self.submodules[sm_id]; // Immutable reborrow so we can use self.submodules
+            let sm = &self.submodules[sm_id];
+            let fully_substitute_result = sm.refers_to.fully_substitute(unifier);
             if !did_already_error {
-                if failed_to_substitute {
+                if fully_substitute_result.is_err() {
                     let sm_name = &sm.name;
                     let mut err = self.errors.error(
                         sm.get_span(self.link_info),
@@ -1103,6 +1109,32 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     self.errors.error(sm.get_span(self.link_info), reason);
                 }
             }
+        }
+    }
+    fn finalize(&mut self) {
+        for w_id in self.wires.id_range() {
+            let w = &mut self.wires[w_id];
+            match &mut w.source {
+                RealWireDataSource::Multiplexer { sources, .. } => {
+                    for s in sources {
+                        Self::finalize_partial_bounds(&mut s.to_path, &w.typ);
+                    }
+                }
+                RealWireDataSource::Select { root, .. } => {
+                    let root_id = *root;
+                    let target_id = w_id;
+                    let [target, root] = self.wires.get_disjoint_mut([target_id, root_id]).unwrap();
+                    let_unwrap!(
+                        RealWireDataSource::Select { root: _, path },
+                        &mut target.source
+                    );
+                    Self::finalize_partial_bounds(path, &root.typ);
+                }
+                _ => {}
+            }
+        }
+
+        for (_, sm) in &mut self.submodules {
             if let Some(instance) = sm.instance.get() {
                 for (_port_id, concrete_port, connecting_wire) in
                     zip_eq(&instance.interface_ports, &sm.port_map)
@@ -1115,7 +1147,9 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
 
                     // We overwrite the ports, to have the Multiplexer inputs correctly call type errors on submodule inputs
                     let connecting_wire = &mut self.wires[connecting_wire.maps_to_wire];
-                    connecting_wire.typ.clone_from(&concrete_port.typ);
+                    let instance_wire = &instance.wires[concrete_port.wire];
+                    assert!(instance_wire.typ.is_valid());
+                    connecting_wire.typ.clone_from(&instance_wire.typ);
                 }
             }
         }
@@ -1135,7 +1169,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     let (new_typ, sz) = typ.unwrap_array();
                     typ = new_typ;
 
-                    if let Unifyable::Set(sz) = sz {
+                    if let Some(sz) = sz.get() {
                         let sz = sz.unwrap_integer();
                         *bounds = match std::mem::replace(bounds, PartialBound::WholeSlice) {
                             PartialBound::Known(from, to) => PartialBound::Known(from, to),

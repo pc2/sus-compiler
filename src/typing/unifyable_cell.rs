@@ -449,7 +449,7 @@ impl<T> Debug for SubTree<T> {
 }
 impl<T> Clone for SubTree<T> {
     fn clone(&self) -> Self {
-        Self(self.0.clone(), PhantomData)
+        *self
     }
 }
 impl<T> Copy for SubTree<T> {}
@@ -583,7 +583,6 @@ pub trait Unifier<'slf, 's: 'slf, T: 's>: UnifierTop<'s> + Sized + 's {
                     } else {
                         last_cell.set_interior(Some(last_id), Interior::Known(to));
                         let constraints = subs.take_constraints_from(last_id);
-                        dbg!(last_id, DelayedConstraint::count(&constraints));
                         subs.add_ready_constraints(constraints);
                         UnifyResult::Success
                     }
@@ -805,7 +804,7 @@ pub trait UnifierTop<'s>: Sized {
     fn decomission(&self) {
         let info = self.get_unifier_info();
         for e in info.delayed_errors.take() {
-            e(&self)
+            e(self)
         }
     }
 }
@@ -1071,8 +1070,6 @@ mod tests {
         assert_eq!(substitutor.unify(&three, &four), UnifyResult::Failure);
         assert_eq!(substitutor.unify(&four, &three), UnifyResult::Failure);
 
-        dbg!(&substitutor, &three, &four);
-
         three.fully_substitute(&substitutor).unwrap();
         four.fully_substitute(&substitutor).unwrap();
     }
@@ -1207,17 +1204,12 @@ mod tests {
             Ok(())
         });
 
-        dbg!(&substitutor, &a, &b, &c);
-
         substitutor.set(&a, mk_peano(3)).unwrap();
-        dbg!(&substitutor, &a, &b, &c);
         substitutor.set(&b, mk_peano(4)).unwrap();
-        dbg!(&substitutor, &a, &b, &c);
 
         substitutor.execute_ready_constraints();
 
         c.fully_substitute(&substitutor).unwrap();
-        dbg!(&substitutor, &a, &b, &c);
 
         assert_eq!(c.unwrap().count(), 7);
     }
