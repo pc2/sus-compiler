@@ -38,8 +38,27 @@ use std::{
 ///   Afterwards, we can *never* reset a [Interior::Known] back to an [Interior::Unallocated] or [Interior::SubstitutesTo], or mess with it in any mutable way. (Panics when trying otherwise)
 ///
 /// A "Prototype" refers to a [UniCell] that has thus far not been touched by a [Substitutor]. [UniCell::UNKNOWN] is a valid prototype.
-/// A [UniCell] ceases to be a "Prototype" when
+/// A [UniCell] ceases to be a "Prototype" when it has touched a [Unifier] in any way.
 pub struct UniCell<T>(UnsafeCell<Interior<T>>);
+
+/// Interior data for [UniCell].
+///
+/// FUTURE WORK: Make [Substitutor::substitutor] unneccesary by directly storing *const UniCell<T> within [Interior::SubstitutesTo],
+/// with [DelayedConstraint] stored in a new [Interior::Terminal] variant.
+///
+/// This slightly increases the minimum size of [Interior], but reduces pointer chasing by a lot. Also allows us to get rid of [Substitutor]'s [RefCell].
+///
+/// At that point, [Interior] would look roughly like this:
+/// ```
+/// enum Interior<T> {
+///     Known(T),
+///     SubstitutesTo(*const UniCell<T>),
+///     Terminal(Box<DelayedConstraint<'static>>)
+///     Unallocated,
+/// }
+/// ```
+///
+/// I've not yet pulled the trigger on actually making the shift, as I'd like to use the new type checker for a little while before doing such optimizations.
 enum Interior<T> {
     Known(T),
     /// If no substitution is known yet, then this points to itself ([SubstitutorInterior::resolve_chain] walks these until it finds a [UniCell] substituting to itself).
@@ -685,6 +704,13 @@ impl<'s, Unif: UnifierTop<'s>> Debug for UnifierTopInfo<'s, Unif> {
 impl<'s, Unif: UnifierTop<'s>> Default for UnifierTopInfo<'s, Unif> {
     fn default() -> Self {
         Self::new()
+    }
+}
+impl<'s, Unif: UnifierTop<'s>> Drop for UnifierTopInfo<'s, Unif> {
+    fn drop(&mut self) {
+        if !std::thread::panicking() && !self.delayed_errors.is_empty() {
+            panic!("UnifierTop Delayed Errors weren't reported!")
+        }
     }
 }
 
