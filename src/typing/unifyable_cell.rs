@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(clippy::type_complexity)]
 
 //! This file contains the final Unifier I make. It should have all the features I'll ever need.
 //!
@@ -12,8 +13,9 @@
 //! ```
 //! /// This Unifier unifies structures containing both `UniCell<PeanoType>` and `UniCell<DomainType>`
 //! struct MyUnifier<'s> {
-//!     peano_subs : Substitutor<'s, PeanoType>,
-//!     domain_subs : Substitutor<'s, DomainType>,
+//!     unifier_info: UnifierTopInfo<'s, Self>,
+//!     peano_subs : Substitutor<'s, PeanoType, Self>,
+//!     domain_subs : Substitutor<'s, DomainType, Self>,
 //! }
 //!
 //! impl<'s> UnifierTop for MyUnifier<'s> {}
@@ -21,7 +23,7 @@
 //! impl<'slf, 's> Unifier<'slf, 's, DomainType> for MyUnifier<'s> {}
 //! ```
 
-use crate::{prelude::*, typing::type_inference::UnifyResult};
+use crate::{append_only_vec::AppendOnlyVec, prelude::*, typing::type_inference::UnifyResult};
 
 use std::{
     cell::{Cell, RefCell, UnsafeCell},
@@ -157,11 +159,11 @@ impl<T: Debug> Debug for Interior<T> {
     }
 }
 
-struct SubstitutorElem<'s, T: Debug, Unif: UnifierTop> {
+struct SubstitutorElem<'s, T: Debug, Unif: UnifierTop<'s>> {
     substitute_to: &'s UniCell<T>,
     constraint_waiting_for: Option<Box<DelayedConstraint<'s, Unif>>>,
 }
-impl<'s, T: Debug, Unif: UnifierTop> Debug for SubstitutorElem<'s, T, Unif> {
+impl<'s, T: Debug, Unif: UnifierTop<'s>> Debug for SubstitutorElem<'s, T, Unif> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SubstitutorElem")
             .field("substitute_to", &self.substitute_to)
@@ -173,7 +175,7 @@ impl<'s, T: Debug, Unif: UnifierTop> Debug for SubstitutorElem<'s, T, Unif> {
             .finish()
     }
 }
-impl<'s, T: Debug, Unif: UnifierTop> Debug for Substitutor<'s, T, Unif> {
+impl<'s, T: Debug, Unif: UnifierTop<'s>> Debug for Substitutor<'s, T, Unif> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut list = f.debug_list();
         for (idx, e) in self.substitutor.borrow().substitutions.iter().enumerate() {
@@ -187,17 +189,17 @@ impl<'s, T: Debug, Unif: UnifierTop> Debug for Substitutor<'s, T, Unif> {
 /// All references are to [UniCell]s in the field. If a new value needs to be injected into the graph of [UniCell]s, then it should be [Unifier::set].
 ///
 /// For usage, see [Unifier]
-pub struct Substitutor<'s, T: Debug, Unif: UnifierTop> {
+pub struct Substitutor<'s, T: Debug, Unif: UnifierTop<'s>> {
     /// Care must be taken to never hold a substitutor RefMut across a recursive call.
     substitutor: RefCell<SubstitutorInterior<'s, T, Unif>>,
     ready_constraints: Cell<Option<Box<DelayedConstraint<'s, Unif>>>>,
 }
 
-struct SubstitutorInterior<'s, T: Debug, Unif: UnifierTop> {
+struct SubstitutorInterior<'s, T: Debug, Unif: UnifierTop<'s>> {
     substitutions: Vec<SubstitutorElem<'s, T, Unif>>,
 }
 
-impl<'s, T: Debug, Unif: UnifierTop> Drop for Substitutor<'s, T, Unif> {
+impl<'s, T: Debug, Unif: UnifierTop<'s>> Drop for Substitutor<'s, T, Unif> {
     fn drop(&mut self) {
         if !std::thread::panicking() && self.ready_constraints.take().is_some() {
             panic!(
@@ -207,7 +209,7 @@ impl<'s, T: Debug, Unif: UnifierTop> Drop for Substitutor<'s, T, Unif> {
     }
 }
 
-impl<'s, T: Debug, Unif: UnifierTop> Substitutor<'s, T, Unif> {
+impl<'s, T: Debug, Unif: UnifierTop<'s>> Substitutor<'s, T, Unif> {
     pub fn new() -> Self {
         Self {
             substitutor: RefCell::new(SubstitutorInterior {
@@ -241,9 +243,7 @@ impl<'s, T: Debug, Unif: UnifierTop> Substitutor<'s, T, Unif> {
             }
         }
     }
-}
 
-impl<'s, T: Debug, Unif: UnifierTop> Substitutor<'s, T, Unif> {
     /// Creates a new substitution map that points to the passed-in object. The passed-in object must be [Interior::Unallocated].
     /// Edits the passed-in object to also point to the newly created ID.
     /// Returns the ID of this map.
@@ -338,6 +338,12 @@ impl<'s, T: Debug, Unif: UnifierTop> Substitutor<'s, T, Unif> {
     }
 }
 
+impl<'s, T: Clone + Debug, Unif: UnifierTop<'s>> Default for Substitutor<'s, T, Unif> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct SubTree<T>(usize, PhantomData<T>);
 
@@ -367,7 +373,7 @@ pub struct SubTree<T>(usize, PhantomData<T>);
 /// we'd have to pass the unifier itself, plus whatever extra data the user wants to attach to it. Lots of complexity for nothing.
 ///
 /// Times we've been through the `&mut Substitutor` dead-end thus far: 4
-pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop + Sized + 's {
+pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop<'s> + Sized + 's {
     /// You should declare a [Substitutor] field for each [UniCell]`<T>` you wish to support. Return it here.
     fn get_substitutor(&'slf self) -> &'slf Substitutor<'s, T, Self>;
     /// `unify_subtrees` should recursively call [Unifier::unify] for every pair of subtrees. (Even for foreign [Substitutor]s).
@@ -577,24 +583,6 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop + Sized + '
     }
 }
 
-pub trait UnifierTop: Sized {
-    /// You must call [UnifierTop::execute_ready_constraints] after creating delayed_constraints,
-    /// as not immediately resolved delayed constraints don't immediately get resolved the moment they become eligible.
-    fn delayed_constraint<'slf, 's: 'slf>(
-        &'slf self,
-        mut f: impl for<'fn_slf> FnMut(&'fn_slf Self) -> Result<(), ResolveError<'fn_slf, 's, Self>>
-        + 's,
-    ) {
-        if let Err(not_found_var) = f(self) {
-            // May be a not_found_var from a different Substitutor
-            not_found_var.add_delayed_constraint(Box::new(DelayedConstraint { next: None, f }));
-        }
-    }
-    /// This method is provided as a reminder that [Substitutor::execute_ready_constraints] must be called for all [Substitutor]s that are part of this [UnifierTop].
-    /// You may call [UnifierTop::execute_ready_constraints] multiple times, but certainly you must make sure to call it before the [UnifierTop] is dropped.
-    fn execute_ready_constraints(&self);
-}
-
 /// Fancy trick! [Rust Forum - Creating a DST struct with a dyn FnMut](https://users.rust-lang.org/t/creating-a-dst-struct-with-a-dyn-fnmut/137256/3).
 /// The trick is, that there is a subtyping coersion `MyStruct<impl Trait>` -> `MyStruct<dyn Trait>`.
 /// The type we like to hold is `DelayedConstraint<dyn FnMut...>`,
@@ -602,7 +590,7 @@ pub trait UnifierTop: Sized {
 /// Very tricky
 struct DelayedConstraint<
     's,
-    Unif: UnifierTop,
+    Unif: UnifierTop<'s>,
     F = dyn for<'slf> FnMut(&'slf Unif) -> Result<(), ResolveError<'slf, 's, Unif>> + 's,
 > where
     F: ?Sized,
@@ -611,7 +599,7 @@ struct DelayedConstraint<
     f: F,
 }
 
-impl<'s, Unif: UnifierTop, F> Debug for DelayedConstraint<'s, Unif, F>
+impl<'s, Unif: UnifierTop<'s>, F> Debug for DelayedConstraint<'s, Unif, F>
 where
     F: ?Sized,
 {
@@ -622,7 +610,7 @@ where
     }
 }
 
-impl<'s, Unif: UnifierTop> DelayedConstraint<'s, Unif> {
+impl<'s, Unif: UnifierTop<'s>> DelayedConstraint<'s, Unif> {
     fn count(mut cur: &Option<Box<Self>>) -> usize {
         let mut total = 0;
         while let Some(nested) = cur {
@@ -642,15 +630,15 @@ impl<'s, Unif: UnifierTop> DelayedConstraint<'s, Unif> {
     }
 }
 
-trait DelayedConstraintAcceptor<'s, Unif: UnifierTop> {
+trait DelayedConstraintAcceptor<'s, Unif: UnifierTop<'s>> {
     fn add_delayed_constraint(&self, id: usize, constraint: Box<DelayedConstraint<'s, Unif>>);
 }
-pub struct ResolveError<'slf, 's, Unif: UnifierTop> {
+pub struct ResolveError<'slf, 's, Unif: UnifierTop<'s>> {
     subs: &'slf (dyn DelayedConstraintAcceptor<'s, Unif> + 's),
     id: usize,
 }
 
-impl<'slf, 's: 'slf, Unif: UnifierTop> Debug for ResolveError<'slf, 's, Unif> {
+impl<'slf, 's: 'slf, Unif: UnifierTop<'s>> Debug for ResolveError<'slf, 's, Unif> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ResolutionError")
             .field("subs", &(self.subs as *const _))
@@ -659,13 +647,13 @@ impl<'slf, 's: 'slf, Unif: UnifierTop> Debug for ResolveError<'slf, 's, Unif> {
     }
 }
 
-impl<'slf, 's, Unif: UnifierTop> ResolveError<'slf, 's, Unif> {
+impl<'slf, 's, Unif: UnifierTop<'s>> ResolveError<'slf, 's, Unif> {
     fn add_delayed_constraint(self, constraint: Box<DelayedConstraint<'s, Unif>>) {
         self.subs.add_delayed_constraint(self.id, constraint);
     }
 }
 
-impl<'s, T: Debug, Unif: UnifierTop> DelayedConstraintAcceptor<'s, Unif>
+impl<'s, T: Debug, Unif: UnifierTop<'s>> DelayedConstraintAcceptor<'s, Unif>
     for Substitutor<'s, T, Unif>
 {
     fn add_delayed_constraint(&self, id: usize, constraint: Box<DelayedConstraint<'s, Unif>>) {
@@ -677,11 +665,73 @@ impl<'s, T: Debug, Unif: UnifierTop> DelayedConstraintAcceptor<'s, Unif>
     }
 }
 
-impl<'s, T: Clone + Debug, Unif: UnifierTop> Default for Substitutor<'s, T, Unif> {
+pub struct UnifierTopInfo<'s, Unif: UnifierTop<'s>> {
+    delayed_errors: AppendOnlyVec<Box<dyn FnOnce(&Unif, &ErrorCollector) + 's>>,
+}
+impl<'s, Unif: UnifierTop<'s>> UnifierTopInfo<'s, Unif> {
+    pub fn new() -> Self {
+        UnifierTopInfo {
+            delayed_errors: AppendOnlyVec::new(),
+        }
+    }
+}
+impl<'s, Unif: UnifierTop<'s>> Debug for UnifierTopInfo<'s, Unif> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UnifierTopInfo")
+            .field("num_delayed_errors", &self.delayed_errors.len())
+            .finish()
+    }
+}
+impl<'s, Unif: UnifierTop<'s>> Default for UnifierTopInfo<'s, Unif> {
     fn default() -> Self {
         Self::new()
     }
 }
+
+pub trait UnifierTop<'s>: Sized {
+    /// This method is provided as a reminder that [Substitutor::execute_ready_constraints] must be called for all [Substitutor]s that are part of this [UnifierTop].
+    /// You may call [UnifierTop::execute_ready_constraints] multiple times, but certainly you must make sure to call it before the [UnifierTop] is dropped.
+    fn execute_ready_constraints(&self);
+
+    /// Your [UnifierTop] should store a field [UnifierTopInfo]. Return it here.
+    fn get_unifier_info(&self) -> &UnifierTopInfo<'s, Self>;
+    /// Your [UnifierTop] should store a field [UnifierTopInfo]. Return it here.
+    fn get_unifier_info_mut(&mut self) -> &mut UnifierTopInfo<'s, Self>;
+
+    /// You must call [UnifierTop::execute_ready_constraints] after creating delayed_constraints,
+    /// as not immediately resolved delayed constraints don't immediately get resolved the moment they become eligible.
+    fn delayed_constraint<'slf>(
+        &'slf self,
+        mut f: impl for<'fn_slf> FnMut(&'fn_slf Self) -> Result<(), ResolveError<'fn_slf, 's, Self>>
+        + 's,
+    ) where
+        's: 'slf,
+    {
+        if let Err(not_found_var) = f(self) {
+            // May be a not_found_var from a different Substitutor
+            not_found_var.add_delayed_constraint(Box::new(DelayedConstraint { next: None, f }));
+        }
+    }
+
+    /// Adds an error, that will be reported after all typechecking has finished. (When [UnifierTop::decomission] is called)
+    fn delayed_error(&self, f: impl FnOnce(&Self, &ErrorCollector) + 's) {
+        let unifier_info = self.get_unifier_info();
+
+        unifier_info.delayed_errors.push(Box::new(f));
+    }
+
+    fn decomission(mut self, error_collector: &ErrorCollector) {
+        let info = self.get_unifier_info_mut();
+        let delayed_errors: Vec<_> = std::mem::take(&mut info.delayed_errors).into();
+        for e in delayed_errors {
+            e(&self, error_collector)
+        }
+    }
+}
+
+// ==================================================
+// ======= FROM HERE ON OUT IT'S EXAMPLE CODE =======
+// ==================================================
 
 #[derive(Debug, Clone)]
 enum PeanoType {
@@ -715,6 +765,7 @@ impl SecondType {
 
 #[derive(Debug)]
 struct PeanoUnifier<'s> {
+    unifier_info: UnifierTopInfo<'s, Self>,
     peano_subs: Substitutor<'s, PeanoType, Self>,
     second_subs: Substitutor<'s, SecondType, Self>,
 }
@@ -722,16 +773,23 @@ struct PeanoUnifier<'s> {
 impl<'s> PeanoUnifier<'s> {
     pub fn new() -> Self {
         Self {
+            unifier_info: UnifierTopInfo::new(),
             peano_subs: Substitutor::new(),
             second_subs: Substitutor::new(),
         }
     }
 }
 
-impl<'s> UnifierTop for PeanoUnifier<'s> {
+impl<'s> UnifierTop<'s> for PeanoUnifier<'s> {
     fn execute_ready_constraints(&self) {
         self.peano_subs.execute_ready_constraints(self);
         self.second_subs.execute_ready_constraints(self);
+    }
+    fn get_unifier_info(&self) -> &UnifierTopInfo<'s, Self> {
+        &self.unifier_info
+    }
+    fn get_unifier_info_mut(&mut self) -> &mut UnifierTopInfo<'s, Self> {
+        &mut self.unifier_info
     }
 }
 impl<'slf, 's: 'slf> Unifier<'slf, 's, PeanoType> for PeanoUnifier<'s> {
