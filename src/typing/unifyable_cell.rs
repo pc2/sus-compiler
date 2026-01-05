@@ -23,12 +23,14 @@
 //! impl<'slf, 's> Unifier<'slf, 's, DomainType> for MyUnifier<'s> {}
 //! ```
 
-use crate::{append_only_vec::AppendOnlyVec, prelude::*, typing::type_inference::UnifyResult};
+use crate::{append_only_vec::AppendOnlyVec, typing::type_inference::UnifyResult};
 
 use std::{
     cell::{Cell, RefCell, UnsafeCell},
-    fmt::Debug,
+    fmt::{Debug, Display, Write},
+    hash::Hash,
     marker::PhantomData,
+    ops::Deref,
 };
 
 /// Basically a [std::cell::OnceCell] for type checking. We implement it safely by maintaining the following invariant:
@@ -69,7 +71,7 @@ enum Interior<T> {
     Unallocated,
 }
 
-impl<T: Debug> UniCell<T> {
+impl<T> UniCell<T> {
     #[allow(clippy::declare_interior_mutable_const)]
     pub const UNKNOWN: Self = Self(UnsafeCell::new(Interior::Unallocated));
 
@@ -86,29 +88,35 @@ impl<T: Debug> UniCell<T> {
             }
         }
     }
-    /// Panics if [Substitutor::unify] has ever been called on this
+    /// Panics if [Unifier::unify] has ever been called on this
     ///
-    /// So only allowed if [Self::is_unallocated]
+    /// So only allowed if [Self::get] is `None`
     fn set_interior(&self, existing_id: Option<usize>, v: Interior<T>) {
-        let interior = self.get_interior();
-        assert_eq!(
-            interior.unwrap_err(),
-            existing_id,
-            "`set_interior({existing_id:?}, {v:?})` had expected id {existing_id:?}, but found {interior:?}!",
-        );
+        match self.get_interior() {
+            Ok(_known) => {
+                panic!("UniCell::set_interior on a an already Interior::Known UniCell!");
+            }
+            Err(found_id) => {
+                if found_id != existing_id {
+                    panic!(
+                        "UniCell::set_interior: The expected substitution value ({existing_id:?}) does not match what it actually had ({found_id:?})!"
+                    );
+                }
+            }
+        }
 
         // SAFETY: We already know we're not Interior::Known, See [UniCell]'s definition
         unsafe { *self.0.get() = v };
     }
 
     #[track_caller]
+    pub fn get(&self) -> Option<&T> {
+        self.get_interior().ok()
+    }
+
+    #[track_caller]
     pub fn unwrap(&self) -> &T {
         self.get_interior().unwrap()
-    }
-    #[track_caller]
-    pub fn unwrap_mut(&mut self) -> &mut T {
-        let_unwrap!(Interior::Known(v), self.0.get_mut());
-        v
     }
     pub fn into_inner(self) -> T {
         let Interior::Known(v) = self.0.into_inner() else {
@@ -142,15 +150,46 @@ impl<T: Debug> UniCell<T> {
             Err(None) => Self(UnsafeCell::new(Interior::Unallocated)),
         }
     }
+
+    /// Substitutes and clones the substitutions such that `obj` actually owns them.
+    ///
+    /// If this succeeds, then `obj` can be safely [Clone]-d.
+    ///
+    /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
+    ///
+    /// Complete this implementation by implementing [Unifier::fully_substitute_recurse]
+    pub fn fully_substitute<'unif, 's: 'unif, Unif: Unifier<'unif, 's, T>>(
+        &'s self,
+        unif: &'unif Unif,
+    ) -> Result<(), ResolveError<'unif, 's, Unif>> {
+        let subs = unif.get_substitutor();
+        let known = match self.get_interior() {
+            Ok(known) => known,
+            Err(Some(id)) => {
+                let (known, _last_cell, last_id) = subs.resolve_chain(id);
+                if let Some(known) = known {
+                    self.set_interior(Some(id), Interior::Known(unif.clone_known(known)));
+                    self.unwrap()
+                } else {
+                    return Err(ResolveError { subs, id: last_id });
+                }
+            }
+            Err(None) => {
+                let id = subs.alloc(self, self);
+                return Err(ResolveError { subs, id });
+            }
+        };
+        unif.fully_substitute_recurse(known)
+    }
 }
 
-impl<T: Debug> From<T> for UniCell<T> {
+impl<T> From<T> for UniCell<T> {
     fn from(known: T) -> Self {
         Self(UnsafeCell::new(Interior::Known(known)))
     }
 }
 
-impl<T: Debug + Clone> Clone for UniCell<T> {
+impl<T: Clone> Clone for UniCell<T> {
     fn clone(&self) -> Self {
         // We cast to a const pointer here instead, such that we never actually create a &mut that might conflict with another existing shared ref
         let known = self.get_interior().expect("Not fully known substitutables can't be Cloned at all! Use [Unifier::clone_unify] or [Unifier::clone_prototype_step] to make clones.");
@@ -168,6 +207,45 @@ impl<T: Debug> Debug for UniCell<T> {
         }
     }
 }
+
+// Extra [UniCell] traits for convenience
+impl<T: Debug> Deref for UniCell<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.unwrap()
+    }
+}
+impl<T: Debug + PartialEq> PartialEq for UniCell<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.unwrap() == other.unwrap()
+    }
+}
+impl<T: Debug + Eq> Eq for UniCell<T> {}
+impl<T: Display> Display for UniCell<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.get() {
+            Some(known) => known.fmt(f),
+            None => f.write_char('?'),
+        }
+    }
+}
+impl<T: Debug + PartialOrd> PartialOrd for UniCell<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.unwrap().partial_cmp(other.unwrap())
+    }
+}
+impl<T: Debug + Ord> Ord for UniCell<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.unwrap().cmp(other.unwrap())
+    }
+}
+impl<T: Debug + Hash> Hash for UniCell<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.unwrap().hash(state);
+    }
+}
+
 impl<T: Debug> Debug for Interior<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -178,7 +256,7 @@ impl<T: Debug> Debug for Interior<T> {
     }
 }
 
-struct SubstitutorElem<'s, T: Debug, Unif: UnifierTop<'s>> {
+struct SubstitutorElem<'s, T, Unif: UnifierTop<'s>> {
     substitute_to: &'s UniCell<T>,
     constraint_waiting_for: Option<Box<DelayedConstraint<'s, Unif>>>,
 }
@@ -208,17 +286,17 @@ impl<'s, T: Debug, Unif: UnifierTop<'s>> Debug for Substitutor<'s, T, Unif> {
 /// All references are to [UniCell]s in the field. If a new value needs to be injected into the graph of [UniCell]s, then it should be [Unifier::set].
 ///
 /// For usage, see [Unifier]
-pub struct Substitutor<'s, T: Debug, Unif: UnifierTop<'s>> {
+pub struct Substitutor<'s, T, Unif: UnifierTop<'s>> {
     /// Care must be taken to never hold a substitutor RefMut across a recursive call.
     substitutor: RefCell<SubstitutorInterior<'s, T, Unif>>,
     ready_constraints: Cell<Option<Box<DelayedConstraint<'s, Unif>>>>,
 }
 
-struct SubstitutorInterior<'s, T: Debug, Unif: UnifierTop<'s>> {
+struct SubstitutorInterior<'s, T, Unif: UnifierTop<'s>> {
     substitutions: Vec<SubstitutorElem<'s, T, Unif>>,
 }
 
-impl<'s, T: Debug, Unif: UnifierTop<'s>> Drop for Substitutor<'s, T, Unif> {
+impl<'s, T, Unif: UnifierTop<'s>> Drop for Substitutor<'s, T, Unif> {
     fn drop(&mut self) {
         if !std::thread::panicking() && self.ready_constraints.take().is_some() {
             panic!(
@@ -228,7 +306,7 @@ impl<'s, T: Debug, Unif: UnifierTop<'s>> Drop for Substitutor<'s, T, Unif> {
     }
 }
 
-impl<'s, T: Debug, Unif: UnifierTop<'s>> Substitutor<'s, T, Unif> {
+impl<'s, T, Unif: UnifierTop<'s>> Substitutor<'s, T, Unif> {
     pub fn new() -> Self {
         Self {
             substitutor: RefCell::new(SubstitutorInterior {
@@ -251,7 +329,7 @@ impl<'s, T: Debug, Unif: UnifierTop<'s>> Substitutor<'s, T, Unif> {
     /// we might blow out the stack.
     ///
     /// You may call [Substitutor::execute_ready_constraints] multiple times, but certainly you must make sure to call it before the [UnifierTop] is dropped.
-    fn execute_ready_constraints(&self, unif: &Unif) {
+    pub fn execute_ready_constraints(&self, unif: &Unif) {
         // During of a delayed constraint, other constraints may of course become ready.
         // We retry delayed constraints in a stack-like manner, as my intuition tells me this is more efficient.
         while let Some(mut first_constraint) = self.ready_constraints.take() {
@@ -357,14 +435,24 @@ impl<'s, T: Debug, Unif: UnifierTop<'s>> Substitutor<'s, T, Unif> {
     }
 }
 
-impl<'s, T: Clone + Debug, Unif: UnifierTop<'s>> Default for Substitutor<'s, T, Unif> {
+impl<'s, T, Unif: UnifierTop<'s>> Default for Substitutor<'s, T, Unif> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[derive(Debug, Clone, Copy)]
 pub struct SubTree<T>(usize, PhantomData<T>);
+impl<T> Debug for SubTree<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("SubTree").field(&self.0).finish()
+    }
+}
+impl<T> Clone for SubTree<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), PhantomData)
+    }
+}
+impl<T> Copy for SubTree<T> {}
 
 /// To use, you should implement:
 /// - [Unifier::get_substitutor]
@@ -377,6 +465,7 @@ pub struct SubTree<T>(usize, PhantomData<T>);
 ///
 /// The trait will then give you access to the following methods you can use to use:
 /// - [UniCell::clone_prototype_step]
+/// - [UniCell::fully_substitute]
 /// - [Unifier::unify]
 /// - [Unifier::set]
 /// - [Unifier::clone_unify]
@@ -392,7 +481,7 @@ pub struct SubTree<T>(usize, PhantomData<T>);
 /// we'd have to pass the unifier itself, plus whatever extra data the user wants to attach to it. Lots of complexity for nothing.
 ///
 /// Times we've been through the `&mut Substitutor` dead-end thus far: 4
-pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop<'s> + Sized + 's {
+pub trait Unifier<'slf, 's: 'slf, T: 's>: UnifierTop<'s> + Sized + 's {
     /// You should declare a [Substitutor] field for each [UniCell]`<T>` you wish to support. Return it here.
     fn get_substitutor(&'slf self) -> &'slf Substitutor<'s, T, Self>;
     /// `unify_subtrees` should recursively call [Unifier::unify] for every pair of subtrees. (Even for foreign [Substitutor]s).
@@ -414,10 +503,15 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop<'s> + Sized
     ///
     /// `contains_subtree` is used to prevent infinite types.
     fn contains_subtree(&'slf self, in_obj: &T, subtree: SubTree<T>) -> bool;
-    /// Recursively call [Unifier::fully_substitute] on every contained [UniCell]`<*>`
+    /// Recursively call [UniCell::fully_substitute] on every contained [UniCell]`<*>`
     ///
     /// IMPORTANT: Do not stop at the first recursive failure!
-    fn fully_substitute_recurse(&'slf self, known: &'s T) -> Option<ResolveError<'slf, 's, Self>>;
+    ///
+    /// It is recommended to use [Result::and] for combining Results
+    fn fully_substitute_recurse(
+        &'slf self,
+        known: &'s T,
+    ) -> Result<(), ResolveError<'slf, 's, Self>>;
     /// Create a clone of T, tolerant of as-yet-unknown variables.
     ///
     /// To implement, do not use regular [Clone], rather, clone nested [UniCell]`<*>` with [Unifier::clone_unify].
@@ -508,8 +602,8 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop<'s> + Sized
         }
     }
     /// Wrapper around [Unifier::set_cell], for Known [UniCell]
-    fn set(&'slf self, cell: &'s UniCell<T>, to: T) -> UnifyResult {
-        self.set_cell(cell, UniCell(UnsafeCell::new(Interior::Known(to))))
+    fn set(&'slf self, cell: &'s UniCell<T>, to: impl Into<T>) -> UnifyResult {
+        self.set_cell(cell, UniCell(UnsafeCell::new(Interior::Known(to.into()))))
     }
     /// Shorthand for creating a [UniCell::UNKNOWN], and then [Unifier::unify]-ing with `obj`.
     ///
@@ -552,40 +646,6 @@ pub trait Unifier<'slf, 's: 'slf, T: Debug + Clone + 's>: UnifierTop<'s> + Sized
                 let id = subs.alloc(obj, obj);
                 Err(ResolveError { subs, id })
             }
-        }
-    }
-
-    /// Substitutes and clones the substitutions such that `obj` actually owns them.
-    ///
-    /// If this succeeds, then `obj` can be safely [Clone]-d.
-    ///
-    /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
-    ///
-    /// Complete this implementation by implementing [Unifier::fully_substitute_recurse]
-    fn fully_substitute(
-        &'slf self,
-        obj: &'s UniCell<T>,
-    ) -> Result<&'s T, ResolveError<'slf, 's, Self>> {
-        let subs = self.get_substitutor();
-        let known = match obj.get_interior() {
-            Ok(known) => known,
-            Err(Some(id)) => {
-                let (known, _last_cell, last_id) = subs.resolve_chain(id);
-                if let Some(known) = known {
-                    obj.set_interior(Some(id), Interior::Known(self.clone_known(known)));
-                    obj.unwrap()
-                } else {
-                    return Err(ResolveError { subs, id: last_id });
-                }
-            }
-            Err(None) => {
-                let id = subs.alloc(obj, obj);
-                return Err(ResolveError { subs, id });
-            }
-        };
-        match self.fully_substitute_recurse(known) {
-            Some(err) => Err(err),
-            None => Ok(known),
         }
     }
 
@@ -672,9 +732,7 @@ impl<'slf, 's, Unif: UnifierTop<'s>> ResolveError<'slf, 's, Unif> {
     }
 }
 
-impl<'s, T: Debug, Unif: UnifierTop<'s>> DelayedConstraintAcceptor<'s, Unif>
-    for Substitutor<'s, T, Unif>
-{
+impl<'s, T, Unif: UnifierTop<'s>> DelayedConstraintAcceptor<'s, Unif> for Substitutor<'s, T, Unif> {
     fn add_delayed_constraint(&self, id: usize, constraint: Box<DelayedConstraint<'s, Unif>>) {
         assert!(
             constraint.next.is_none(),
@@ -685,7 +743,7 @@ impl<'s, T: Debug, Unif: UnifierTop<'s>> DelayedConstraintAcceptor<'s, Unif>
 }
 
 pub struct UnifierTopInfo<'s, Unif: UnifierTop<'s>> {
-    delayed_errors: AppendOnlyVec<Box<dyn FnOnce(&Unif, &ErrorCollector) + 's>>,
+    delayed_errors: AppendOnlyVec<Box<dyn FnOnce(&Unif) + 's>>,
 }
 impl<'s, Unif: UnifierTop<'s>> UnifierTopInfo<'s, Unif> {
     pub fn new() -> Self {
@@ -721,8 +779,6 @@ pub trait UnifierTop<'s>: Sized {
 
     /// Your [UnifierTop] should store a field [UnifierTopInfo]. Return it here.
     fn get_unifier_info(&self) -> &UnifierTopInfo<'s, Self>;
-    /// Your [UnifierTop] should store a field [UnifierTopInfo]. Return it here.
-    fn get_unifier_info_mut(&mut self) -> &mut UnifierTopInfo<'s, Self>;
 
     /// You must call [UnifierTop::execute_ready_constraints] after creating delayed_constraints,
     /// as not immediately resolved delayed constraints don't immediately get resolved the moment they become eligible.
@@ -740,17 +796,16 @@ pub trait UnifierTop<'s>: Sized {
     }
 
     /// Adds an error, that will be reported after all typechecking has finished. (When [UnifierTop::decomission] is called)
-    fn delayed_error(&self, f: impl FnOnce(&Self, &ErrorCollector) + 's) {
+    fn delayed_error(&self, f: impl FnOnce(&Self) + 's) {
         let unifier_info = self.get_unifier_info();
 
         unifier_info.delayed_errors.push(Box::new(f));
     }
 
-    fn decomission(mut self, error_collector: &ErrorCollector) {
-        let info = self.get_unifier_info_mut();
-        let delayed_errors: Vec<_> = std::mem::take(&mut info.delayed_errors).into();
-        for e in delayed_errors {
-            e(&self, error_collector)
+    fn decomission(&self) {
+        let info = self.get_unifier_info();
+        for e in info.delayed_errors.take() {
+            e(&self)
         }
     }
 }
@@ -814,9 +869,6 @@ impl<'s> UnifierTop<'s> for PeanoUnifier<'s> {
     fn get_unifier_info(&self) -> &UnifierTopInfo<'s, Self> {
         &self.unifier_info
     }
-    fn get_unifier_info_mut(&mut self) -> &mut UnifierTopInfo<'s, Self> {
-        &mut self.unifier_info
-    }
 }
 impl<'slf, 's: 'slf> Unifier<'slf, 's, PeanoType> for PeanoUnifier<'s> {
     fn get_substitutor(&'slf self) -> &'slf Substitutor<'s, PeanoType, Self> {
@@ -845,10 +897,10 @@ impl<'slf, 's: 'slf> Unifier<'slf, 's, PeanoType> for PeanoUnifier<'s> {
     fn fully_substitute_recurse(
         &'slf self,
         known: &'s PeanoType,
-    ) -> Option<ResolveError<'slf, 's, Self>> {
+    ) -> Result<(), ResolveError<'slf, 's, Self>> {
         match known {
-            PeanoType::Zero => None,
-            PeanoType::Succ(succ) => self.fully_substitute(succ).err(),
+            PeanoType::Zero => Ok(()),
+            PeanoType::Succ(succ) => succ.fully_substitute(self),
         }
     }
     fn clone_known(&'slf self, known: &'s PeanoType) -> PeanoType {
@@ -888,15 +940,11 @@ impl<'slf, 's: 'slf> Unifier<'slf, 's, SecondType> for PeanoUnifier<'s> {
     fn fully_substitute_recurse(
         &'slf self,
         known: &'s SecondType,
-    ) -> Option<ResolveError<'slf, 's, Self>> {
+    ) -> Result<(), ResolveError<'slf, 's, Self>> {
         match known {
-            SecondType::None => None,
-            SecondType::OnePeano(a) => self.fully_substitute(a).err(),
-            SecondType::TwoPeano(a, b) => {
-                let a = self.fully_substitute(a).err();
-                let b = self.fully_substitute(b).err();
-                a.or(b)
-            }
+            SecondType::None => Ok(()),
+            SecondType::OnePeano(a) => a.fully_substitute(self),
+            SecondType::TwoPeano(a, b) => a.fully_substitute(self).and(b.fully_substitute(self)),
         }
     }
     fn clone_known(&'slf self, known: &'s SecondType) -> SecondType {
@@ -922,6 +970,8 @@ impl UniCell<PeanoType> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::prelude::*;
 
     use rand::prelude::IndexedRandom;
     use rand::seq::SliceRandom;
@@ -989,7 +1039,7 @@ mod tests {
 
         substitutor.unify(&four, &three_plus_a).unwrap();
 
-        substitutor.fully_substitute(&a).unwrap();
+        a.fully_substitute(&substitutor).unwrap();
 
         assert_eq!(a.unwrap().count(), 1)
     }
@@ -1008,8 +1058,8 @@ mod tests {
         substitutor.unify(&a_plus_zero, &a).unwrap();
 
         // a and a_plus_zero should both still have a type variable.
-        assert!(substitutor.fully_substitute(&a).is_err());
-        assert!(substitutor.fully_substitute(&a_plus_zero).is_err());
+        assert!(a.fully_substitute(&substitutor).is_err());
+        assert!(a_plus_zero.fully_substitute(&substitutor).is_err());
     }
 
     #[test]
@@ -1023,8 +1073,8 @@ mod tests {
 
         dbg!(&substitutor, &three, &four);
 
-        substitutor.fully_substitute(&three).unwrap();
-        substitutor.fully_substitute(&four).unwrap();
+        three.fully_substitute(&substitutor).unwrap();
+        four.fully_substitute(&substitutor).unwrap();
     }
 
     #[test]
@@ -1047,8 +1097,8 @@ mod tests {
             UnifyResult::FailureInfiniteTypes
         );
 
-        assert!(substitutor.fully_substitute(&a).is_err());
-        assert!(substitutor.fully_substitute(&a_plus_one).is_err());
+        assert!(a.fully_substitute(&substitutor).is_err());
+        assert!(a_plus_one.fully_substitute(&substitutor).is_err());
     }
 
     #[test]
@@ -1098,9 +1148,9 @@ mod tests {
         substitutor.unify(&z, &z_val).unwrap();
         substitutor.unify(&z, &x_plus_2).unwrap();
 
-        substitutor.fully_substitute(&x).unwrap();
-        substitutor.fully_substitute(&y).unwrap();
-        substitutor.fully_substitute(&z).unwrap();
+        x.fully_substitute(&substitutor).unwrap();
+        y.fully_substitute(&substitutor).unwrap();
+        z.fully_substitute(&substitutor).unwrap();
 
         assert_eq!(x.unwrap().count(), 0);
         assert_eq!(y.unwrap().count(), 1);
@@ -1129,9 +1179,9 @@ mod tests {
         substitutor.unify(&b, &b_val).unwrap();
         substitutor.unify(&c, &c_val).unwrap();
 
-        substitutor.fully_substitute(&a).unwrap();
-        substitutor.fully_substitute(&b).unwrap();
-        substitutor.fully_substitute(&c).unwrap();
+        a.fully_substitute(&substitutor).unwrap();
+        b.fully_substitute(&substitutor).unwrap();
+        c.fully_substitute(&substitutor).unwrap();
 
         assert_eq!(a.unwrap().count(), 0);
         assert_eq!(b.unwrap().count(), 2);
@@ -1147,11 +1197,11 @@ mod tests {
         let substitutor = PeanoUnifier::new();
 
         substitutor.delayed_constraint(|substitutor| {
-            let a = substitutor.fully_substitute(&a)?;
-            let b = substitutor.fully_substitute(&b)?;
+            a.fully_substitute(substitutor)?;
+            b.fully_substitute(substitutor)?;
 
             substitutor
-                .set(&c, mk_peano(a.count() + b.count()))
+                .set(&c, mk_peano(a.unwrap().count() + b.unwrap().count()))
                 .unwrap();
 
             Ok(())
@@ -1166,10 +1216,10 @@ mod tests {
 
         substitutor.execute_ready_constraints();
 
-        let cc = substitutor.fully_substitute(&c).unwrap();
+        c.fully_substitute(&substitutor).unwrap();
         dbg!(&substitutor, &a, &b, &c);
 
-        assert_eq!(cc.count(), 7);
+        assert_eq!(c.unwrap().count(), 7);
     }
 
     /// Performs a bunch of unifications, delayed_constraints, sets, etc in random order. This should be a thorough test for the correctness of [Unifier]
@@ -1257,9 +1307,9 @@ mod tests {
                         let delta: i64 = rng.random_range(-4..=4);
                         let deltas = &deltas;
                         substitutor.delayed_constraint(move |substitutor| {
-                            let prev = substitutor.fully_substitute(prev)?;
+                            prev.fully_substitute(substitutor)?;
 
-                            let prev_count = prev.count();
+                            let prev_count = prev.unwrap().count();
 
                             let new_count = prev_count as i64 + delta;
 
@@ -1310,8 +1360,8 @@ mod tests {
 
         // Finally, let's fully_substitute them, and actually count that they are correct
         for idx in 0..NUM_PEANOS {
-            let peano = substitutor.fully_substitute(&cells[idx]).unwrap();
-            assert_eq!(peano.count(), expecteds[idx] as usize);
+            cells[idx].fully_substitute(&substitutor).unwrap();
+            assert_eq!(cells[idx].unwrap().count(), expecteds[idx] as usize);
             println!("peanos[{idx}]: {}", expecteds[idx]);
         }
     }
@@ -1356,11 +1406,11 @@ mod tests {
 
         substitutor.unify(&a, &b).unwrap();
 
-        let a = substitutor.fully_substitute(&a).unwrap();
-        let b = substitutor.fully_substitute(&b).unwrap();
+        a.fully_substitute(&substitutor).unwrap();
+        b.fully_substitute(&substitutor).unwrap();
 
-        let_unwrap!(SecondType::TwoPeano(a1, a2), a);
-        let_unwrap!(SecondType::TwoPeano(b1, b2), b);
+        let_unwrap!(SecondType::TwoPeano(a1, a2), a.unwrap());
+        let_unwrap!(SecondType::TwoPeano(b1, b2), b.unwrap());
 
         assert_eq!(a1.unwrap().count(), 1);
         assert_eq!(a2.unwrap().count(), 2);
@@ -1416,7 +1466,7 @@ mod tests {
                     // Fully substitute something
                     let a = cells.choose(&mut rng).unwrap();
 
-                    if substitutor.fully_substitute(a).is_ok() {
+                    if a.fully_substitute(&substitutor).is_ok() {
                         // Can clone values after a successful substitute
                         let _a_clone = a.clone();
                     }
@@ -1426,9 +1476,10 @@ mod tests {
                     let b = cells.choose(&mut rng).unwrap();
                     let c = cells.choose(&mut rng).unwrap();
                     substitutor.delayed_constraint(move |substitutor| {
-                        let a = substitutor.fully_substitute(a)?;
-                        let b = substitutor.fully_substitute(b)?;
-                        let _may_fail = substitutor.set(c, mk_peano(a.count() + b.count()));
+                        a.fully_substitute(substitutor)?;
+                        b.fully_substitute(substitutor)?;
+                        let _may_fail =
+                            substitutor.set(c, mk_peano(a.unwrap().count() + b.unwrap().count()));
                         Ok(())
                     });
                 }
