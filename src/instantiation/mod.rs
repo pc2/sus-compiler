@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::typing::unifyable_cell::UniCell;
 
 mod concrete_typecheck;
 mod execute;
@@ -15,7 +16,6 @@ use crate::instantiation::concrete_typecheck::ModuleTypingSuperContext;
 use crate::latency::{AbsLat, InferenceFailure};
 use crate::linker::{LinkInfo, LinkerGlobals};
 use crate::typing::template::TVec;
-use crate::typing::value_unifier::UnifyableValue;
 
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashSet;
@@ -99,12 +99,12 @@ pub enum RealWireDataSource {
     },
     UnaryOp {
         op: UnaryOperator,
-        rank: Vec<UnifyableValue>,
+        rank: Vec<UniCell<Value>>,
         right: WireID,
     },
     BinaryOp {
         op: BinaryOperator,
-        rank: Vec<UnifyableValue>,
+        rank: Vec<UniCell<Value>>,
         left: WireID,
         right: WireID,
     },

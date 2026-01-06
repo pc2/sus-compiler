@@ -25,7 +25,6 @@ use super::{
     template::TemplateKind,
 };
 
-pub type UnifyableValue = UniCell<Value>;
 #[derive(Default)]
 pub struct ValueUnifier<'inst> {
     value_substitutor: Substitutor<'inst, Value, Self>,
@@ -103,7 +102,7 @@ impl<'slf, 'inst: 'slf> Unifier<'slf, 'inst, Value> for ValueUnifier<'inst> {
 }
 
 impl<'inst> ValueUnifier<'inst> {
-    /// Unifies all [UnifyableValue] parameters contained in the [ConcreteType]. This includes values in subtyping relations [SubtypeRelation::Min] and [SubtypeRelation::Max].
+    /// Unifies all [UniCell<Value>] parameters contained in the [ConcreteType]. This includes values in subtyping relations [SubtypeRelation::Min] and [SubtypeRelation::Max].
     pub fn unify_concrete_all(&self, from: &'inst ConcreteType, to: &'inst ConcreteType) -> bool {
         let mut success = true;
         ConcreteType::co_iterate_parameters(from, to, &mut |f, t, _relation| {
@@ -112,7 +111,7 @@ impl<'inst> ValueUnifier<'inst> {
         success
     }
 
-    /// Unifies all [UnifyableValue] parameters contained in the [ConcreteType]. This only includes [SubtypeRelation::Exact]
+    /// Unifies all [UniCell<Value>] parameters contained in the [ConcreteType]. This only includes [SubtypeRelation::Exact]
     pub fn unify_concrete_only_exact(
         &self,
         from: &'inst ConcreteType,
@@ -153,7 +152,7 @@ impl<'inst> ValueUnifier<'inst> {
         let expected_num_targets = type_iter.size_hint().0;
 
         let mut source_gather_hashmap =
-            HashMap::<*const UnifyableValue, CommonSubtypeRelation<'inst>>::new();
+            HashMap::<*const UniCell<Value>, CommonSubtypeRelation<'inst>>::new();
 
         for (to_typ, from_typ) in type_iter {
             let mut source_gather = SubTypeSourceGatherer {
@@ -195,9 +194,9 @@ impl<'inst> ValueUnifier<'inst> {
 }
 
 pub struct CommonSubtypeRelation<'t> {
-    pub target: &'t UnifyableValue,
+    pub target: &'t UniCell<Value>,
     pub relation: ValueUnificationRelation,
-    pub sources: Vec<&'t UnifyableValue>,
+    pub sources: Vec<&'t UniCell<Value>>,
 }
 
 impl Value {
@@ -363,8 +362,8 @@ impl Value {
                         ]
                     } else {
                         vec![
-                            TemplateKind::Value(UnifyableValue::UNKNOWN),
-                            TemplateKind::Value(UnifyableValue::UNKNOWN),
+                            TemplateKind::Value(Value::UNKNOWN),
+                            TemplateKind::Value(Value::UNKNOWN),
                         ]
                     });
                 ConcreteType::Named(ConcreteGlobalReference {
@@ -384,14 +383,14 @@ impl Value {
         };
 
         assert!(tensor_sizes.len() <= array_depth);
-        let mut array_size_vars: Vec<UnifyableValue> = Vec::with_capacity(array_depth);
+        let mut array_size_vars: Vec<UniCell<Value>> = Vec::with_capacity(array_depth);
         for sz in tensor_sizes {
             array_size_vars.push(Value::Integer(IBig::from(sz)).into());
         }
         // Because we might encounter zero sized arrays, we don't actually know sizes under there
         // Fill remaining array slots with Unknown
         while array_size_vars.len() < array_depth {
-            array_size_vars.push(UnifyableValue::UNKNOWN);
+            array_size_vars.push(Value::UNKNOWN);
         }
         Ok(content_typ.stack_arrays(array_size_vars))
     }
@@ -467,7 +466,7 @@ impl<ID> ConcreteGlobalReference<ID> {
 }
 
 impl ConcreteType {
-    pub fn get_value_args<const N: usize>(&self, expected: TypeUUID) -> [&UnifyableValue; N] {
+    pub fn get_value_args<const N: usize>(&self, expected: TypeUUID) -> [&UniCell<Value>; N] {
         let_unwrap!(ConcreteType::Named(typ), &self);
         assert_eq!(typ.id, expected);
         typ.template_args
@@ -487,7 +486,7 @@ impl ConcreteType {
 }
 
 struct SubTypeSourceGatherer<'hm, 'a> {
-    source_gather: &'hm mut HashMap<*const UnifyableValue, CommonSubtypeRelation<'a>>,
+    source_gather: &'hm mut HashMap<*const UniCell<Value>, CommonSubtypeRelation<'a>>,
     expected_num_targets: usize,
 }
 
@@ -495,8 +494,8 @@ impl<'hm, 'inst> SubTypeSourceGatherer<'hm, 'inst> {
     fn add_relation(
         &mut self,
         relation: ValueUnificationRelation,
-        target: &'inst UnifyableValue,
-        value: &'inst UnifyableValue,
+        target: &'inst UniCell<Value>,
+        value: &'inst UniCell<Value>,
     ) {
         let list = match self.source_gather.entry(target) {
             std::collections::hash_map::Entry::Occupied(occupied_entry) => {

@@ -1,7 +1,7 @@
-use crate::prelude::*;
+use crate::{prelude::*, typing::unifyable_cell::UniCell, value::Value};
 use ibig::IBig;
 
-use super::{concrete_type::ConcreteTemplateArg, value_unifier::UnifyableValue};
+use super::concrete_type::ConcreteTemplateArg;
 
 /// See [TVec]. All circumstances handling Templates need to handle both Types and Values.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -119,7 +119,7 @@ pub struct TypeParameterKind {}
 pub type TVec<T> = FlatAlloc<T, TemplateIDMarker>;
 
 impl TVec<ConcreteTemplateArg> {
-    pub fn cast_to_unifyable_array<const N: usize>(&self) -> [&UnifyableValue; N] {
+    pub fn cast_to_unifyable_array<const N: usize>(&self) -> [&UniCell<Value>; N] {
         self.cast_to_array().each_ref().map(|v| v.unwrap_value())
     }
     pub fn cast_to_int_array<const N: usize>(&self) -> [&IBig; N] {

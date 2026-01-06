@@ -12,7 +12,7 @@ use crate::{
         concrete_type::{ConcreteType, SubtypeRelation},
         domain_type::DomainType,
         template::{Parameter, TVec, TemplateKind},
-        value_unifier::UnifyableValue,
+        unifyable_cell::UniCell,
     },
     util::partition_in_place,
     value::Value,
@@ -276,7 +276,7 @@ fn walk_type<'t>(path: &[SubtypeInferencePathElem], mut typ: &'t ConcreteType) -
     typ
 }
 impl InferenceTargetPath {
-    pub fn follow_value_path<'t>(&self, typ: &'t ConcreteType) -> &'t UnifyableValue {
+    pub fn follow_value_path<'t>(&self, typ: &'t ConcreteType) -> &'t UniCell<Value> {
         let (last, pre_path) = self.path.split_last().unwrap();
         let typ = walk_type(pre_path, typ);
         match last {

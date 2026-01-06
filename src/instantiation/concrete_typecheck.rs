@@ -28,7 +28,7 @@ macro_rules! assert_due_to_variable_clones {
 }
 
 fn unify_rank<'inst>(
-    rank: &'inst [UnifyableValue],
+    rank: &'inst [UniCell<Value>],
     mut typ: &'inst ConcreteType,
     unifier: &ValueUnifier<'inst>,
 ) -> bool {
@@ -99,7 +99,7 @@ pub fn co_walk_path<'inst>(
 /// Panics if `potentials.len() < 2`
 fn set_min_max_with_min_max<'inst>(
     unifier: &ValueUnifier<'inst>,
-    out_bounds: IntBounds<&'inst UnifyableValue>,
+    out_bounds: IntBounds<&'inst UniCell<Value>>,
     potentials: impl IntoIterator<Item = IBig>,
 ) {
     let mut potentials = potentials.into_iter();
@@ -653,7 +653,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         &self,
         sm: &SubModule,
         path: &InferenceTargetPath,
-    ) -> Option<&UnifyableValue> {
+    ) -> Option<&UniCell<Value>> {
         let port = &sm.port_map[path.port].as_ref()?;
         let port_wire = &self.wires[port.maps_to_wire];
         Some(path.follow_value_path(&port_wire.typ))

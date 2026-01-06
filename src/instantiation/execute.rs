@@ -614,7 +614,7 @@ impl<'l> ExecutionContext<'l> {
                                 .clone()
                                 .into()
                         } else {
-                            UniCell::UNKNOWN
+                            Value::UNKNOWN
                         },
                     ),
                 })
@@ -650,7 +650,7 @@ impl<'l> ExecutionContext<'l> {
                                 TemplateKind::Type(_) => {
                                     todo!("Abstract Type Args aren't yet supported!")
                                 }
-                                TemplateKind::Value(_) => TemplateKind::Value(UniCell::UNKNOWN),
+                                TemplateKind::Value(_) => TemplateKind::Value(Value::UNKNOWN),
                             }),
                         },
                         Some(t) => unreachable!(
@@ -677,11 +677,11 @@ impl<'l> ExecutionContext<'l> {
                                 .clone()
                                 .into()
                         } else {
-                            UniCell::UNKNOWN
+                            Value::UNKNOWN
                         };
                         (Some(content), sz)
                     }
-                    None => (None, UniCell::UNKNOWN),
+                    None => (None, Value::UNKNOWN),
                     Some(t) => unreachable!(
                         "Expected an Array Written type (PeanoType is Succ(_)), but found {t:?}"
                     ),
@@ -1493,8 +1493,8 @@ impl<'l> ExecutionContext<'l> {
         }
     }
 
-    fn alloc_array_dimensions_stack(&mut self, peano_type: &PeanoType) -> Vec<UnifyableValue> {
-        vec![UniCell::UNKNOWN; peano_type.count().unwrap()]
+    fn alloc_array_dimensions_stack(&mut self, peano_type: &PeanoType) -> Vec<UniCell<Value>> {
+        vec![Value::UNKNOWN; peano_type.count().unwrap()]
     }
     fn expression_to_real_wire(
         &mut self,

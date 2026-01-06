@@ -11,7 +11,7 @@ use crate::{
     instantiation::PartSelectDirection,
     typing::{
         concrete_type::{ConcreteType, IntBounds},
-        value_unifier::UnifyableValue,
+        unifyable_cell::UniCell,
     },
     value::Value,
 };
@@ -36,7 +36,7 @@ fn make_output_typ<'c>(typ: &'c ConcreteType, path: &[RealWirePathElem]) -> Cow<
             let content = make_output_typ(content, rest_of_path).into_owned();
             Cow::Owned(ConcreteType::Array(Box::new((
                 content,
-                UnifyableValue::from(Value::Integer(width.clone())),
+                UniCell::from(Value::Integer(width.clone())),
             ))))
         }
         RealWirePathElem::Slice { bounds, .. } => {
@@ -44,7 +44,7 @@ fn make_output_typ<'c>(typ: &'c ConcreteType, path: &[RealWirePathElem]) -> Cow<
             let content = make_output_typ(content, rest_of_path).into_owned();
             Cow::Owned(ConcreteType::Array(Box::new((
                 content,
-                UnifyableValue::from(Value::Integer(bounds.unwrap_width())),
+                UniCell::from(Value::Integer(bounds.unwrap_width())),
             ))))
         }
     }

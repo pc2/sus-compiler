@@ -27,6 +27,10 @@ pub enum Value {
     /// The initial [Value] a variable has, before it's been set. (translates to `'x` don't care)
     Unset,
 }
+impl Value {
+    #[allow(clippy::declare_interior_mutable_const)]
+    pub const UNKNOWN: UniCell<Value> = UniCell::<Value>::UNKNOWN;
+}
 impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))

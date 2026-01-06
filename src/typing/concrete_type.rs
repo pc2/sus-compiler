@@ -10,15 +10,16 @@ use crate::typing::abstract_type::AbstractGlobalReference;
 use crate::typing::abstract_type::AbstractInnerType;
 use crate::typing::abstract_type::AbstractRankedType;
 use crate::typing::abstract_type::PeanoType;
+use crate::typing::unifyable_cell::UniCell;
 use crate::util::all_equal;
+use crate::value::Value;
 use std::ops::Deref;
 
 use super::template::TVec;
 
 use super::template::TemplateKind;
-use super::value_unifier::UnifyableValue;
 
-pub type ConcreteTemplateArg = TemplateKind<ConcreteType, UnifyableValue>;
+pub type ConcreteTemplateArg = TemplateKind<ConcreteType, UniCell<Value>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ConcreteGlobalReference<ID> {
@@ -55,7 +56,7 @@ pub enum SubtypeRelation {
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ConcreteType {
     Named(ConcreteGlobalReference<TypeUUID>),
-    Array(Box<(ConcreteType, UnifyableValue)>),
+    Array(Box<(ConcreteType, UniCell<Value>)>),
 }
 
 impl std::fmt::Debug for ConcreteType {
@@ -92,7 +93,7 @@ impl ConcreteType {
         template_args: FlatAlloc::new(),
     });
 
-    pub fn stack_arrays(self, tensor_sizes: Vec<UnifyableValue>) -> Self {
+    pub fn stack_arrays(self, tensor_sizes: Vec<UniCell<Value>>) -> Self {
         let mut result = self;
         for s in tensor_sizes.into_iter().rev() {
             result = ConcreteType::Array(Box::new((result, s)));
@@ -107,7 +108,7 @@ impl ConcreteType {
         v
     }
     #[track_caller]
-    pub fn unwrap_array(&self) -> &(ConcreteType, UnifyableValue) {
+    pub fn unwrap_array(&self) -> &(ConcreteType, UniCell<Value>) {
         let ConcreteType::Array(arr_box) = self else {
             unreachable!("unwrap_array")
         };
@@ -133,7 +134,7 @@ impl ConcreteType {
     pub fn co_iterate_parameters<'a>(
         a: &'a Self,
         b: &'a Self,
-        f: &mut impl FnMut(&'a UnifyableValue, &'a UnifyableValue, SubtypeRelation),
+        f: &mut impl FnMut(&'a UniCell<Value>, &'a UniCell<Value>, SubtypeRelation),
     ) {
         match (a, b) {
             (ConcreteType::Named(a), ConcreteType::Named(b)) => match all_equal([a.id, b.id]) {
@@ -315,7 +316,7 @@ impl ConcreteType {
     }
 
     #[track_caller]
-    pub fn unwrap_int_bounds_unknown(&self) -> IntBounds<&UnifyableValue> {
+    pub fn unwrap_int_bounds_unknown(&self) -> IntBounds<&UniCell<Value>> {
         let ConcreteType::Named(v) = self else {
             unreachable!("unwrap_integer_bounds_unknown")
         };
@@ -395,7 +396,7 @@ impl ConcreteGlobalReference<TypeUUID> {
     }
 
     #[track_caller]
-    pub fn unwrap_int_bounds_unknown(&self) -> IntBounds<&UnifyableValue> {
+    pub fn unwrap_int_bounds_unknown(&self) -> IntBounds<&UniCell<Value>> {
         assert_eq!(self.id, get_builtin_type!("int"));
         let [from, to] = self.template_args.cast_to_unifyable_array();
         IntBounds { from, to }

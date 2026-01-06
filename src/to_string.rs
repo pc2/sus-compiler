@@ -22,7 +22,7 @@ use crate::typing::domain_type::DomainType;
 use crate::typing::template::{
     GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind,
 };
-use crate::typing::value_unifier::UnifyableValue;
+use crate::typing::unifyable_cell::UniCell;
 use crate::value::Value;
 
 use crate::flattening::*;
@@ -1201,7 +1201,7 @@ impl ModuleTypingContext<'_> {
         }
         Ok(())
     }
-    fn fmt_rank(&self, f: &mut Formatter<'_>, rank: &[UnifyableValue]) -> std::fmt::Result {
+    fn fmt_rank(&self, f: &mut Formatter<'_>, rank: &[UniCell<Value>]) -> std::fmt::Result {
         for r in rank {
             write!(f, "[{r}]")?;
         }
