@@ -13,7 +13,8 @@ use crate::{
         template::TVec,
         type_inference::UnifyResult,
         unifyable_cell::{
-            ResolveError, SubTree, Substitutor, UniCell, Unifier, UnifierTop, UnifierTopInfo,
+            ResolveError, SubTree, SubstituteRecurse, Substitutor, UniCell, Unifier, UnifierTop,
+            UnifierTopInfo, UnifyRecurse,
         },
     },
     value::Value,
@@ -26,12 +27,12 @@ use super::{
 };
 
 #[derive(Default)]
-pub struct ValueUnifier<'inst> {
-    value_substitutor: Substitutor<'inst, Value, Self>,
-    unifier_top_info: UnifierTopInfo<'inst, Self>,
+pub struct ValueUnifier<'s> {
+    value_substitutor: Substitutor<'s, Value, Self>,
+    unifier_top_info: UnifierTopInfo<'s, Self>,
 }
 
-impl<'inst> ValueUnifier<'inst> {
+impl<'s> ValueUnifier<'s> {
     pub fn new() -> Self {
         Self {
             value_substitutor: Substitutor::new(),
@@ -40,11 +41,11 @@ impl<'inst> ValueUnifier<'inst> {
     }
 }
 
-impl<'inst> UnifierTop<'inst> for ValueUnifier<'inst> {
+impl<'s> UnifierTop<'s> for ValueUnifier<'s> {
     fn execute_ready_constraints(&self) {
         self.value_substitutor.execute_ready_constraints(self);
     }
-    fn get_unifier_info(&self) -> &UnifierTopInfo<'inst, Self> {
+    fn get_unifier_info(&self) -> &UnifierTopInfo<'s, Self> {
         &self.unifier_top_info
     }
 }
@@ -72,38 +73,40 @@ fn check_values_equal(a: &Value, b: &Value) -> UnifyResult {
         UnifyResult::Failure
     }
 }
-impl<'slf, 'inst: 'slf> Unifier<'slf, 'inst, Value> for ValueUnifier<'inst> {
-    fn get_substitutor(&'slf self) -> &'slf Substitutor<'inst, Value, Self> {
-        &self.value_substitutor
+impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, Value> for ValueUnifier<'s> {
+    fn fully_substitute_recurse(
+        &'unif self,
+        _: &'s Value,
+    ) -> Result<(), ResolveError<'unif, 's, Self>> {
+        Ok(()) // No recursion
     }
-
-    fn unify_subtrees(&'slf self, a: &'inst Value, b: &'inst Value) -> UnifyResult {
+}
+impl<'unif, 's: 'unif> UnifyRecurse<'unif, 's, Value> for ValueUnifier<'s> {
+    fn unify_subtrees(&'unif self, a: &'s Value, b: &'s Value) -> UnifyResult {
         check_values_equal(a, b)
     }
 
-    fn set_subtrees(&'slf self, a: &'inst Value, b: Value) -> UnifyResult {
+    fn set_subtrees(&'unif self, a: &'s Value, b: Value) -> UnifyResult {
         check_values_equal(a, &b)
     }
 
-    fn contains_subtree(&'slf self, _: &Value, _: SubTree<Value>) -> bool {
+    fn contains_subtree(&'unif self, _: &Value, _: SubTree<Value>) -> bool {
         false // No recursion
     }
 
-    fn fully_substitute_recurse(
-        &'slf self,
-        _: &'inst Value,
-    ) -> Result<(), ResolveError<'slf, 'inst, Self>> {
-        Ok(()) // No recursion
-    }
-
-    fn clone_known(&'slf self, known: &'inst Value) -> Value {
+    fn clone_known(&'unif self, known: &'s Value) -> Value {
         known.clone() // No recursion
     }
 }
+impl<'unif, 's: 'unif> Unifier<'unif, 's, Value> for ValueUnifier<'s> {
+    fn get_substitutor(&'unif self) -> &'unif Substitutor<'s, Value, Self> {
+        &self.value_substitutor
+    }
+}
 
-impl<'inst> ValueUnifier<'inst> {
+impl<'s> ValueUnifier<'s> {
     /// Unifies all [UniCell<Value>] parameters contained in the [ConcreteType]. This includes values in subtyping relations [SubtypeRelation::Min] and [SubtypeRelation::Max].
-    pub fn unify_concrete_all(&self, from: &'inst ConcreteType, to: &'inst ConcreteType) -> bool {
+    pub fn unify_concrete_all(&self, from: &'s ConcreteType, to: &'s ConcreteType) -> bool {
         let mut success = true;
         ConcreteType::co_iterate_parameters(from, to, &mut |f, t, _relation| {
             success &= self.unify(f, t) == UnifyResult::Success;
@@ -112,11 +115,7 @@ impl<'inst> ValueUnifier<'inst> {
     }
 
     /// Unifies all [UniCell<Value>] parameters contained in the [ConcreteType]. This only includes [SubtypeRelation::Exact]
-    pub fn unify_concrete_only_exact(
-        &self,
-        from: &'inst ConcreteType,
-        to: &'inst ConcreteType,
-    ) -> bool {
+    pub fn unify_concrete_only_exact(&self, from: &'s ConcreteType, to: &'s ConcreteType) -> bool {
         let mut success = true;
         ConcreteType::co_iterate_parameters(from, to, &mut |f, t, relation| {
             if relation == SubtypeRelation::Exact {
@@ -129,9 +128,9 @@ impl<'inst> ValueUnifier<'inst> {
     /// Gathers values for subtype relations for a's parameters
     fn unify_gather_subtype_relations(
         &self,
-        a: &'inst ConcreteType,
-        b: &'inst ConcreteType,
-        source_gather: &mut SubTypeSourceGatherer<'_, 'inst>,
+        a: &'s ConcreteType,
+        b: &'s ConcreteType,
+        source_gather: &mut SubTypeSourceGatherer<'_, 's>,
     ) {
         ConcreteType::co_iterate_parameters(a, b, &mut |a, b, relation| match relation {
             SubtypeRelation::Exact => {
@@ -146,13 +145,13 @@ impl<'inst> ValueUnifier<'inst> {
     /// In type_iter: The first type represents the target, the second type represents the source
     pub fn create_subtype_constraint(
         &self,
-        type_iter: impl IntoIterator<Item = (&'inst ConcreteType, &'inst ConcreteType)>,
+        type_iter: impl IntoIterator<Item = (&'s ConcreteType, &'s ConcreteType)>,
     ) {
         let type_iter = type_iter.into_iter();
         let expected_num_targets = type_iter.size_hint().0;
 
         let mut source_gather_hashmap =
-            HashMap::<*const UniCell<Value>, CommonSubtypeRelation<'inst>>::new();
+            HashMap::<*const UniCell<Value>, CommonSubtypeRelation<'s>>::new();
 
         for (to_typ, from_typ) in type_iter {
             let mut source_gather = SubTypeSourceGatherer {
@@ -423,45 +422,49 @@ impl Value {
     }
 }
 
-impl ConcreteType {
-    pub fn fully_substitute<'unif, 'inst: 'unif>(
-        &'inst self,
-        unifier: &'unif ValueUnifier<'inst>,
-    ) -> Result<(), ResolveError<'unif, 'inst, ValueUnifier<'inst>>> {
-        match self {
-            ConcreteType::Named(global_ref) => global_ref.template_args.fully_substitute(unifier),
+impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, ConcreteType> for ValueUnifier<'s> {
+    fn fully_substitute_recurse(
+        &'unif self,
+        v: &'s ConcreteType,
+    ) -> Result<(), ResolveError<'unif, 's, Self>> {
+        match v {
+            ConcreteType::Named(global_ref) => {
+                self.fully_substitute_recurse(&global_ref.template_args)
+            }
             ConcreteType::Array(arr) => {
                 let (content, sz) = arr.deref();
-                content
-                    .fully_substitute(unifier)
-                    .and(sz.fully_substitute(unifier))
+                self.fully_substitute_recurse(content)
+                    .and(self.fully_substitute(sz))
             }
         }
     }
 }
-
-impl TVec<ConcreteTemplateArg> {
-    pub fn fully_substitute<'unif, 'inst: 'unif>(
-        &'inst self,
-        unifier: &'unif ValueUnifier<'inst>,
-    ) -> Result<(), ResolveError<'unif, 'inst, ValueUnifier<'inst>>> {
+impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, TVec<ConcreteTemplateArg>>
+    for ValueUnifier<'s>
+{
+    fn fully_substitute_recurse(
+        &'unif self,
+        v: &'s TVec<ConcreteTemplateArg>,
+    ) -> Result<(), ResolveError<'unif, 's, Self>> {
         let mut total_result = Ok(());
-        for (_, arg) in self {
+        for (_, arg) in v {
             total_result = total_result.and(match arg {
-                TemplateKind::Type(t) => t.fully_substitute(unifier),
-                TemplateKind::Value(v) => v.fully_substitute(unifier),
+                TemplateKind::Type(t) => self.fully_substitute_recurse(t),
+                TemplateKind::Value(v) => self.fully_substitute(v),
             })
         }
         total_result
     }
 }
 
-impl<ID> ConcreteGlobalReference<ID> {
-    pub fn fully_substitute<'unif, 'inst: 'unif>(
-        &'inst self,
-        unifier: &'unif ValueUnifier<'inst>,
-    ) -> Result<(), ResolveError<'unif, 'inst, ValueUnifier<'inst>>> {
-        self.template_args.fully_substitute(unifier)
+impl<'unif, 's: 'unif, ID> SubstituteRecurse<'unif, 's, ConcreteGlobalReference<ID>>
+    for ValueUnifier<'s>
+{
+    fn fully_substitute_recurse(
+        &'unif self,
+        v: &'s ConcreteGlobalReference<ID>,
+    ) -> Result<(), ResolveError<'unif, 's, Self>> {
+        self.fully_substitute_recurse(&v.template_args)
     }
 }
 
@@ -474,12 +477,12 @@ impl ConcreteType {
             .each_ref()
             .map(|v| v.unwrap_value())
     }
-    pub fn display_substitute<'inst>(
-        &'inst self,
+    pub fn display_substitute<'s>(
+        &'s self,
         globals: &LinkerGlobals,
-        unifier: &ValueUnifier<'inst>,
+        unifier: &ValueUnifier<'s>,
     ) -> String {
-        let _ = self.fully_substitute(unifier);
+        let _ = unifier.fully_substitute_recurse(self);
         let as_display = self.display(globals);
         as_display.to_string()
     }
@@ -490,12 +493,12 @@ struct SubTypeSourceGatherer<'hm, 'a> {
     expected_num_targets: usize,
 }
 
-impl<'hm, 'inst> SubTypeSourceGatherer<'hm, 'inst> {
+impl<'hm, 's> SubTypeSourceGatherer<'hm, 's> {
     fn add_relation(
         &mut self,
         relation: ValueUnificationRelation,
-        target: &'inst UniCell<Value>,
-        value: &'inst UniCell<Value>,
+        target: &'s UniCell<Value>,
+        value: &'s UniCell<Value>,
     ) {
         let list = match self.source_gather.entry(target) {
             std::collections::hash_map::Entry::Occupied(occupied_entry) => {

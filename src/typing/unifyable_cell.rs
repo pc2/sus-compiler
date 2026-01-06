@@ -6,6 +6,8 @@
 //! Important types:
 //! - [UniCell]: The wrapper type for your types. This Cell can be unified with others. It can also be [Unifier::fully_substitute]d from a shared ref.
 //! - [Substitutor]: A substitutor responsible for one type of substitutions. A single [UnifierTop] implementor can have multiple [Substitutor]s.
+//! - [SubstituteRecurse]: Trait that provides [SubstituteRecurse::fully_substitute_recurse]
+//! - [UnifyRecurse]: Trait needed for recursive unification of subcomponents.
 //! - [Unifier]: Trait the user should implement for each [Substitutor] they wish to use.
 //! - [UnifierTop]: This trait should be implemented once for any unifier you wish to create.
 //!
@@ -19,8 +21,12 @@
 //! }
 //!
 //! impl<'s> UnifierTop for MyUnifier<'s> {}
-//! impl<'slf, 's> Unifier<'slf, 's, PeanoType> for MyUnifier<'s> {}
-//! impl<'slf, 's> Unifier<'slf, 's, DomainType> for MyUnifier<'s> {}
+//! impl<'unif, 's> SubstituteRecurse<'unif, 's, PeanoType> for MyUnifier<'s> {}
+//! impl<'unif, 's> SubstituteRecurse<'unif, 's, DomainType> for MyUnifier<'s> {}
+//! impl<'unif, 's> UnifyRecurse<'unif, 's, PeanoType> for MyUnifier<'s> {}
+//! impl<'unif, 's> UnifyRecurse<'unif, 's, DomainType> for MyUnifier<'s> {}
+//! impl<'unif, 's> Unifier<'unif, 's, PeanoType> for MyUnifier<'s> {}
+//! impl<'unif, 's> Unifier<'unif, 's, DomainType> for MyUnifier<'s> {}
 //! ```
 
 use crate::{append_only_vec::AppendOnlyVec, typing::type_inference::UnifyResult};
@@ -149,37 +155,6 @@ impl<T> UniCell<T> {
             ),
             Err(None) => Self(UnsafeCell::new(Interior::Unallocated)),
         }
-    }
-
-    /// Substitutes and clones the substitutions such that `obj` actually owns them.
-    ///
-    /// If this succeeds, then `obj` can be safely [Clone]-d.
-    ///
-    /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
-    ///
-    /// Complete this implementation by implementing [Unifier::fully_substitute_recurse]
-    pub fn fully_substitute<'unif, 's: 'unif, Unif: Unifier<'unif, 's, T>>(
-        &'s self,
-        unif: &'unif Unif,
-    ) -> Result<(), ResolveError<'unif, 's, Unif>> {
-        let subs = unif.get_substitutor();
-        let known = match self.get_interior() {
-            Ok(known) => known,
-            Err(Some(id)) => {
-                let (known, _last_cell, last_id) = subs.resolve_chain(id);
-                if let Some(known) = known {
-                    self.set_interior(Some(id), Interior::Known(unif.clone_known(known)));
-                    self.unwrap()
-                } else {
-                    return Err(ResolveError { subs, id: last_id });
-                }
-            }
-            Err(None) => {
-                let id = subs.alloc(self, self);
-                return Err(ResolveError { subs, id });
-            }
-        };
-        unif.fully_substitute_recurse(known)
     }
 }
 
@@ -454,18 +429,56 @@ impl<T> Clone for SubTree<T> {
 }
 impl<T> Copy for SubTree<T> {}
 
+/// All types in the unifyable type hierarchy should implement this.
+pub trait SubstituteRecurse<'unif, 's: 'unif, T>: UnifierTop<'s> + 's {
+    /// Recursively call [SubstituteRecurse::fully_substitute] on every contained [UniCell]`<*>`
+    ///
+    /// IMPORTANT: Do not stop at the first recursive failure!
+    ///
+    /// It is recommended to use [Result::and] for combining Results
+    fn fully_substitute_recurse(&'unif self, v: &'s T)
+    -> Result<(), ResolveError<'unif, 's, Self>>;
+}
+
+/// Should *not* be implemented for types that have some kind of subtyiping relation. For this you should create your own subtyping methods.
+pub trait UnifyRecurse<'unif, 's: 'unif, T>: SubstituteRecurse<'unif, 's, T> + 's {
+    /// `unify_subtrees` should recursively call [Unifier::unify] for every pair of subtrees. (Even for foreign [Substitutor]s).
+    /// If some irreconcilable difference is found it should return [UnifyResult::Failure].
+    /// Otherwise return the binary AND of subtree unifications.
+    /// Regardless of failure, all subtrees should be unified for best possible type error information.
+    /// You as the user should never return [UnifyResult::FailureInfiniteTypes]
+    fn unify_subtrees(&'unif self, a: &'s T, b: &'s T) -> UnifyResult;
+    /// Owning variant of [UnifyRecurse::unify_subtrees]
+    ///
+    /// Recursively call [Unifier::set_cell] on every contained [UniCell]`<*>`
+    ///
+    /// Should check if two Knowns are the same (if not, return [UnifyResult::Failure]),
+    /// If they are the same, then call [Unifier::set_cell] recursively.
+    fn set_subtrees(&'unif self, a: &'s T, b: T) -> UnifyResult;
+    /// Recursively call [Unifier::contains_subtree_recurse] on every contained [UniCell]`<T>`
+    /// If multiple substitutors are in play, then try to [Unifier::resolve] foreign [UniCell]`<F>` first,
+    /// and call [Unifier::contains_subtree_recurse] on any [UniCell]`<T>` found inside.
+    ///
+    /// `contains_subtree` is used to prevent infinite types.
+    fn contains_subtree(&'unif self, in_obj: &T, subtree: SubTree<T>) -> bool;
+    /// Create a clone of T, tolerant of as-yet-unknown variables.
+    ///
+    /// To implement, do not use regular [Clone], rather, clone nested [UniCell]`<*>` with [Unifier::clone_unify].
+    fn clone_known(&'unif self, known: &'s T) -> T;
+}
+
 /// To use, you should implement:
+/// - [SubstituteRecurse::fully_substitute_recurse]
+/// - [UnifyRecurse::unify_subtrees]
+/// - [UnifyRecurse::set_subtrees]
+/// - [UnifyRecurse::contains_subtree]
+/// - [UnifyRecurse::clone_known]
 /// - [Unifier::get_substitutor]
-/// - [Unifier::unify_subtrees]
-/// - [Unifier::set_subtrees]
-/// - [Unifier::contains_subtree]
-/// - [Unifier::fully_substitute_recurse]
-/// - [Unifier::clone_known]
 /// - [UnifierTop::execute_ready_constraints]
 ///
 /// The trait will then give you access to the following methods you can use to use:
 /// - [UniCell::clone_prototype_step]
-/// - [UniCell::fully_substitute]
+/// - [Unifier::fully_substitute]
 /// - [Unifier::unify]
 /// - [Unifier::set]
 /// - [Unifier::clone_unify]
@@ -481,47 +494,15 @@ impl<T> Copy for SubTree<T> {}
 /// we'd have to pass the unifier itself, plus whatever extra data the user wants to attach to it. Lots of complexity for nothing.
 ///
 /// Times we've been through the `&mut Substitutor` dead-end thus far: 4
-pub trait Unifier<'slf, 's: 'slf, T: 's>: UnifierTop<'s> + Sized + 's {
+pub trait Unifier<'unif, 's: 'unif, T: 's>: UnifyRecurse<'unif, 's, T> + 's {
     /// You should declare a [Substitutor] field for each [UniCell]`<T>` you wish to support. Return it here.
-    fn get_substitutor(&'slf self) -> &'slf Substitutor<'s, T, Self>;
-    /// `unify_subtrees` should recursively call [Unifier::unify] for every pair of subtrees. (Even for foreign [Substitutor]s).
-    /// If some irreconcilable difference is found it should return [UnifyResult::Failure].
-    /// Otherwise return the binary AND of subtree unifications.
-    /// Regardless of failure, all subtrees should be unified for best possible type error information.
-    /// You as the user should never return [UnifyResult::FailureInfiniteTypes]
-    fn unify_subtrees(&'slf self, a: &'s T, b: &'s T) -> UnifyResult;
-    /// Owning variant of [Unifier::unify_subtrees]
-    ///
-    /// Recursively call [Unifier::set_cell] on every contained [UniCell]`<*>`
-    ///
-    /// Should check if two Knowns are the same (if not, return [UnifyResult::Failure]),
-    /// If they are the same, then call [Unifier::set_cell] recursively.
-    fn set_subtrees(&'slf self, a: &'s T, b: T) -> UnifyResult;
-    /// Recursively call [Unifier::contains_subtree_recurse] on every contained [UniCell]`<T>`
-    /// If multiple substitutors are in play, then try to [Unifier::resolve] foreign [UniCell]`<F>` first,
-    /// and call [Unifier::contains_subtree_recurse] on any [UniCell]`<T>` found inside.
-    ///
-    /// `contains_subtree` is used to prevent infinite types.
-    fn contains_subtree(&'slf self, in_obj: &T, subtree: SubTree<T>) -> bool;
-    /// Recursively call [UniCell::fully_substitute] on every contained [UniCell]`<*>`
-    ///
-    /// IMPORTANT: Do not stop at the first recursive failure!
-    ///
-    /// It is recommended to use [Result::and] for combining Results
-    fn fully_substitute_recurse(
-        &'slf self,
-        known: &'s T,
-    ) -> Result<(), ResolveError<'slf, 's, Self>>;
-    /// Create a clone of T, tolerant of as-yet-unknown variables.
-    ///
-    /// To implement, do not use regular [Clone], rather, clone nested [UniCell]`<*>` with [Unifier::clone_unify].
-    fn clone_known(&'slf self, known: &'s T) -> T;
+    fn get_substitutor(&'unif self) -> &'unif Substitutor<'s, T, Self>;
 
     /// Most fundamental operation of [Unifier]. This makes it so the left type, and the right type must be identical.
     /// This information is kept in a graph of unifications, and conflicting unifications will lead to [UnifyResult::Failure]
     ///
     /// For unifying a [UniCell] already in the graph (and thus not mutably accessible), with a new owned [UniCell], see [Unifier::set] and [Unifier::set_cell]
-    fn unify(&'slf self, a: &'s UniCell<T>, b: &'s UniCell<T>) -> UnifyResult {
+    fn unify(&'unif self, a: &'s UniCell<T>, b: &'s UniCell<T>) -> UnifyResult {
         let subs = self.get_substitutor();
 
         match (subs.try_get(a), subs.try_get(b)) {
@@ -569,7 +550,7 @@ pub trait Unifier<'slf, 's: 'slf, T: 's>: UnifierTop<'s> + Sized + 's {
     }
     /// Basically the same as [Unifier::unify], but with the second argument an owned object.
     /// This allows you to inject new Ts into the substitution graph.
-    fn set_cell(&'slf self, cell: &'s UniCell<T>, to: UniCell<T>) -> UnifyResult {
+    fn set_cell(&'unif self, cell: &'s UniCell<T>, to: UniCell<T>) -> UnifyResult {
         let subs = self.get_substitutor();
         match to.0.into_inner() {
             Interior::Known(to) => match cell.get_interior() {
@@ -601,7 +582,7 @@ pub trait Unifier<'slf, 's: 'slf, T: 's>: UnifierTop<'s> + Sized + 's {
         }
     }
     /// Wrapper around [Unifier::set_cell], for Known [UniCell]
-    fn set(&'slf self, cell: &'s UniCell<T>, to: impl Into<T>) -> UnifyResult {
+    fn set(&'unif self, cell: &'s UniCell<T>, to: impl Into<T>) -> UnifyResult {
         self.set_cell(cell, UniCell(UnsafeCell::new(Interior::Known(to.into()))))
     }
     /// Shorthand for creating a [UniCell::UNKNOWN], and then [Unifier::unify]-ing with `obj`.
@@ -609,7 +590,7 @@ pub trait Unifier<'slf, 's: 'slf, T: 's>: UnifierTop<'s> + Sized + 's {
     /// For clones after successful typechecking, use the regular [std::clone::Clone]
     ///
     /// For clones that *don't* unify type variables, use [UniCell::clone_prototype_step]
-    fn clone_unify(&'slf self, to_clone: &'s UniCell<T>) -> UniCell<T> {
+    fn clone_unify(&'unif self, to_clone: &'s UniCell<T>) -> UniCell<T> {
         let subs = self.get_substitutor();
         match to_clone.get_interior() {
             Ok(_known) => {
@@ -628,7 +609,7 @@ pub trait Unifier<'slf, 's: 'slf, T: 's>: UnifierTop<'s> + Sized + 's {
     /// Walks the substitution chains to determine if it ends in a [Interior::Known]. If it does, it returns a reference to the known value.
     ///
     /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
-    fn resolve(&'slf self, obj: &'s UniCell<T>) -> Result<&'s T, ResolveError<'slf, 's, Self>> {
+    fn resolve(&'unif self, obj: &'s UniCell<T>) -> Result<&'s T, ResolveError<'unif, 's, Self>> {
         let subs = self.get_substitutor();
         match obj.get_interior() {
             Ok(known) => Ok(known),
@@ -648,10 +629,41 @@ pub trait Unifier<'slf, 's: 'slf, T: 's>: UnifierTop<'s> + Sized + 's {
         }
     }
 
+    /// Substitutes and clones the substitutions such that `obj` actually owns them.
+    ///
+    /// If this succeeds, then `obj` can be safely [Clone]-d.
+    ///
+    /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
+    ///
+    /// Complete this implementation by implementing [SubstituteRecurse::fully_substitute]
+    fn fully_substitute(
+        &'unif self,
+        cell: &'s UniCell<T>,
+    ) -> Result<(), ResolveError<'unif, 's, Self>> {
+        let subs = self.get_substitutor();
+        let known = match cell.get_interior() {
+            Ok(known) => known,
+            Err(Some(id)) => {
+                let (known, _last_cell, last_id) = subs.resolve_chain(id);
+                if let Some(known) = known {
+                    cell.set_interior(Some(id), Interior::Known(self.clone_known(known)));
+                    cell.unwrap()
+                } else {
+                    return Err(ResolveError { subs, id: last_id });
+                }
+            }
+            Err(None) => {
+                let id = subs.alloc(cell, cell);
+                return Err(ResolveError { subs, id });
+            }
+        };
+        self.fully_substitute_recurse(known)
+    }
+
     /// Used to detect infinite types and report errors on them.
     ///
-    /// Complete this by implementing [Unifier::contains_subtree]
-    fn contains_subtree_recurse(&'slf self, obj: &UniCell<T>, subtree: SubTree<T>) -> bool {
+    /// Complete this by implementing [UnifyRecurse::contains_subtree]
+    fn contains_subtree_recurse(&'unif self, obj: &UniCell<T>, subtree: SubTree<T>) -> bool {
         let subs = self.get_substitutor();
         match subs.try_get(obj).0 {
             Ok(known) => self.contains_subtree(known, subtree),
@@ -669,7 +681,7 @@ pub trait Unifier<'slf, 's: 'slf, T: 's>: UnifierTop<'s> + Sized + 's {
 struct DelayedConstraint<
     's,
     Unif: UnifierTop<'s>,
-    F = dyn for<'slf> FnMut(&'slf Unif) -> Result<(), ResolveError<'slf, 's, Unif>> + 's,
+    F = dyn for<'unif> FnMut(&'unif Unif) -> Result<(), ResolveError<'unif, 's, Unif>> + 's,
 > where
     F: ?Sized,
 {
@@ -711,12 +723,12 @@ impl<'s, Unif: UnifierTop<'s>> DelayedConstraint<'s, Unif> {
 trait DelayedConstraintAcceptor<'s, Unif: UnifierTop<'s>> {
     fn add_delayed_constraint(&self, id: usize, constraint: Box<DelayedConstraint<'s, Unif>>);
 }
-pub struct ResolveError<'slf, 's, Unif: UnifierTop<'s>> {
-    subs: &'slf (dyn DelayedConstraintAcceptor<'s, Unif> + 's),
+pub struct ResolveError<'unif, 's, Unif: UnifierTop<'s>> {
+    subs: &'unif (dyn DelayedConstraintAcceptor<'s, Unif> + 's),
     id: usize,
 }
 
-impl<'slf, 's: 'slf, Unif: UnifierTop<'s>> Debug for ResolveError<'slf, 's, Unif> {
+impl<'unif, 's: 'unif, Unif: UnifierTop<'s>> Debug for ResolveError<'unif, 's, Unif> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ResolutionError")
             .field("subs", &(self.subs as *const _))
@@ -725,7 +737,7 @@ impl<'slf, 's: 'slf, Unif: UnifierTop<'s>> Debug for ResolveError<'slf, 's, Unif
     }
 }
 
-impl<'slf, 's, Unif: UnifierTop<'s>> ResolveError<'slf, 's, Unif> {
+impl<'unif, 's, Unif: UnifierTop<'s>> ResolveError<'unif, 's, Unif> {
     fn add_delayed_constraint(self, constraint: Box<DelayedConstraint<'s, Unif>>) {
         self.subs.add_delayed_constraint(self.id, constraint);
     }
@@ -781,12 +793,12 @@ pub trait UnifierTop<'s>: Sized {
 
     /// You must call [UnifierTop::execute_ready_constraints] after creating delayed_constraints,
     /// as not immediately resolved delayed constraints don't immediately get resolved the moment they become eligible.
-    fn delayed_constraint<'slf>(
-        &'slf self,
+    fn delayed_constraint<'unif>(
+        &'unif self,
         mut f: impl for<'fn_slf> FnMut(&'fn_slf Self) -> Result<(), ResolveError<'fn_slf, 's, Self>>
         + 's,
     ) where
-        's: 'slf,
+        's: 'unif,
     {
         if let Err(not_found_var) = f(self) {
             // May be a not_found_var from a different Substitutor
@@ -869,51 +881,59 @@ impl<'s> UnifierTop<'s> for PeanoUnifier<'s> {
         &self.unifier_info
     }
 }
-impl<'slf, 's: 'slf> Unifier<'slf, 's, PeanoType> for PeanoUnifier<'s> {
-    fn get_substitutor(&'slf self) -> &'slf Substitutor<'s, PeanoType, Self> {
-        &self.peano_subs
+impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, PeanoType> for PeanoUnifier<'s> {
+    fn fully_substitute_recurse(
+        &'unif self,
+        known: &'s PeanoType,
+    ) -> Result<(), ResolveError<'unif, 's, Self>> {
+        match known {
+            PeanoType::Zero => Ok(()),
+            PeanoType::Succ(succ) => self.fully_substitute(succ),
+        }
     }
-    fn unify_subtrees(&'slf self, a: &'s PeanoType, b: &'s PeanoType) -> UnifyResult {
+}
+impl<'unif, 's: 'unif> UnifyRecurse<'unif, 's, PeanoType> for PeanoUnifier<'s> {
+    fn unify_subtrees(&'unif self, a: &'s PeanoType, b: &'s PeanoType) -> UnifyResult {
         match (a, b) {
             (PeanoType::Zero, PeanoType::Zero) => UnifyResult::Success,
             (PeanoType::Succ(a), PeanoType::Succ(b)) => self.unify(a, b),
             _ => UnifyResult::Failure,
         }
     }
-    fn set_subtrees(&'slf self, a: &'s PeanoType, b: PeanoType) -> UnifyResult {
+    fn set_subtrees(&'unif self, a: &'s PeanoType, b: PeanoType) -> UnifyResult {
         match (a, b) {
             (PeanoType::Zero, PeanoType::Zero) => UnifyResult::Success,
             (PeanoType::Succ(a), PeanoType::Succ(b)) => self.set_cell(a, *b),
             _ => UnifyResult::Failure,
         }
     }
-    fn contains_subtree(&'slf self, in_obj: &PeanoType, subtree: SubTree<PeanoType>) -> bool {
+    fn contains_subtree(&'unif self, in_obj: &PeanoType, subtree: SubTree<PeanoType>) -> bool {
         match in_obj {
             PeanoType::Zero => false,
             PeanoType::Succ(succ) => self.contains_subtree_recurse(succ, subtree),
         }
     }
-    fn fully_substitute_recurse(
-        &'slf self,
-        known: &'s PeanoType,
-    ) -> Result<(), ResolveError<'slf, 's, Self>> {
-        match known {
-            PeanoType::Zero => Ok(()),
-            PeanoType::Succ(succ) => succ.fully_substitute(self),
-        }
-    }
-    fn clone_known(&'slf self, known: &'s PeanoType) -> PeanoType {
+    fn clone_known(&'unif self, known: &'s PeanoType) -> PeanoType {
         match known {
             PeanoType::Zero => PeanoType::Zero,
             PeanoType::Succ(succ) => PeanoType::Succ(Box::new(self.clone_unify(succ))),
         }
     }
 }
-impl<'slf, 's: 'slf> Unifier<'slf, 's, SecondType> for PeanoUnifier<'s> {
-    fn get_substitutor(&'slf self) -> &'slf Substitutor<'s, SecondType, Self> {
-        &self.second_subs
+impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, SecondType> for PeanoUnifier<'s> {
+    fn fully_substitute_recurse(
+        &'unif self,
+        known: &'s SecondType,
+    ) -> Result<(), ResolveError<'unif, 's, Self>> {
+        match known {
+            SecondType::None => Ok(()),
+            SecondType::OnePeano(a) => self.fully_substitute(a),
+            SecondType::TwoPeano(a, b) => self.fully_substitute(a).and(self.fully_substitute(b)),
+        }
     }
-    fn unify_subtrees(&'slf self, a: &'s SecondType, b: &'s SecondType) -> UnifyResult {
+}
+impl<'unif, 's: 'unif> UnifyRecurse<'unif, 's, SecondType> for PeanoUnifier<'s> {
+    fn unify_subtrees(&'unif self, a: &'s SecondType, b: &'s SecondType) -> UnifyResult {
         match (a, b) {
             (SecondType::None, SecondType::None) => UnifyResult::Success,
             (SecondType::OnePeano(a), SecondType::OnePeano(b)) => self.unify(a, b),
@@ -923,7 +943,7 @@ impl<'slf, 's: 'slf> Unifier<'slf, 's, SecondType> for PeanoUnifier<'s> {
             _ => UnifyResult::Failure,
         }
     }
-    fn set_subtrees(&'slf self, a: &'s SecondType, b: SecondType) -> UnifyResult {
+    fn set_subtrees(&'unif self, a: &'s SecondType, b: SecondType) -> UnifyResult {
         match (a, b) {
             (SecondType::None, SecondType::None) => UnifyResult::Success,
             (SecondType::OnePeano(a), SecondType::OnePeano(b)) => self.set_cell(a, b),
@@ -933,20 +953,10 @@ impl<'slf, 's: 'slf> Unifier<'slf, 's, SecondType> for PeanoUnifier<'s> {
             _ => UnifyResult::Failure,
         }
     }
-    fn contains_subtree(&'slf self, _in_obj: &SecondType, _subtree: SubTree<SecondType>) -> bool {
+    fn contains_subtree(&'unif self, _in_obj: &SecondType, _subtree: SubTree<SecondType>) -> bool {
         false // SecondType doesn't recurse
     }
-    fn fully_substitute_recurse(
-        &'slf self,
-        known: &'s SecondType,
-    ) -> Result<(), ResolveError<'slf, 's, Self>> {
-        match known {
-            SecondType::None => Ok(()),
-            SecondType::OnePeano(a) => a.fully_substitute(self),
-            SecondType::TwoPeano(a, b) => a.fully_substitute(self).and(b.fully_substitute(self)),
-        }
-    }
-    fn clone_known(&'slf self, known: &'s SecondType) -> SecondType {
+    fn clone_known(&'unif self, known: &'s SecondType) -> SecondType {
         match known {
             SecondType::None => SecondType::None,
             SecondType::OnePeano(a) => SecondType::OnePeano(self.clone_unify(a)),
@@ -954,6 +964,16 @@ impl<'slf, 's: 'slf> Unifier<'slf, 's, SecondType> for PeanoUnifier<'s> {
                 SecondType::TwoPeano(self.clone_unify(a), self.clone_unify(b))
             }
         }
+    }
+}
+impl<'unif, 's: 'unif> Unifier<'unif, 's, PeanoType> for PeanoUnifier<'s> {
+    fn get_substitutor(&'unif self) -> &'unif Substitutor<'s, PeanoType, Self> {
+        &self.peano_subs
+    }
+}
+impl<'unif, 's: 'unif> Unifier<'unif, 's, SecondType> for PeanoUnifier<'s> {
+    fn get_substitutor(&'unif self) -> &'unif Substitutor<'s, SecondType, Self> {
+        &self.second_subs
     }
 }
 
@@ -1038,7 +1058,7 @@ mod tests {
 
         substitutor.unify(&four, &three_plus_a).unwrap();
 
-        a.fully_substitute(&substitutor).unwrap();
+        substitutor.fully_substitute(&a).unwrap();
 
         assert_eq!(a.unwrap().count(), 1)
     }
@@ -1057,8 +1077,8 @@ mod tests {
         substitutor.unify(&a_plus_zero, &a).unwrap();
 
         // a and a_plus_zero should both still have a type variable.
-        assert!(a.fully_substitute(&substitutor).is_err());
-        assert!(a_plus_zero.fully_substitute(&substitutor).is_err());
+        assert!(substitutor.fully_substitute(&a).is_err());
+        assert!(substitutor.fully_substitute(&a_plus_zero).is_err());
     }
 
     #[test]
@@ -1070,8 +1090,8 @@ mod tests {
         assert_eq!(substitutor.unify(&three, &four), UnifyResult::Failure);
         assert_eq!(substitutor.unify(&four, &three), UnifyResult::Failure);
 
-        three.fully_substitute(&substitutor).unwrap();
-        four.fully_substitute(&substitutor).unwrap();
+        substitutor.fully_substitute(&three).unwrap();
+        substitutor.fully_substitute(&four).unwrap();
     }
 
     #[test]
@@ -1094,8 +1114,8 @@ mod tests {
             UnifyResult::FailureInfiniteTypes
         );
 
-        assert!(a.fully_substitute(&substitutor).is_err());
-        assert!(a_plus_one.fully_substitute(&substitutor).is_err());
+        assert!(substitutor.fully_substitute(&a).is_err());
+        assert!(substitutor.fully_substitute(&a_plus_one).is_err());
     }
 
     #[test]
@@ -1145,9 +1165,9 @@ mod tests {
         substitutor.unify(&z, &z_val).unwrap();
         substitutor.unify(&z, &x_plus_2).unwrap();
 
-        x.fully_substitute(&substitutor).unwrap();
-        y.fully_substitute(&substitutor).unwrap();
-        z.fully_substitute(&substitutor).unwrap();
+        substitutor.fully_substitute(&x).unwrap();
+        substitutor.fully_substitute(&y).unwrap();
+        substitutor.fully_substitute(&z).unwrap();
 
         assert_eq!(x.unwrap().count(), 0);
         assert_eq!(y.unwrap().count(), 1);
@@ -1176,9 +1196,9 @@ mod tests {
         substitutor.unify(&b, &b_val).unwrap();
         substitutor.unify(&c, &c_val).unwrap();
 
-        a.fully_substitute(&substitutor).unwrap();
-        b.fully_substitute(&substitutor).unwrap();
-        c.fully_substitute(&substitutor).unwrap();
+        substitutor.fully_substitute(&a).unwrap();
+        substitutor.fully_substitute(&b).unwrap();
+        substitutor.fully_substitute(&c).unwrap();
 
         assert_eq!(a.unwrap().count(), 0);
         assert_eq!(b.unwrap().count(), 2);
@@ -1194,8 +1214,8 @@ mod tests {
         let substitutor = PeanoUnifier::new();
 
         substitutor.delayed_constraint(|substitutor| {
-            a.fully_substitute(substitutor)?;
-            b.fully_substitute(substitutor)?;
+            substitutor.fully_substitute(&a)?;
+            substitutor.fully_substitute(&b)?;
 
             substitutor
                 .set(&c, mk_peano(a.unwrap().count() + b.unwrap().count()))
@@ -1209,7 +1229,7 @@ mod tests {
 
         substitutor.execute_ready_constraints();
 
-        c.fully_substitute(&substitutor).unwrap();
+        substitutor.fully_substitute(&c).unwrap();
 
         assert_eq!(c.unwrap().count(), 7);
     }
@@ -1299,7 +1319,7 @@ mod tests {
                         let delta: i64 = rng.random_range(-4..=4);
                         let deltas = &deltas;
                         substitutor.delayed_constraint(move |substitutor| {
-                            prev.fully_substitute(substitutor)?;
+                            substitutor.fully_substitute(prev)?;
 
                             let prev_count = prev.unwrap().count();
 
@@ -1352,7 +1372,7 @@ mod tests {
 
         // Finally, let's fully_substitute them, and actually count that they are correct
         for idx in 0..NUM_PEANOS {
-            cells[idx].fully_substitute(&substitutor).unwrap();
+            substitutor.fully_substitute(&cells[idx]).unwrap();
             assert_eq!(cells[idx].unwrap().count(), expecteds[idx] as usize);
             println!("peanos[{idx}]: {}", expecteds[idx]);
         }
@@ -1398,8 +1418,8 @@ mod tests {
 
         substitutor.unify(&a, &b).unwrap();
 
-        a.fully_substitute(&substitutor).unwrap();
-        b.fully_substitute(&substitutor).unwrap();
+        substitutor.fully_substitute(&a).unwrap();
+        substitutor.fully_substitute(&b).unwrap();
 
         let_unwrap!(SecondType::TwoPeano(a1, a2), a.unwrap());
         let_unwrap!(SecondType::TwoPeano(b1, b2), b.unwrap());
@@ -1458,7 +1478,7 @@ mod tests {
                     // Fully substitute something
                     let a = cells.choose(&mut rng).unwrap();
 
-                    if a.fully_substitute(&substitutor).is_ok() {
+                    if substitutor.fully_substitute(a).is_ok() {
                         // Can clone values after a successful substitute
                         let _a_clone = a.clone();
                     }
@@ -1468,8 +1488,8 @@ mod tests {
                     let b = cells.choose(&mut rng).unwrap();
                     let c = cells.choose(&mut rng).unwrap();
                     substitutor.delayed_constraint(move |substitutor| {
-                        a.fully_substitute(substitutor)?;
-                        b.fully_substitute(substitutor)?;
+                        substitutor.fully_substitute(a)?;
+                        substitutor.fully_substitute(b)?;
                         let _may_fail =
                             substitutor.set(c, mk_peano(a.unwrap().count() + b.unwrap().count()));
                         Ok(())

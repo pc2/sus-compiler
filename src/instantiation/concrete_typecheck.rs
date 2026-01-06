@@ -17,7 +17,7 @@ use crate::typing::{concrete_type::ConcreteType, value_unifier::ValueUnifier};
 use crate::util::{all_equal, ceil_div, floor_div};
 use crate::value::MAX_SHIFT;
 
-use crate::typing::unifyable_cell::{Unifier, UnifierTop};
+use crate::typing::unifyable_cell::{SubstituteRecurse, Unifier, UnifierTop};
 
 use super::*;
 
@@ -924,7 +924,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
             let sm = &self.submodules[*id];
 
             // Doing can_fully_substitute first saves on quite a few clones. TODO remove once we switch to unifyable_cell.rs, as that can do fully_substitute without needing &mut.
-            if sm.refers_to.fully_substitute(unifier).is_ok() {
+            if unifier.fully_substitute_recurse(&sm.refers_to).is_ok() {
                 recursive_submodules_to_instantiate.push((*id, sm.refers_to.clone()));
 
                 false
@@ -1018,7 +1018,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         let did_already_error = self.errors.did_error();
 
         for (_, w) in &self.wires {
-            if w.typ.fully_substitute(unifier).is_err() {
+            if unifier.fully_substitute_recurse(&w.typ).is_err() {
                 let span = w.get_span(self.link_info);
                 span.debug();
                 if !did_already_error {
@@ -1046,7 +1046,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 | RealWireDataSource::BinaryOp { rank, .. } => {
                     for r in rank {
                         // Rank not fully substituting is caught by the fully_substitute calls on w
-                        let _ = r.fully_substitute(unifier);
+                        let _ = unifier.fully_substitute(r);
                     }
                 }
                 _ => {}
@@ -1055,7 +1055,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
 
         for sm_id in self.submodules.id_range() {
             let sm = &self.submodules[sm_id];
-            let fully_substitute_result = sm.refers_to.fully_substitute(unifier);
+            let fully_substitute_result = unifier.fully_substitute_recurse(&sm.refers_to);
             if !did_already_error {
                 if fully_substitute_result.is_err() {
                     let sm_name = &sm.name;
