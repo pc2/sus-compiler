@@ -77,11 +77,12 @@ fn check_values_equal(a: &Value, b: &Value) -> UnifyResult {
     UnifyResult::from(eq)
 }
 impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, Value> for ValueUnifier<'s> {
-    fn fully_substitute_recurse(
-        &'unif self,
-        _: &'s Value,
-    ) -> Result<(), ResolveError<'unif, 's, Self>> {
-        Ok(()) // No recursion
+    fn fully_substitute_recurse(&'unif self, _: &Value) -> bool {
+        true // No recursion
+    }
+
+    fn resolve_recurse(&'unif self, _: &'s Value) -> Result<(), ResolveError<'unif, 's, Self>> {
+        Ok(())
     }
 }
 impl<'unif, 's: 'unif> UnifyRecurse<'unif, 's, Value> for ValueUnifier<'s> {
@@ -426,48 +427,69 @@ impl Value {
 }
 
 impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, ConcreteType> for ValueUnifier<'s> {
-    fn fully_substitute_recurse(
-        &'unif self,
-        v: &'s ConcreteType,
-    ) -> Result<(), ResolveError<'unif, 's, Self>> {
+    fn fully_substitute_recurse(&'unif self, v: &ConcreteType) -> bool {
         match v {
             ConcreteType::Named(global_ref) => {
                 self.fully_substitute_recurse(&global_ref.template_args)
             }
             ConcreteType::Array(arr) => {
                 let (content, sz) = arr.deref();
-                self.fully_substitute_recurse(content)
-                    .and(self.fully_substitute(sz))
+                self.fully_substitute_recurse(content) & self.fully_substitute(sz)
+            }
+        }
+    }
+
+    fn resolve_recurse(
+        &'unif self,
+        v: &'s ConcreteType,
+    ) -> Result<(), ResolveError<'unif, 's, Self>> {
+        match v {
+            ConcreteType::Named(global_ref) => self.resolve_recurse(&global_ref.template_args),
+            ConcreteType::Array(arr) => {
+                let (content, sz) = arr.deref();
+                self.resolve_recurse(content)?;
+                self.resolve_all(sz)
             }
         }
     }
 }
+
 impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, TVec<ConcreteTemplateArg>>
     for ValueUnifier<'s>
 {
-    fn fully_substitute_recurse(
+    fn fully_substitute_recurse(&'unif self, v: &TVec<ConcreteTemplateArg>) -> bool {
+        v.iter().all(|(_, arg)| match arg {
+            TemplateKind::Type(t) => self.fully_substitute_recurse(t),
+            TemplateKind::Value(v) => self.fully_substitute(v),
+        })
+    }
+
+    fn resolve_recurse(
         &'unif self,
         v: &'s TVec<ConcreteTemplateArg>,
     ) -> Result<(), ResolveError<'unif, 's, Self>> {
-        let mut total_result = Ok(());
         for (_, arg) in v {
-            total_result = total_result.and(match arg {
-                TemplateKind::Type(t) => self.fully_substitute_recurse(t),
-                TemplateKind::Value(v) => self.fully_substitute(v),
-            })
+            match arg {
+                TemplateKind::Type(t) => self.resolve_recurse(t)?,
+                TemplateKind::Value(v) => self.resolve_all(v)?,
+            }
         }
-        total_result
+        Ok(())
     }
 }
 
 impl<'unif, 's: 'unif, ID> SubstituteRecurse<'unif, 's, ConcreteGlobalReference<ID>>
     for ValueUnifier<'s>
 {
-    fn fully_substitute_recurse(
+    fn fully_substitute_recurse(&'unif self, v: &ConcreteGlobalReference<ID>) -> bool {
+        self.fully_substitute_recurse(&v.template_args)
+    }
+
+    fn resolve_recurse(
         &'unif self,
         v: &'s ConcreteGlobalReference<ID>,
     ) -> Result<(), ResolveError<'unif, 's, Self>> {
-        self.fully_substitute_recurse(&v.template_args)
+        self.resolve_recurse(&v.template_args)
     }
 }
 

@@ -923,7 +923,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
             let sm = &self.submodules[*id];
 
             // Doing can_fully_substitute first saves on quite a few clones. TODO remove once we switch to unifyable_cell.rs, as that can do fully_substitute without needing &mut.
-            if unifier.fully_substitute_recurse(&sm.refers_to).is_ok() {
+            if unifier.fully_substitute_recurse(&sm.refers_to) {
                 recursive_submodules_to_instantiate.push((*id, sm.refers_to.clone()));
 
                 false
@@ -1017,7 +1017,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         let did_already_error = self.errors.did_error();
 
         for (_, w) in &self.wires {
-            if unifier.fully_substitute_recurse(&w.typ).is_err() {
+            if !unifier.fully_substitute_recurse(&w.typ) {
                 let span = w.get_span(self.link_info);
                 span.debug();
                 if !did_already_error {
@@ -1054,9 +1054,9 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
 
         for sm_id in self.submodules.id_range() {
             let sm = &self.submodules[sm_id];
-            let fully_substitute_result = unifier.fully_substitute_recurse(&sm.refers_to);
+            let fully_substitute_successful = unifier.fully_substitute_recurse(&sm.refers_to);
             if !did_already_error {
-                if fully_substitute_result.is_err() {
+                if !fully_substitute_successful {
                     let sm_name = &sm.name;
                     let mut err = self.errors.error(
                         sm.get_span(self.link_info),
