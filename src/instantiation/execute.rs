@@ -1494,7 +1494,7 @@ impl<'l> ExecutionContext<'l> {
     }
 
     fn alloc_array_dimensions_stack(&mut self, peano_type: &PeanoType) -> Vec<UniCell<Value>> {
-        vec![Value::UNKNOWN; peano_type.count().unwrap()]
+        vec![Value::UNKNOWN; peano_type.count()]
     }
     fn expression_to_real_wire(
         &mut self,
@@ -1710,7 +1710,7 @@ impl<'l> ExecutionContext<'l> {
             }
             ExpressionSource::UnaryOp { op, rank, right } => {
                 let right_val = self.generation_state.get_generation_value(*right)?;
-                duplicate_for_all_array_ranks(&[right_val], rank.count().unwrap(), &mut |[v]| {
+                duplicate_for_all_array_ranks(&[right_val], rank.count(), &mut |[v]| {
                     Ok(compute_unary_op(*op, v))
                 })
                 .unwrap()
@@ -1726,7 +1726,7 @@ impl<'l> ExecutionContext<'l> {
 
                 duplicate_for_all_array_ranks(
                     &[left_val, right_val],
-                    rank.count().unwrap(),
+                    rank.count(),
                     &mut |[l, r]| compute_binary_op(l, *op, r),
                 )
                 .map_err(|reason| (expr.span, reason))?

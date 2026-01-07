@@ -2,7 +2,7 @@
 
 use std::cell::OnceCell;
 use std::fmt::Debug;
-use std::ops::{BitAnd, BitAndAssign, Deref, DerefMut};
+use std::ops::{Deref, DerefMut};
 
 use crate::errors::ErrorInfo;
 use crate::prelude::*;
@@ -11,6 +11,7 @@ use crate::alloc::{UUID, UUIDMarker, zip_eq};
 use crate::typing::abstract_type::AbstractGlobalReference;
 use crate::typing::domain_type::DomainType;
 use crate::typing::template::TemplateKind;
+use crate::typing::unifyable_cell::UnifyResult;
 
 use super::abstract_type::AbstractRankedType;
 use super::abstract_type::{AbstractInnerType, PeanoType};

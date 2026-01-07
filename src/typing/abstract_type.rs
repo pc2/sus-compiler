@@ -149,18 +149,12 @@ pub enum PeanoType {
 }
 
 impl PeanoType {
-    pub fn count(&self) -> Option<usize> {
+    pub fn count(&self) -> usize {
         match self {
-            PeanoType::Zero => Some(0),
-            PeanoType::Succ(inner) => Some(inner.count()? + 1),
-            PeanoType::Unknown(_) => None,
+            PeanoType::Zero => 0,
+            PeanoType::Succ(inner) => inner.count() + 1,
+            PeanoType::Unknown(_) => panic!("Peano Number {self:?} still contains Unknown!"),
         }
-    }
-    pub fn count_unwrap(&self) -> usize {
-        let Some(cnt) = self.count() else {
-            panic!("Peano Number {self:?} still contains Unknown!");
-        };
-        cnt
     }
     pub fn from_natural(count: usize) -> Self {
         if count == 0 {
@@ -187,7 +181,7 @@ impl AbstractRankedType {
             AbstractInnerType::Template(id) => args[*id]
                 .unwrap_type()
                 .clone()
-                .rank_up_multi(self.rank.count_unwrap()),
+                .rank_up_multi(self.rank.count()),
             AbstractInnerType::Named(named_ref) => AbstractRankedType {
                 inner: AbstractInnerType::Named(named_ref.substitute_template_args(args)),
                 rank: self.rank.clone(),

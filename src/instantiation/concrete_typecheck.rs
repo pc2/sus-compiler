@@ -12,12 +12,11 @@ use crate::latency::port_latency_inference::{
 use crate::to_string::display_all_infer_params;
 use crate::typing::concrete_type::SubtypeRelation;
 use crate::typing::template::TemplateKind;
-use crate::typing::type_inference::UnifyResult;
 use crate::typing::{concrete_type::ConcreteType, value_unifier::ValueUnifier};
 use crate::util::{all_equal, ceil_div, floor_div};
 use crate::value::MAX_SHIFT;
 
-use crate::typing::unifyable_cell::{SubstituteRecurse, Unifier, UnifierTop};
+use crate::typing::unifyable_cell::{SubstituteRecurse, Unifier, UnifierTop, UnifyResult};
 
 use super::*;
 

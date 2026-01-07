@@ -215,7 +215,7 @@ impl Value {
         let array_depth = abs_typ.rank.count();
         let mut tensor_sizes = Vec::with_capacity(array_depth);
 
-        let content_typ = match abs_typ.inner.unwrap() {
+        let content_typ = match &abs_typ.inner {
             AbstractInnerType::Template(template_id) => {
                 self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |_| Ok(()))?;
                 template_args[*template_id].unwrap_type().clone()
@@ -380,6 +380,7 @@ impl Value {
                     "Interfaces can't be concretized, should have been caught by typecheck!"
                 )
             }
+            AbstractInnerType::Unknown(_) => unreachable!(),
         };
 
         assert!(tensor_sizes.len() <= array_depth);
