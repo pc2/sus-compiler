@@ -56,39 +56,6 @@ impl<F: FnOnce() -> (String, Vec<ErrorInfo>)> UnifyErrorReport for F {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UnifyResult {
-    Success,
-    Failure,
-    FailureInfiniteTypes,
-}
-impl UnifyResult {
-    pub fn unwrap(&self) {
-        assert_eq!(*self, UnifyResult::Success);
-    }
-    pub fn expect(&self, msg: &str) {
-        assert_eq!(*self, UnifyResult::Success, "{msg}");
-    }
-}
-impl BitAnd for UnifyResult {
-    type Output = UnifyResult;
-
-    fn bitand(self, rhs: Self) -> Self::Output {
-        if self == UnifyResult::Success {
-            rhs
-        } else {
-            self
-        }
-    }
-}
-impl BitAndAssign for UnifyResult {
-    fn bitand_assign(&mut self, rhs: Self) {
-        if *self == UnifyResult::Success {
-            *self = rhs;
-        }
-    }
-}
-
 impl<MyType: HindleyMilner> TypeSubstitutor<MyType> {
     fn does_typ_reference_var_recurse_with_substitution(
         &self,

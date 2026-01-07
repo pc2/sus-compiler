@@ -1,29 +1,25 @@
-use std::{collections::HashMap, ops::Deref};
+use crate::prelude::*;
+
+use std::{collections::HashMap, fmt::Display, ops::Deref};
 
 use ibig::IBig;
 use sus_proc_macro::get_builtin_type;
 
 use crate::{
-    let_unwrap,
     linker::LinkerGlobals,
-    prelude::*,
     typing::{
+        abstract_type::AbstractRankedType,
         abstract_type::{AbstractGlobalReference, AbstractInnerType},
         concrete_type::SubtypeRelation,
+        concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg, ConcreteType},
         template::TVec,
-        type_inference::UnifyResult,
+        template::TemplateKind,
         unifyable_cell::{
             ResolveError, SubTree, SubstituteRecurse, Substitutor, UniCell, Unifier, UnifierTop,
-            UnifierTopInfo, UnifyRecurse,
+            UnifierTopInfo, UnifyRecurse, UnifyResult,
         },
     },
     value::Value,
-};
-
-use super::{
-    abstract_type::AbstractRankedType,
-    concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg, ConcreteType},
-    template::TemplateKind,
 };
 
 #[derive(Default)]
@@ -38,6 +34,17 @@ impl<'s> ValueUnifier<'s> {
             value_substitutor: Substitutor::new(),
             unifier_top_info: UnifierTopInfo::new(),
         }
+    }
+}
+
+impl ConcreteType {
+    pub fn display_substitute<'s, 'obj: 's>(
+        &'obj self,
+        globals: &'obj LinkerGlobals,
+        unifier: &ValueUnifier<'s>,
+    ) -> impl Display + 'obj {
+        let _ = unifier.fully_substitute_recurse(self);
+        self.display(globals)
     }
 }
 
@@ -67,11 +74,7 @@ fn check_values_equal(a: &Value, b: &Value) -> UnifyResult {
             "Abstract Typing Error in Unifier? Should have been caught by Abstract Type Checker!"
         ),
     };
-    if eq {
-        UnifyResult::Success
-    } else {
-        UnifyResult::Failure
-    }
+    UnifyResult::from(eq)
 }
 impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, Value> for ValueUnifier<'s> {
     fn fully_substitute_recurse(
@@ -90,10 +93,6 @@ impl<'unif, 's: 'unif> UnifyRecurse<'unif, 's, Value> for ValueUnifier<'s> {
         check_values_equal(a, &b)
     }
 
-    fn contains_subtree(&'unif self, _: &Value, _: SubTree<Value>) -> bool {
-        false // No recursion
-    }
-
     fn clone_known(&'unif self, known: &'s Value) -> Value {
         known.clone() // No recursion
     }
@@ -101,6 +100,9 @@ impl<'unif, 's: 'unif> UnifyRecurse<'unif, 's, Value> for ValueUnifier<'s> {
 impl<'unif, 's: 'unif> Unifier<'unif, 's, Value> for ValueUnifier<'s> {
     fn get_substitutor(&'unif self) -> &'unif Substitutor<'s, Value, Self> {
         &self.value_substitutor
+    }
+    fn contains_subtree(&'unif self, _: &Value, _: SubTree<Value>) -> bool {
+        false // No recursion
     }
 }
 
@@ -210,10 +212,10 @@ impl Value {
         abs_typ: &AbstractRankedType,
         template_args: &TVec<ConcreteTemplateArg>,
     ) -> Result<ConcreteType, String> {
-        let array_depth = abs_typ.rank.count().unwrap();
+        let array_depth = abs_typ.rank.count();
         let mut tensor_sizes = Vec::with_capacity(array_depth);
 
-        let content_typ = match &abs_typ.inner {
+        let content_typ = match abs_typ.inner.unwrap() {
             AbstractInnerType::Template(template_id) => {
                 self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |_| Ok(()))?;
                 template_args[*template_id].unwrap_type().clone()
@@ -373,7 +375,6 @@ impl Value {
             AbstractInnerType::Named(AbstractGlobalReference { .. }) => {
                 return Err("TODO: Structs".to_string()); // todo!("Structs")
             }
-            AbstractInnerType::Unknown(_) => unreachable!("Caught by typecheck"),
             AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => {
                 unreachable!(
                     "Interfaces can't be concretized, should have been caught by typecheck!"
@@ -476,15 +477,6 @@ impl ConcreteType {
             .cast_to_array::<N>()
             .each_ref()
             .map(|v| v.unwrap_value())
-    }
-    pub fn display_substitute<'s>(
-        &'s self,
-        globals: &LinkerGlobals,
-        unifier: &ValueUnifier<'s>,
-    ) -> String {
-        let _ = unifier.fully_substitute_recurse(self);
-        let as_display = self.display(globals);
-        as_display.to_string()
     }
 }
 

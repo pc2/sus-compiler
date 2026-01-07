@@ -29,14 +29,14 @@
 //! impl<'unif, 's> Unifier<'unif, 's, DomainType> for MyUnifier<'s> {}
 //! ```
 
-use crate::{append_only_vec::AppendOnlyVec, typing::type_inference::UnifyResult};
+use crate::append_only_vec::AppendOnlyVec;
 
 use std::{
     cell::{Cell, RefCell, UnsafeCell},
     fmt::{Debug, Display, Write},
     hash::Hash,
     marker::PhantomData,
-    ops::Deref,
+    ops::{BitAnd, BitAndAssign, Deref},
 };
 
 /// Basically a [std::cell::OnceCell] for type checking. We implement it safely by maintaining the following invariant:
@@ -80,6 +80,10 @@ enum Interior<T> {
 impl<T> UniCell<T> {
     #[allow(clippy::declare_interior_mutable_const)]
     pub const UNKNOWN: Self = Self(UnsafeCell::new(Interior::Unallocated));
+
+    pub const fn from_known(known: T) -> Self {
+        Self(UnsafeCell::new(Interior::Known(known)))
+    }
 
     /// Either get a shared reference to the known value if it's set, or a mutable reference to the whole thing if it's not yet known
     /// This is safe, because [UniCell] only allows references to [Interior::Known] once it is set, and it can never be unset through a shared ref
@@ -218,6 +222,23 @@ impl<T: Debug + Ord> Ord for UniCell<T> {
 impl<T: Debug + Hash> Hash for UniCell<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.unwrap().hash(state);
+    }
+}
+
+/// Used for global Ts containing [UniCell] (Such as when using [std::sync::LazyLock]).
+/// ONLY SAFE IF T IS FULLY RESOLVED.
+pub struct SyncWrapper<T>(T);
+impl<T> SyncWrapper<T> {
+    pub fn new(v: T) -> Self {
+        Self(v)
+    }
+}
+unsafe impl<T> Sync for SyncWrapper<T> {}
+impl<T> Deref for SyncWrapper<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -455,12 +476,6 @@ pub trait UnifyRecurse<'unif, 's: 'unif, T>: SubstituteRecurse<'unif, 's, T> + '
     /// Should check if two Knowns are the same (if not, return [UnifyResult::Failure]),
     /// If they are the same, then call [Unifier::set_cell] recursively.
     fn set_subtrees(&'unif self, a: &'s T, b: T) -> UnifyResult;
-    /// Recursively call [Unifier::contains_subtree_recurse] on every contained [UniCell]`<T>`
-    /// If multiple substitutors are in play, then try to [Unifier::resolve] foreign [UniCell]`<F>` first,
-    /// and call [Unifier::contains_subtree_recurse] on any [UniCell]`<T>` found inside.
-    ///
-    /// `contains_subtree` is used to prevent infinite types.
-    fn contains_subtree(&'unif self, in_obj: &T, subtree: SubTree<T>) -> bool;
     /// Create a clone of T, tolerant of as-yet-unknown variables.
     ///
     /// To implement, do not use regular [Clone], rather, clone nested [UniCell]`<*>` with [Unifier::clone_unify].
@@ -497,6 +512,13 @@ pub trait UnifyRecurse<'unif, 's: 'unif, T>: SubstituteRecurse<'unif, 's, T> + '
 pub trait Unifier<'unif, 's: 'unif, T: 's>: UnifyRecurse<'unif, 's, T> + 's {
     /// You should declare a [Substitutor] field for each [UniCell]`<T>` you wish to support. Return it here.
     fn get_substitutor(&'unif self) -> &'unif Substitutor<'s, T, Self>;
+
+    /// Recursively call [Unifier::contains_subtree_recurse] on every contained [UniCell]`<T>`
+    /// If multiple substitutors are in play, then try to [Unifier::resolve] foreign [UniCell]`<F>` first,
+    /// and call [Unifier::contains_subtree_recurse] on any [UniCell]`<T>` found inside.
+    ///
+    /// `contains_subtree` is used to prevent infinite types.
+    fn contains_subtree(&'unif self, in_obj: &T, subtree: SubTree<T>) -> bool;
 
     /// Most fundamental operation of [Unifier]. This makes it so the left type, and the right type must be identical.
     /// This information is kept in a graph of unifications, and conflicting unifications will lead to [UnifyResult::Failure]
@@ -723,6 +745,53 @@ impl<'s, Unif: UnifierTop<'s>> DelayedConstraint<'s, Unif> {
 trait DelayedConstraintAcceptor<'s, Unif: UnifierTop<'s>> {
     fn add_delayed_constraint(&self, id: usize, constraint: Box<DelayedConstraint<'s, Unif>>);
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnifyResult {
+    Success,
+    Failure,
+    FailureInfiniteTypes,
+}
+impl UnifyResult {
+    pub fn unwrap(&self) {
+        assert_eq!(*self, UnifyResult::Success);
+    }
+    pub fn expect(&self, msg: &str) {
+        assert_eq!(*self, UnifyResult::Success, "{msg}");
+    }
+}
+impl BitAnd for UnifyResult {
+    type Output = UnifyResult;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        if rhs == UnifyResult::FailureInfiniteTypes {
+            UnifyResult::FailureInfiniteTypes
+        } else if self == UnifyResult::Success {
+            rhs
+        } else {
+            self
+        }
+    }
+}
+impl BitAndAssign for UnifyResult {
+    fn bitand_assign(&mut self, rhs: Self) {
+        if rhs == UnifyResult::FailureInfiniteTypes {
+            *self = UnifyResult::FailureInfiniteTypes;
+        } else if *self == UnifyResult::Success {
+            *self = rhs;
+        }
+    }
+}
+impl From<bool> for UnifyResult {
+    fn from(value: bool) -> Self {
+        if value {
+            UnifyResult::Success
+        } else {
+            UnifyResult::Failure
+        }
+    }
+}
+
 pub struct ResolveError<'unif, 's, Unif: UnifierTop<'s>> {
     subs: &'unif (dyn DelayedConstraintAcceptor<'s, Unif> + 's),
     id: usize,
@@ -907,12 +976,6 @@ impl<'unif, 's: 'unif> UnifyRecurse<'unif, 's, PeanoType> for PeanoUnifier<'s> {
             _ => UnifyResult::Failure,
         }
     }
-    fn contains_subtree(&'unif self, in_obj: &PeanoType, subtree: SubTree<PeanoType>) -> bool {
-        match in_obj {
-            PeanoType::Zero => false,
-            PeanoType::Succ(succ) => self.contains_subtree_recurse(succ, subtree),
-        }
-    }
     fn clone_known(&'unif self, known: &'s PeanoType) -> PeanoType {
         match known {
             PeanoType::Zero => PeanoType::Zero,
@@ -953,9 +1016,6 @@ impl<'unif, 's: 'unif> UnifyRecurse<'unif, 's, SecondType> for PeanoUnifier<'s> 
             _ => UnifyResult::Failure,
         }
     }
-    fn contains_subtree(&'unif self, _in_obj: &SecondType, _subtree: SubTree<SecondType>) -> bool {
-        false // SecondType doesn't recurse
-    }
     fn clone_known(&'unif self, known: &'s SecondType) -> SecondType {
         match known {
             SecondType::None => SecondType::None,
@@ -970,10 +1030,19 @@ impl<'unif, 's: 'unif> Unifier<'unif, 's, PeanoType> for PeanoUnifier<'s> {
     fn get_substitutor(&'unif self) -> &'unif Substitutor<'s, PeanoType, Self> {
         &self.peano_subs
     }
+    fn contains_subtree(&'unif self, in_obj: &PeanoType, subtree: SubTree<PeanoType>) -> bool {
+        match in_obj {
+            PeanoType::Zero => false,
+            PeanoType::Succ(succ) => self.contains_subtree_recurse(succ, subtree),
+        }
+    }
 }
 impl<'unif, 's: 'unif> Unifier<'unif, 's, SecondType> for PeanoUnifier<'s> {
     fn get_substitutor(&'unif self) -> &'unif Substitutor<'s, SecondType, Self> {
         &self.second_subs
+    }
+    fn contains_subtree(&'unif self, _in_obj: &SecondType, _subtree: SubTree<SecondType>) -> bool {
+        false // SecondType doesn't recurse
     }
 }
 
@@ -1456,7 +1525,7 @@ mod tests {
             }
         }
 
-        for _ in 0..1000 {
+        for _ in 0..cells.len() {
             match rng.random_range(0..5) {
                 0 => {
                     // Add a computed successor
