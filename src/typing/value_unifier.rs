@@ -89,8 +89,8 @@ impl<'unif, 's: 'unif> UnifyRecurse<'unif, 's, Value> for ValueUnifier<'s> {
         check_values_equal(a, b)
     }
 
-    fn set_subtrees(&'unif self, a: &'s Value, b: Value) -> UnifyResult {
-        check_values_equal(a, &b)
+    fn set_subtrees(&'unif self, a: &'s Value, b: &mut Value) -> UnifyResult {
+        check_values_equal(a, b)
     }
 
     fn clone_known(&'unif self, known: &'s Value) -> Value {
@@ -169,7 +169,9 @@ impl<'s> ValueUnifier<'s> {
             if var_sources.target.get().is_none() {
                 self.delayed_constraint(move |unifier| {
                     let mut source_iter = var_sources.sources.iter();
-                    let mut common_subtype = unifier.resolve(source_iter.next().unwrap())?.unwrap_integer();
+                    let mut common_subtype = unifier
+                        .resolve(source_iter.next().unwrap())?
+                        .unwrap_integer();
 
                     for source in source_iter {
                         let v = unifier.resolve(*source)?.unwrap_integer();
@@ -184,9 +186,8 @@ impl<'s> ValueUnifier<'s> {
                         }
                     }
 
-                    unifier
-                        .set(var_sources.target, Value::Integer(common_subtype.clone()))
-                        .expect("Values used in subtyping relations are always resolved in a forward direction (so a value b that depends on value a only gets resolved after a is resolved) That's why we can safely assert");
+                    // Values used in subtyping relations are always resolved in a forward direction (so a value b that depends on value a only gets resolved after a is resolved) That's why we can safely assert
+                    unifier.set_unwrap(var_sources.target, Value::Integer(common_subtype.clone()));
                     Ok(())
                 });
             }

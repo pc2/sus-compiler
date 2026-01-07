@@ -84,6 +84,9 @@ impl<T> UniCell<T> {
     pub const fn from_known(known: T) -> Self {
         Self(UnsafeCell::new(Interior::Known(known)))
     }
+    pub fn new(known: impl Into<T>) -> Self {
+        Self(UnsafeCell::new(Interior::Known(known.into())))
+    }
 
     /// Either get a shared reference to the known value if it's set, or a mutable reference to the whole thing if it's not yet known
     /// This is safe, because [UniCell] only allows references to [Interior::Known] once it is set, and it can never be unset through a shared ref
@@ -101,6 +104,7 @@ impl<T> UniCell<T> {
     /// Panics if [Unifier::unify] has ever been called on this
     ///
     /// So only allowed if [Self::get] is `None`
+    #[track_caller]
     fn set_interior(&self, existing_id: Option<usize>, v: Interior<T>) {
         match self.get_interior() {
             Ok(_known) => {
@@ -136,11 +140,13 @@ impl<T> UniCell<T> {
     }
 
     /// `self` must be [UniCell::UNKNOWN]
+    #[track_caller]
     pub fn set_initial(&self, v: T) {
         self.set_interior(None, Interior::Known(v));
     }
 
     /// `self` must be [UniCell::UNKNOWN]
+    #[track_caller]
     pub fn set_initial_cell(&self, v: UniCell<T>) {
         self.set_interior(None, v.0.into_inner());
     }
@@ -473,9 +479,11 @@ pub trait UnifyRecurse<'unif, 's: 'unif, T>: SubstituteRecurse<'unif, 's, T> + '
     ///
     /// Recursively call [Unifier::set_cell] on every contained [UniCell]`<*>`
     ///
-    /// Should check if two Knowns are the same (if not, return [UnifyResult::Failure]),
-    /// If they are the same, then call [Unifier::set_cell] recursively.
-    fn set_subtrees(&'unif self, a: &'s T, b: T) -> UnifyResult;
+    /// Should check if two Knowns are compatible (if not, return [UnifyResult::Failure]),
+    /// If they are compatible, then call [Unifier::set_cell] recursively.
+    ///
+    /// This may steal interior [UniCell]s of `b`, and replace them with [Unifier::clone_unify]d copies of `a`
+    fn set_subtrees(&'unif self, a: &'s T, b: &mut T) -> UnifyResult;
     /// Create a clone of T, tolerant of as-yet-unknown variables.
     ///
     /// To implement, do not use regular [Clone], rather, clone nested [UniCell]`<*>` with [Unifier::clone_unify].
@@ -486,8 +494,8 @@ pub trait UnifyRecurse<'unif, 's: 'unif, T>: SubstituteRecurse<'unif, 's, T> + '
 /// - [SubstituteRecurse::fully_substitute_recurse]
 /// - [UnifyRecurse::unify_subtrees]
 /// - [UnifyRecurse::set_subtrees]
-/// - [UnifyRecurse::contains_subtree]
 /// - [UnifyRecurse::clone_known]
+/// - [Unifier::contains_subtree]
 /// - [Unifier::get_substitutor]
 /// - [UnifierTop::execute_ready_constraints]
 ///
@@ -572,40 +580,54 @@ pub trait Unifier<'unif, 's: 'unif, T: 's>: UnifyRecurse<'unif, 's, T> + 's {
     }
     /// Basically the same as [Unifier::unify], but with the second argument an owned object.
     /// This allows you to inject new Ts into the substitution graph.
-    fn set_cell(&'unif self, cell: &'s UniCell<T>, to: UniCell<T>) -> UnifyResult {
+    ///
+    /// This may steal interior [UniCell]s of `to`, and replace them with [Unifier::clone_unify]d copies of `cell`
+    ///
+    /// Afterwards, `to` is still equivalent to the original `to`, and can be used for error reporting.
+    fn set(&'unif self, cell: &'s UniCell<T>, to: &mut UniCell<T>) -> UnifyResult {
         let subs = self.get_substitutor();
-        match to.0.into_inner() {
-            Interior::Known(to) => match cell.get_interior() {
-                Ok(known) => self.set_subtrees(known, to),
+        match to.0.get_mut() {
+            Interior::Known(tok) => match cell.get_interior() {
+                Ok(known) => self.set_subtrees(known, tok),
                 Err(Some(id)) => {
                     let (known, last_cell, last_id) = subs.resolve_chain(id);
                     if let Some(known) = known {
-                        self.set_subtrees(known, to)
-                    } else if self.contains_subtree(&to, SubTree(last_id, PhantomData)) {
+                        self.set_subtrees(known, tok)
+                    } else if self.contains_subtree(tok, SubTree(last_id, PhantomData)) {
                         UnifyResult::FailureInfiniteTypes
                     } else {
-                        last_cell.set_interior(Some(last_id), Interior::Known(to));
+                        // Steal `to`'s contents, and replace with a `SubstituteTo(last_cell)`
+                        let stolen_to = std::mem::replace(to, UniCell::UNKNOWN);
+                        last_cell.set_interior(Some(last_id), stolen_to.0.into_inner());
+                        to.set_interior(None, Interior::SubstitutesTo(last_id));
                         let constraints = subs.take_constraints_from(last_id);
                         subs.add_ready_constraints(constraints);
                         UnifyResult::Success
                     }
                 }
                 Err(None) => {
-                    cell.set_interior(None, Interior::Known(to));
+                    // Steal `to`'s contents, and replace with a `SubstituteTo(cell)`
+                    let stolen_to = std::mem::replace(to, UniCell::UNKNOWN);
+                    cell.set_interior(None, stolen_to.0.into_inner());
+                    subs.alloc(cell, to);
                     UnifyResult::Success
                 }
             },
             Interior::SubstitutesTo(to_id) => {
-                let (_known, last_cell, _last_id) = subs.resolve_chain(to_id);
+                let (_known, last_cell, _last_id) = subs.resolve_chain(*to_id);
                 self.unify(cell, last_cell)
             }
             // Unifying with an anonymous variable always succeeds, of course
             Interior::Unallocated => UnifyResult::Success,
         }
     }
-    /// Wrapper around [Unifier::set_cell], for Known [UniCell]
-    fn set(&'unif self, cell: &'s UniCell<T>, to: impl Into<T>) -> UnifyResult {
-        self.set_cell(cell, UniCell(UnsafeCell::new(Interior::Known(to.into()))))
+    /// Wrapper around [Unifier::set], for Known [UniCell]
+    fn set_unwrap(&'unif self, cell: &'s UniCell<T>, to: impl Into<T>) {
+        self.set(
+            cell,
+            &mut UniCell(UnsafeCell::new(Interior::Known(to.into()))),
+        )
+        .unwrap();
     }
     /// Shorthand for creating a [UniCell::UNKNOWN], and then [Unifier::unify]-ing with `obj`.
     ///
@@ -969,10 +991,10 @@ impl<'unif, 's: 'unif> UnifyRecurse<'unif, 's, PeanoType> for PeanoUnifier<'s> {
             _ => UnifyResult::Failure,
         }
     }
-    fn set_subtrees(&'unif self, a: &'s PeanoType, b: PeanoType) -> UnifyResult {
+    fn set_subtrees(&'unif self, a: &'s PeanoType, b: &mut PeanoType) -> UnifyResult {
         match (a, b) {
             (PeanoType::Zero, PeanoType::Zero) => UnifyResult::Success,
-            (PeanoType::Succ(a), PeanoType::Succ(b)) => self.set_cell(a, *b),
+            (PeanoType::Succ(a), PeanoType::Succ(b)) => self.set(a, b),
             _ => UnifyResult::Failure,
         }
     }
@@ -1006,12 +1028,12 @@ impl<'unif, 's: 'unif> UnifyRecurse<'unif, 's, SecondType> for PeanoUnifier<'s> 
             _ => UnifyResult::Failure,
         }
     }
-    fn set_subtrees(&'unif self, a: &'s SecondType, b: SecondType) -> UnifyResult {
+    fn set_subtrees(&'unif self, a: &'s SecondType, b: &mut SecondType) -> UnifyResult {
         match (a, b) {
             (SecondType::None, SecondType::None) => UnifyResult::Success,
-            (SecondType::OnePeano(a), SecondType::OnePeano(b)) => self.set_cell(a, b),
+            (SecondType::OnePeano(a), SecondType::OnePeano(b)) => self.set(a, b),
             (SecondType::TwoPeano(a1, a2), SecondType::TwoPeano(b1, b2)) => {
-                self.set_cell(a1, b1) & self.set_cell(a2, b2)
+                self.set(a1, b1) & self.set(a2, b2)
             }
             _ => UnifyResult::Failure,
         }
@@ -1120,14 +1142,12 @@ mod tests {
         let a = PeanoType::UNKNOWN;
         let three_plus_a = PeanoType::UNKNOWN;
 
-        let substitutor = PeanoUnifier::new();
-        substitutor
-            .set(&three_plus_a, add_to(substitutor.clone_unify(&a), 3))
-            .unwrap();
+        let unifier = PeanoUnifier::new();
+        three_plus_a.set_initial(add_to(unifier.clone_unify(&a), 3));
 
-        substitutor.unify(&four, &three_plus_a).unwrap();
+        unifier.unify(&four, &three_plus_a).unwrap();
 
-        substitutor.fully_substitute(&a).unwrap();
+        unifier.fully_substitute(&a).unwrap();
 
         assert_eq!(a.unwrap().count(), 1)
     }
@@ -1137,30 +1157,28 @@ mod tests {
         let a = PeanoType::UNKNOWN;
         let a_plus_zero = PeanoType::UNKNOWN;
 
-        let substitutor = PeanoUnifier::new();
-        substitutor
-            .set_cell(&a_plus_zero, add_to_cell(substitutor.clone_unify(&a), 0))
-            .unwrap();
+        let unifier = PeanoUnifier::new();
+        a_plus_zero.set_initial_cell(add_to_cell(unifier.clone_unify(&a), 0));
 
-        substitutor.unify(&a, &a_plus_zero).unwrap();
-        substitutor.unify(&a_plus_zero, &a).unwrap();
+        unifier.unify(&a, &a_plus_zero).unwrap();
+        unifier.unify(&a_plus_zero, &a).unwrap();
 
         // a and a_plus_zero should both still have a type variable.
-        assert!(substitutor.fully_substitute(&a).is_err());
-        assert!(substitutor.fully_substitute(&a_plus_zero).is_err());
+        assert!(unifier.fully_substitute(&a).is_err());
+        assert!(unifier.fully_substitute(&a_plus_zero).is_err());
     }
 
     #[test]
     fn test_invalid_unification() {
         let three = mk_peano_cell(3);
         let four = mk_peano_cell(4);
-        let substitutor = PeanoUnifier::new();
+        let unifier = PeanoUnifier::new();
 
-        assert_eq!(substitutor.unify(&three, &four), UnifyResult::Failure);
-        assert_eq!(substitutor.unify(&four, &three), UnifyResult::Failure);
+        assert_eq!(unifier.unify(&three, &four), UnifyResult::Failure);
+        assert_eq!(unifier.unify(&four, &three), UnifyResult::Failure);
 
-        substitutor.fully_substitute(&three).unwrap();
-        substitutor.fully_substitute(&four).unwrap();
+        unifier.fully_substitute(&three).unwrap();
+        unifier.fully_substitute(&four).unwrap();
     }
 
     #[test]
@@ -1168,23 +1186,21 @@ mod tests {
         let a = PeanoType::UNKNOWN;
         let a_plus_one = PeanoType::UNKNOWN;
 
-        let substitutor = PeanoUnifier::new();
-        substitutor
-            .set(&a_plus_one, add_to(substitutor.clone_unify(&a), 1))
-            .unwrap();
+        let unifier = PeanoUnifier::new();
+        a_plus_one.set_initial(add_to(unifier.clone_unify(&a), 1));
 
         // Both of these try to unify a = a + 1, which would lead to an infinite tower of +1s
         assert_eq!(
-            substitutor.unify(&a, &a_plus_one),
+            unifier.unify(&a, &a_plus_one),
             UnifyResult::FailureInfiniteTypes
         );
         assert_eq!(
-            substitutor.unify(&a_plus_one, &a),
+            unifier.unify(&a_plus_one, &a),
             UnifyResult::FailureInfiniteTypes
         );
 
-        assert!(substitutor.fully_substitute(&a).is_err());
-        assert!(substitutor.fully_substitute(&a_plus_one).is_err());
+        assert!(unifier.fully_substitute(&a).is_err());
+        assert!(unifier.fully_substitute(&a_plus_one).is_err());
     }
 
     #[test]
@@ -1194,15 +1210,11 @@ mod tests {
         let one_plus_three = PeanoType::UNKNOWN;
         let two_plus_two = PeanoType::UNKNOWN;
 
-        let substitutor = PeanoUnifier::new();
-        substitutor
-            .set(&one_plus_three, add_to(substitutor.clone_unify(&one), 3))
-            .unwrap();
-        substitutor
-            .set(&two_plus_two, add_to(substitutor.clone_unify(&two), 2))
-            .unwrap();
+        let unifier = PeanoUnifier::new();
+        one_plus_three.set_initial(add_to(unifier.clone_unify(&one), 3));
+        two_plus_two.set_initial(add_to(unifier.clone_unify(&two), 2));
         // 2+2 == 1+3
-        substitutor.unify(&two_plus_two, &one_plus_three).unwrap();
+        unifier.unify(&two_plus_two, &one_plus_three).unwrap();
     }
 
     #[test]
@@ -1218,25 +1230,19 @@ mod tests {
         let y_val = PeanoType::UNKNOWN;
         let z_val = PeanoType::UNKNOWN;
 
-        let substitutor = PeanoUnifier::new();
-        substitutor
-            .set(&x_plus_2, add_to(substitutor.clone_unify(&x), 2))
-            .unwrap();
-        substitutor
-            .set(&y_val, add_to(substitutor.clone_unify(&x), 1))
-            .unwrap();
-        substitutor
-            .set(&z_val, add_to(substitutor.clone_unify(&y), 1))
-            .unwrap();
+        let unifier = PeanoUnifier::new();
+        x_plus_2.set_initial(add_to(unifier.clone_unify(&x), 2));
+        y_val.set_initial(add_to(unifier.clone_unify(&x), 1));
+        z_val.set_initial(add_to(unifier.clone_unify(&y), 1));
 
         // Unify y with x+1, z with y+1, and z with x+2
-        substitutor.unify(&y, &y_val).unwrap();
-        substitutor.unify(&z, &z_val).unwrap();
-        substitutor.unify(&z, &x_plus_2).unwrap();
+        unifier.unify(&y, &y_val).unwrap();
+        unifier.unify(&z, &z_val).unwrap();
+        unifier.unify(&z, &x_plus_2).unwrap();
 
-        substitutor.fully_substitute(&x).unwrap();
-        substitutor.fully_substitute(&y).unwrap();
-        substitutor.fully_substitute(&z).unwrap();
+        unifier.fully_substitute(&x).unwrap();
+        unifier.fully_substitute(&y).unwrap();
+        unifier.fully_substitute(&z).unwrap();
 
         assert_eq!(x.unwrap().count(), 0);
         assert_eq!(y.unwrap().count(), 1);
@@ -1254,20 +1260,16 @@ mod tests {
         let b_val = PeanoType::UNKNOWN;
         let c_val = PeanoType::UNKNOWN;
 
-        let substitutor = PeanoUnifier::new();
-        substitutor
-            .set(&b_val, add_to(substitutor.clone_unify(&a), 2))
-            .unwrap();
-        substitutor
-            .set(&c_val, add_to(substitutor.clone_unify(&b), 1))
-            .unwrap();
+        let unifier = PeanoUnifier::new();
+        b_val.set_initial(add_to(unifier.clone_unify(&a), 2));
+        c_val.set_initial(add_to(unifier.clone_unify(&b), 1));
 
-        substitutor.unify(&b, &b_val).unwrap();
-        substitutor.unify(&c, &c_val).unwrap();
+        unifier.unify(&b, &b_val).unwrap();
+        unifier.unify(&c, &c_val).unwrap();
 
-        substitutor.fully_substitute(&a).unwrap();
-        substitutor.fully_substitute(&b).unwrap();
-        substitutor.fully_substitute(&c).unwrap();
+        unifier.fully_substitute(&a).unwrap();
+        unifier.fully_substitute(&b).unwrap();
+        unifier.fully_substitute(&c).unwrap();
 
         assert_eq!(a.unwrap().count(), 0);
         assert_eq!(b.unwrap().count(), 2);
@@ -1280,25 +1282,23 @@ mod tests {
         let b = PeanoType::UNKNOWN;
         let c = PeanoType::UNKNOWN;
 
-        let substitutor = PeanoUnifier::new();
+        let unifier = PeanoUnifier::new();
 
-        substitutor.delayed_constraint(|substitutor| {
-            substitutor.fully_substitute(&a)?;
-            substitutor.fully_substitute(&b)?;
+        unifier.delayed_constraint(|unifier| {
+            unifier.fully_substitute(&a)?;
+            unifier.fully_substitute(&b)?;
 
-            substitutor
-                .set(&c, mk_peano(a.unwrap().count() + b.unwrap().count()))
-                .unwrap();
+            unifier.set_unwrap(&c, mk_peano(a.unwrap().count() + b.unwrap().count()));
 
             Ok(())
         });
 
-        substitutor.set(&a, mk_peano(3)).unwrap();
-        substitutor.set(&b, mk_peano(4)).unwrap();
+        unifier.set_unwrap(&a, mk_peano(3));
+        unifier.set_unwrap(&b, mk_peano(4));
 
-        substitutor.execute_ready_constraints();
+        unifier.execute_ready_constraints();
 
-        substitutor.fully_substitute(&c).unwrap();
+        unifier.fully_substitute(&c).unwrap();
 
         assert_eq!(c.unwrap().count(), 7);
     }
@@ -1322,14 +1322,14 @@ mod tests {
 
         idxes.shuffle(&mut rng);
 
-        let substitutor = PeanoUnifier::new();
+        let unifier = PeanoUnifier::new();
 
         for (nth, idx) in idxes.into_iter().enumerate() {
             println!("{nth}th unify is idx {idx}");
             let cur = &cells[idx];
             if idx == 0 {
                 // Large initial value, such that we can be reasonably certain that it's always possible to subtract by unifying.
-                substitutor.set(cur, mk_peano(INITIAL_PEANO)).unwrap();
+                unifier.set_unwrap(cur, mk_peano(INITIAL_PEANO));
                 deltas.borrow_mut()[idx] = INITIAL_PEANO as i64;
             } else {
                 let prev = &cells[idx - 1];
@@ -1337,22 +1337,20 @@ mod tests {
                 // Roughly balance the positive & negative deltas
                 match rng.random_range(0..6) {
                     0 => {
-                        substitutor.unify(cur, prev).unwrap();
+                        unifier.unify(cur, prev).unwrap();
                         deltas.borrow_mut()[idx] = 0;
                     }
                     1 => {
-                        substitutor
-                            .set_cell(cur, substitutor.clone_unify(prev))
-                            .unwrap();
+                        unifier.set(cur, &mut unifier.clone_unify(prev)).unwrap();
                         deltas.borrow_mut()[idx] = 0;
                     }
                     2 => {
                         let selected_amount: i64 = rng.random_range(0..=4);
-                        substitutor
-                            .set_cell(
+                        unifier
+                            .set(
                                 cur,
-                                add_to_cell(
-                                    substitutor.clone_unify(prev),
+                                &mut add_to_cell(
+                                    unifier.clone_unify(prev),
                                     selected_amount as usize,
                                 ),
                             )
@@ -1361,25 +1359,28 @@ mod tests {
                     }
                     3 => {
                         let selected_amount: i64 = rng.random_range(0..=4);
-                        substitutor
-                            .set_cell(
+                        unifier
+                            .set(
                                 prev,
-                                add_to_cell(substitutor.clone_unify(cur), selected_amount as usize),
+                                &mut add_to_cell(
+                                    unifier.clone_unify(cur),
+                                    selected_amount as usize,
+                                ),
                             )
                             .unwrap(); // Very unlikely to fail, since we start at a large value. (INITIAL_PEANO)
                         deltas.borrow_mut()[idx] = -selected_amount;
                     }
                     4 => {
                         let delta = rng.random_range(0..=4);
-                        substitutor.delayed_constraint(move |substitutor| {
+                        unifier.delayed_constraint(move |unifier| {
                             let mut prev = prev;
                             for _ in 0..delta {
                                 // Very unlikely to fail, since we start at a large value. (INITIAL_PEANO)
-                                let_unwrap!(PeanoType::Succ(prev_prev), substitutor.resolve(prev)?);
+                                let_unwrap!(PeanoType::Succ(prev_prev), unifier.resolve(prev)?);
                                 prev = prev_prev;
                             }
                             // Very unlikely to fail, since we start at a large value. (INITIAL_PEANO)
-                            substitutor.unify(cur, prev).unwrap();
+                            unifier.unify(cur, prev).unwrap();
                             Ok(())
                         });
                         deltas.borrow_mut()[idx] = -delta;
@@ -1387,8 +1388,8 @@ mod tests {
                     5 => {
                         let delta: i64 = rng.random_range(-4..=4);
                         let deltas = &deltas;
-                        substitutor.delayed_constraint(move |substitutor| {
-                            substitutor.fully_substitute(prev)?;
+                        unifier.delayed_constraint(move |unifier| {
+                            unifier.fully_substitute(prev)?;
 
                             let prev_count = prev.unwrap().count();
 
@@ -1401,13 +1402,13 @@ mod tests {
                             ) as usize;
                             deltas.borrow_mut()[idx] = new_count as i64 - prev_count as i64;
 
-                            substitutor.set(cur, mk_peano(new_count)).unwrap();
+                            unifier.set_unwrap(cur, mk_peano(new_count));
                             Ok(())
                         });
                     }
                     _ => unreachable!(),
                 }
-                substitutor.execute_ready_constraints();
+                unifier.execute_ready_constraints();
             }
         }
 
@@ -1428,9 +1429,9 @@ mod tests {
             let idx_b = rng.random_range(0..NUM_PEANOS);
 
             let unify_result = if rng.random_bool(0.5) {
-                substitutor.unify(&cells[idx_a], &cells[idx_b])
+                unifier.unify(&cells[idx_a], &cells[idx_b])
             } else {
-                substitutor.set_cell(&cells[idx_a], substitutor.clone_unify(&cells[idx_b]))
+                unifier.set(&cells[idx_a], &mut unifier.clone_unify(&cells[idx_b]))
             };
             if expecteds[idx_a] == expecteds[idx_b] {
                 unify_result.unwrap();
@@ -1441,7 +1442,7 @@ mod tests {
 
         // Finally, let's fully_substitute them, and actually count that they are correct
         for idx in 0..NUM_PEANOS {
-            substitutor.fully_substitute(&cells[idx]).unwrap();
+            unifier.fully_substitute(&cells[idx]).unwrap();
             assert_eq!(cells[idx].unwrap().count(), expecteds[idx] as usize);
             println!("peanos[{idx}]: {}", expecteds[idx]);
         }
@@ -1451,16 +1452,16 @@ mod tests {
     fn test_longer_chain() {
         for i in 0..4 {
             let peanos = [PeanoType::UNKNOWN; 4];
-            let substitutor = PeanoUnifier::new();
+            let unifier = PeanoUnifier::new();
 
-            substitutor.unify(&peanos[0], &peanos[1]).unwrap();
-            substitutor.unify(&peanos[2], &peanos[3]).unwrap();
-            substitutor.unify(&peanos[0], &peanos[3]).unwrap();
+            unifier.unify(&peanos[0], &peanos[1]).unwrap();
+            unifier.unify(&peanos[2], &peanos[3]).unwrap();
+            unifier.unify(&peanos[0], &peanos[3]).unwrap();
 
-            substitutor.set(&peanos[i], PeanoType::Zero).unwrap();
+            unifier.set_unwrap(&peanos[i], PeanoType::Zero);
 
             for p in &peanos {
-                assert_eq!(substitutor.resolve(p).unwrap().count(), 0);
+                assert_eq!(unifier.resolve(p).unwrap().count(), 0);
             }
         }
     }
@@ -1470,25 +1471,14 @@ mod tests {
         let a = SecondType::UNKNOWN;
         let b = SecondType::UNKNOWN;
 
-        let substitutor = PeanoUnifier::new();
+        let unifier = PeanoUnifier::new();
+        a.set_initial(SecondType::TwoPeano(mk_peano_cell(1), PeanoType::UNKNOWN));
+        b.set_initial(SecondType::TwoPeano(PeanoType::UNKNOWN, mk_peano_cell(2)));
 
-        substitutor
-            .set(
-                &a,
-                SecondType::TwoPeano(mk_peano_cell(1), PeanoType::UNKNOWN),
-            )
-            .unwrap();
-        substitutor
-            .set(
-                &b,
-                SecondType::TwoPeano(PeanoType::UNKNOWN, mk_peano_cell(2)),
-            )
-            .unwrap();
+        unifier.unify(&a, &b).unwrap();
 
-        substitutor.unify(&a, &b).unwrap();
-
-        substitutor.fully_substitute(&a).unwrap();
-        substitutor.fully_substitute(&b).unwrap();
+        unifier.fully_substitute(&a).unwrap();
+        unifier.fully_substitute(&b).unwrap();
 
         let_unwrap!(SecondType::TwoPeano(a1, a2), a.unwrap());
         let_unwrap!(SecondType::TwoPeano(b1, b2), b.unwrap());
@@ -1507,7 +1497,7 @@ mod tests {
         // Create a bunch of unknowns
         let cells: Vec<UniCell<PeanoType>> = (0..1000).map(|_| PeanoType::UNKNOWN).collect();
 
-        let substitutor = PeanoUnifier::new();
+        let unifier = PeanoUnifier::new();
 
         // Randomly set some initial values
         for cell in cells.iter().take(100) {
@@ -1531,9 +1521,9 @@ mod tests {
                     // Add a computed successor
                     let ontu = cells.choose(&mut rng).unwrap();
                     let add_count = rng.random_range(0..5);
-                    let new_cell = add_to_cell(substitutor.clone_unify(ontu), add_count);
+                    let mut new_cell = add_to_cell(unifier.clone_unify(ontu), add_count);
                     // May fail, may not fail
-                    let _may_fail = substitutor.set_cell(cells.choose(&mut rng).unwrap(), new_cell);
+                    let _may_fail = unifier.set(cells.choose(&mut rng).unwrap(), &mut new_cell);
                 }
                 1 => {
                     // Unify two peanos
@@ -1541,13 +1531,13 @@ mod tests {
                     let b = cells.choose(&mut rng).unwrap();
 
                     // May fail, may not fail
-                    let _may_fail = substitutor.unify(a, b);
+                    let _may_fail = unifier.unify(a, b);
                 }
                 2 => {
                     // Fully substitute something
                     let a = cells.choose(&mut rng).unwrap();
 
-                    if substitutor.fully_substitute(a).is_ok() {
+                    if unifier.fully_substitute(a).is_ok() {
                         // Can clone values after a successful substitute
                         let _a_clone = a.clone();
                     }
@@ -1556,11 +1546,13 @@ mod tests {
                     let a = cells.choose(&mut rng).unwrap();
                     let b = cells.choose(&mut rng).unwrap();
                     let c = cells.choose(&mut rng).unwrap();
-                    substitutor.delayed_constraint(move |substitutor| {
-                        substitutor.fully_substitute(a)?;
-                        substitutor.fully_substitute(b)?;
-                        let _may_fail =
-                            substitutor.set(c, mk_peano(a.unwrap().count() + b.unwrap().count()));
+                    unifier.delayed_constraint(move |unifier| {
+                        unifier.fully_substitute(a)?;
+                        unifier.fully_substitute(b)?;
+                        let _may_fail = unifier.set(
+                            c,
+                            &mut UniCell::new(mk_peano(a.unwrap().count() + b.unwrap().count())),
+                        );
                         Ok(())
                     });
                 }
@@ -1568,15 +1560,15 @@ mod tests {
                     let a = cells.choose(&mut rng).unwrap();
                     let b = cells.choose(&mut rng).unwrap();
                     let c = cells.choose(&mut rng).unwrap();
-                    substitutor.delayed_constraint(move |substitutor| {
-                        let a = substitutor.resolve(a)?;
-                        let b = substitutor.resolve(b)?;
+                    unifier.delayed_constraint(move |unifier| {
+                        let a = unifier.resolve(a)?;
+                        let b = unifier.resolve(b)?;
                         if let PeanoType::Zero = a
                             && let PeanoType::Zero = b
                         {
-                            let _may_fail = substitutor.set(c, mk_peano(1));
+                            let _may_fail = unifier.set(c, &mut UniCell::new(mk_peano(1)));
                         } else {
-                            let _may_fail = substitutor.set_cell(c, mk_peano_at_least(1));
+                            let _may_fail = unifier.set(c, &mut mk_peano_at_least(1));
                         }
                         Ok(())
                     });
@@ -1584,7 +1576,7 @@ mod tests {
                 _ => unreachable!(),
             }
 
-            substitutor.execute_ready_constraints();
+            unifier.execute_ready_constraints();
         }
     }
 }

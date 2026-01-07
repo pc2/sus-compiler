@@ -56,7 +56,7 @@ pub fn co_walk_path<'inst>(
                 b = new_b;
 
                 // Is checked in final_checks
-                let _ = unifier.set(b_sz, width.clone());
+                let _ = unifier.set(b_sz, &mut UniCell::new(width.clone()));
             }
             RealWirePathElem::Slice { bounds, .. } => {
                 let (new_a, a_sz) = a.unwrap_array();
@@ -67,21 +67,21 @@ pub fn co_walk_path<'inst>(
                 match bounds {
                     PartialBound::Known(from, to) => {
                         // Is checked in final_checks
-                        let _ = unifier.set(b_sz, to - from);
+                        let _ = unifier.set(b_sz, &mut UniCell::new(to - from));
                     }
                     PartialBound::From(from) => {
                         unifier.delayed_constraint(move |unifier| {
                             let a_sz = unifier.resolve(a_sz)?.unwrap_integer();
                             // TODO #88, Slices of variable base offset
                             // Is checked in final_checks
-                            let _ = unifier.set(b_sz, a_sz - from);
+                            let _ = unifier.set(b_sz, &mut UniCell::new(a_sz - from));
                             Ok(())
                         });
                     }
                     PartialBound::To(to) => {
                         // TODO #88, Slices of variable base offset
                         // Is checked in final_checks
-                        let _ = unifier.set(b_sz, to.clone());
+                        let _ = unifier.set(b_sz, &mut UniCell::new(to.clone()));
                     }
                     PartialBound::WholeSlice => {
                         // Is checked in final_checks
@@ -114,8 +114,8 @@ fn set_min_max_with_min_max<'inst>(
             max = p;
         }
     }
-    unifier.set(out_bounds.from, min).unwrap();
-    unifier.set(out_bounds.to, max + 1).unwrap();
+    unifier.set_unwrap(out_bounds.from, min);
+    unifier.set_unwrap(out_bounds.to, max + 1);
 }
 
 /// Combine both mutable context elements into a single struct, to avoid <https://github.com/someguynamedjosh/ouroboros/issues/138>
@@ -293,7 +293,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 }));
 
                 // The output's size cannot have already been unified, this is the first time we see it
-                unifier.set(arr_sz, IBig::from(array_wires.len())).unwrap();
+                unifier.set_unwrap(arr_sz, IBig::from(array_wires.len()));
             }
             // type is already set when the wire was created
             RealWireDataSource::Constant { value: _ } => {}
@@ -327,12 +327,12 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 // 4:7 -> -6:-3
                 unifier.delayed_constraint(|unifier| {
                     let to = unifier.resolve(to)?.unwrap_integer();
-                    unifier.set(out.from, 1 - to).unwrap();
+                    unifier.set_unwrap(out.from, 1 - to);
                     Ok(())
                 });
                 unifier.delayed_constraint(|unifier| {
                     let from = unifier.resolve(from)?.unwrap_integer();
-                    unifier.set(out.to, 1 - from).unwrap();
+                    unifier.set_unwrap(out.to, 1 - from);
                     Ok(())
                 });
             }
@@ -344,13 +344,13 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 unifier.delayed_constraint(|unifier| {
                     let from = unifier.resolve(from)?.unwrap_integer();
                     let sz = unifier.resolve(sz)?.unwrap_integer();
-                    unifier.set(out.from, from * sz).unwrap();
+                    unifier.set_unwrap(out.from, from * sz);
                     Ok(())
                 });
                 unifier.delayed_constraint(|unifier| {
                     let to = unifier.resolve(to)?.unwrap_integer();
                     let sz = unifier.resolve(sz)?.unwrap_integer();
-                    unifier.set(out.to, (to - 1) * sz + 1).unwrap();
+                    unifier.set_unwrap(out.to, (to - 1) * sz + 1);
                     Ok(())
                 });
             }
@@ -363,7 +363,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     let from = unifier.resolve(from)?.unwrap_integer();
                     let sz = unifier.resolve(sz)?.unwrap_integer();
                     let sz = usize::try_from(sz).unwrap();
-                    unifier.set(out.from, from.pow(sz)).unwrap();
+                    unifier.set_unwrap(out.from, from.pow(sz));
                     Ok(())
                 });
                 unifier.delayed_constraint(|unifier| {
@@ -371,7 +371,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     let sz = unifier.resolve(sz)?.unwrap_integer();
                     let sz = usize::try_from(sz).unwrap();
                     let max: IBig = to - 1;
-                    unifier.set(out.to, max.pow(sz) + 1).unwrap();
+                    unifier.set_unwrap(out.to, max.pow(sz) + 1);
                     Ok(())
                 });
             }
@@ -401,13 +401,13 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 unifier.delayed_constraint(move |unifier| {
                     let lf = unifier.resolve(lf)?.unwrap_integer();
                     let rf = unifier.resolve(rf)?.unwrap_integer();
-                    unifier.set(out.from, lf + rf).unwrap();
+                    unifier.set_unwrap(out.from, lf + rf);
                     Ok(())
                 });
                 unifier.delayed_constraint(move |unifier| {
                     let lt = unifier.resolve(lt)?.unwrap_integer();
                     let rt = unifier.resolve(rt)?.unwrap_integer();
-                    unifier.set(out.to, lt + rt - 1).unwrap();
+                    unifier.set_unwrap(out.to, lt + rt - 1);
                     Ok(())
                 });
             }
@@ -418,13 +418,13 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 unifier.delayed_constraint(move |unifier| {
                     let lf = unifier.resolve(lf)?.unwrap_integer();
                     let rt = unifier.resolve(rt)?.unwrap_integer();
-                    unifier.set(out.from, lf - (rt - 1)).unwrap();
+                    unifier.set_unwrap(out.from, lf - (rt - 1));
                     Ok(())
                 });
                 unifier.delayed_constraint(move |unifier| {
                     let lt = unifier.resolve(lt)?.unwrap_integer();
                     let rf = unifier.resolve(rf)?.unwrap_integer();
-                    unifier.set(out.to, lt - rf).unwrap();
+                    unifier.set_unwrap(out.to, lt - rf);
                     Ok(())
                 });
             }
@@ -503,8 +503,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
 
                     let ot = lt.clone().clamp(IBig::from(1), remainder_max.clone());
                     let of = lf.clone().clamp(-remainder_max + 1, IBig::from(0));
-                    unifier.set(out.from, of).unwrap();
-                    unifier.set(out.to, ot).unwrap();
+                    unifier.set_unwrap(out.from, of);
+                    unifier.set_unwrap(out.to, ot);
                     Ok(())
                 });
             }
@@ -512,7 +512,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 let _ = left_root.unwrap_int_bounds_unknown();
                 let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
                 let out = out_root.unwrap_int_bounds_unknown();
-                unifier.set(out.from, IBig::from(0)).unwrap();
+                unifier.set_unwrap(out.from, IBig::from(0));
                 unifier.delayed_constraint(move |unifier| {
                     let rf = unifier.resolve(rf)?.unwrap_integer();
                     let rt = unifier.resolve(rt)?.unwrap_integer();
@@ -524,7 +524,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         self.errors.error(span, format!("Modulus must be strictly positive, right argument bounds are {right_bounds}"));
                         return Ok(());
                     }
-                    unifier.set(out.to, rt - 1).unwrap();
+                    unifier.set_unwrap(out.to, rt - 1);
                     Ok(())
                 });
             }
@@ -911,7 +911,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     }
                 }
                 if let Some(total) = total {
-                    unifier.set(concrete_param, Value::Integer(total)).unwrap();
+                    unifier.set_unwrap(concrete_param, Value::Integer(total));
                     // Success! We found the inferred value!
                 }
             }
