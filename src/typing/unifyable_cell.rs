@@ -48,7 +48,7 @@ pub struct UniCell<T>(UnsafeCell<Interior<T>>);
 /// Interior data for [UniCell].
 enum Interior<T> {
     Known(T),
-    /// This [UniCell] is the same as the [UniCell] that this points to. [Substitutor::resolve_chain] walks these until it finds a [Interior::Terminal] or [Interior::Known].
+    /// This [UniCell] is the same as the [UniCell] that this points to. [resolve_chain] walks these until it finds a [Interior::Terminal] or [Interior::Known].
     /// CANNOT BE CLONED
     /// The lifetime `'s` of the contained pointer is guarded by [UnifierTop]`<'s>`.
     /// The pointer and other variants can only be accessed *through* a [UnifierTop],
@@ -377,7 +377,7 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     ///
     /// For unifying a [UniCell] already in the graph (and thus not mutably accessible), with a new owned [UniCell], see [Unifier::set]
     fn unify(&self, a: &'s UniCell<T>, b: &'s UniCell<T>) -> UnifyResult {
-        match (try_get(self, a), try_get(self, b)) {
+        match (resolve_chain(self, a), resolve_chain(self, b)) {
             ((Some(a), _), (Some(b), _)) => {
                 // Simple optimization. Unification will often create referential identity.
                 if std::ptr::eq(a, b) {
@@ -423,7 +423,7 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     fn set(&self, cell: &'s UniCell<T>, to: &mut UniCell<T>) -> UnifyResult {
         match to.0.get_mut() {
             Interior::Known(to_known) => {
-                let (cell_known, cell_terminal) = try_get(self, cell);
+                let (cell_known, cell_terminal) = resolve_chain(self, cell);
 
                 if let Some(cell_known) = cell_known {
                     self.set_subtrees(cell_known, to_known)
@@ -472,7 +472,7 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     ///
     /// For clones that *don't* unify type variables, use [UniCell::clone_prototype_step]
     fn clone_unify(&self, to_clone: &'s UniCell<T>) -> UniCell<T> {
-        let (_to_clone_known, to_clone_terminal) = try_get(self, to_clone);
+        let (_to_clone_known, to_clone_terminal) = resolve_chain(self, to_clone);
         UniCell(UnsafeCell::new(mk_substitute_to(self, to_clone_terminal)))
     }
 
@@ -480,7 +480,7 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     ///
     /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
     fn resolve(&self, obj: &'s UniCell<T>) -> Result<&'s T, ResolveError<'s>> {
-        let (obj_known, obj_last_cell) = try_get(self, obj);
+        let (obj_known, obj_last_cell) = resolve_chain(self, obj);
 
         if let Some(obj_known) = obj_known {
             Ok(obj_known)
@@ -512,7 +512,7 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
             }
             Err(UnknownInterior::SubstitutesTo(subs_to)) => unsafe {
                 let subs_to: &'s UniCell<T> = &*subs_to;
-                if let Some(substitute_known) = try_get(self, subs_to).0 {
+                if let Some(substitute_known) = resolve_chain(self, subs_to).0 {
                     let known = self.clone_known(substitute_known);
                     let substitute_result = self.fully_substitute_recurse(&known);
                     cell.replace_substitution(subs_to, Interior::Known(known));
@@ -529,7 +529,7 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     ///
     /// Complete this by implementing [UnifyRecurse::contains_subtree]
     fn contains_subtree_recurse(&self, obj: &UniCell<T>, subtree: SubTree<T>) -> bool {
-        let (known, last_cell) = try_get(self, obj);
+        let (known, last_cell) = resolve_chain(self, obj);
         if let Some(known) = known {
             self.contains_subtree(known, subtree)
         } else {
@@ -546,29 +546,42 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
 ///
 /// Walks the substitution chain until either finding a [Interior::Known] value, or a [Interior::Terminal].
 /// In either case, the last cell in the chain is also returned.
-fn try_get<'out, 's: 'out, T: 's, Unif: Unifier<'s, T>>(
+fn resolve_chain<'out, 's: 'out, T: 's, Unif: Unifier<'s, T>>(
     _slf: &Unif,
-    mut cur: &'out UniCell<T>,
+    from: &'out UniCell<T>,
 ) -> (Option<&'out T>, &'out UniCell<T>) {
     // SAFETY: Each [Interior::SubstitutesTo] points to the next cell,
     // and due to the fact that Unifier<'s> does not allow such SubstitutesTo to be created from non-'s references
     // we can safely dereference each intermediary pointer.
     unsafe {
-        // Initialize the first element. It could have been [Interior::Unknown]
-        let _ = cur.get_interior();
-        loop {
+        // Initialize the first element. It could have been [Interior::Unknown]. No other elements could be Unknown though!
+        let _ = from.get_interior();
+        let mut cur = from;
+        let (final_known, final_cell) = loop {
             let interior_ptr: *const Interior<T> = cur.0.get();
             match &*interior_ptr {
                 Interior::Known(known) => break (Some(known), cur),
-                Interior::SubstitutesTo(substitute_to) => {
-                    cur = &**substitute_to;
+                Interior::SubstitutesTo(next_link) => {
+                    cur = &**next_link;
                 }
                 Interior::Terminal(_) => break (None, cur),
                 Interior::Unallocated => {
                     unreachable!("Interior::Unknown in the substitution chain???")
                 }
             }
+        };
+
+        // Now we do chain compression, basically we link every pointer we encountered on our path to final_cell
+        let mut cur = from;
+        while !std::ptr::eq(cur, final_cell) {
+            let Interior::SubstitutesTo(next_link) = &mut *cur.0.get() else {
+                unreachable!()
+            };
+            cur = &**next_link;
+            *next_link = final_cell as *const UniCell<T>;
         }
+
+        (final_known, final_cell)
     }
 }
 
