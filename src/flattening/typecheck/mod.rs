@@ -2,158 +2,212 @@ mod domain_check;
 mod lints;
 mod type_check;
 
+use super::*;
+
+use bumpalo::Bump;
+pub use lints::perform_lints;
+
 use crate::{
     alloc::UUIDAllocator,
+    errors::ErrorInfo,
     linker::{
         GlobalObj,
         passes::{GlobalResolver, LinkerPass},
     },
-    typing::type_inference::{
-        AbstractTypeSubstitutor, FailedUnification, TypeSubstitutor, TypeUnifier,
+    typing::{
+        abstract_type::AbstractInnerType,
+        abstract_unifier::AbstractUnifier,
+        unifyable_cell::{Unifier, UnifierTop, UnifyResult},
     },
 };
 
-use super::*;
-
-use std::{cell::OnceCell, ops::Deref};
-
-pub use lints::perform_lints;
 struct TypeCheckingContext<'l> {
     globals: GlobalResolver<'l, 'l>,
     errors: &'l ErrorCollector<'l>,
-    instructions: &'l FlatAlloc<Instruction, FlatIDMarker>,
     link_info: &'l LinkInfo,
-    type_checker: TypeUnifier<AbstractTypeSubstitutor>,
-    domain_checker: TypeUnifier<TypeSubstitutor<DomainType>>,
+    instructions: &'l FlatAlloc<Instruction, FlatIDMarker>,
+    domains: &'l FlatAlloc<DomainInfo, DomainIDMarker>,
+    extra_allocator: &'l Bump,
+    unifier: AbstractUnifier<'l>,
 }
 
-struct FinalizationContext {
-    substitution_failures: Vec<(AbstractRankedType, Span)>,
-    type_checker: TypeUnifier<AbstractTypeSubstitutor>,
-    domain_checker: TypeUnifier<TypeSubstitutor<DomainType>>,
+/// To be passed to [TypeCheckingContext::unify_type_report_error]
+pub trait UnifyErrorReport {
+    fn report(self) -> (String, Vec<ErrorInfo>);
+}
+impl UnifyErrorReport for &str {
+    fn report(self) -> (String, Vec<ErrorInfo>) {
+        (self.to_string(), Vec::new())
+    }
+}
+impl<F: FnOnce() -> (String, Vec<ErrorInfo>)> UnifyErrorReport for F {
+    fn report(self) -> (String, Vec<ErrorInfo>) {
+        self()
+    }
+}
+
+impl<'l> TypeCheckingContext<'l> {
+    pub fn unify_type_report_error(
+        &self,
+        found: &'l AbstractRankedType,
+        expected: &'l AbstractRankedType,
+        span: Span,
+        report: impl UnifyErrorReport,
+    ) {
+        self.unify_type_parts_report_error(
+            &found.inner,
+            &found.rank,
+            &expected.inner,
+            &expected.rank,
+            span,
+            report,
+        );
+    }
+    pub fn unify_type_parts_report_error(
+        &self,
+        found_inner: &'l UniCell<AbstractInnerType>,
+        found_rank: &'l UniCell<PeanoType>,
+        expected_inner: &'l UniCell<AbstractInnerType>,
+        expected_rank: &'l UniCell<PeanoType>,
+        span: Span,
+        report: impl UnifyErrorReport,
+    ) {
+        let inner_result = self.unifier.unify(found_inner, expected_inner);
+        let rank_result = self.unifier.unify(found_rank, expected_rank);
+
+        let expected_inner = self.unifier.clone_unify(expected_inner);
+        let expected_rank = self.unifier.clone_unify(expected_rank);
+        self.report_unify_error(
+            found_inner,
+            found_rank,
+            expected_inner,
+            expected_rank,
+            span,
+            report,
+            inner_result & rank_result,
+        );
+    }
+    pub fn set_type_report_error(
+        &self,
+        found: &'l AbstractRankedType,
+        expected: AbstractRankedType,
+        span: Span,
+        report: impl UnifyErrorReport,
+    ) {
+        self.set_type_parts_report_error(
+            &found.inner,
+            &found.rank,
+            expected.inner,
+            expected.rank,
+            span,
+            report,
+        );
+    }
+    pub fn set_type_parts_report_error(
+        &self,
+        found_inner: &'l UniCell<AbstractInnerType>,
+        found_rank: &'l UniCell<PeanoType>,
+        mut expected_inner: UniCell<AbstractInnerType>,
+        mut expected_rank: UniCell<PeanoType>,
+        span: Span,
+        report: impl UnifyErrorReport,
+    ) {
+        let inner_result = self.unifier.set(found_inner, &mut expected_inner);
+        let rank_result = self.unifier.set(found_rank, &mut expected_rank);
+
+        self.report_unify_error(
+            found_inner,
+            found_rank,
+            expected_inner,
+            expected_rank,
+            span,
+            report,
+            inner_result & rank_result,
+        );
+    }
+    pub fn report_unify_error(
+        &self,
+        found_inner: &'l UniCell<AbstractInnerType>,
+        found_rank: &'l UniCell<PeanoType>,
+        expected_inner: UniCell<AbstractInnerType>,
+        expected_rank: UniCell<PeanoType>,
+        span: Span,
+        report: impl UnifyErrorReport,
+        unify_result: UnifyResult,
+    ) {
+        if unify_result == UnifyResult::Success {
+            return;
+        }
+        let globals = self.globals.globals;
+        let errors = self.errors;
+        let link_info = self.link_info;
+        let (mut context, infos) = report.report();
+        if unify_result == UnifyResult::FailureInfiniteTypes {
+            context.push_str(": Creating Infinite Types is Forbidden!");
+
+            self.unifier.fully_substitute(found_inner);
+            self.unifier.fully_substitute(found_rank);
+            self.unifier.fully_substitute(&expected_inner);
+            self.unifier.fully_substitute(&expected_rank);
+            __debug_span!(span, "{found_inner:?}{found_rank:?}   ---   {expected_inner:?}{expected_rank:?}");
+            __debug_breakpoint!()
+        }
+        self.unifier.delayed_error(move |unifier| {
+            unifier.fully_substitute(found_inner);
+            unifier.fully_substitute(found_rank);
+            unifier.fully_substitute(&expected_inner);
+            unifier.fully_substitute(&expected_rank);
+
+            let found_inner = found_inner.display(globals, link_info);
+            let expected_inner = expected_inner.display(globals, link_info);
+
+            errors
+                .error(
+                    span,
+                    format!(
+                        "Typing Error: {context} expects '{expected_inner}{expected_rank}' but was given '{found_inner}{found_rank}'"
+                    ),
+                )
+                .add_info_list(infos);
+                
+            assert!(format!("{expected_inner}{expected_rank}") != format!("{found_inner}{found_rank}"))
+        });
+    }
 }
 
 pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
     let (working_on, globals) = pass.get_with_context();
     let link_info = working_on.get_link_info();
-    let mut context = TypeCheckingContext {
+    let extra_allocator = Bump::new();
+    let domains = if let GlobalObj::Module(md) = working_on {
+        &md.domains
+    } else {
+        &FlatAlloc::EMPTY_FLAT_ALLOC
+    };
+    let context = TypeCheckingContext {
         globals,
         errors,
-        type_checker: TypeUnifier::from(AbstractTypeSubstitutor::default()),
-        domain_checker: TypeUnifier::default(),
         instructions: &link_info.instructions,
         link_info,
+        domains,
+        extra_allocator: &extra_allocator,
+        unifier: AbstractUnifier::new(),
     };
 
     context.init_all_declarations();
-    context.init_domains();
 
     for (_, instr) in context.instructions {
         context.type_check_instr(instr);
         context.domain_check_instr(instr);
     }
 
-    let type_checker = context.type_checker;
-    let domain_checker = context.domain_checker;
-
-    let mut working_on_mut = pass.get_mut();
-    if let GlobalObj::Module(md) = &mut working_on_mut {
-        // Set the remaining domain variables that aren't associated with a module port.
-        // We just find domain IDs that haven't been
-        let mut leftover_domain_alloc =
-            UUIDAllocator::new_start_from(md.domains.get_next_alloc_id());
-        for (_, d) in domain_checker.iter() {
-            if d.get().is_none() {
-                assert!(
-                    d.set(DomainType::Physical(leftover_domain_alloc.alloc()))
-                        .is_ok()
-                );
-            }
-        }
-    }
-
-    // Grab another mutable copy of md so it doesn't force a borrow conflict
-    let mut finalize_ctx = FinalizationContext {
-        type_checker,
-        domain_checker,
-        substitution_failures: Vec::new(),
-    };
-    let link_info = working_on_mut.get_link_info();
-    finalize_ctx.apply_types(&mut link_info.instructions);
-    finalize_ctx.apply_domains(&mut link_info.instructions);
-
-    let (working_on, globals) = pass.get_with_context();
-    let link_info = working_on.get_link_info();
-    if let GlobalObj::Module(md) = working_on {
-        for FailedUnification {
-            mut found,
-            mut expected,
-            span,
-            context,
-            infos,
-        } in finalize_ctx.domain_checker.extract_errors()
-        {
-            let _ = found.fully_substitute(&finalize_ctx.domain_checker);
-            let _ = expected.fully_substitute(&finalize_ctx.domain_checker);
-
-            let expected_name = expected.display(&md.domains);
-            let found_name = found.display(&md.domains);
-            errors
-            .error(span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"))
-            .add_info_list(infos);
-
-            assert_ne!(found, expected);
-
-            /*assert!(
-                expected_name != found_name,
-                "{expected_name} != {found_name}"
-            );*/
-        }
-    }
-    // Print all errors
-    for FailedUnification {
-        mut found,
-        mut expected,
-        span,
-        context,
-        infos,
-    } in finalize_ctx.type_checker.extract_errors()
-    {
-        // Not being able to fully substitute is not an issue. We just display partial types
-        let _ = found.fully_substitute(&finalize_ctx.type_checker);
-        let _ = expected.fully_substitute(&finalize_ctx.type_checker);
-
-        let expected_name = expected.display(globals.globals, link_info);
-        let found_name = found.display(globals.globals, link_info);
-        errors
-            .error(
-                span,
-                format!(
-                    "Typing Error: {context} expects '{expected_name}' but was given '{found_name}'"
-                ),
-            )
-            .add_info_list(infos);
-
-        assert_ne!(found, expected);
-
-        /*assert!(
-            expected_name != found_name,
-            "{expected_name} != {found_name}"
-        );*/
-    }
-
-    // Skip printing not fully figured out types of there are type errors to reduce visual overhead.
-    if !errors.did_error() {
-        for (typ, span) in finalize_ctx.substitution_failures {
-            errors.error(
-                span,
-                format!(
-                    "Could not fully figure out the type of this object. {}",
-                    typ.display(globals.globals, link_info)
-                ),
-            );
-        }
-    }
+    // This order is important, such that unknown domains get IDd here,
+    // but the errors for incomplete types are reported *after* reporting the unification errors,
+    // so we can choose not to report incomplete type errors.
+    context.finalize_domains();
+    context.unifier.decomission();
+    context.finalize_types();
+    std::mem::drop(context);
 
     if let GlobalObj::Module(md) = pass.get_mut() {
         // Also create the inference info now.
@@ -164,58 +218,3 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
         );
     }
 }
-
-/// Basically equivalent to [std::cell::OnceCell], but implements [std::ops::Deref] and automatically unwraps
-/// This file defines a OnceCell variant for use with typechecking
-///
-/// Because in typechecking, we will always set it to uninitialized in Flatten, set it to an initial value (&self) in typechecking, and then finalize the type in (&mut self)
-#[derive(Debug)]
-pub struct TyCell<T: std::fmt::Debug>(OnceCell<T>);
-
-impl<T: std::fmt::Debug> TyCell<T> {
-    pub fn new() -> Self {
-        Self(OnceCell::new())
-    }
-    #[track_caller]
-    fn get_mut(&mut self) -> &mut T {
-        self.0.get_mut().unwrap()
-    }
-    /// Private because only typechecking should be allowed to set TyCells
-    #[track_caller]
-    fn set(&self, v: T) {
-        self.0.set(v).unwrap();
-    }
-    pub fn get_maybe(&self) -> Option<&T> {
-        self.0.get()
-    }
-}
-
-impl<T: std::fmt::Debug> Default for TyCell<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T: std::fmt::Debug> Deref for TyCell<T> {
-    type Target = T;
-
-    #[track_caller]
-    fn deref(&self) -> &Self::Target {
-        self.0.get().expect("Deref on an unfinished TyCell!")
-    }
-}
-
-/*
-// This delegated IntoIterator impl causes infinite recursion due to a bug in rustc. https://github.com/rust-lang/rust/issues/106512
-// Right now, just defer to .iter()
-impl<'a, T> IntoIterator for &'a TyCell<T>
-where
-    &'a T: IntoIterator,
-{
-    type Item = <&'a T as IntoIterator>::Item; // NOTE diff
-    type IntoIter = <&'a T as IntoIterator>::IntoIter; // NOTE diff
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.get().unwrap().into_iter()
-    }
-}
-*/

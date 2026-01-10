@@ -5,7 +5,6 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use crate::config::EarlyExitUpTo;
-use crate::flattening::typecheck::{perform_lints, typecheck};
 use crate::linker::GlobalObj;
 use crate::linker::checkpoint::{
     AFTER_FLATTEN_CP, AFTER_INITIAL_PARSE_CP, AFTER_LINTS_CP, AFTER_TYPE_CHECK_CP,
@@ -243,7 +242,7 @@ impl Linker {
 
         for global_id in &global_ids {
             self.pass("Typechecking", *global_id, |pass, errors, files| {
-                typecheck(pass, errors);
+                crate::flattening::typecheck::typecheck(pass, errors);
 
                 if crate::debug::is_enabled("print-abstract") {
                     let (md, globals) = pass.get_with_context();
@@ -265,7 +264,7 @@ impl Linker {
 
         for global_id in &global_ids {
             self.pass("Lints", *global_id, |pass, errors, files| {
-                perform_lints(pass, errors, files);
+                crate::flattening::typecheck::perform_lints(pass, errors, files);
             });
         }
         self.checkpoint(&global_ids, AFTER_LINTS_CP);

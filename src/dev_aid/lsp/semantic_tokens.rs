@@ -142,7 +142,7 @@ fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifier
                     } else {
                         IDEIdentifierType::make_local(
                             decl.decl_kind.is_state(),
-                            decl.domain.get().unwrap_physical(),
+                            decl.domain.unwrap_physical(),
                         )
                     }
                 }
@@ -170,7 +170,6 @@ fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifier
                         let domain = md.link_info.instructions[decl_id]
                             .unwrap_declaration()
                             .domain
-                            .get()
                             .unwrap_physical();
                         IDEIdentifierType::make_local(false, domain)
                     }

@@ -284,12 +284,12 @@ Warning: Not Instantiating multiply_add_with_latencies #() due to abstract typin
      │        ─────────────┬─────────────  
      │                     ╰─────────────── Not Instantiating multiply_add_with_latencies #() due to abstract typing errors
 ─────╯
-Error: A function call expects this to be an interface, but found a regular wire
+Error: A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
      ╭─[ test.sus:219:17 ]
      │
  219 │     int tmp'1 = multiply(a, b)
      │                 ────┬───  
-     │                     ╰───── A function call expects this to be an interface, but found a regular wire
+     │                     ╰───── A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
 ─────╯
 Error: No Global 'multiply' was found.
      ╭─[ test.sus:219:17 ]
@@ -428,12 +428,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                                                        ──┬──  
      │                                                                          ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Typing Error: writing the output of this expression expects 'bool #()[]' but was given 'int #(FROM: _, TO: _)'
+Error: Typing Error: writing the output of this expression expects 'int #(FROM: _, TO: _)' but was given 'bool #()[]'
      ╭─[ test.sus:250:2 ]
      │
  250 │     state bool[24] stored_valid_permutes = 000000000000000000000000
      │     ──────────────────┬─────────────────  
-     │                       ╰─────────────────── Typing Error: writing the output of this expression expects 'bool #()[]' but was given 'int #(FROM: _, TO: _)'
+     │                       ╰─────────────────── Typing Error: writing the output of this expression expects 'int #(FROM: _, TO: _)' but was given 'bool #()[]'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:252:10 ]
@@ -1135,14 +1135,14 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │             ┬  
      │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Attempting to write from a non-generative value to a generative value
+Error: Attempting to write a runtime value to a generative target
      ╭─[ test.sus:701:6 ]
      │
  701 │     b = a
      │     ┬   ┬  
-     │     ╰────── This is a generative value
+     │     ╰────── This is a generative target
      │         │  
-     │         ╰── Attempting to write from a non-generative value to a generative value
+     │         ╰── Attempting to write a runtime value to a generative target
 ─────╯
 Warning: Not Instantiating use_bad_interface #() due to abstract typing errors
      ╭─[ test.sus:704:8 ]
@@ -1814,12 +1814,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │            ─┬─  
      │             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Typing Error: writing the output of this expression expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
+Error: Typing Error: writing the output of this expression expects 'bool #()' but was given 'int #(FROM: _, TO: _)'
      ╭─[ test.sus:929:2 ]
      │
  929 │     xyz[3] = true
      │     ───┬──  
-     │        ╰──── Typing Error: writing the output of this expression expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
+     │        ╰──── Typing Error: writing the output of this expression expects 'bool #()' but was given 'int #(FROM: _, TO: _)'
 ─────╯
 Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
      ╭─[ test.sus:935:2 ]
@@ -2052,12 +2052,12 @@ Warning: Not Instantiating make_infinite_type #() due to abstract typing errors
       │        ─────────┬────────  
       │                 ╰────────── Not Instantiating make_infinite_type #() due to abstract typing errors
 ──────╯
-Error: Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects '?[][...]' but was given '?[...]'
+Error: Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects '?[...]' but was given '?[][...]'
       ╭─[ test.sus:1030:2 ]
       │
  1030 │     mtinf.a = mtinf.b
       │     ───┬───  
-      │        ╰───── Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects '?[][...]' but was given '?[...]'
+      │        ╰───── Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects '?[...]' but was given '?[][...]'
 ──────╯
 Warning: Not Instantiating UseDualPortMem #() due to abstract typing errors
       ╭─[ test.sus:1035:8 ]
@@ -2087,19 +2087,19 @@ Error: No Global 'DualPortMem' was found.
       │     ─────┬─────  
       │          ╰─────── No Global 'DualPortMem' was found.
 ──────╯
-Error: A function call expects this to be an interface, but found a regular wire
+Error: A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
       ╭─[ test.sus:1044:2 ]
       │
  1044 │     mem.write(do_write, addr, data)
       │     ────┬────  
-      │         ╰────── A function call expects this to be an interface, but found a regular wire
+      │         ╰────── A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
 ──────╯
-Error: A function call expects this to be an interface, but found a regular wire
+Error: A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
       ╭─[ test.sus:1046:14 ]
       │
  1046 │     read_data = mem.read(addr)
       │                 ────┬───  
-      │                     ╰───── A function call expects this to be an interface, but found a regular wire
+      │                     ╰───── A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
 ──────╯
 Warning: Not Instantiating example_FIFO #() due to abstract typing errors
       ╭─[ test.sus:1049:8 ]
@@ -2154,12 +2154,12 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │            ──┬──  
       │              ╰──── Interface 'start' defined here
 ──────╯
-Error: A function call expects this to be an interface, but found a regular wire
+Error: A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
       ╭─[ test.sus:1064:31 ]
       │
  1064 │     bool iter_valid, int value = arrayStream.iter()
       │                                  ────────┬───────  
-      │                                          ╰───────── A function call expects this to be an interface, but found a regular wire
+      │                                          ╰───────── A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
 ──────╯
 Error: No such field 'iter' on Iterator #(MAX: _). Available fields are 'Iterator', 'may_next', 'start', 'next'
       ╭─[ test.sus:1064:43 ]
@@ -2554,12 +2554,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                               ────┬────  
       │                                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Typing Error: writing the output of this expression expects 'float #()' but was given 'int #(FROM: _, TO: _)'
+Error: Typing Error: writing the output of this expression expects 'int #(FROM: _, TO: _)' but was given 'float #()'
       ╭─[ test.sus:1258:3 ]
       │
  1258 │        float next_state = cur_state * cur_state
       │        ────────┬───────  
-      │                ╰───────── Typing Error: writing the output of this expression expects 'float #()' but was given 'int #(FROM: _, TO: _)'
+      │                ╰───────── Typing Error: writing the output of this expression expects 'int #(FROM: _, TO: _)' but was given 'float #()'
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1258:9 ]

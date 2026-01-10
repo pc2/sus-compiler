@@ -1,10 +1,11 @@
+use crate::prelude::*;
+
 use std::cell::OnceCell;
 use std::num::NonZeroU16;
 
 use crate::alloc::{UUID, UUIDRange};
 
 use crate::linker::passes::{GlobalResolver, LinkerPass};
-use crate::prelude::*;
 
 use ibig::{IBig, UBig};
 use ordered_float::NotNan;
@@ -182,13 +183,13 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         Some(NamedLocal::Declaration(decl_id)) => {
                             let wire_read_id = self.instructions.alloc(Instruction::Expression(Expression {
                                 parent_condition: self.current_parent_condition,
-                                output: ExpressionOutput::SubExpression(TyCell::new()),
+                                output: ExpressionOutput::SubExpression(AbstractRankedType::UNKNOWN),
                                 span: name_span,
-                                domain: Cell::new(DomainType::PLACEHOLDER),
+                                domain: DomainType::UNKNOWN,
                                 source: ExpressionSource::WireRef(WireReference {
                                     root: WireReferenceRoot::LocalDecl(decl_id),
                                     root_span: name_span,
-                                    output_typ: TyCell::new(),
+                                    output_typ: AbstractRankedType::UNKNOWN,
                                     path: Vec::new(),
                                 })
                             }));
@@ -273,21 +274,21 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         id,
                         name_span,
                         template_args,
-                        template_arg_types: TyCell::new(),
+                        template_arg_types: OnceCell::new(),
                         template_span,
                     }),
                     GlobalUUID::Type(id) => LocalOrGlobal::Type(GlobalReference {
                         id,
                         name_span,
                         template_args,
-                        template_arg_types: TyCell::new(),
+                        template_arg_types: OnceCell::new(),
                         template_span,
                     }),
                     GlobalUUID::Constant(id) => LocalOrGlobal::Constant(GlobalReference {
                         id,
                         name_span,
                         template_args,
-                        template_arg_types: TyCell::new(),
+                        template_arg_types: OnceCell::new(),
                         template_span,
                     }),
                 }
@@ -497,7 +498,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         name_span,
                         module_ref,
                         local_domain_map: OnceCell::new(),
-                        typ: TyCell::new(),
+                        typ: AbstractRankedType::UNKNOWN,
                         documentation,
                     };
                     self.instructions.alloc_next_alloc_id(
@@ -671,16 +672,18 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             };
 
             let domain = if let DeclarationKind::Port { .. } = decl_kind {
-                Cell::new(DomainType::Physical(self.current_domain))
+                DomainType::Physical(UniCell::new(self.current_domain))
+            } else if decl_kind.is_generative() {
+                DomainType::Generative
             } else {
-                Cell::new(DomainType::PLACEHOLDER)
+                DomainType::Physical(DomainID::UNKNOWN)
             };
             self.instructions.alloc_next_alloc_id(
                 declaration_instruction,
                 Instruction::Declaration(Declaration {
                     parent_condition: self.current_parent_condition,
                     typ_expr,
-                    typ: TyCell::new(),
+                    typ: AbstractRankedType::UNKNOWN,
                     domain,
                     declaration_itself_is_not_written_to,
                     decl_kind,
@@ -786,10 +789,10 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let (source, span) = self.flatten_expr_source(cursor);
         let wire_instance = Expression {
             parent_condition: self.current_parent_condition,
-            domain: Cell::new(DomainType::PLACEHOLDER),
+            domain: DomainType::UNKNOWN,
             span,
             source,
-            output: ExpressionOutput::SubExpression(TyCell::new()),
+            output: ExpressionOutput::SubExpression(AbstractRankedType::UNKNOWN),
         };
 
         self.instructions
@@ -814,14 +817,14 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             ) => ExpressionOutput::MultiWrite(Vec::new()),
             (_, true) => {
                 self.errors.warn(span, "The result of this expression is not used. Only function calls can return nothing. ");
-                ExpressionOutput::SubExpression(TyCell::new())
+                ExpressionOutput::SubExpression(AbstractRankedType::UNKNOWN)
             }
         };
 
         let wire_instance = Expression {
             parent_condition: self.current_parent_condition,
             span,
-            domain: Cell::new(DomainType::PLACEHOLDER),
+            domain: DomainType::UNKNOWN,
             source,
             output,
         };
@@ -834,7 +837,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             root: WireReferenceRoot::Error,
             path: Vec::new(),
             root_span,
-            output_typ: TyCell::new(),
+            output_typ: AbstractRankedType::UNKNOWN,
         }
     }
 
@@ -845,8 +848,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             span: root_span,
             parent_condition: self.current_parent_condition,
             source: ExpressionSource::WireRef(wire_ref),
-            domain: Cell::new(DomainType::Generative),
-            output: ExpressionOutput::SubExpression(TyCell::new()),
+            domain: DomainType::UNKNOWN,
+            output: ExpressionOutput::SubExpression(AbstractRankedType::UNKNOWN),
         }))
     }
 
@@ -1022,7 +1025,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
                         ExpressionSource::UnaryOp {
                             op,
-                            rank: TyCell::new(),
+                            rank: PeanoType::UNKNOWN,
                             right,
                         }
                     }
@@ -1040,7 +1043,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
                 ExpressionSource::BinaryOp {
                     op,
-                    rank: TyCell::new(),
+                    rank: PeanoType::UNKNOWN,
                     left,
                     right,
                 }
@@ -1090,7 +1093,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             let root = WireReferenceRoot::LocalDecl(instr);
                             WireReference {
                                 root,
-                                output_typ: TyCell::new(),
+                                output_typ: AbstractRankedType::UNKNOWN,
                                 root_span: expr_span,
                                 path: Vec::new(),
                             }
@@ -1099,7 +1102,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             let root = WireReferenceRoot::LocalSubmodule(instr);
                             WireReference {
                                 root,
-                                output_typ: TyCell::new(),
+                                output_typ: AbstractRankedType::UNKNOWN,
                                 root_span: expr_span,
                                 path: Vec::new(),
                             }
@@ -1108,7 +1111,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             let root = WireReferenceRoot::LocalInterface(instr);
                             WireReference {
                                 root,
-                                output_typ: TyCell::new(),
+                                output_typ: AbstractRankedType::UNKNOWN,
                                 root_span: expr_span,
                                 path: Vec::new(),
                             }
@@ -1143,7 +1146,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         let root = WireReferenceRoot::NamedConstant(cst_ref);
                         WireReference {
                             root,
-                            output_typ: TyCell::new(),
+                            output_typ: AbstractRankedType::UNKNOWN,
                             root_span: expr_span,
                             path: Vec::new(),
                         }
@@ -1152,7 +1155,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         let root = WireReferenceRoot::NamedModule(md_ref);
                         WireReference {
                             root,
-                            output_typ: TyCell::new(),
+                            output_typ: AbstractRankedType::UNKNOWN,
                             root_span: expr_span,
                             path: Vec::new(),
                         }
@@ -1536,7 +1539,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 is_local,
                 inputs: Vec::new(),
                 outputs: Vec::new(),
-                domain: DomainType::Physical(self.current_domain),
+                domain: UniCell::new(self.current_domain),
                 then_block: FlatIDRange::PLACEHOLDER,
                 else_block: FlatIDRange::PLACEHOLDER,
                 then_span: Some(Span::PLACEHOLDER),
@@ -1690,7 +1693,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     let flat_root_decl = self.instructions[root].unwrap_declaration();
                     WireReference {
                         root: WireReferenceRoot::LocalDecl(root),
-                        output_typ: TyCell::new(),
+                        output_typ: AbstractRankedType::UNKNOWN,
                         root_span: flat_root_decl.name_span,
                         path: Vec::new(),
                     }
@@ -1702,7 +1705,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     to,
                     to_span,
                     write_modifiers,
-                    target_domain: Cell::new(DomainType::PLACEHOLDER),
+                    target_domain: DomainType::UNKNOWN,
                 }
             })
         })
@@ -1876,8 +1879,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         .alloc(Instruction::Declaration(Declaration {
                             parent_condition: self.current_parent_condition,
                             typ_expr,
-                            typ: TyCell::new(),
-                            domain: Cell::new(DomainType::PLACEHOLDER),
+                            typ: AbstractRankedType::UNKNOWN,
+                            domain: DomainType::Generative,
                             decl_span,
                             name_span,
                             name: name.to_owned(),

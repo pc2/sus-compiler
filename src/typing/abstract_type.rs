@@ -4,10 +4,11 @@ use sus_proc_macro::get_builtin_type;
 
 use crate::{
     prelude::*,
-    typing::template::{TVec, TemplateKind},
+    typing::{
+        template::{TVec, TemplateKind},
+        unifyable_cell::{SyncWrapper, UniCell},
+    },
 };
-
-use super::type_inference::{InnerTypeVariableID, PeanoVariableID};
 
 /// This contains only the information that can be type-checked before template instantiation.
 ///
@@ -30,11 +31,6 @@ pub enum AbstractInnerType {
     Named(AbstractGlobalReference<TypeUUID>),
     Interface(AbstractGlobalReference<ModuleUUID>, InterfaceID),
     LocalInterface(FlatID),
-    /// Referencing [AbstractType::Unknown] is a strong code smell.
-    /// It is likely you should use [TypeSubstitutor::unify_must_succeed] or [TypeSubstitutor::unify_report_error] instead
-    ///
-    /// It should only occur in creation `AbstractType::Unknown(self.type_substitutor.alloc())`
-    Unknown(InnerTypeVariableID),
 }
 
 pub const BOOL_INNER: AbstractInnerType = AbstractInnerType::Named(AbstractGlobalReference {
@@ -53,71 +49,76 @@ pub const STRING_INNER: AbstractInnerType = AbstractInnerType::Named(AbstractGlo
     id: get_builtin_type!("string"),
     template_arg_types: TVec::new(),
 });
-pub static INT_INNER: LazyLock<AbstractInnerType> = LazyLock::new(|| {
-    AbstractInnerType::Named(AbstractGlobalReference {
+pub static INT_INNER: LazyLock<SyncWrapper<AbstractInnerType>> = LazyLock::new(|| {
+    SyncWrapper::new(AbstractInnerType::Named(AbstractGlobalReference {
         id: get_builtin_type!("int"),
         template_arg_types: TVec::from_vec(vec![TemplateKind::Value(()), TemplateKind::Value(())]),
-    })
+    }))
 });
 
 impl AbstractInnerType {
-    pub fn scalar(self) -> AbstractRankedType {
+    #[allow(clippy::declare_interior_mutable_const)]
+    pub const UNKNOWN: UniCell<AbstractInnerType> = UniCell::UNKNOWN;
+
+    pub const fn scalar(self) -> AbstractRankedType {
         AbstractRankedType {
-            inner: self,
-            rank: PeanoType::Zero,
+            inner: UniCell::from_known(self),
+            rank: UniCell::from_known(PeanoType::Zero),
         }
     }
-    pub fn with_rank(self, rank: PeanoType) -> AbstractRankedType {
-        AbstractRankedType { inner: self, rank }
+    pub fn with_rank(self, rank: impl Into<UniCell<PeanoType>>) -> AbstractRankedType {
+        AbstractRankedType {
+            inner: UniCell::from_known(self),
+            rank: rank.into(),
+        }
     }
     pub fn is_interface(&self) -> bool {
         match self {
             AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => true,
-            AbstractInnerType::Template(_)
-            | AbstractInnerType::Named(_)
-            | AbstractInnerType::Unknown(_) => false,
+            AbstractInnerType::Template(_) | AbstractInnerType::Named(_) => false,
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AbstractRankedType {
-    pub inner: AbstractInnerType,
-    pub rank: PeanoType,
+    pub inner: UniCell<AbstractInnerType>,
+    pub rank: UniCell<PeanoType>,
 }
 
-pub const BOOL_SCALAR: AbstractRankedType = AbstractRankedType {
-    inner: BOOL_INNER,
-    rank: PeanoType::Zero,
-};
-pub const FLOAT_SCALAR: AbstractRankedType = AbstractRankedType {
-    inner: FLOAT_INNER,
-    rank: PeanoType::Zero,
-};
-pub const DOUBLE_SCALAR: AbstractRankedType = AbstractRankedType {
-    inner: DOUBLE_INNER,
-    rank: PeanoType::Zero,
-};
-pub const STRING_SCALAR: AbstractRankedType = AbstractRankedType {
-    inner: STRING_INNER,
-    rank: PeanoType::Zero,
-};
-pub static INT_SCALAR: LazyLock<AbstractRankedType> = LazyLock::new(|| AbstractRankedType {
-    inner: INT_INNER.clone(),
-    rank: PeanoType::Zero,
-});
+#[allow(clippy::declare_interior_mutable_const)]
+pub const BOOL_SCALAR: AbstractRankedType = BOOL_INNER.scalar();
+pub static BOOL_SCALAR_FOR_REF: SyncWrapper<AbstractRankedType> = SyncWrapper::new(BOOL_SCALAR);
+#[allow(clippy::declare_interior_mutable_const)]
+pub const FLOAT_SCALAR: AbstractRankedType = FLOAT_INNER.scalar();
+#[allow(clippy::declare_interior_mutable_const)]
+pub const DOUBLE_SCALAR: AbstractRankedType = DOUBLE_INNER.scalar();
+#[allow(clippy::declare_interior_mutable_const)]
+pub const STRING_SCALAR: AbstractRankedType = STRING_INNER.scalar();
+pub static INT_SCALAR: LazyLock<SyncWrapper<AbstractRankedType>> =
+    LazyLock::new(|| SyncWrapper::new(INT_INNER.clone().scalar()));
 
 impl AbstractRankedType {
+    #[allow(clippy::declare_interior_mutable_const)]
+    pub const UNKNOWN: AbstractRankedType = AbstractRankedType {
+        inner: AbstractInnerType::UNKNOWN,
+        rank: PeanoType::UNKNOWN,
+    };
+
     pub const fn scalar(inner: AbstractInnerType) -> Self {
         Self {
-            inner,
-            rank: PeanoType::Zero,
+            inner: UniCell::from_known(inner),
+            rank: UniCell::from_known(PeanoType::Zero),
         }
+    }
+    pub fn set_initial(&self, initial: AbstractRankedType) {
+        self.inner.set_initial_cell(initial.inner);
+        self.rank.set_initial_cell(initial.rank);
     }
     pub fn rank_up(self) -> Self {
         Self {
             inner: self.inner,
-            rank: PeanoType::Succ(Box::new(self.rank)),
+            rank: UniCell::from_known(PeanoType::Succ(Box::new(self.rank))),
         }
     }
     pub fn rank_up_multi(self, cnt: usize) -> Self {
@@ -130,9 +131,9 @@ impl AbstractRankedType {
         cur
     }
     pub fn is_int_scalar(&self) -> bool {
-        self.rank == PeanoType::Zero
+        *self.rank.unwrap() == PeanoType::Zero
             && matches!(
-                &self.inner,
+                &self.inner.unwrap(),
                 AbstractInnerType::Named(AbstractGlobalReference {
                     id: get_builtin_type!("int"),
                     ..
@@ -144,24 +145,32 @@ impl AbstractRankedType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PeanoType {
     Zero,
-    Succ(Box<PeanoType>),
-    Unknown(PeanoVariableID),
+    Succ(Box<UniCell<PeanoType>>),
 }
 
 impl PeanoType {
+    #[allow(clippy::declare_interior_mutable_const)]
+    pub const UNKNOWN: UniCell<PeanoType> = UniCell::UNKNOWN;
+
     pub fn count(&self) -> usize {
-        match self {
-            PeanoType::Zero => 0,
-            PeanoType::Succ(inner) => inner.count() + 1,
-            PeanoType::Unknown(_) => panic!("Peano Number {self:?} still contains Unknown!"),
+        let mut cur = self;
+        let mut sum = 0;
+
+        while let PeanoType::Succ(succ) = cur {
+            cur = succ.unwrap();
+            sum += 1;
         }
+
+        sum
     }
     pub fn from_natural(count: usize) -> Self {
-        if count == 0 {
-            PeanoType::Zero
-        } else {
-            PeanoType::Succ(Box::new(PeanoType::from_natural(count - 1)))
+        let mut result = PeanoType::Zero;
+
+        for _ in 0..count {
+            result = PeanoType::Succ(Box::new(UniCell::from(result)));
         }
+
+        result
     }
 }
 
@@ -176,25 +185,22 @@ impl AbstractRankedType {
         &self,
         args: &TVec<TemplateKind<AbstractRankedType, ()>>,
     ) -> Self {
-        match &self.inner {
+        match self.inner.unwrap() {
             // We don't recursively substitute the type we get from the template arg, because those are in a different namespace
             AbstractInnerType::Template(id) => args[*id]
                 .unwrap_type()
                 .clone()
                 .rank_up_multi(self.rank.count()),
-            AbstractInnerType::Named(named_ref) => AbstractRankedType {
-                inner: AbstractInnerType::Named(named_ref.substitute_template_args(args)),
-                rank: self.rank.clone(),
-            },
-            AbstractInnerType::Interface(module_ref, interface_id) => AbstractRankedType {
-                inner: AbstractInnerType::Interface(
-                    module_ref.substitute_template_args(args),
-                    *interface_id,
-                ),
-                rank: self.rank.clone(),
-            },
+            AbstractInnerType::Named(named_ref) => {
+                AbstractInnerType::Named(named_ref.substitute_template_args(args))
+                    .with_rank(self.rank.unwrap().clone())
+            }
+            AbstractInnerType::Interface(module_ref, interface_id) => AbstractInnerType::Interface(
+                module_ref.substitute_template_args(args),
+                *interface_id,
+            )
+            .with_rank(self.rank.unwrap().clone()),
             AbstractInnerType::LocalInterface(_) => self.clone(),
-            AbstractInnerType::Unknown(_) => unreachable!(),
         }
     }
 }

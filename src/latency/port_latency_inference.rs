@@ -10,7 +10,6 @@ use crate::{
     typing::{
         abstract_type::PeanoType,
         concrete_type::{ConcreteType, SubtypeRelation},
-        domain_type::DomainType,
         template::{Parameter, TVec, TemplateKind},
         unifyable_cell::UniCell,
     },
@@ -115,7 +114,7 @@ fn expression_to_param_linearity(
     template_arg_ids: UUIDRange<TemplateIDMarker>,
 ) -> Option<ParamLinearity> {
     let expr = instructions[cur_instr].unwrap_subexpression();
-    if expr.domain != DomainType::Generative {
+    if !expr.domain.unwrap().is_generative() {
         return None; // Early exit, the user can create an invalid interface, we just don't handle it
     }
     if let ExpressionSource::WireRef(WireReference {

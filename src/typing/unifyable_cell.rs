@@ -175,6 +175,7 @@ impl<T> From<T> for UniCell<T> {
 }
 
 impl<T: Clone> Clone for UniCell<T> {
+    #[track_caller]
     fn clone(&self) -> Self {
         // We cast to a const pointer here instead, such that we never actually create a &mut that might conflict with another existing shared ref
         let known = self.get_interior().expect("Not fully known substitutables can't be Cloned at all! Use [Unifier::clone_unify] or [Unifier::clone_prototype_step] to make clones.");
@@ -197,6 +198,7 @@ impl<T: Debug> Debug for UniCell<T> {
 impl<T: Debug> Deref for UniCell<T> {
     type Target = T;
 
+    #[track_caller]
     fn deref(&self) -> &Self::Target {
         self.unwrap()
     }
@@ -235,7 +237,7 @@ impl<T: Debug + Hash> Hash for UniCell<T> {
 /// ONLY SAFE IF T IS FULLY RESOLVED.
 pub struct SyncWrapper<T>(T);
 impl<T> SyncWrapper<T> {
-    pub fn new(v: T) -> Self {
+    pub const fn new(v: T) -> Self {
         Self(v)
     }
 }
@@ -794,23 +796,18 @@ impl UnifyResult {
 impl BitAnd for UnifyResult {
     type Output = UnifyResult;
 
-    fn bitand(self, rhs: Self) -> Self::Output {
-        if rhs == UnifyResult::FailureInfiniteTypes {
-            UnifyResult::FailureInfiniteTypes
-        } else if self == UnifyResult::Success {
-            rhs
-        } else {
-            self
+    fn bitand(self, rhs: Self) -> UnifyResult {
+        use UnifyResult::*;
+        match (self, rhs) {
+            (FailureInfiniteTypes, _) | (_, FailureInfiniteTypes) => FailureInfiniteTypes,
+            (Failure, _) | (_, Failure) => Failure,
+            (Success, Success) => Success,
         }
     }
 }
 impl BitAndAssign for UnifyResult {
     fn bitand_assign(&mut self, rhs: Self) {
-        if rhs == UnifyResult::FailureInfiniteTypes {
-            *self = UnifyResult::FailureInfiniteTypes;
-        } else if *self == UnifyResult::Success {
-            *self = rhs;
-        }
+        *self = self.bitand(rhs);
     }
 }
 impl From<bool> for UnifyResult {
@@ -939,7 +936,7 @@ impl PeanoType {
         let mut cur = self;
         let mut total = 0;
         while let PeanoType::Succ(inner) = cur {
-            cur = inner;
+            cur = inner.unwrap();
             total += 1;
         }
         total
@@ -1517,13 +1514,58 @@ mod tests {
         assert_eq!(b2.unwrap().count(), 2);
     }
 
-    /// Just a stress test to cover all possible code paths. To check under miri that everything is alright.
     #[test]
-    fn stress_test_for_miri() {
+    fn test_infinite_type_dection() {
+        const TOTAL_SIZE: usize = 1000;
+        const TOTAL_ITER: usize = 10000;
         let mut rng = rand::rngs::StdRng::seed_from_u64(42);
 
         // Create a bunch of unknowns
-        let cells: Vec<UniCell<PeanoType>> = (0..1000).map(|_| PeanoType::UNKNOWN).collect();
+        let cells: Vec<UniCell<PeanoType>> = (0..TOTAL_SIZE).map(|_| PeanoType::UNKNOWN).collect();
+
+        let unifier = PeanoUnifier::new();
+
+        for _ in 0..10 {
+            let a = cells.choose(&mut rng).unwrap();
+            if rng.random_bool(0.5) {
+                a.set_initial(PeanoType::Zero);
+            } else {
+                unifier.set_unwrap(a, PeanoType::Zero);
+            }
+        }
+
+        for _ in 0..TOTAL_ITER {
+            //let [a, b] = rand::seq::index::sample_array(&mut rng, TOTAL_SIZE).unwrap();
+            let a = cells.choose(&mut rng).unwrap();
+            let b = cells.choose(&mut rng).unwrap();
+
+            match rng.random_range(0..3) {
+                0 => {
+                    unifier.unify(a, b).unwrap();
+                }
+                1 => {
+                    unifier.set(a, &mut unifier.clone_unify(b)).unwrap();
+                }
+                2 => {
+                    if let Err(None) = a.get_interior()
+                        && !std::ptr::eq(a, b)
+                    {
+                        a.set_initial_cell(unifier.clone_unify(b));
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+
+    /// Just a stress test to cover all possible code paths. To check under miri that everything is alright.
+    #[test]
+    fn stress_test_for_miri() {
+        const TOTAL_SIZE: usize = 1000;
+        let mut rng = rand::rngs::StdRng::seed_from_u64(42);
+
+        // Create a bunch of unknowns
+        let cells: Vec<UniCell<PeanoType>> = (0..TOTAL_SIZE).map(|_| PeanoType::UNKNOWN).collect();
 
         let unifier = PeanoUnifier::new();
 

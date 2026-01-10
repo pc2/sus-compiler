@@ -595,7 +595,7 @@ impl<'l> ExecutionContext<'l> {
     ) -> ExecutionResult<ConcreteGlobalReference<ID>> {
         let target: &LinkInfo = &self.globals[global_ref.id.into()];
         let template_args = target.parameters.try_map2(
-            &global_ref.template_arg_types,
+            global_ref.template_arg_types.get().unwrap(),
             |(param_id, param, abs_typ)| -> ExecutionResult<ConcreteTemplateArg> {
                 Ok(match &param.kind {
                     TemplateKind::Type(_) => {
@@ -658,9 +658,6 @@ impl<'l> ExecutionContext<'l> {
                         ),
                     })
                 }
-                AbstractInnerType::Unknown(_) => {
-                    unreachable!("Should have been resolved already!")
-                }
                 AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => {
                     unreachable!(
                         "Cannot concretize an interface type. Only proper wire types are concretizeable! Should have been caught by typecheck!"
@@ -690,9 +687,6 @@ impl<'l> ExecutionContext<'l> {
                     self.concretize_type_recurse(inner, one_down, new_wr_typ)?,
                     size,
                 )))
-            }
-            PeanoType::Unknown(_) => {
-                caught_by_typecheck!("No PeanoType::Unknown should be left in execute!")
             }
         })
     }
@@ -1085,9 +1079,9 @@ impl<'l> ExecutionContext<'l> {
                 let port_decl = submod_md.link_info.instructions[port_decl].unwrap_declaration();
                 let_unwrap!(DeclarationKind::Port { port_id, .. }, port_decl.decl_kind);
                 let local_domain_map = submod.local_domain_map.get().unwrap();
-                let domain = local_domain_map[submod_interface.domain.unwrap()].unwrap_physical();
+                let domain = &local_domain_map[submod_interface.domain.unwrap()];
                 let submod_id = self.generation_state[*submod_id].unwrap_submodule_instance();
-                self.get_submodule_port(submod_id, port_id, Some(port_span), domain)
+                self.get_submodule_port(submod_id, port_id, Some(port_span), *domain.unwrap())
             }
             WireReferenceRoot::NamedConstant(cst) => {
                 let (value, typ) = self.get_named_constant_value(cst)?;
@@ -1255,7 +1249,7 @@ impl<'l> ExecutionContext<'l> {
             SubModuleOrWire::CompileTimeValue(v) => {
                 let value = v.clone();
                 let (typ, span) = match &self.link_info.instructions[original_instruction] {
-                    Instruction::Declaration(decl) => (decl.typ.deref(), decl.name_span),
+                    Instruction::Declaration(decl) => (&decl.typ, decl.name_span),
                     Instruction::Expression(expr) => {
                         let expr = expr.as_single_output_expr().unwrap();
                         (expr.typ, expr.span)
@@ -1307,9 +1301,9 @@ impl<'l> ExecutionContext<'l> {
                 Instruction::Declaration(submodule_decl) => {
                     let original_global_ref =
                         submod_instance.get_original_global_ref(&self.link_info.instructions);
-                    let substituted_type = submodule_decl
-                        .typ
-                        .substitute_template_args(&original_global_ref.template_arg_types);
+                    let substituted_type = submodule_decl.typ.substitute_template_args(
+                        original_global_ref.template_arg_types.get().unwrap(),
+                    );
 
                     // We don't pass the WrittenType of the port declaration, because we want fresh variables such that
                     let typ = self.concretize_type(&substituted_type, None).unwrap();
@@ -1647,7 +1641,7 @@ impl<'l> ExecutionContext<'l> {
                 name: self.unique_name_producer.get_unique_name(&wire_decl.name),
                 typ,
                 original_instruction,
-                domain: wire_decl.domain.get().unwrap_physical(),
+                domain: wire_decl.domain.unwrap_physical(),
                 source,
                 specified_latency,
                 absolute_latency: AbsLat::UNKNOWN,
@@ -1794,14 +1788,14 @@ impl<'l> ExecutionContext<'l> {
             // Interface execution is up to whoever calls it
             return Ok(SubModuleOrWire::Unassigned);
         }
-        Ok(match expr.domain.get() {
+        Ok(match expr.domain.unwrap() {
             DomainType::Generative => {
                 let value_computed = self.compute_compile_time(expr)?;
                 match &expr.output {
                     ExpressionOutput::SubExpression(_full_type) => {} // Simply returning value_computed is enough
                     ExpressionOutput::MultiWrite(write_tos) => {
                         if let Some(single_write) = write_tos.first() {
-                            match single_write.target_domain.get() {
+                            match single_write.target_domain.unwrap() {
                                 DomainType::Generative => {
                                     self.write_generative(
                                         single_write,
@@ -1813,7 +1807,7 @@ impl<'l> ExecutionContext<'l> {
                                         value_computed.clone(),
                                         &single_write.to.output_typ,
                                         original_instruction,
-                                        domain,
+                                        *domain.unwrap(),
                                         expr.span,
                                     )?;
                                     self.write_non_generative(
@@ -1821,10 +1815,9 @@ impl<'l> ExecutionContext<'l> {
                                         original_instruction,
                                         value_as_wire,
                                         single_write.to_span,
-                                        domain,
+                                        *domain.unwrap(),
                                     )?;
                                 }
-                                DomainType::Unknown(_) => caught_by_typecheck!(),
                             }
                         }
                     }
@@ -1833,7 +1826,7 @@ impl<'l> ExecutionContext<'l> {
             }
             DomainType::Physical(domain) => {
                 let output_wires =
-                    self.expression_to_real_wire(expr, original_instruction, domain)?;
+                    self.expression_to_real_wire(expr, original_instruction, *domain.unwrap())?;
                 match &expr.output {
                     ExpressionOutput::SubExpression(_full_type) => {
                         let single_wire = unwrap_single_element(output_wires);
@@ -1849,14 +1842,13 @@ impl<'l> ExecutionContext<'l> {
                                 original_instruction,
                                 expr_output,
                                 write.to_span,
-                                domain,
+                                *domain.unwrap(),
                             )?;
                         }
                         SubModuleOrWire::Unassigned
                     }
                 }
             }
-            DomainType::Unknown(_) => caught_by_typecheck!(),
         })
     }
 
@@ -1981,7 +1973,7 @@ impl<'l> ExecutionContext<'l> {
                             },
                             _ => unreachable!(),
                         };
-                        let domain = interface.domain.unwrap_physical();
+                        let domain = *interface.domain.unwrap();
                         let condition_wire = self.wires.alloc(RealWire {
                             name: self.unique_name_producer.get_unique_name(&interface.name),
                             typ: ConcreteType::BOOL,

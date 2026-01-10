@@ -1,4 +1,6 @@
-use crate::{alloc::UUID, prelude::*, typing::type_inference::DomainVariableID};
+use crate::prelude::*;
+
+use crate::typing::unifyable_cell::UniCell;
 
 /// These represent (clock) domains. While clock domains are included under this umbrella, domains can use the same clock.
 /// The use case for non-clock-domains is to separate Latency Counting domains. So different pipelines where it doesn't
@@ -9,30 +11,57 @@ use crate::{alloc::UUID, prelude::*, typing::type_inference::DomainVariableID};
 /// As a convenience, we make [DomainType::Generative] a special case for a domain.
 ///
 /// The fun thing is that we can now use this domain info for syntax highlighting, giving wires in different domains a different color.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum DomainType {
     /// Generative conflicts with nothing
     Generative,
     /// This object is a real wire. It corresponds to a certain (clock) domain. It can only affect wires in the same domain.
-    Physical(DomainID),
-
-    /// These are unified by Hindley-Milner unification
-    ///
-    /// They always point to non-generative domains.
-    ///
-    /// Referencing [DomainType::Unknown] is a strong code smell.
-    /// It is likely you should use [TypeSubstitutor::unify_must_succeed] or [TypeSubstitutor::unify_report_error] instead
-    ///
-    /// It should only occur in creation `DomainType::Unknown(self.domain_substitutor.alloc())`
-    Unknown(DomainVariableID),
+    Physical(UniCell<DomainID>),
 }
 
 impl DomainType {
-    pub const PLACEHOLDER: DomainType = DomainType::Unknown(UUID::PLACEHOLDER);
+    #[allow(clippy::declare_interior_mutable_const)]
+    pub const UNKNOWN: UniCell<DomainType> = UniCell::UNKNOWN;
 
     #[track_caller]
     pub fn unwrap_physical(&self) -> DomainID {
         let_unwrap!(Self::Physical(w), self);
-        *w
+        *w.unwrap()
+    }
+
+    pub fn is_generative(&self) -> bool {
+        matches!(self, DomainType::Generative)
+    }
+}
+
+impl DomainID {
+    #[allow(clippy::declare_interior_mutable_const)]
+    pub const UNKNOWN: UniCell<DomainID> = UniCell::UNKNOWN;
+}
+
+#[derive(Debug, Clone, Copy)]
+/// Equivalent to [DomainType], but used to pass references to the inner [DomainType::Physical]
+pub enum DomainTypeRef<'s> {
+    /// Generative conflicts with nothing
+    Generative,
+    /// This object is a real wire. It corresponds to a certain (clock) domain. It can only affect wires in the same domain.
+    Physical(&'s UniCell<DomainID>),
+}
+
+impl<'dt> DomainTypeRef<'dt> {
+    pub fn is_generative(&self) -> bool {
+        match self {
+            DomainTypeRef::Generative => true,
+            DomainTypeRef::Physical(_) => false,
+        }
+    }
+}
+
+impl<'dt> From<&'dt DomainType> for DomainTypeRef<'dt> {
+    fn from(d: &'dt DomainType) -> Self {
+        match d {
+            DomainType::Generative => DomainTypeRef::Generative,
+            DomainType::Physical(cell) => DomainTypeRef::Physical(cell),
+        }
     }
 }

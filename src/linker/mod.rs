@@ -4,7 +4,7 @@ use crate::{
     linker::passes::ResolvedGlobals,
     prelude::*,
     typing::{
-        domain_type::DomainType,
+        domain_type::DomainTypeRef,
         template::{Parameter, TVec},
     },
 };
@@ -151,11 +151,11 @@ impl LinkInfo {
             Instruction::IfStatement(_) | Instruction::ForStatement(_) => "",
         }
     }
-    pub fn get_instruction_domain(&self, instr_id: FlatID) -> Option<DomainType> {
+    pub fn get_instruction_domain<'s>(&'s self, instr_id: FlatID) -> Option<DomainTypeRef<'s>> {
         match &self.instructions[instr_id] {
-            Instruction::Declaration(decl) => Some(decl.domain.get()),
-            Instruction::Interface(interface) => Some(interface.domain),
-            Instruction::Expression(expr) => Some(expr.domain.get()),
+            Instruction::Declaration(decl) => Some(DomainTypeRef::from(&decl.domain)),
+            Instruction::Interface(interface) => Some(DomainTypeRef::Physical(&interface.domain)),
+            Instruction::Expression(expr) => Some(DomainTypeRef::from(expr.domain.get()?)),
             Instruction::SubModule(_)
             | Instruction::IfStatement(_)
             | Instruction::ForStatement(_) => None,
@@ -432,9 +432,9 @@ impl<'globals> GetGlobalByNameError<'globals> {
 /// Incremental operations such as adding and removing files can be performed on this
 pub struct Linker {
     pub files: LinkerFiles,
+    global_namespace: HashMap<String, NamespaceElement>,
     pub globals: LinkerGlobals,
     pub instantiator: Instantiator,
-    global_namespace: HashMap<String, NamespaceElement>,
 }
 
 pub type LinkerFiles = ArenaAllocator<FileData, FileUUIDMarker>;
@@ -462,14 +462,14 @@ impl DerefMut for Linker {
 impl Linker {
     pub fn new() -> Linker {
         Linker {
+            files: ArenaAllocator::new(),
+            global_namespace: HashMap::new(),
             globals: LinkerGlobals {
                 types: ArenaAllocator::new(),
                 modules: ArenaAllocator::new(),
                 constants: ArenaAllocator::new(),
             },
-            files: ArenaAllocator::new(),
             instantiator: Instantiator::new(),
-            global_namespace: HashMap::new(),
         }
     }
 

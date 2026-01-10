@@ -1,23 +1,16 @@
+use crate::prelude::*;
+
 use ibig::IBig;
 use ibig::UBig;
 use sus_proc_macro::get_builtin_type;
 
-use crate::linker::GlobalUUID;
-use crate::linker::LinkerGlobals;
-use crate::prelude::*;
-use crate::to_string::display_join;
-use crate::typing::abstract_type::AbstractGlobalReference;
-use crate::typing::abstract_type::AbstractInnerType;
-use crate::typing::abstract_type::AbstractRankedType;
-use crate::typing::abstract_type::PeanoType;
-use crate::typing::unifyable_cell::UniCell;
-use crate::util::all_equal;
-use crate::value::Value;
+use crate::{
+    linker::GlobalUUID, linker::LinkerGlobals, to_string::display_join,
+    typing::abstract_type::AbstractGlobalReference, typing::abstract_type::AbstractInnerType,
+    typing::abstract_type::AbstractRankedType, typing::template::TVec,
+    typing::template::TemplateKind, typing::unifyable_cell::UniCell, util::all_equal, value::Value,
+};
 use std::ops::Deref;
-
-use super::template::TVec;
-
-use super::template::TemplateKind;
 
 pub type ConcreteTemplateArg = TemplateKind<ConcreteType, UniCell<Value>>;
 
@@ -258,19 +251,14 @@ impl ConcreteType {
 
     pub fn to_abstract(&self) -> AbstractRankedType {
         match self {
-            ConcreteType::Named(named_typ) => {
-                let inner = AbstractInnerType::Named(AbstractGlobalReference {
-                    id: named_typ.id,
-                    template_arg_types: named_typ.template_args.map(|(_, arg)| match arg {
-                        TemplateKind::Type(t) => TemplateKind::Type(t.to_abstract()),
-                        TemplateKind::Value(_) => TemplateKind::Value(()),
-                    }),
-                });
-                AbstractRankedType {
-                    inner,
-                    rank: PeanoType::Zero,
-                }
-            }
+            ConcreteType::Named(named_typ) => AbstractInnerType::Named(AbstractGlobalReference {
+                id: named_typ.id,
+                template_arg_types: named_typ.template_args.map(|(_, arg)| match arg {
+                    TemplateKind::Type(t) => TemplateKind::Type(t.to_abstract()),
+                    TemplateKind::Value(_) => TemplateKind::Value(()),
+                }),
+            })
+            .scalar(),
             ConcreteType::Array(arr_box) => {
                 let (content, _size) = arr_box.deref();
                 content.to_abstract().rank_up()

@@ -1,7 +1,9 @@
-use crate::{prelude::*, typing::unifyable_cell::UniCell, value::Value};
-use ibig::IBig;
+use crate::prelude::*;
 
-use super::concrete_type::ConcreteTemplateArg;
+use crate::{
+    typing::concrete_type::ConcreteTemplateArg, typing::unifyable_cell::UniCell, value::Value,
+};
+use ibig::IBig;
 
 /// See [TVec]. All circumstances handling Templates need to handle both Types and Values.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

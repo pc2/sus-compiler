@@ -377,6 +377,7 @@ pub fn parse_args() {
 }
 
 #[cfg(test)]
+#[allow(unused)]
 pub fn init_cfg_for_test() {
     let cfg = ConfigStruct {
         lsp_settings: None,

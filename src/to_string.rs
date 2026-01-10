@@ -4,7 +4,6 @@ use sus_proc_macro::kw;
 
 use crate::alloc::zip_eq;
 use crate::dev_aid::ariadne_interface::pretty_print_many_spans;
-use crate::flattening::typecheck::TyCell;
 use crate::instantiation::{
     InferenceResult, InstantiatedModule, IsPort, ModuleTypingContext, MultiplexerSource,
     PartialBound, RealWire, RealWireDataSource, RealWirePathElem, SubModule, SubModuleOrWire,
@@ -16,9 +15,9 @@ use crate::latency::port_latency_inference::{
 use crate::prelude::*;
 
 use crate::file_position::FileText;
-use crate::typing::abstract_type::{AbstractGlobalReference, AbstractInnerType};
+use crate::typing::abstract_type::{AbstractGlobalReference, AbstractInnerType, PeanoType};
 use crate::typing::concrete_type::{ConcreteGlobalReference, SubtypeRelation};
-use crate::typing::domain_type::DomainType;
+use crate::typing::domain_type::{DomainType, DomainTypeRef};
 use crate::typing::template::{
     GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind,
 };
@@ -60,67 +59,57 @@ impl AbstractRankedType {
         link_info: &'a LinkInfo,
     ) -> impl Display + 'a {
         FmtWrapper(move |f| {
-            let res = match &self.inner {
-                AbstractInnerType::Unknown(_) => write!(f, "?"),
-                AbstractInnerType::Template(id) => f.write_str(&link_info.parameters[*id].name),
-                AbstractInnerType::Named(name) => {
-                    write!(f, "{}", name.display(globals, link_info))
-                }
-                AbstractInnerType::Interface(md_id, interface_id) => {
-                    let md = &globals.modules[md_id.id];
-                    write!(
-                        f,
-                        "Interface {} of {}",
-                        md.interfaces[*interface_id].name,
-                        md_id.display(globals, link_info)
-                    )
-                }
-                AbstractInnerType::LocalInterface(local_interface) => write!(
-                    f,
-                    "Local Interface '{}'",
-                    link_info.instructions[*local_interface]
-                        .unwrap_interface()
-                        .name,
-                ),
-            };
-            res?;
-            // Print PeanoType rank using its custom Display impl
-            write!(f, "{}", PeanoTypeDisplay(&self.rank))
+            write!(
+                f,
+                "{}{}",
+                self.inner.display(globals, link_info),
+                &self.rank
+            )
         })
     }
 }
-impl TyCell<AbstractRankedType> {
+impl UniCell<AbstractInnerType> {
     pub fn display<'a>(
         &'a self,
         globals: &'a LinkerGlobals,
         link_info: &'a LinkInfo,
     ) -> impl Display + 'a {
-        FmtWrapper(move |f| {
-            if let Some(slf) = self.get_maybe() {
-                slf.display(globals, link_info).fmt(f)
-            } else {
-                f.write_str("?")
+        FmtWrapper(move |f| match self.get() {
+            Some(AbstractInnerType::Template(id)) => f.write_str(&link_info.parameters[*id].name),
+            Some(AbstractInnerType::Named(name)) => {
+                write!(f, "{}", name.display(globals, link_info))
             }
+            Some(AbstractInnerType::Interface(md_id, interface_id)) => {
+                let md = &globals.modules[md_id.id];
+                write!(
+                    f,
+                    "Interface {} of {}",
+                    md.interfaces[*interface_id].name,
+                    md_id.display(globals, link_info)
+                )
+            }
+            Some(AbstractInnerType::LocalInterface(local_interface)) => write!(
+                f,
+                "Local Interface '{}'",
+                link_info.instructions[*local_interface]
+                    .unwrap_interface()
+                    .name,
+            ),
+            None => write!(f, "?"),
         })
     }
 }
-
-// Helper wrapper for PeanoType display
-struct PeanoTypeDisplay<'a>(&'a crate::typing::abstract_type::PeanoType);
-impl<'a> std::fmt::Display for PeanoTypeDisplay<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut cur = self.0;
+impl Display for UniCell<PeanoType> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut cur = self;
         loop {
-            match cur {
-                crate::typing::abstract_type::PeanoType::Zero => return Ok(()),
-                crate::typing::abstract_type::PeanoType::Succ(inner) => {
+            match cur.get() {
+                Some(PeanoType::Zero) => break Ok(()),
+                Some(PeanoType::Succ(inner)) => {
                     f.write_str("[]")?;
                     cur = inner;
                 }
-                crate::typing::abstract_type::PeanoType::Unknown(_) => {
-                    write!(f, "[...]")?;
-                    return Ok(());
-                }
+                None => break write!(f, "[...]"),
             }
         }
     }
@@ -358,6 +347,16 @@ impl Display for Value {
     }
 }
 
+impl Display for IsExtern {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            IsExtern::Normal => "non-extern",
+            IsExtern::Extern => "extern",
+            IsExtern::Builtin => "__builtin__",
+        })
+    }
+}
+
 impl DomainID {
     pub fn display<'d>(
         &'d self,
@@ -372,17 +371,17 @@ impl DomainID {
         })
     }
 }
-
-impl Display for IsExtern {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            IsExtern::Normal => "non-extern",
-            IsExtern::Extern => "extern",
-            IsExtern::Builtin => "__builtin__",
+impl UniCell<DomainID> {
+    pub fn display<'d>(
+        &'d self,
+        domains: &'d FlatAlloc<DomainInfo, DomainIDMarker>,
+    ) -> impl Display + 'd {
+        FmtWrapper(move |f| match self.get() {
+            Some(d) => d.display(domains).fmt(f),
+            None => f.write_str("?"),
         })
     }
 }
-
 impl DomainType {
     pub fn display<'d>(
         &'d self,
@@ -391,17 +390,17 @@ impl DomainType {
         FmtWrapper(move |f| match self {
             DomainType::Generative => f.write_str("gen"),
             DomainType::Physical(physical_id) => physical_id.display(domains).fmt(f),
-            DomainType::Unknown(_) => unreachable!(),
         })
     }
-    pub fn debug<'d>(
+}
+impl UniCell<DomainType> {
+    pub fn display<'d>(
         &'d self,
         domains: &'d FlatAlloc<DomainInfo, DomainIDMarker>,
     ) -> impl Display + 'd {
-        FmtWrapper(move |f| match self {
-            DomainType::Generative => f.write_str("gen"),
-            DomainType::Physical(physical_id) => write!(f, "{}", physical_id.display(domains)),
-            DomainType::Unknown(unknown_id) => write!(f, "{{{unknown_id:?}}}"),
+        FmtWrapper(move |f| match self.get() {
+            Some(d) => d.display(domains).fmt(f),
+            None => f.write_str("?"),
         })
     }
 }
@@ -756,12 +755,10 @@ impl LinkInfo {
         domains: &'s FlatAlloc<DomainInfo, DomainIDMarker>,
     ) -> impl Display + 's {
         let domain = self.get_instruction_domain(instr_id);
-        FmtWrapper(move |f| {
-            if let Some(domain) = domain {
-                write!(f, "{}", domain.debug(domains))
-            } else {
-                Ok(())
-            }
+        FmtWrapper(move |f| match domain {
+            Some(DomainTypeRef::Generative) => write!(f, "gen"),
+            Some(DomainTypeRef::Physical(phys)) => write!(f, "{}", phys.display(domains)),
+            None => Ok(()),
         })
     }
     pub fn fmt_instructions(
@@ -809,7 +806,7 @@ impl LinkInfo {
                             local_domain_map,
                             |f, (submod_domain, domain_here)| {
                                 let submod_domain = submod_domain.display(submod_domains);
-                                let domain_here = domain_here.unwrap_physical();
+                                let domain_here = *domain_here.unwrap();
                                 let domain_here = domain_here.display(domains);
                                 write!(f, ".{submod_domain} = {domain_here}")
                             },
@@ -850,8 +847,7 @@ impl LinkInfo {
                                      target_domain,
                                      ..
                                  }| {
-                                    let target_domain = target_domain.get();
-                                    let target_domain = target_domain.debug(domains);
+                                    let target_domain = target_domain.display(domains);
                                     let typ_disp = to.output_typ.display(globals, self);
                                     let to = to.display(globals, self);
                                     write!(f, "{target_domain} ({typ_disp}) {write_modifiers} {to}")
@@ -985,11 +981,7 @@ impl Module {
         may_print_domain: bool,
     ) -> impl Display {
         let domain = display_if(may_print_domain, |f| {
-            write!(
-                f,
-                "{{{}}} ",
-                self.domains[interface.domain.unwrap_physical()].name
-            )
+            write!(f, "{{{}}} ", self.domains[*interface.domain.unwrap()].name)
         });
         let interface_kind = interface.interface_kind;
         let name = &file_text[interface.name_span];
@@ -1028,7 +1020,7 @@ impl Module {
                 if let Some(domain_map) = &local_domains_used_in_parent_module {
                     let submod_name = &self.link_info.name;
                     let name_in_parent =
-                        domain_map.local_domain_map[domain_id].debug(domain_map.domains);
+                        domain_map.local_domain_map[domain_id].display(domain_map.domains);
                     write!(f, "\ndomain {submod_name}.{name} = {name_in_parent}:")?;
                 } else {
                     write!(f, "\ndomain {name}:")?;
@@ -1038,7 +1030,7 @@ impl Module {
                     match interface.declaration_instruction {
                         Some(InterfaceDeclKind::Interface(decl_id)) => {
                             let interface = self.link_info.instructions[decl_id].unwrap_interface();
-                            if interface.domain.unwrap_physical() == domain_id {
+                            if *interface.domain.unwrap() == domain_id {
                                 let info = self.display_interface_info(interface, file_text, false);
                                 write!(f, "\n{info}")?;
                             }
@@ -1046,7 +1038,7 @@ impl Module {
                         Some(InterfaceDeclKind::SinglePort(decl_id)) => {
                             let single_port =
                                 self.link_info.instructions[decl_id].unwrap_declaration();
-                            if single_port.domain.get().unwrap_physical() == domain_id {
+                            if single_port.domain.unwrap_physical() == domain_id {
                                 let info = self.display_port_info(single_port, file_text);
                                 write!(f, "\n{info}")?;
                             }

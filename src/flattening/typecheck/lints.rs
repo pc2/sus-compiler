@@ -119,7 +119,7 @@ impl LintContext<'_> {
                     direction: _,
                 } => {
                     let width = self.working_on.instructions[*width].unwrap_subexpression();
-                    if width.domain != DomainType::Generative {
+                    if !width.domain.unwrap().is_generative() {
                         self.errors.error(
                             width.span,
                             "The width of a part-select cannot be non-generative",
@@ -133,7 +133,7 @@ impl LintContext<'_> {
                 } => {
                     for bound in from.iter().chain(to.iter()) {
                         let bound = self.working_on.instructions[*bound].unwrap_subexpression();
-                        if bound.domain != DomainType::Generative {
+                        if !bound.domain.unwrap().is_generative() {
                             self.errors
                                 .error(bound.span, "A slice bound cannot be non-generative");
                         }
@@ -143,13 +143,12 @@ impl LintContext<'_> {
         }
     }
     fn cant_be_interface(&self, operation: &'static str, wire_ref: &WireReference) {
-        match &wire_ref.output_typ.inner {
-            AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => {
+        match wire_ref.output_typ.inner.get() {
+            Some(AbstractInnerType::Interface(_, _))
+            | Some(AbstractInnerType::LocalInterface(_)) => {
                 self.errors.error(wire_ref.get_total_span(), format!("Can't {operation} an interface. Use a function call or interface connector instead"));
             }
-            AbstractInnerType::Template(_)
-            | AbstractInnerType::Named(_)
-            | AbstractInnerType::Unknown(_) => {}
+            Some(AbstractInnerType::Template(_)) | Some(AbstractInnerType::Named(_)) | None => {}
         }
     }
     fn lint_instructions(&self) {
@@ -538,7 +537,9 @@ impl LintContext<'_> {
                         continue;
                     }
                     let non_synthesizeable_typ_name =
-                        if let AbstractInnerType::Named(global_ref) = &declaration.typ.inner {
+                        if let Some(AbstractInnerType::Named(global_ref)) =
+                            declaration.typ.inner.get()
+                        {
                             match global_ref.id {
                                 get_builtin_type!("string") => "string",
                                 _ => continue,

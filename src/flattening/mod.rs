@@ -5,21 +5,22 @@ mod parser;
 pub mod typecheck;
 mod walk;
 
-use crate::flattening::typecheck::TyCell;
 use crate::prelude::*;
-use crate::typing::abstract_type::{AbstractGlobalReference, AbstractRankedType, PeanoType};
-use crate::typing::domain_type::DomainType;
 
-use std::cell::{Cell, OnceCell};
+use crate::{
+    latency::port_latency_inference::PortLatencyInferenceInfo,
+    linker::{Documentation, LinkInfo},
+    typing::abstract_type::{AbstractGlobalReference, AbstractRankedType, PeanoType},
+    typing::domain_type::DomainType,
+    typing::template::{TVec, TemplateKind},
+    typing::unifyable_cell::UniCell,
+    value::Value,
+};
 
-use crate::latency::port_latency_inference::PortLatencyInferenceInfo;
+use std::cell::OnceCell;
+
 pub use flatten::flatten_all_globals;
 pub use initialization::gather_initial_file_data;
-
-use crate::linker::{Documentation, LinkInfo};
-use crate::value::Value;
-
-use crate::typing::template::{TVec, TemplateKind};
 
 /// Modules are compiled in 4 stages. All modules must pass through each stage before advancing to the next stage.
 ///
@@ -371,7 +372,7 @@ impl WireReferenceRoot {
 pub struct WireReference {
     pub root: WireReferenceRoot,
     pub path: Vec<WireReferencePathElement>,
-    pub output_typ: TyCell<AbstractRankedType>,
+    pub output_typ: AbstractRankedType,
     pub root_span: Span,
 }
 
@@ -429,7 +430,7 @@ pub struct WriteTo {
     pub to: WireReference,
     pub to_span: Span,
     pub write_modifiers: WriteModifiers,
-    pub target_domain: Cell<DomainType>,
+    pub target_domain: UniCell<DomainType>,
 }
 
 /// -x
@@ -497,13 +498,13 @@ pub enum ExpressionSource {
     UnaryOp {
         op: UnaryOperator,
         /// Operators automatically parallelize across arrays
-        rank: TyCell<PeanoType>,
+        rank: UniCell<PeanoType>,
         right: FlatID,
     },
     BinaryOp {
         op: BinaryOperator,
         /// Operators automatically parallelize across arrays
-        rank: TyCell<PeanoType>,
+        rank: UniCell<PeanoType>,
         left: FlatID,
         right: FlatID,
     },
@@ -525,7 +526,7 @@ impl ExpressionSource {
 /// - We refuse to have tuple types
 #[derive(Debug)]
 pub enum ExpressionOutput {
-    SubExpression(TyCell<AbstractRankedType>),
+    SubExpression(AbstractRankedType),
     MultiWrite(Vec<WriteTo>),
 }
 /// An [Instruction] that represents a single expression in the program. Like ((3) + (x))
@@ -539,7 +540,7 @@ pub struct Expression {
     pub parent_condition: Option<ParentCondition>,
     pub source: ExpressionSource,
     /// Means [Self::source] can be computed at compiletime, not that [Self::output] neccesarily requires a generative result
-    pub domain: Cell<DomainType>,
+    pub domain: UniCell<DomainType>,
 
     /// If [None], then this function returns a single result like a normal expression
     /// If Some(outputs), then this function is a dead-end expression, and does it's outputs manually
@@ -559,7 +560,7 @@ impl Expression {
         };
         Some(SingleOutputExpression {
             typ,
-            domain: self.domain.get(),
+            domain: &self.domain,
             span: self.span,
             source: &self.source,
         })
@@ -653,8 +654,9 @@ impl DeclarationKind {
 pub struct Declaration {
     pub parent_condition: Option<ParentCondition>,
     pub typ_expr: WrittenType,
-    pub typ: TyCell<AbstractRankedType>,
-    pub domain: Cell<DomainType>,
+    pub typ: AbstractRankedType,
+    /// In a declaration, we immediately known if we're generative, but not the exact physical domain.
+    pub domain: DomainType,
     pub decl_span: Span,
     pub name_span: Span,
     pub name: String,
@@ -684,8 +686,8 @@ pub struct SubModuleInstance {
     /// `local_domain_map[submodule_domain] = parent_domain`
     ///
     /// These are *always* [DomainType::Physical] (of course, start out as [DomainType::Unknown] before typing)
-    pub local_domain_map: OnceCell<FlatAlloc<DomainType, DomainIDMarker>>,
-    pub typ: TyCell<AbstractRankedType>,
+    pub local_domain_map: OnceCell<FlatAlloc<UniCell<DomainID>, DomainIDMarker>>,
+    pub typ: AbstractRankedType,
     pub documentation: Documentation,
 }
 
@@ -754,7 +756,7 @@ pub struct GlobalReference<ID> {
     pub name_span: Span,
     pub id: ID,
     pub template_args: Vec<WrittenTemplateArg>,
-    pub template_arg_types: TyCell<TVec<TemplateKind<AbstractRankedType, ()>>>,
+    pub template_arg_types: OnceCell<TVec<TemplateKind<AbstractRankedType, ()>>>,
     pub template_span: Option<BracketSpan>,
 }
 
@@ -765,13 +767,6 @@ impl<ID: Copy> GlobalReference<ID> {
             result = Span::new_overarching(result, template_span.outer_span());
         }
         result
-    }
-
-    pub fn as_abstract_global_ref(&self) -> AbstractGlobalReference<ID> {
-        AbstractGlobalReference {
-            id: self.id,
-            template_arg_types: self.template_arg_types.clone(),
-        }
     }
 
     pub fn resolve_template_args(&self, errors: &ErrorCollector, target: &LinkInfo) {
@@ -943,7 +938,7 @@ pub struct InterfaceDeclaration {
     pub else_block: FlatIDRange,
     pub then_span: Option<Span>,
     pub else_span: Option<Span>,
-    pub domain: DomainType,
+    pub domain: UniCell<DomainID>,
 }
 
 /// When a module has been parsed and flattened, it is turned into a large list of instructions,
@@ -970,7 +965,7 @@ pub enum Instruction {
 #[derive(Debug, Clone, Copy)]
 pub struct SingleOutputExpression<'e> {
     pub typ: &'e AbstractRankedType,
-    pub domain: DomainType,
+    pub domain: &'e UniCell<DomainType>,
     pub span: Span,
     pub source: &'e ExpressionSource,
 }
@@ -991,7 +986,7 @@ impl Instruction {
         };
         SingleOutputExpression {
             typ,
-            domain: expr.domain.get(),
+            domain: &expr.domain,
             span: expr.span,
             source: &expr.source,
         }

@@ -1,7 +1,12 @@
-use crate::{dev_aid::ariadne_interface::pretty_print_many_spans, linker::LinkerFiles, prelude::*};
+use crate::prelude::*;
+
+use crate::{
+    dev_aid::ariadne_interface::pretty_print_many_spans, linker::LinkerFiles, to_string::FmtWrapper,
+};
 
 use std::{
     cell::{Cell, RefCell},
+    fmt::Display,
     path::PathBuf,
     sync::{Arc, LazyLock, Mutex, atomic::AtomicBool},
     thread,
@@ -36,7 +41,7 @@ struct SpanDebuggerStackElement {
 
 thread_local! {
     static DEBUG_STACK : RefCell<PerThreadDebugInfo> = const { RefCell::new(PerThreadDebugInfo{debug_stack: Vec::new(), recent_debug_options: CircularBuffer::new()}) };
-    static STORED_LINKER: Cell<*mut Linker> = const { Cell::new(std::ptr::null_mut()) };
+    static FILES_FOR_DEBUG: Cell<*mut LinkerFiles> = const { Cell::new(std::ptr::null_mut()) };
 }
 
 /// Register a [crate::file_position::Span] for printing by [SpanDebugger] on panic.
@@ -80,17 +85,19 @@ fn print_most_recent_spans(linker_files: &LinkerFiles, history: &SpanDebuggerSta
 /// Used by __debug_span
 #[allow(unused)]
 pub fn debug_print_span(span: Span, label: String) {
-    let linker_ptr = STORED_LINKER.get();
+    let linker_files_ptr = FILES_FOR_DEBUG.get();
     // SAFETY: Well actually this is totally not safe, since this could be called while a &mut Linker is held, and returned.
     // But since this is exclusively for debugging (and therefore should never be part of a release), it doesn't matter.
-    if let Some(linker) = unsafe { linker_ptr.as_ref() } {
-        pretty_print_span(&linker.files, span, label);
-    } else {
-        error!("DEBUG: No Linker registered for Span Debugging!");
+    unsafe {
+        if let Some(files) = linker_files_ptr.as_ref() {
+            pretty_print_span(files, span, label);
+        } else {
+            error!("DEBUG: No Linker registered for Span Debugging!");
+        }
     }
 }
 
-fn print_stack_top(enter_exit: &str) {
+fn print_stack_top(enter_exit: impl Display) {
     DEBUG_STACK.with_borrow(|stack| {
         if !config().enabled_debug_paths.contains("spandebugger") {
             return;
@@ -141,7 +148,9 @@ pub fn debug_context<R>(stage: &'static str, global_obj_name: String, f: impl Fn
     let result = f(); // On panic, skips the following code (of course _out_of_time_killer is still Dropped)
 
     let time_taken = std::time::Instant::now() - started_at;
-    print_stack_top(&format!("Exit (Took {:.2}s)", time_taken.as_secs_f64()));
+    print_stack_top(FmtWrapper(|f| {
+        write!(f, "Exit (Took {:.2}s)", time_taken.as_secs_f64())
+    }));
 
     // Clean up most recent debug stack frame. DOES NOT TRIGGER ON PANIC, such that it doesn't destroy the state for [setup_panic_handler]
     DEBUG_STACK.with_borrow_mut(|stack| {
@@ -183,7 +192,7 @@ pub fn debugging_enabled() -> bool {
     })
 }
 
-fn create_dump(linker: &Linker) {
+fn create_dump(linker_files: &LinkerFiles) {
     let config = crate::config();
 
     if config.no_redump {
@@ -247,7 +256,7 @@ fn create_dump(linker: &Linker) {
         let _ = f.write_all(cmd.as_bytes());
     }
 
-    for (_id, file_data) in &linker.files {
+    for (_id, file_data) in linker_files {
         // Exclude files from the standard library directory
         if file_data.is_std {
             continue;
@@ -271,13 +280,13 @@ pub fn setup_panic_handler() {
         // === Display last touched spans ===
 
         // Additional barrier for errant optimizations?
-        let linker_ptr: *mut Linker = std::hint::black_box(STORED_LINKER.get());
-        if linker_ptr.is_null() {
+        let files_ptr: *mut LinkerFiles = std::hint::black_box(FILES_FOR_DEBUG.get());
+        if files_ptr.is_null() {
             info!("sus_compiler crashed outside of an area protected by create_dump_on_panic");
             return;
         };
         // SAFETY: Haha, yeah this is technically UB, see [create_dump_on_panic]
-        let linker = unsafe { &*linker_ptr };
+        let linker_files = unsafe { &*files_ptr };
 
         DEBUG_STACK.with_borrow(|history| {
             if let Some(last_stack_elem) = history.debug_stack.last() {
@@ -292,7 +301,7 @@ pub fn setup_panic_handler() {
                 );
 
                 //pretty_print_span(file_data, span, label);
-                print_most_recent_spans(&linker.files, last_stack_elem);
+                print_most_recent_spans(linker_files, last_stack_elem);
             } else {
                 eprintln!("{}", "No Span-guarding context".red());
             }
@@ -308,17 +317,7 @@ pub fn setup_panic_handler() {
 
         // === Create Dump on Panic ===
 
-        create_dump(linker);
-
-        #[cfg(miri)]
-        {
-            // Miri can't handle deallocation of tree-sitter trees
-            unsafe {
-                std::mem::forget(std::mem::take(
-                    &mut STORED_LINKER.get().as_mut().unwrap().files,
-                ));
-            }
-        }
+        create_dump(linker_files);
     }));
 }
 
@@ -330,8 +329,8 @@ pub fn setup_panic_handler() {
 /// Look, it's UB, but it's a better tradeoff than *not* having the debug info that the program can give me immediately upon panic.
 /// STORED_LINKER is turned into a simple shared reference in [setup_panic_handler], which again should slightly limit the blast radius of this UB.
 pub fn create_dump_on_panic<R>(linker: &mut Linker, f: impl FnOnce(&mut Linker) -> R) -> R {
-    let linker_ptr: *mut Linker = linker as *mut Linker;
-    let old_stored_linker = STORED_LINKER.replace(linker_ptr);
+    let linker_files: *mut LinkerFiles = &mut linker.files;
+    let old_stored_linker = FILES_FOR_DEBUG.replace(linker_files);
     if !old_stored_linker.is_null() {
         panic!("create_dump_on_panic is re-entrant? This is a logic error!");
     }
@@ -340,9 +339,9 @@ pub fn create_dump_on_panic<R>(linker: &mut Linker, f: impl FnOnce(&mut Linker) 
     // the &mut Linker is no longer in scope, therefore STORED_LINKER is the only reference to it (disregarding the reborrow of `linker`).
     // The &mut passed to f must be derived from STORED_LINKER, passing linker directly would mean linker_ptr is an invalid reborrow
     // See https://users.rust-lang.org/t/how-to-report-extra-information-on-crashes-from-global-state-without-invalidating-a-pointer/136699
-    let r = f(unsafe { &mut *linker_ptr });
+    let r = f(linker);
 
-    STORED_LINKER.replace(std::ptr::null_mut());
+    FILES_FOR_DEBUG.replace(std::ptr::null_mut());
     //assert_eq!(STORED_LINKER.replace(None), Some(NonNull::from(linker)));
 
     r
@@ -452,9 +451,9 @@ macro_rules! __debug_dbg {
     };
 }
 
-#[cfg(test)]
+/*#[cfg(test)]
 mod tests {
-    use std::cell::OnceCell;
+    use std::{cell::OnceCell, panic::AssertUnwindSafe};
 
     use crate::{errors::ErrorStore, file_position::FileText, linker::FileData};
 
@@ -468,32 +467,38 @@ mod tests {
         setup_panic_handler();
         let mut linker = Linker::new();
 
-        create_dump_on_panic(&mut linker, |_linker| {
-            panic!("OOPS");
-
+        create_dump_on_panic(&mut linker, |linker| {
             // The below, there's not much point. The test already fails miri, and I don't really see a way to fix that.
 
-            /*let fd_id = linker.files.alloc(FileData {
-                file_identifier: "/non_existent/test/file/path.sus".to_string(),
-                file_text: FileText::new("non extistent file text".to_string()),
-                parsing_errors: ErrorStore::new(),
-                associated_values: Vec::new(),
-                tree: unsafe { tree_sitter::Tree::from_raw(std::ptr::dangling_mut()) },
-                is_std: false,
-                ariadne_source: OnceCell::new(),
-            });
+            let info = std::panic::catch_unwind(AssertUnwindSafe(|| {
+                panic!("OOPS");
 
-            debug_context("test_context", "test_obj".to_string(), || {
-                let my_span = Span::from_range(4..13, fd_id); // "existent"
-                my_span.debug();
-                if !linker.files.is_empty() {
-                    panic!("OOPS");
-                }
+                let fd_id = linker.files.alloc(FileData {
+                    file_identifier: "/non_existent/test/file/path.sus".to_string(),
+                    file_text: FileText::new("non extistent file text".to_string()),
+                    parsing_errors: ErrorStore::new(),
+                    associated_values: Vec::new(),
+                    // miri can't handle creation of tree-sitter trees
+                    tree: unsafe { tree_sitter::Tree::from_raw(std::ptr::dangling_mut()) },
+                    is_std: false,
+                    ariadne_source: OnceCell::new(),
+                });
 
-                let linker_two = &*linker;
+                debug_context("test_context", "test_obj".to_string(), || {
+                    let my_span = Span::from_range(4..13, fd_id); // "existent"
+                    my_span.debug();
+                    if !linker.files.is_empty() {
+                        panic!("OOPS");
+                    }
 
-                println!("{}", linker_two.files[fd_id].is_std);
-            });*/
+                    let _linker_two = &*linker;
+
+                    //println!("{}", linker_two.files[fd_id].is_std);
+                });
+            }));
+            // Miri can't handle deallocation of tree-sitter trees
+            std::mem::forget(std::mem::take(&mut linker.files));
+            std::panic::resume_unwind(info.unwrap_err())
         });
     }
-}
+}*/

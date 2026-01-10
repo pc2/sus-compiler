@@ -217,7 +217,7 @@ impl Value {
         let array_depth = abs_typ.rank.count();
         let mut tensor_sizes = Vec::with_capacity(array_depth);
 
-        let content_typ = match &abs_typ.inner {
+        let content_typ = match abs_typ.inner.unwrap() {
             AbstractInnerType::Template(template_id) => {
                 self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |_| Ok(()))?;
                 template_args[*template_id].unwrap_type().clone()
@@ -382,7 +382,6 @@ impl Value {
                     "Interfaces can't be concretized, should have been caught by typecheck!"
                 )
             }
-            AbstractInnerType::Unknown(_) => unreachable!(),
         };
 
         assert!(tensor_sizes.len() <= array_depth);
@@ -458,10 +457,15 @@ impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, TVec<ConcreteTemplateArg>>
     for ValueUnifier<'s>
 {
     fn fully_substitute_recurse(&'unif self, v: &TVec<ConcreteTemplateArg>) -> bool {
-        v.iter().all(|(_, arg)| match arg {
-            TemplateKind::Type(t) => self.fully_substitute_recurse(t),
-            TemplateKind::Value(v) => self.fully_substitute(v),
-        })
+        let mut total = true;
+        // In any case, iterate all
+        for (_, arg) in v {
+            total &= match arg {
+                TemplateKind::Type(t) => self.fully_substitute_recurse(t),
+                TemplateKind::Value(v) => self.fully_substitute(v),
+            }
+        }
+        total
     }
 
     fn resolve_recurse(

@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use crate::to_string::{display_all_infer_params, display_infer_param_info};
-use crate::typing::domain_type::DomainType;
 use crate::typing::template::TemplateKind;
 
 use lsp_types::{LanguageString, MarkedString};
@@ -100,7 +99,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             } else {
                 &FlatAlloc::EMPTY_FLAT_ALLOC
             };
-            details_vec.push(decl.domain.get().display(domains).to_string());
+            details_vec.push(decl.domain.display(domains).to_string());
 
             match decl.decl_kind {
                 DeclarationKind::Port { direction, .. } => details_vec.push(direction.to_string()),
@@ -178,7 +177,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             details_vec.push(expr.domain.display(domains).to_string());
             details_vec.push(expr.typ.display(linker, link_info).to_string());
             hover.sus_code(details_vec.join(" "));
-            hover.gather_hover_infos(obj_id, id, expr.domain == DomainType::Generative);
+            hover.gather_hover_infos(obj_id, id, expr.domain.unwrap().is_generative());
         }
         LocationInfo::Type(typ, link_info) => {
             hover.sus_code(typ.display(linker, &link_info.parameters).to_string());
