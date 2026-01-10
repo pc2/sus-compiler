@@ -34,6 +34,9 @@ impl<T> AppendOnlyVec<T> {
     pub fn push(&self, data: T) {
         unsafe { (*self.0.get()).push(data) }
     }
+    pub fn append(&self, vec: &mut Vec<T>) {
+        unsafe { (*self.0.get()).append(vec) }
+    }
     pub fn pop(&self) -> Option<T> {
         unsafe { (*self.0.get()).pop() }
     }

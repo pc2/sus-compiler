@@ -15,8 +15,8 @@ use crate::{
         template::TVec,
         template::TemplateKind,
         unifyable_cell::{
-            ResolveError, SubTree, SubstituteRecurse, Substitutor, UniCell, Unifier, UnifierTop,
-            UnifierTopInfo, UnifyRecurse, UnifyResult,
+            ResolveError, SubTree, SubstituteRecurse, UniCell, Unifier, UnifierTop, UnifierTopInfo,
+            UnifyRecurse, UnifyResult,
         },
     },
     value::Value,
@@ -24,14 +24,12 @@ use crate::{
 
 #[derive(Default)]
 pub struct ValueUnifier<'s> {
-    value_substitutor: Substitutor<'s, Value, Self>,
     unifier_top_info: UnifierTopInfo<'s, Self>,
 }
 
 impl<'s> ValueUnifier<'s> {
     pub fn new() -> Self {
         Self {
-            value_substitutor: Substitutor::new(),
             unifier_top_info: UnifierTopInfo::new(),
         }
     }
@@ -49,9 +47,6 @@ impl ConcreteType {
 }
 
 impl<'s> UnifierTop<'s> for ValueUnifier<'s> {
-    fn execute_ready_constraints(&self) {
-        self.value_substitutor.execute_ready_constraints(self);
-    }
     fn get_unifier_info(&self) -> &UnifierTopInfo<'s, Self> {
         &self.unifier_top_info
     }
@@ -76,33 +71,30 @@ fn check_values_equal(a: &Value, b: &Value) -> UnifyResult {
     };
     UnifyResult::from(eq)
 }
-impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, Value> for ValueUnifier<'s> {
-    fn fully_substitute_recurse(&'unif self, _: &Value) -> bool {
+impl<'s> SubstituteRecurse<'s, Value> for ValueUnifier<'s> {
+    fn fully_substitute_recurse(&self, _: &Value) -> bool {
         true // No recursion
     }
 
-    fn resolve_recurse(&'unif self, _: &'s Value) -> Result<(), ResolveError<'unif, 's, Self>> {
+    fn resolve_recurse(&self, _: &'s Value) -> Result<(), ResolveError<'s>> {
         Ok(())
     }
 }
-impl<'unif, 's: 'unif> UnifyRecurse<'unif, 's, Value> for ValueUnifier<'s> {
-    fn unify_subtrees(&'unif self, a: &'s Value, b: &'s Value) -> UnifyResult {
+impl<'s> UnifyRecurse<'s, Value> for ValueUnifier<'s> {
+    fn unify_subtrees(&self, a: &'s Value, b: &'s Value) -> UnifyResult {
         check_values_equal(a, b)
     }
 
-    fn set_subtrees(&'unif self, a: &'s Value, b: &mut Value) -> UnifyResult {
+    fn set_subtrees(&self, a: &'s Value, b: &mut Value) -> UnifyResult {
         check_values_equal(a, b)
     }
 
-    fn clone_known(&'unif self, known: &'s Value) -> Value {
+    fn clone_known(&self, known: &'s Value) -> Value {
         known.clone() // No recursion
     }
 }
-impl<'unif, 's: 'unif> Unifier<'unif, 's, Value> for ValueUnifier<'s> {
-    fn get_substitutor(&'unif self) -> &'unif Substitutor<'s, Value, Self> {
-        &self.value_substitutor
-    }
-    fn contains_subtree(&'unif self, _: &Value, _: SubTree<Value>) -> bool {
+impl<'s> Unifier<'s, Value> for ValueUnifier<'s> {
+    fn contains_subtree(&self, _: &Value, _: SubTree<Value>) -> bool {
         false // No recursion
     }
 }
@@ -425,8 +417,8 @@ impl Value {
     }
 }
 
-impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, ConcreteType> for ValueUnifier<'s> {
-    fn fully_substitute_recurse(&'unif self, v: &ConcreteType) -> bool {
+impl<'s> SubstituteRecurse<'s, ConcreteType> for ValueUnifier<'s> {
+    fn fully_substitute_recurse(&self, v: &ConcreteType) -> bool {
         match v {
             ConcreteType::Named(global_ref) => {
                 self.fully_substitute_recurse(&global_ref.template_args)
@@ -438,10 +430,7 @@ impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, ConcreteType> for ValueUnifi
         }
     }
 
-    fn resolve_recurse(
-        &'unif self,
-        v: &'s ConcreteType,
-    ) -> Result<(), ResolveError<'unif, 's, Self>> {
+    fn resolve_recurse(&self, v: &'s ConcreteType) -> Result<(), ResolveError<'s>> {
         match v {
             ConcreteType::Named(global_ref) => self.resolve_recurse(&global_ref.template_args),
             ConcreteType::Array(arr) => {
@@ -453,10 +442,8 @@ impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, ConcreteType> for ValueUnifi
     }
 }
 
-impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, TVec<ConcreteTemplateArg>>
-    for ValueUnifier<'s>
-{
-    fn fully_substitute_recurse(&'unif self, v: &TVec<ConcreteTemplateArg>) -> bool {
+impl<'s> SubstituteRecurse<'s, TVec<ConcreteTemplateArg>> for ValueUnifier<'s> {
+    fn fully_substitute_recurse(&self, v: &TVec<ConcreteTemplateArg>) -> bool {
         let mut total = true;
         // In any case, iterate all
         for (_, arg) in v {
@@ -468,10 +455,7 @@ impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, TVec<ConcreteTemplateArg>>
         total
     }
 
-    fn resolve_recurse(
-        &'unif self,
-        v: &'s TVec<ConcreteTemplateArg>,
-    ) -> Result<(), ResolveError<'unif, 's, Self>> {
+    fn resolve_recurse(&self, v: &'s TVec<ConcreteTemplateArg>) -> Result<(), ResolveError<'s>> {
         for (_, arg) in v {
             match arg {
                 TemplateKind::Type(t) => self.resolve_recurse(t)?,
@@ -482,17 +466,12 @@ impl<'unif, 's: 'unif> SubstituteRecurse<'unif, 's, TVec<ConcreteTemplateArg>>
     }
 }
 
-impl<'unif, 's: 'unif, ID> SubstituteRecurse<'unif, 's, ConcreteGlobalReference<ID>>
-    for ValueUnifier<'s>
-{
-    fn fully_substitute_recurse(&'unif self, v: &ConcreteGlobalReference<ID>) -> bool {
+impl<'s, ID> SubstituteRecurse<'s, ConcreteGlobalReference<ID>> for ValueUnifier<'s> {
+    fn fully_substitute_recurse(&self, v: &ConcreteGlobalReference<ID>) -> bool {
         self.fully_substitute_recurse(&v.template_args)
     }
 
-    fn resolve_recurse(
-        &'unif self,
-        v: &'s ConcreteGlobalReference<ID>,
-    ) -> Result<(), ResolveError<'unif, 's, Self>> {
+    fn resolve_recurse(&self, v: &'s ConcreteGlobalReference<ID>) -> Result<(), ResolveError<'s>> {
         self.resolve_recurse(&v.template_args)
     }
 }

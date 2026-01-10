@@ -144,13 +144,6 @@ impl<'l> TypeCheckingContext<'l> {
         let (mut context, infos) = report.report();
         if unify_result == UnifyResult::FailureInfiniteTypes {
             context.push_str(": Creating Infinite Types is Forbidden!");
-
-            self.unifier.fully_substitute(found_inner);
-            self.unifier.fully_substitute(found_rank);
-            self.unifier.fully_substitute(&expected_inner);
-            self.unifier.fully_substitute(&expected_rank);
-            __debug_span!(span, "{found_inner:?}{found_rank:?}   ---   {expected_inner:?}{expected_rank:?}");
-            __debug_breakpoint!()
         }
         self.unifier.delayed_error(move |unifier| {
             unifier.fully_substitute(found_inner);
