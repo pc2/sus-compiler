@@ -60,11 +60,14 @@ use std::{
 ///
 /// A "Prototype" refers to a [UniCell] that has thus far not been touched by a [Substitutor]. [UniCell::UNKNOWN] is a valid prototype.
 /// A [UniCell] ceases to be a "Prototype" when it has touched a [Unifier] in any way.
-pub struct UniCell<T>(UnsafeCell<Interior<T>>);
+pub struct UniCell<T>(UnsafeCell<InteriorStore<T>>);
 
 /// Interior data for [UniCell].
-enum Interior<T> {
-    Known(T),
+/// Does double duty:
+/// - as "storage": [Interior]
+/// - and as "interior reference": [InteriorRef]
+enum Interior<KnownT, SubsT> {
+    Known(KnownT),
     /// This [UniCell] is the same as the [UniCell] that this points to. [resolve_chain] walks these until it finds a [Interior::Terminal] or [Interior::Known].
     /// CANNOT BE CLONED
     /// The lifetime `'s` of the contained pointer is guarded by [UnifierTop]`<'s>`.
@@ -73,7 +76,7 @@ enum Interior<T> {
     ///
     /// Of course, this is broken if ever a second unrelated [UnifierTop] is used to access a [UniCell] created by a previous one,
     /// but it seems an acceptable assumption.
-    SubstitutesTo(*const UniCell<T>),
+    SubstitutesTo(SubsT),
     /// The end of a chain of [Interior::SubstitutesTo]. This means this [UniCell] is the representative for all [UniCell]s that point to it.
     /// Any cluster of such unified [UniCell]s has exactly one [Interior::Terminal] representative.
     /// CANNOT BE CLONED
@@ -85,26 +88,14 @@ enum Interior<T> {
     /// When [UniCell] is [Interior::Unallocated], no [Substitutor] references can exist to it yet.
     Unallocated,
 }
+type InteriorStore<T> = Interior<T, *const UniCell<T>>;
+type InteriorRef<'obj, T> = Interior<&'obj T, *const UniCell<T>>;
 
 pub struct ConstraintsIDMarker;
 impl crate::alloc::UUIDMarker for ConstraintsIDMarker {
     const DISPLAY_NAME: &'static str = "delayed_constraint_";
 }
 pub type ConstraintsID = crate::alloc::UUID<ConstraintsIDMarker>;
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum UnknownInterior<T> {
-    SubstitutesTo(*const UniCell<T>),
-    Terminal(ConstraintsID),
-}
-impl<T> Debug for UnknownInterior<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::SubstitutesTo(arg0) => f.debug_tuple("SubstitutesTo").field(arg0).finish(),
-            Self::Terminal(arg0) => f.debug_tuple("Terminal").field(arg0).finish(),
-        }
-    }
-}
 
 impl<T> UniCell<T> {
     #[allow(clippy::declare_interior_mutable_const)]
@@ -120,24 +111,20 @@ impl<T> UniCell<T> {
     /// Either get a shared reference to the known value if it's set, or a mutable reference to the whole thing if it's not yet known
     /// This is safe, because [UniCell] only allows references to [Interior::Known] once it is set, and it can never be unset through a shared ref
     /// Immediately converts [Interior::Unallocated] to [Interior::Terminal]
-    fn get_interior(&self) -> Result<&T, UnknownInterior<T>> {
+    fn get_interior<'slf>(&'slf self) -> InteriorRef<'slf, T> {
         // SAFETY: See [UniCell]'s definition
         unsafe {
-            let interior_ptr: *mut Interior<T> = self.0.get();
-            match &*(interior_ptr as *const Interior<T>) {
-                Interior::Known(known) => Ok(known),
-                Interior::SubstitutesTo(id) => Err(UnknownInterior::SubstitutesTo(*id)),
-                Interior::Terminal(constraints) => Err(UnknownInterior::Terminal(*constraints)),
-                Interior::Unallocated => {
-                    *interior_ptr = Interior::Terminal(ConstraintsID::PLACEHOLDER);
-                    Err(UnknownInterior::Terminal(ConstraintsID::PLACEHOLDER))
-                }
+            match &*(self.0.get() as *const InteriorStore<T>) {
+                Interior::Known(known) => Interior::Known(known),
+                Interior::SubstitutesTo(id) => Interior::SubstitutesTo(*id),
+                Interior::Terminal(constraints) => Interior::Terminal(*constraints),
+                Interior::Unallocated => Interior::Unallocated,
             }
         }
     }
     #[track_caller]
-    fn replace_substitution(&self, existing_substitution: *const UniCell<T>, v: Interior<T>) {
-        if let Err(UnknownInterior::SubstitutesTo(subs)) = self.get_interior()
+    fn replace_substitution(&self, existing_substitution: *const UniCell<T>, v: InteriorStore<T>) {
+        if let Interior::SubstitutesTo(subs) = self.get_interior()
             && subs == existing_substitution
         {
             // SAFETY: We already know we're not Interior::Known, See [UniCell]'s definition
@@ -147,24 +134,30 @@ impl<T> UniCell<T> {
         }
     }
     #[track_caller]
-    fn replace_terminal(&self, v: Interior<T>) -> ConstraintsID {
-        if let Err(UnknownInterior::Terminal(constraints)) = self.get_interior() {
-            // SAFETY: We already know we're not Interior::Known, See [UniCell]'s definition
-            unsafe { *self.0.get() = v };
-            constraints
-        } else {
-            panic!("UniCell::replace_substitution's existing_id did not match the interior!");
+    fn replace_terminal(&self, v: InteriorStore<T>) -> ConstraintsID {
+        match self.get_interior() {
+            Interior::Terminal(constraints) => {
+                // SAFETY: We already know we're not Interior::Known, See [UniCell]'s definition
+                unsafe { *self.0.get() = v };
+                constraints
+            }
+            Interior::Unallocated => {
+                // SAFETY: We already know we're not Interior::Known, See [UniCell]'s definition
+                unsafe { *self.0.get() = v };
+                ConstraintsID::PLACEHOLDER
+            }
+            Interior::Known(_) | Interior::SubstitutesTo(_) => {
+                panic!("UniCell::replace_substitution's existing_id did not match the interior!");
+            }
         }
     }
 
     #[track_caller]
     pub fn get(&self) -> Option<&T> {
-        unsafe {
-            if let Interior::Known(known) = &*self.0.get() {
-                Some(known)
-            } else {
-                None
-            }
+        if let Interior::Known(k) = self.get_interior() {
+            Some(k)
+        } else {
+            None
         }
     }
     #[track_caller]
@@ -189,8 +182,8 @@ impl<T> UniCell<T> {
     #[track_caller]
     pub fn set_initial_cell(&self, v: UniCell<T>) {
         unsafe {
-            let interior_ptr: *mut Interior<T> = self.0.get();
-            let interior_should_be_unallocated = &*(interior_ptr as *const Interior<T>);
+            let interior_ptr: *mut InteriorStore<T> = self.0.get();
+            let interior_should_be_unallocated = &*(interior_ptr as *const InteriorStore<T>);
             if let Interior::Unallocated = interior_should_be_unallocated {
                 *interior_ptr = v.0.into_inner();
             }
@@ -204,19 +197,14 @@ impl<T> UniCell<T> {
     ///
     /// For clones that *do* unify type variables, use [Unifier::clone_unify]
     pub fn clone_prototype_step(&self, clone_recurse: impl FnOnce(&T) -> T) -> Self {
-        unsafe {
-            let interior_ptr: *const Interior<T> = self.0.get();
-            match &*interior_ptr {
-                Interior::Known(known) => {
-                    Self(UnsafeCell::new(Interior::Known(clone_recurse(known))))
-                }
-                Interior::SubstitutesTo(_) | Interior::Terminal(_) => {
-                    unreachable!(
-                        "An already unified UniCell cannot be used in [UniCell::clone_prototype_step]"
-                    )
-                }
-                Interior::Unallocated => Self(UnsafeCell::new(Interior::Unallocated)),
+        match self.get_interior() {
+            Interior::Known(known) => Self(UnsafeCell::new(Interior::Known(clone_recurse(known)))),
+            Interior::SubstitutesTo(_) | Interior::Terminal(_) => {
+                unreachable!(
+                    "An already unified UniCell cannot be used in [UniCell::clone_prototype_step]"
+                )
             }
+            Interior::Unallocated => Self(UnsafeCell::new(Interior::Unallocated)),
         }
     }
 }
@@ -231,7 +219,7 @@ impl<T: Clone> Clone for UniCell<T> {
     #[track_caller]
     fn clone(&self) -> Self {
         // We cast to a const pointer here instead, such that we never actually create a &mut that might conflict with another existing shared ref
-        let known = self.get_interior().expect("Not fully known substitutables can't be Cloned at all! Use [Unifier::clone_unify] or [Unifier::clone_prototype_step] to make clones.");
+        let known = self.get().expect("Not fully known substitutables can't be Cloned at all! Use [Unifier::clone_unify] or [Unifier::clone_prototype_step] to make clones.");
         let known_clone = known.clone();
         Self(UnsafeCell::new(Interior::Known(known_clone)))
     }
@@ -239,14 +227,11 @@ impl<T: Clone> Clone for UniCell<T> {
 
 impl<T: Debug> Debug for UniCell<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        unsafe {
-            let interior_ptr: *const Interior<T> = self.0.get();
-            match &*interior_ptr {
-                Interior::Known(known) => known.fmt(f),
-                Interior::SubstitutesTo(subs) => write!(f, "SubstitutesTo({subs:?})"),
-                Interior::Terminal(_) => write!(f, "Terminal"),
-                Interior::Unallocated => write!(f, "Unallocated"),
-            }
+        match self.get_interior() {
+            Interior::Known(known) => known.fmt(f),
+            Interior::SubstitutesTo(subs) => write!(f, "SubstitutesTo({subs:?})"),
+            Interior::Terminal(_) => write!(f, "Terminal"),
+            Interior::Unallocated => write!(f, "Unallocated"),
         }
     }
 }
@@ -400,6 +385,8 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     ///
     /// For unifying a [UniCell] already in the graph (and thus not mutably accessible), with a new owned [UniCell], see [Unifier::set]
     fn unify(&self, a: &'s UniCell<T>, b: &'s UniCell<T>) -> UnifyResult {
+        ensure_initialized(self, a);
+        ensure_initialized(self, b);
         match (resolve_chain(self, a), resolve_chain(self, b)) {
             (Ok((a, _)), Ok((b, _))) => {
                 // Simple optimization. Unification will often create referential identity.
@@ -444,6 +431,7 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     ///
     /// Afterwards, `to` is still equivalent to the original `to`, and can be used for error reporting.
     fn set(&self, cell: &'s UniCell<T>, to: &mut UniCell<T>) -> UnifyResult {
+        ensure_initialized(self, cell);
         match to.0.get_mut() {
             Interior::Known(to_known) => {
                 match resolve_chain(self, cell) {
@@ -479,13 +467,19 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
             ),
         }
     }
-    /// Wrapper around [Unifier::set], for Known [UniCell]
-    fn set_unwrap(&self, cell: &'s UniCell<T>, to: impl Into<T>) {
-        self.set(
-            cell,
-            &mut UniCell(UnsafeCell::new(Interior::Known(to.into()))),
-        )
-        .unwrap();
+    /// Allows us to set any [UniCell] that resolves to the [Interior::Terminal] or [Interior::Unallocated] state to the given value.
+    ///
+    /// Panics if it would resolve to [Interior::Known].
+    ///
+    /// Useful after a failed [Unifier::resolve]
+    fn set_hard(&self, cell: &UniCell<T>, to: impl Into<T>) {
+        match resolve_chain(self, cell) {
+            Ok(_) => panic!("Unifier::set_hard requires `cell` not to have been resolved yet!"),
+            Err(terminal_node) => {
+                let constraints = terminal_node.replace_terminal(Interior::Known(to.into()));
+                self.get_unifier_info().mark_constraints_ready(constraints);
+            }
+        }
     }
 
     /// Shorthand for creating a [UniCell::UNKNOWN], and then [Unifier::unify]-ing with `obj`.
@@ -494,6 +488,7 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     ///
     /// For clones that *don't* unify type variables, use [UniCell::clone_prototype_step]
     fn clone_unify(&self, to_clone: &'s UniCell<T>) -> UniCell<T> {
+        ensure_initialized(self, to_clone);
         match resolve_chain(self, to_clone) {
             Ok((_, to_clone_terminal)) | Err(to_clone_terminal) => {
                 UniCell(UnsafeCell::new(mk_substitute_to(self, to_clone_terminal)))
@@ -505,6 +500,7 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     ///
     /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
     fn resolve(&self, obj: &'s UniCell<T>) -> Result<&'s T, ResolveError<'s>> {
+        ensure_initialized(self, obj);
         match resolve_chain(self, obj) {
             Ok((obj_known, _)) => Ok(obj_known),
             Err(obj_last_cell) => Err(ResolveError(obj_last_cell)),
@@ -514,26 +510,32 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     /// Try to [Unifier::resolve] an object not in the `'s` lifetime.
     /// The &mut ref isn't strictly needed, but it conveniently blocks out the 's lifetimed objects.
     ///
-    /// If this was created using [Unifier::clone_unify], or some other way that ensures it is at least [Interior::SubstitutesTo], then it is safe to unwrap()
+    /// Returns:
+    /// - `Ok(known)` if it resolved correctly
+    /// - `Err(None)` if `obj` itself was [Interior::Unallocated] (can't have a delayed constraint depend on non-'s UniCell)
+    /// - `Err(Some(resolve_err))` if `obj` does substitute, and therefore we can wait on
+    ///
+    /// If this was created using [Unifier::clone_unify], or some other way that ensures it is at least [Interior::SubstitutesTo], then it is safe to unwrap() the error.
+    ///
     /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
     fn try_resolve<'obj>(
         &self,
         obj: &'obj mut UniCell<T>,
-    ) -> Option<Result<&'obj T, ResolveError<'s>>>
+    ) -> Result<&'obj T, Option<ResolveError<'s>>>
     where
         's: 'obj,
     {
         unsafe {
             match &*obj.0.get() {
-                Interior::Known(known) => Some(Ok(known)),
+                Interior::Known(known) => Ok(known),
                 Interior::SubstitutesTo(subs_to) => {
                     let subs_to: &'s UniCell<T> = &**subs_to;
-                    Some(self.resolve(subs_to))
+                    self.resolve(subs_to).map_err(|e| Some(e))
                 }
                 Interior::Terminal(_) => {
-                    unreachable!("Non 's UniCells cannot be Terminal. Only those in 's can be")
+                    unreachable!("Non-'s UniCells cannot be Terminal. Only those in 's can be")
                 }
-                Interior::Unallocated => None,
+                Interior::Unallocated => Err(None),
             }
         }
     }
@@ -555,11 +557,11 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     /// Complete this implementation by implementing [SubstituteRecurse::fully_substitute_recurse]
     fn fully_substitute(&self, cell: &UniCell<T>) -> bool {
         match cell.get_interior() {
-            Ok(known) => {
+            Interior::Known(known) => {
                 // Already known
                 self.fully_substitute_recurse(known)
             }
-            Err(UnknownInterior::SubstitutesTo(subs_to)) => unsafe {
+            Interior::SubstitutesTo(subs_to) => unsafe {
                 let subs_to: &'s UniCell<T> = &*subs_to;
                 if let Ok((substitute_known, _)) = resolve_chain(self, subs_to) {
                     let known = self.clone_known(substitute_known);
@@ -570,7 +572,7 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
                     false
                 }
             },
-            Err(UnknownInterior::Terminal(_)) => false,
+            Interior::Terminal(_) | Interior::Unallocated => false,
         }
     }
 
@@ -604,11 +606,9 @@ fn resolve_chain<'out, 's: 'out, T: 's, Unif: Unifier<'s, T>>(
     // and due to the fact that Unifier<'s> does not allow such SubstitutesTo to be created from non-'s references
     // we can safely dereference each intermediary pointer.
     unsafe {
-        // Initialize the first element. It could have been [Interior::Unknown]. No other elements could be Unknown though!
-        let _ = from.get_interior();
         let mut cur = from;
         let result = loop {
-            let interior_ptr: *const Interior<T> = cur.0.get();
+            let interior_ptr: *const InteriorStore<T> = cur.0.get();
             match &*interior_ptr {
                 Interior::Known(known) => break Ok((known, cur)),
                 Interior::SubstitutesTo(next_link) => {
@@ -619,7 +619,11 @@ fn resolve_chain<'out, 's: 'out, T: 's, Unif: Unifier<'s, T>>(
                     break Err(cur);
                 }
                 Interior::Unallocated => {
-                    unreachable!("Interior::Unknown in the substitution chain???")
+                    assert!(
+                        std::ptr::eq(cur, from),
+                        "Only the first element in a substitution chain can ever be Interior::Unallocated!"
+                    );
+                    return Err(cur);
                 }
             }
         };
@@ -641,12 +645,18 @@ fn resolve_chain<'out, 's: 'out, T: 's, Unif: Unifier<'s, T>>(
     }
 }
 
+fn ensure_initialized<'s, T, Unif: Unifier<'s, T>>(_slf: &Unif, cell: &'s UniCell<T>) {
+    if let Interior::Unallocated = cell.get_interior() {
+        unsafe { *cell.0.get() = Interior::Terminal(ConstraintsID::PLACEHOLDER) }
+    }
+}
+
 /// All [Interior::SubstitutesTo] MUST be created through this method!
 /// It ensures that they are all bound to the `'s` lifetime!
 fn mk_substitute_to<'s, T, Unif: Unifier<'s, T>>(
     _slf: &Unif,
     cell_to: &'s UniCell<T>,
-) -> Interior<T> {
+) -> InteriorStore<T> {
     Interior::SubstitutesTo(cell_to)
 }
 
@@ -699,8 +709,8 @@ trait SetDelayedConstraintID {
 
 impl<T> SetDelayedConstraintID for UniCell<T> {
     fn try_set_delayed_constraint_id(&self, new_constraints_id: ConstraintsID) -> ConstraintsID {
-        let Err(UnknownInterior::Terminal(existing_constraints)) = self.get_interior() else {
-            unreachable!("SetDelayedConstraintID expects it to be UniCell::Terminal!")
+        let Interior::Terminal(existing_constraints) = self.get_interior() else {
+            unreachable!("SetDelayedConstraintID expects the UniCell to be Interior::Terminal!")
         };
         if existing_constraints == ConstraintsID::PLACEHOLDER {
             let _placeholder = self.replace_terminal(Interior::Terminal(new_constraints_id));
@@ -712,10 +722,15 @@ impl<T> SetDelayedConstraintID for UniCell<T> {
 }
 
 pub struct ResolveError<'s>(&'s dyn SetDelayedConstraintID);
+impl<'s, T> From<&'s UniCell<T>> for ResolveError<'s> {
+    fn from(value: &'s UniCell<T>) -> Self {
+        Self(value)
+    }
+}
 
 impl<'s> Debug for ResolveError<'s> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ResolutionError").finish_non_exhaustive()
+        f.debug_struct("ResolveError").finish_non_exhaustive()
     }
 }
 
@@ -766,10 +781,7 @@ impl<'s, Unif: UnifierTop<'s>> UnifierTopInfo<'s, Unif> {
         } else {
             // SAFETY: We first assert that we're Terminal, so we're certain we're not producing a &mut to a Known.
             unsafe {
-                assert!(matches!(
-                    to.get_interior(),
-                    Err(UnknownInterior::Terminal(_))
-                ));
+                assert!(matches!(to.get_interior(), Interior::Terminal(_)));
                 let Interior::Terminal(terminal_constraints) = &mut *to.0.get() else {
                     unreachable!()
                 };
@@ -1233,15 +1245,15 @@ mod tests {
             unifier.resolve_all(&a)?;
             unifier.resolve_all(&b)?;
 
-            unifier.set_unwrap(&c, mk_peano(a.unwrap().count() + b.unwrap().count()));
+            unifier.set_hard(&c, mk_peano(a.unwrap().count() + b.unwrap().count()));
 
             Ok(())
         });
 
-        unifier.set_unwrap(&a, mk_peano(3));
+        unifier.set_hard(&a, mk_peano(3));
         unifier.execute_ready_constraints();
 
-        unifier.set_unwrap(&b, mk_peano(4));
+        unifier.set_hard(&b, mk_peano(4));
         unifier.execute_ready_constraints();
 
         assert!(unifier.fully_substitute(&c));
@@ -1275,7 +1287,9 @@ mod tests {
             let cur = &cells[idx];
             if idx == 0 {
                 // Large initial value, such that we can be reasonably certain that it's always possible to subtract by unifying.
-                unifier.set_unwrap(cur, mk_peano(INITIAL_PEANO));
+                unifier
+                    .set(cur, &mut UniCell::new(mk_peano(INITIAL_PEANO)))
+                    .unwrap();
                 deltas.borrow_mut()[idx] = INITIAL_PEANO as i64;
             } else {
                 let prev = &cells[idx - 1];
@@ -1349,7 +1363,9 @@ mod tests {
                             ) as usize;
                             deltas.borrow_mut()[idx] = new_count as i64 - prev_count as i64;
 
-                            unifier.set_unwrap(cur, mk_peano(new_count));
+                            unifier
+                                .set(cur, &mut UniCell::new(mk_peano(new_count)))
+                                .unwrap();
                             Ok(())
                         });
                     }
@@ -1420,7 +1436,7 @@ mod tests {
             unifier.unify(&peanos[2], &peanos[3]).unwrap();
             unifier.unify(&peanos[0], &peanos[3]).unwrap();
 
-            unifier.set_unwrap(&peanos[i], PeanoType::Zero);
+            unifier.set_hard(&peanos[i], PeanoType::Zero);
 
             for p in &peanos {
                 assert_eq!(unifier.resolve(p).unwrap().count(), 0);
@@ -1462,12 +1478,14 @@ mod tests {
 
         let unifier = PeanoUnifier::new();
 
-        for _ in 0..10 {
-            let a = cells.choose(&mut rng).unwrap();
+        let cell_idxes: [usize; 10] =
+            rand::seq::index::sample_array(&mut rng, cells.len()).unwrap();
+        for cell_idx in cell_idxes {
+            let a = &cells[cell_idx];
             if rng.random_bool(0.5) {
                 a.set_initial(PeanoType::Zero);
             } else {
-                unifier.set_unwrap(a, PeanoType::Zero);
+                unifier.set_hard(a, PeanoType::Zero);
             }
         }
 
@@ -1484,7 +1502,7 @@ mod tests {
                     unifier.set(a, &mut unifier.clone_unify(b)).unwrap();
                 }
                 2 => {
-                    if let Err(UnknownInterior::Terminal(_)) = a.get_interior()
+                    if let Interior::Terminal(_) = a.get_interior()
                         && !std::ptr::eq(a, b)
                     {
                         a.set_initial_cell(unifier.clone_unify(b));

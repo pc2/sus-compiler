@@ -180,7 +180,7 @@ impl<'s> ValueUnifier<'s> {
                     }
 
                     // Values used in subtyping relations are always resolved in a forward direction (so a value b that depends on value a only gets resolved after a is resolved) That's why we can safely assert
-                    unifier.set_unwrap(var_sources.target, Value::Integer(common_subtype.clone()));
+                    unifier.set_hard(var_sources.target, common_subtype.clone());
                     Ok(())
                 });
             }

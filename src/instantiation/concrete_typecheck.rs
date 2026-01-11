@@ -114,8 +114,8 @@ fn set_min_max_with_min_max<'inst>(
             max = p;
         }
     }
-    unifier.set_unwrap(out_bounds.from, min);
-    unifier.set_unwrap(out_bounds.to, max + 1);
+    unifier.set_hard(out_bounds.from, min);
+    unifier.set_hard(out_bounds.to, max + 1);
 }
 
 /// Combine both mutable context elements into a single struct, to avoid <https://github.com/someguynamedjosh/ouroboros/issues/138>
@@ -293,7 +293,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 }));
 
                 // The output's size cannot have already been unified, this is the first time we see it
-                unifier.set_unwrap(arr_sz, IBig::from(array_wires.len()));
+                unifier.set_hard(arr_sz, IBig::from(array_wires.len()));
             }
             // type is already set when the wire was created
             RealWireDataSource::Constant { value: _ } => {}
@@ -327,12 +327,12 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 // 4:7 -> -6:-3
                 unifier.delayed_constraint(|unifier| {
                     let to = unifier.resolve(to)?.unwrap_integer();
-                    unifier.set_unwrap(out.from, 1 - to);
+                    unifier.set_hard(out.from, 1 - to);
                     Ok(())
                 });
                 unifier.delayed_constraint(|unifier| {
                     let from = unifier.resolve(from)?.unwrap_integer();
-                    unifier.set_unwrap(out.to, 1 - from);
+                    unifier.set_hard(out.to, 1 - from);
                     Ok(())
                 });
             }
@@ -344,13 +344,13 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 unifier.delayed_constraint(|unifier| {
                     let from = unifier.resolve(from)?.unwrap_integer();
                     let sz = unifier.resolve(sz)?.unwrap_integer();
-                    unifier.set_unwrap(out.from, from * sz);
+                    unifier.set_hard(out.from, from * sz);
                     Ok(())
                 });
                 unifier.delayed_constraint(|unifier| {
                     let to = unifier.resolve(to)?.unwrap_integer();
                     let sz = unifier.resolve(sz)?.unwrap_integer();
-                    unifier.set_unwrap(out.to, (to - 1) * sz + 1);
+                    unifier.set_hard(out.to, (to - 1) * sz + 1);
                     Ok(())
                 });
             }
@@ -363,7 +363,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     let from = unifier.resolve(from)?.unwrap_integer();
                     let sz = unifier.resolve(sz)?.unwrap_integer();
                     let sz = usize::try_from(sz).unwrap();
-                    unifier.set_unwrap(out.from, from.pow(sz));
+                    unifier.set_hard(out.from, from.pow(sz));
                     Ok(())
                 });
                 unifier.delayed_constraint(|unifier| {
@@ -371,7 +371,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     let sz = unifier.resolve(sz)?.unwrap_integer();
                     let sz = usize::try_from(sz).unwrap();
                     let max: IBig = to - 1;
-                    unifier.set_unwrap(out.to, max.pow(sz) + 1);
+                    unifier.set_hard(out.to, max.pow(sz) + 1);
                     Ok(())
                 });
             }
@@ -401,13 +401,13 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 unifier.delayed_constraint(move |unifier| {
                     let lf = unifier.resolve(lf)?.unwrap_integer();
                     let rf = unifier.resolve(rf)?.unwrap_integer();
-                    unifier.set_unwrap(out.from, lf + rf);
+                    unifier.set_hard(out.from, lf + rf);
                     Ok(())
                 });
                 unifier.delayed_constraint(move |unifier| {
                     let lt = unifier.resolve(lt)?.unwrap_integer();
                     let rt = unifier.resolve(rt)?.unwrap_integer();
-                    unifier.set_unwrap(out.to, lt + rt - 1);
+                    unifier.set_hard(out.to, lt + rt - 1);
                     Ok(())
                 });
             }
@@ -418,13 +418,13 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 unifier.delayed_constraint(move |unifier| {
                     let lf = unifier.resolve(lf)?.unwrap_integer();
                     let rt = unifier.resolve(rt)?.unwrap_integer();
-                    unifier.set_unwrap(out.from, lf - (rt - 1));
+                    unifier.set_hard(out.from, lf - (rt - 1));
                     Ok(())
                 });
                 unifier.delayed_constraint(move |unifier| {
                     let lt = unifier.resolve(lt)?.unwrap_integer();
                     let rf = unifier.resolve(rf)?.unwrap_integer();
-                    unifier.set_unwrap(out.to, lt - rf);
+                    unifier.set_hard(out.to, lt - rf);
                     Ok(())
                 });
             }
@@ -503,8 +503,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
 
                     let ot = lt.clone().clamp(IBig::from(1), remainder_max.clone());
                     let of = lf.clone().clamp(-remainder_max + 1, IBig::from(0));
-                    unifier.set_unwrap(out.from, of);
-                    unifier.set_unwrap(out.to, ot);
+                    unifier.set_hard(out.from, of);
+                    unifier.set_hard(out.to, ot);
                     Ok(())
                 });
             }
@@ -512,7 +512,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 let _ = left_root.unwrap_int_bounds_unknown();
                 let IntBounds { from: rf, to: rt } = right_root.unwrap_int_bounds_unknown();
                 let out = out_root.unwrap_int_bounds_unknown();
-                unifier.set_unwrap(out.from, IBig::from(0));
+                unifier.set_hard(out.from, IBig::from(0));
                 unifier.delayed_constraint(move |unifier| {
                     let rf = unifier.resolve(rf)?.unwrap_integer();
                     let rt = unifier.resolve(rt)?.unwrap_integer();
@@ -524,7 +524,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         self.errors.error(span, format!("Modulus must be strictly positive, right argument bounds are {right_bounds}"));
                         return Ok(());
                     }
-                    unifier.set_unwrap(out.to, rt - 1);
+                    unifier.set_hard(out.to, rt - 1);
                     Ok(())
                 });
             }
@@ -911,7 +911,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     }
                 }
                 if let Some(total) = total {
-                    unifier.set_unwrap(concrete_param, Value::Integer(total));
+                    unifier.set_hard(concrete_param, Value::Integer(total));
                     // Success! We found the inferred value!
                 }
             }

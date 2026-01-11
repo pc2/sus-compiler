@@ -343,7 +343,7 @@ impl<'l> TypeCheckingContext<'l> {
         id_alloc: &mut UUIDAllocator<DomainIDMarker>,
     ) {
         if self.unifier.resolve(domain).is_err() {
-            self.unifier.set_unwrap(domain, id_alloc.alloc());
+            self.unifier.set_hard(domain, id_alloc.alloc());
         }
         assert!(self.unifier.fully_substitute(domain));
     }
@@ -358,7 +358,7 @@ impl<'l> TypeCheckingContext<'l> {
                 self.finalize_physical(phys, id_alloc);
             }
             Err(_) => {
-                self.unifier.set_unwrap(domain, DomainType::Generative);
+                self.unifier.set_hard(domain, DomainType::Generative);
             }
         }
         assert!(self.unifier.fully_substitute(domain));
