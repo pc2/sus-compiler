@@ -159,13 +159,19 @@ impl<T> UniCell<T> {
 
     #[track_caller]
     pub fn get(&self) -> Option<&T> {
-        self.get_interior().ok()
+        unsafe {
+            if let Interior::Known(known) = &*self.0.get() {
+                Some(known)
+            } else {
+                None
+            }
+        }
     }
-
     #[track_caller]
     pub fn unwrap(&self) -> &T {
-        self.get_interior().unwrap()
+        self.get().unwrap()
     }
+    #[track_caller]
     pub fn into_inner(self) -> T {
         let Interior::Known(v) = self.0.into_inner() else {
             unreachable!("UniCell::into_inner on not a Interior::Known");
@@ -460,7 +466,7 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
                 }
             }
             Interior::SubstitutesTo(to_subs_to) => {
-                // SAFETY: All [Interior::SubstituteTo] MUST be created through [Unifier::mk_substitute_to], which enforces 's lifetime.
+                // SAFETY: All [Interior::SubstitutesTo] MUST be created through [Unifier::mk_substitute_to], which enforces 's lifetime.
                 unsafe {
                     let to_subs_to: &'s UniCell<T> = &**to_subs_to;
                     self.unify(cell, to_subs_to)
