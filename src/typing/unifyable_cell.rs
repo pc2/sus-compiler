@@ -334,7 +334,7 @@ pub trait SubstituteRecurse<'s, T>: UnifierTop<'s> + 's {
     ///
     /// As opposed to [SubstituteRecurse::fully_substitute_recurse], this one should stop as soon as possible.
     /// Mostly meant for [UnifierTop::delayed_constraint] that wish to wait until a type is fully resolved.
-    fn resolve_recurse(&self, v: &T) -> Result<(), ResolveError<'s>>;
+    fn resolve_recurse(&self, v: &'s T) -> Result<(), ResolveError<'s>>;
 }
 
 /// Should *not* be implemented for types that have some kind of subtyiping relation. For this you should create your own subtyping methods.
@@ -504,20 +504,44 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     /// Walks the substitution chains to determine if it ends in a [Interior::Known]. If it does, it returns a reference to the known value.
     ///
     /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
-    fn resolve<'obj>(&self, obj: &'obj UniCell<T>) -> Result<&'obj T, ResolveError<'s>>
-    where
-        's: 'obj,
-    {
+    fn resolve(&self, obj: &'s UniCell<T>) -> Result<&'s T, ResolveError<'s>> {
         match resolve_chain(self, obj) {
             Ok((obj_known, _)) => Ok(obj_known),
             Err(obj_last_cell) => Err(ResolveError(obj_last_cell)),
         }
     }
 
+    /// Try to [Unifier::resolve] an object not in the `'s` lifetime.
+    /// The &mut ref isn't strictly needed, but it conveniently blocks out the 's lifetimed objects.
+    ///
+    /// If this was created using [Unifier::clone_unify], or some other way that ensures it is at least [Interior::SubstitutesTo], then it is safe to unwrap()
+    /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
+    fn try_resolve<'obj>(
+        &self,
+        obj: &'obj mut UniCell<T>,
+    ) -> Option<Result<&'obj T, ResolveError<'s>>>
+    where
+        's: 'obj,
+    {
+        unsafe {
+            match &*obj.0.get() {
+                Interior::Known(known) => Some(Ok(known)),
+                Interior::SubstitutesTo(subs_to) => {
+                    let subs_to: &'s UniCell<T> = &**subs_to;
+                    Some(self.resolve(subs_to))
+                }
+                Interior::Terminal(_) => {
+                    unreachable!("Non 's UniCells cannot be Terminal. Only those in 's can be")
+                }
+                Interior::Unallocated => None,
+            }
+        }
+    }
+
     /// Walks the substitution chains to determine if it ends in a [Interior::Known]. If it does, it returns a reference to the known value.
     ///
     /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
-    fn resolve_all(&self, obj: &UniCell<T>) -> Result<(), ResolveError<'s>> {
+    fn resolve_all(&self, obj: &'s UniCell<T>) -> Result<(), ResolveError<'s>> {
         let known = self.resolve(obj)?;
         self.resolve_recurse(known)
     }
@@ -572,10 +596,10 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
 ///
 /// Due to it being impossible for non `'s` UniCells to be [Interior::Terminal],
 /// this returns a `Err(&'s UniCell)` if the substitution isn't known. Sadly we can't really assert this, so we just have to trust the reasoning.
-fn resolve_chain<'out, 's: 'out, T, Unif: Unifier<'s, T>>(
+fn resolve_chain<'out, 's: 'out, T: 's, Unif: Unifier<'s, T>>(
     _slf: &Unif,
     from: &'out UniCell<T>,
-) -> Result<(&'out T, &'out UniCell<T>), &'s UniCell<T>> {
+) -> Result<(&'out T, &'out UniCell<T>), &'out UniCell<T>> {
     // SAFETY: Each [Interior::SubstitutesTo] points to the next cell,
     // and due to the fact that Unifier<'s> does not allow such SubstitutesTo to be created from non-'s references
     // we can safely dereference each intermediary pointer.
@@ -592,8 +616,7 @@ fn resolve_chain<'out, 's: 'out, T, Unif: Unifier<'s, T>>(
                 }
                 Interior::Terminal(_) => {
                     // This is only allowed because it's impossible for a UniCell to be [Interior::Terminal] UNLESS it is in 's.
-                    let cur_in_s: &'s UniCell<T> = &*(cur as *const UniCell<T>);
-                    break Err(cur_in_s);
+                    break Err(cur);
                 }
                 Interior::Unallocated => {
                     unreachable!("Interior::Unknown in the substitution chain???")
@@ -896,7 +919,7 @@ impl<'s> SubstituteRecurse<'s, PeanoType> for PeanoUnifier<'s> {
         }
     }
 
-    fn resolve_recurse(&self, v: &PeanoType) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, v: &'s PeanoType) -> Result<(), ResolveError<'s>> {
         match v {
             PeanoType::Zero => Ok(()),
             PeanoType::Succ(succ) => self.resolve_all(succ),
@@ -934,7 +957,7 @@ impl<'s> SubstituteRecurse<'s, SecondType> for PeanoUnifier<'s> {
         }
     }
 
-    fn resolve_recurse(&self, v: &SecondType) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, v: &'s SecondType) -> Result<(), ResolveError<'s>> {
         match v {
             SecondType::None => Ok(()),
             SecondType::OnePeano(a) => self.resolve_all(a),
