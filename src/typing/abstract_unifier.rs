@@ -47,7 +47,7 @@ impl<'s> SubstituteRecurse<'s, PeanoType> for AbstractUnifier<'s> {
         }
     }
 
-    fn resolve_recurse(&self, v: &'s PeanoType) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, v: &PeanoType) -> Result<(), ResolveError<'s>> {
         match v {
             PeanoType::Zero => Ok(()),
             PeanoType::Succ(succ) => self.resolve_all(succ),
@@ -101,7 +101,7 @@ impl<'s, ID> SubstituteRecurse<'s, AbstractGlobalReference<ID>> for AbstractUnif
         total
     }
 
-    fn resolve_recurse(&self, v: &'s AbstractGlobalReference<ID>) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, v: &AbstractGlobalReference<ID>) -> Result<(), ResolveError<'s>> {
         for (_, t) in &v.template_arg_types {
             match t {
                 TemplateKind::Type(t) => {
@@ -169,7 +169,7 @@ impl<'s> SubstituteRecurse<'s, AbstractRankedType> for AbstractUnifier<'s> {
         self.fully_substitute(&v.inner) & self.fully_substitute(&v.rank)
     }
 
-    fn resolve_recurse(&self, v: &'s AbstractRankedType) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, v: &AbstractRankedType) -> Result<(), ResolveError<'s>> {
         self.resolve_all(&v.inner)?;
         self.resolve_all(&v.rank)
     }
@@ -200,7 +200,7 @@ impl<'s> SubstituteRecurse<'s, AbstractInnerType> for AbstractUnifier<'s> {
         }
     }
 
-    fn resolve_recurse(&self, v: &'s AbstractInnerType) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, v: &AbstractInnerType) -> Result<(), ResolveError<'s>> {
         match v {
             AbstractInnerType::Template(_) => Ok(()),
             AbstractInnerType::Named(named) => self.resolve_recurse(named),
@@ -286,7 +286,7 @@ impl<'s> SubstituteRecurse<'s, DomainType> for AbstractUnifier<'s> {
         true
     }
 
-    fn resolve_recurse(&self, _: &'s DomainType) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, _: &DomainType) -> Result<(), ResolveError<'s>> {
         Ok(())
     }
 }
@@ -326,7 +326,7 @@ impl<'s> SubstituteRecurse<'s, DomainID> for AbstractUnifier<'s> {
         true
     }
 
-    fn resolve_recurse(&self, _: &'s DomainID) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, _: &DomainID) -> Result<(), ResolveError<'s>> {
         Ok(())
     }
 }

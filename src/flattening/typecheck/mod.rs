@@ -198,7 +198,7 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
     // but the errors for incomplete types are reported *after* reporting the unification errors,
     // so we can choose not to report incomplete type errors.
     context.finalize_domains();
-    context.unifier.decomission();
+    context.unifier.report_delayed_errors();
     context.finalize_types();
     std::mem::drop(context);
 

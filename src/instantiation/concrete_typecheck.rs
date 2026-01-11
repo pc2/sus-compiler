@@ -190,7 +190,7 @@ impl<'l> ModuleTypingSuperContext<'l> {
             fields
                 .ctx
                 .fully_substitute_everything(&fields.mutable_state.unifier);
-            fields.mutable_state.unifier.decomission();
+            fields.mutable_state.unifier.report_delayed_errors();
         });
 
         let mut ctx = self.into_heads().ctx;

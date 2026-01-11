@@ -76,7 +76,7 @@ impl<'s> SubstituteRecurse<'s, Value> for ValueUnifier<'s> {
         true // No recursion
     }
 
-    fn resolve_recurse(&self, _: &'s Value) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, _: &Value) -> Result<(), ResolveError<'s>> {
         Ok(())
     }
 }
@@ -430,7 +430,7 @@ impl<'s> SubstituteRecurse<'s, ConcreteType> for ValueUnifier<'s> {
         }
     }
 
-    fn resolve_recurse(&self, v: &'s ConcreteType) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, v: &ConcreteType) -> Result<(), ResolveError<'s>> {
         match v {
             ConcreteType::Named(global_ref) => self.resolve_recurse(&global_ref.template_args),
             ConcreteType::Array(arr) => {
@@ -455,7 +455,7 @@ impl<'s> SubstituteRecurse<'s, TVec<ConcreteTemplateArg>> for ValueUnifier<'s> {
         total
     }
 
-    fn resolve_recurse(&self, v: &'s TVec<ConcreteTemplateArg>) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, v: &TVec<ConcreteTemplateArg>) -> Result<(), ResolveError<'s>> {
         for (_, arg) in v {
             match arg {
                 TemplateKind::Type(t) => self.resolve_recurse(t)?,
@@ -471,7 +471,7 @@ impl<'s, ID> SubstituteRecurse<'s, ConcreteGlobalReference<ID>> for ValueUnifier
         self.fully_substitute_recurse(&v.template_args)
     }
 
-    fn resolve_recurse(&self, v: &'s ConcreteGlobalReference<ID>) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, v: &ConcreteGlobalReference<ID>) -> Result<(), ResolveError<'s>> {
         self.resolve_recurse(&v.template_args)
     }
 }

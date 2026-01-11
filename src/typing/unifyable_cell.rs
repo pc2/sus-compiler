@@ -25,6 +25,23 @@
 //! impl<'s> Unifier<'s, PeanoType> for MyUnifier<'s> {}
 //! impl<'s> Unifier<'s, DomainType> for MyUnifier<'s> {}
 //! ```
+//!
+//! The Lifecycle of [UniCell]s goes through the following 3 stages:
+//! - [UniCell]s are created in the program structure either through [UniCell::new] or [UniCell::UNKNOWN].
+//!   At this time the only two possible states are [Interior::Known] and [Interior::Unallocated]
+//! - A [Unifier]`<'s>` is created, and begins performing unifications on the program structure.
+//!   For this, the program structure will have a lifetime we will henceforth call `&'s`.
+//!   [UniCell]s in `'s` can be freely [Unifier::unify]'d, and unification between `&'s UniCell`
+//!   and an outside `&mut UniCell` happens through [Unifier::set].
+//!   It is still possible to create new [UniCell]s, for instance through [Unifier::clone_unify].
+//!   Critically, ONLY [UniCell]s in `'s` can take on [Interior::Terminal], and
+//!   [Interior::SubstitutesTo] can only ever point to [UniCell]s in `'s`.
+//! - Finally, all [UniCell]s in the program structure are [Unifier::fully_substitute]'d, and
+//!   the unifier is decomissioned. At this point the [UniCell]s can still be left in any of [Interior]'s states, since
+//!   without a [Unifier] the user can't observe anything ([UniCell::get]) beyond being [Interior::Known] or not known.
+//!
+//! The correctness of this whole shebang does depend on only one [Unifier] ever touching any given [UniCell].
+//! It's not practical to enforce this, but this also doesn't seem like something we would be likely to run into.
 
 use crate::{alloc::ArenaAllocator, append_only_vec::AppendOnlyVec};
 
@@ -311,7 +328,7 @@ pub trait SubstituteRecurse<'s, T>: UnifierTop<'s> + 's {
     ///
     /// As opposed to [SubstituteRecurse::fully_substitute_recurse], this one should stop as soon as possible.
     /// Mostly meant for [UnifierTop::delayed_constraint] that wish to wait until a type is fully resolved.
-    fn resolve_recurse(&self, v: &'s T) -> Result<(), ResolveError<'s>>;
+    fn resolve_recurse(&self, v: &T) -> Result<(), ResolveError<'s>>;
 }
 
 /// Should *not* be implemented for types that have some kind of subtyiping relation. For this you should create your own subtyping methods.
@@ -378,7 +395,7 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     /// For unifying a [UniCell] already in the graph (and thus not mutably accessible), with a new owned [UniCell], see [Unifier::set]
     fn unify(&self, a: &'s UniCell<T>, b: &'s UniCell<T>) -> UnifyResult {
         match (resolve_chain(self, a), resolve_chain(self, b)) {
-            ((Some(a), _), (Some(b), _)) => {
+            (Ok((a, _)), Ok((b, _))) => {
                 // Simple optimization. Unification will often create referential identity.
                 if std::ptr::eq(a, b) {
                     UnifyResult::Success
@@ -386,8 +403,8 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
                     self.unify_subtrees(a, b)
                 }
             }
-            ((None, unknown_cell), (Some(known), known_cell))
-            | ((Some(known), known_cell), (None, unknown_cell)) => {
+            (Err(unknown_cell), Ok((known, known_cell)))
+            | (Ok((known, known_cell)), Err(unknown_cell)) => {
                 if self.contains_subtree(known, SubTree(unknown_cell)) {
                     // Always have to check contains_subtree.
                     // Could be that a contains b which means if we merge them we'll get an infinite type.
@@ -402,7 +419,7 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
 
                 UnifyResult::Success
             }
-            ((None, cell_a), (None, cell_b)) => {
+            (Err(cell_a), Err(cell_b)) => {
                 // We don't want to create a self-referential SubstituteTo
                 if !std::ptr::eq(cell_a, cell_b) {
                     let b_constraints = cell_b.replace_terminal(mk_substitute_to(self, cell_a));
@@ -423,23 +440,22 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     fn set(&self, cell: &'s UniCell<T>, to: &mut UniCell<T>) -> UnifyResult {
         match to.0.get_mut() {
             Interior::Known(to_known) => {
-                let (cell_known, cell_terminal) = resolve_chain(self, cell);
-
-                if let Some(cell_known) = cell_known {
-                    self.set_subtrees(cell_known, to_known)
-                } else {
-                    // Not known
-                    // Same reasoning as in [Unifier::unify]
-                    if self.contains_subtree(to_known, SubTree(cell_terminal)) {
-                        UnifyResult::FailureInfiniteTypes
-                    } else {
-                        let stolen_to = std::mem::replace(
-                            to,
-                            UniCell(UnsafeCell::new(mk_substitute_to(self, cell_terminal))),
-                        );
-                        let ready_cs = cell_terminal.replace_terminal(stolen_to.0.into_inner());
-                        self.get_unifier_info().mark_constraints_ready(ready_cs);
-                        UnifyResult::Success
+                match resolve_chain(self, cell) {
+                    Ok((cell_known, _)) => self.set_subtrees(cell_known, to_known),
+                    Err(cell_terminal) => {
+                        // Not known
+                        // Same reasoning as in [Unifier::unify]
+                        if self.contains_subtree(to_known, SubTree(cell_terminal)) {
+                            UnifyResult::FailureInfiniteTypes
+                        } else {
+                            let stolen_to = std::mem::replace(
+                                to,
+                                UniCell(UnsafeCell::new(mk_substitute_to(self, cell_terminal))),
+                            );
+                            let ready_cs = cell_terminal.replace_terminal(stolen_to.0.into_inner());
+                            self.get_unifier_info().mark_constraints_ready(ready_cs);
+                            UnifyResult::Success
+                        }
                     }
                 }
             }
@@ -472,27 +488,30 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     ///
     /// For clones that *don't* unify type variables, use [UniCell::clone_prototype_step]
     fn clone_unify(&self, to_clone: &'s UniCell<T>) -> UniCell<T> {
-        let (_to_clone_known, to_clone_terminal) = resolve_chain(self, to_clone);
-        UniCell(UnsafeCell::new(mk_substitute_to(self, to_clone_terminal)))
-    }
-
-    /// Walks the substitution chains to determine if it ends in a [Interior::Known]. If it does, it returns a reference to the known value.
-    ///
-    /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
-    fn resolve(&self, obj: &'s UniCell<T>) -> Result<&'s T, ResolveError<'s>> {
-        let (obj_known, obj_last_cell) = resolve_chain(self, obj);
-
-        if let Some(obj_known) = obj_known {
-            Ok(obj_known)
-        } else {
-            Err(ResolveError(obj_last_cell))
+        match resolve_chain(self, to_clone) {
+            Ok((_, to_clone_terminal)) | Err(to_clone_terminal) => {
+                UniCell(UnsafeCell::new(mk_substitute_to(self, to_clone_terminal)))
+            }
         }
     }
 
     /// Walks the substitution chains to determine if it ends in a [Interior::Known]. If it does, it returns a reference to the known value.
     ///
     /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
-    fn resolve_all(&self, obj: &'s UniCell<T>) -> Result<(), ResolveError<'s>> {
+    fn resolve<'obj>(&self, obj: &'obj UniCell<T>) -> Result<&'obj T, ResolveError<'s>>
+    where
+        's: 'obj,
+    {
+        match resolve_chain(self, obj) {
+            Ok((obj_known, _)) => Ok(obj_known),
+            Err(obj_last_cell) => Err(ResolveError(obj_last_cell)),
+        }
+    }
+
+    /// Walks the substitution chains to determine if it ends in a [Interior::Known]. If it does, it returns a reference to the known value.
+    ///
+    /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
+    fn resolve_all(&self, obj: &UniCell<T>) -> Result<(), ResolveError<'s>> {
         let known = self.resolve(obj)?;
         self.resolve_recurse(known)
     }
@@ -512,7 +531,7 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
             }
             Err(UnknownInterior::SubstitutesTo(subs_to)) => unsafe {
                 let subs_to: &'s UniCell<T> = &*subs_to;
-                if let Some(substitute_known) = resolve_chain(self, subs_to).0 {
+                if let Ok((substitute_known, _)) = resolve_chain(self, subs_to) {
                     let known = self.clone_known(substitute_known);
                     let substitute_result = self.fully_substitute_recurse(&known);
                     cell.replace_substitution(subs_to, Interior::Known(known));
@@ -529,11 +548,9 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     ///
     /// Complete this by implementing [UnifyRecurse::contains_subtree]
     fn contains_subtree_recurse(&self, obj: &UniCell<T>, subtree: SubTree<T>) -> bool {
-        let (known, last_cell) = resolve_chain(self, obj);
-        if let Some(known) = known {
-            self.contains_subtree(known, subtree)
-        } else {
-            std::ptr::eq(last_cell, subtree.0)
+        match resolve_chain(self, obj) {
+            Ok((known, _)) => self.contains_subtree(known, subtree),
+            Err(terminal_cell) => std::ptr::eq(terminal_cell, subtree.0),
         }
     }
 }
@@ -546,10 +563,13 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
 ///
 /// Walks the substitution chain until either finding a [Interior::Known] value, or a [Interior::Terminal].
 /// In either case, the last cell in the chain is also returned.
-fn resolve_chain<'out, 's: 'out, T: 's, Unif: Unifier<'s, T>>(
+///
+/// Due to it being impossible for non `'s` UniCells to be [Interior::Terminal],
+/// this returns a `Err(&'s UniCell)` if the substitution isn't known. Sadly we can't really assert this, so we just have to trust the reasoning.
+fn resolve_chain<'out, 's: 'out, T, Unif: Unifier<'s, T>>(
     _slf: &Unif,
     from: &'out UniCell<T>,
-) -> (Option<&'out T>, &'out UniCell<T>) {
+) -> Result<(&'out T, &'out UniCell<T>), &'s UniCell<T>> {
     // SAFETY: Each [Interior::SubstitutesTo] points to the next cell,
     // and due to the fact that Unifier<'s> does not allow such SubstitutesTo to be created from non-'s references
     // we can safely dereference each intermediary pointer.
@@ -557,14 +577,18 @@ fn resolve_chain<'out, 's: 'out, T: 's, Unif: Unifier<'s, T>>(
         // Initialize the first element. It could have been [Interior::Unknown]. No other elements could be Unknown though!
         let _ = from.get_interior();
         let mut cur = from;
-        let (final_known, final_cell) = loop {
+        let result = loop {
             let interior_ptr: *const Interior<T> = cur.0.get();
             match &*interior_ptr {
-                Interior::Known(known) => break (Some(known), cur),
+                Interior::Known(known) => break Ok((known, cur)),
                 Interior::SubstitutesTo(next_link) => {
                     cur = &**next_link;
                 }
-                Interior::Terminal(_) => break (None, cur),
+                Interior::Terminal(_) => {
+                    // This is only allowed because it's impossible for a UniCell to be [Interior::Terminal] UNLESS it is in 's.
+                    let cur_in_s: &'s UniCell<T> = &*(cur as *const UniCell<T>);
+                    break Err(cur_in_s);
+                }
                 Interior::Unallocated => {
                     unreachable!("Interior::Unknown in the substitution chain???")
                 }
@@ -573,15 +597,18 @@ fn resolve_chain<'out, 's: 'out, T: 's, Unif: Unifier<'s, T>>(
 
         // Now we do chain compression, basically we link every pointer we encountered on our path to final_cell
         let mut cur = from;
+        let final_cell: *const UniCell<T> = match result {
+            Ok((_, final_cell)) | Err(final_cell) => final_cell as *const UniCell<T>,
+        };
         while !std::ptr::eq(cur, final_cell) {
             let Interior::SubstitutesTo(next_link) = &mut *cur.0.get() else {
                 unreachable!()
             };
             cur = &**next_link;
-            *next_link = final_cell as *const UniCell<T>;
+            *next_link = final_cell;
         }
 
-        (final_known, final_cell)
+        result
     }
 }
 
@@ -792,7 +819,7 @@ pub trait UnifierTop<'s>: Sized {
         unifier_info.delayed_errors.push(Box::new(f));
     }
 
-    fn decomission(&self) {
+    fn report_delayed_errors(&self) {
         let info = self.get_unifier_info();
         for e in info.delayed_errors.take() {
             e(self)
@@ -863,7 +890,7 @@ impl<'s> SubstituteRecurse<'s, PeanoType> for PeanoUnifier<'s> {
         }
     }
 
-    fn resolve_recurse(&self, v: &'s PeanoType) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, v: &PeanoType) -> Result<(), ResolveError<'s>> {
         match v {
             PeanoType::Zero => Ok(()),
             PeanoType::Succ(succ) => self.resolve_all(succ),
@@ -901,7 +928,7 @@ impl<'s> SubstituteRecurse<'s, SecondType> for PeanoUnifier<'s> {
         }
     }
 
-    fn resolve_recurse(&self, v: &'s SecondType) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, v: &SecondType) -> Result<(), ResolveError<'s>> {
         match v {
             SecondType::None => Ok(()),
             SecondType::OnePeano(a) => self.resolve_all(a),
