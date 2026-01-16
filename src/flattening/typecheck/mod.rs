@@ -4,8 +4,8 @@ mod type_check;
 
 use super::*;
 
-use bumpalo::Bump;
 pub use lints::perform_lints;
+use typed_arena::Arena;
 
 use crate::{
     alloc::UUIDAllocator,
@@ -27,7 +27,8 @@ struct TypeCheckingContext<'l> {
     link_info: &'l LinkInfo,
     instructions: &'l FlatAlloc<Instruction, FlatIDMarker>,
     domains: &'l FlatAlloc<DomainInfo, DomainIDMarker>,
-    extra_allocator: &'l Bump,
+    typ_alloc: &'l Arena<UniCell<AbstractInnerType>>,
+    domain_alloc: &'l Arena<UniCell<DomainID>>,
     unifier: AbstractUnifier<'l>,
 }
 
@@ -171,7 +172,8 @@ impl<'l> TypeCheckingContext<'l> {
 pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
     let (working_on, globals) = pass.get_with_context();
     let link_info = working_on.get_link_info();
-    let extra_allocator = Bump::new();
+    let typ_alloc = Arena::new();
+    let domain_alloc = Arena::new();
     let domains = if let GlobalObj::Module(md) = working_on {
         &md.domains
     } else {
@@ -183,7 +185,8 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
         instructions: &link_info.instructions,
         link_info,
         domains,
-        extra_allocator: &extra_allocator,
+        typ_alloc: &typ_alloc,
+        domain_alloc: &domain_alloc,
         unifier: AbstractUnifier::new(),
     };
 

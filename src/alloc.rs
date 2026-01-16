@@ -680,6 +680,15 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
             _ph: PhantomData,
         }
     }
+    pub fn map_mut<'slf, OT>(
+        &'slf mut self,
+        f: impl FnMut((UUID<IndexMarker>, &'slf mut T)) -> OT,
+    ) -> FlatAlloc<OT, IndexMarker> {
+        FlatAlloc {
+            data: Vec::from_iter(self.iter_mut().map(f)),
+            _ph: PhantomData,
+        }
+    }
     pub fn map2<'s1, 's2, T2, OT>(
         &'s1 self,
         second: &'s2 FlatAlloc<T2, IndexMarker>,

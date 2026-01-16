@@ -116,42 +116,36 @@ impl<'l> TypeCheckingContext<'l> {
         let root_typ = match &wire_ref.root {
             WireReferenceRoot::LocalDecl(decl_id) => {
                 let decl = self.instructions[*decl_id].unwrap_declaration();
-                &decl.typ
+                self.unifier.clone_known(&decl.typ)
             }
             WireReferenceRoot::LocalSubmodule(submod_decl) => {
                 let submod = self.instructions[*submod_decl].unwrap_submodule();
-                &submod.typ
+                self.unifier.clone_known(&submod.typ)
             }
             WireReferenceRoot::LocalInterface(interface_decl) => {
                 let _ = self.instructions[*interface_decl].unwrap_interface();
-                self.extra_allocator
-                    .alloc(AbstractInnerType::LocalInterface(*interface_decl).scalar())
+                AbstractInnerType::LocalInterface(*interface_decl).scalar()
             }
             WireReferenceRoot::NamedConstant(cst) => {
                 self.typecheck_global_ref(cst);
 
-                self.extra_allocator.alloc(
-                    self.globals
-                        .get_global_constant(cst)
-                        .get_target_decl()
-                        .get_local_type(self),
-                )
+                self.globals
+                    .get_global_constant(cst)
+                    .get_target_decl()
+                    .get_local_type(self)
             }
             WireReferenceRoot::NamedModule(md) => {
                 self.typecheck_global_ref(md);
-                self.extra_allocator.alloc(
-                    AbstractInnerType::Interface(
-                        self.make_global_ref_types(md),
-                        InterfaceID::MAIN_INTERFACE,
-                    )
-                    .scalar(),
+                AbstractInnerType::Interface(
+                    self.make_global_ref_types(md),
+                    InterfaceID::MAIN_INTERFACE,
                 )
+                .scalar()
             }
-            WireReferenceRoot::Error => self.extra_allocator.alloc(AbstractRankedType::UNKNOWN),
+            WireReferenceRoot::Error => AbstractRankedType::UNKNOWN,
         };
 
-        let mut walking_rank = &root_typ.rank;
-        let mut walking_inner = &root_typ.inner;
+        let mut walking_typ = root_typ;
         for p in &wire_ref.path {
             match p {
                 WireReferencePathElement::FieldAccess {
@@ -159,90 +153,13 @@ impl<'l> TypeCheckingContext<'l> {
                     name_span,
                     refers_to,
                 } => {
-                    let new_owned = match self.unifier.resolve(walking_inner) {
-                        Ok(AbstractInnerType::Template(template_id)) => {
-                            let template_arg = &self.link_info.parameters[*template_id];
-                            self.errors
-                                .error(
-                                    *name_span,
-                                    format!(
-                                        "The type of this object is the template parameter '{}'. You cannot use struct fields on template args",
-                                        template_arg.name
-                                    ),
-                                )
-                                .info_obj(template_arg);
-                            AbstractRankedType::UNKNOWN
-                        }
-                        Ok(AbstractInnerType::LocalInterface(interface_id)) => {
-                            let interface_decl =
-                                self.link_info.instructions[*interface_id].unwrap_interface();
-                            self.errors
-                                .error(
-                                    *name_span,
-                                    format!(
-                                        "The type of this object is a local interface '{}'. You cannot use struct fields on local interfaces",
-                                        interface_decl.name
-                                    ),
-                                )
-                                .info_obj(interface_decl);
-                            AbstractRankedType::UNKNOWN
-                        }
-                        Ok(AbstractInnerType::Named(_)) => {
-                            self.errors.todo(*name_span, "Structs");
-                            AbstractRankedType::UNKNOWN // todo!("Structs")
-                        }
-                        // TODO "subinterfaces"
-                        Ok(AbstractInnerType::Interface(md_ref, _interface)) => {
-                            let md = self.globals.get_submodule(md_ref);
-
-                            let interface = md
-                                .md
-                                .interfaces
-                                .find(|_, interface| &interface.name == name);
-                            refers_to
-                                .set(PathElemRefersTo::Interface(md_ref.id, interface))
-                                .unwrap();
-
-                            if let Some(interface) = interface {
-                                if let Some(InterfaceDeclKind::SinglePort(port_decl)) =
-                                    md.md.interfaces[interface].declaration_instruction
-                                {
-                                    md.get_decl(port_decl).get_local_type(self)
-                                } else {
-                                    AbstractInnerType::Interface(
-                                        self.unifier.clone_known(md_ref),
-                                        interface,
-                                    )
-                                    .scalar()
-                                }
-                            } else {
-                                let md = self.globals.get_module(md_ref.id);
-                                let md_name = md_ref.display(self.globals.globals, self.link_info);
-                                let field_names =
-                                    display_join(", ", md.interfaces.iter(), |f, (_, v)| {
-                                        write!(f, "'{}'", v.name)
-                                    });
-                                self.errors
-                                    .error(
-                                        *name_span,
-                                        format!("No such field '{name}' on {md_name}. Available fields are {field_names}"),
-                                    )
-                                    .info_obj((md, self.errors.files));
-
-                                AbstractRankedType::UNKNOWN
-                            }
-                        }
-                        Err(_) => AbstractRankedType::UNKNOWN, // todo!("Structs")
-                    };
-                    let new_as_ref = self.extra_allocator.alloc(new_owned);
-                    walking_inner = &new_as_ref.inner;
-                    walking_rank = &new_as_ref.rank;
+                    // Once we do struct fields this will need to become a delayed_constraint, but not today.
+                    walking_typ = self.walk_field_access(walking_typ, name, name_span, refers_to);
                 }
                 WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
                     self.must_be_int(*idx);
 
-                    walking_rank =
-                        self.must_be_array(walking_rank, walking_inner, bracket_span.outer_span());
+                    walking_typ = self.must_be_array(walking_typ, bracket_span.outer_span());
                 }
                 WireReferencePathElement::ArraySlice { from, to, .. } => {
                     if let Some(from) = from {
@@ -267,43 +184,127 @@ impl<'l> TypeCheckingContext<'l> {
             }
         }
 
-        let output_typ = AbstractRankedType {
-            inner: self.unifier.clone_unify(walking_inner),
-            rank: self.unifier.clone_unify(walking_rank),
-        };
         // First time we touch the output typ
-        wire_ref.output_typ.set_initial(output_typ);
+        wire_ref.output_typ.set_initial(walking_typ);
     }
 
-    /// Inner can stay the same
-    fn must_be_array(
+    fn walk_field_access(
         &self,
-        rank: &'l UniCell<PeanoType>,
-        inner: &'l UniCell<AbstractInnerType>,
-        span: Span,
-    ) -> &'l UniCell<PeanoType> {
-        if let Some(rank_down) = self.unifier.rank_down(rank) {
+        mut walking_typ: AbstractRankedType,
+        field_name: &str,
+        name_span: &Span,
+        refers_to: &OnceCell<PathElemRefersTo>,
+    ) -> AbstractRankedType {
+        let Ok(Some(inner)) = self.unifier.try_resolve(&mut walking_typ.inner) else {
+            // Was already UNKNOWN, don't report more errors
+            // Could be that it was an UNKNOWN that we could resolve with delayed constraints. Not necessary now, but will be for TODO STRUCTS
+            return AbstractRankedType::UNKNOWN;
+        };
+        match inner.deref() {
+            AbstractInnerType::Template(template_id) => {
+                let template_arg = &self.link_info.parameters[*template_id];
+                self.errors
+                    .error(
+                        *name_span,
+                        format!(
+                            "The type of this object is the template parameter '{}'. You cannot use struct fields on template args",
+                            template_arg.name
+                        ),
+                    )
+                    .info_obj(template_arg);
+                AbstractRankedType::UNKNOWN
+            }
+            AbstractInnerType::LocalInterface(interface_id) => {
+                let interface_decl = self.link_info.instructions[*interface_id].unwrap_interface();
+                self.errors
+                    .error(
+                        *name_span,
+                        format!(
+                            "The type of this object is a local interface '{}'. You cannot use struct fields on local interfaces",
+                            interface_decl.name
+                        ),
+                    )
+                    .info_obj(interface_decl);
+                AbstractRankedType::UNKNOWN
+            }
+            AbstractInnerType::Named(_) => {
+                self.errors.todo(*name_span, "Structs");
+                AbstractRankedType::UNKNOWN // todo!("Structs")
+            }
+            // TODO "subinterfaces"
+            AbstractInnerType::Interface(_md_ref, _old_interface) => {
+                // Convert to 'l
+                let inner: &'l UniCell<AbstractInnerType> = self
+                    .typ_alloc
+                    .alloc(UniCell::new(inner.into_owned(&self.unifier)));
+                let_unwrap!(
+                    AbstractInnerType::Interface(md_ref, _old_interface),
+                    inner.unwrap()
+                );
+                let md = self.globals.get_submodule(md_ref);
+                let interface = md
+                    .md
+                    .interfaces
+                    .find(|_, interface| interface.name == field_name);
+
+                refers_to
+                    .set(PathElemRefersTo::Interface(md_ref.id, interface))
+                    .unwrap();
+
+                if let Some(interface) = interface {
+                    if let Some(InterfaceDeclKind::SinglePort(port_decl)) =
+                        md.md.interfaces[interface].declaration_instruction
+                    {
+                        md.get_decl(port_decl).get_local_type(self)
+                    } else {
+                        AbstractInnerType::Interface(self.unifier.clone_known(md_ref), interface)
+                            .scalar()
+                    }
+                } else {
+                    let md = self.globals.get_module(md_ref.id);
+                    let md_name = md_ref.display(self.globals.globals, self.link_info);
+                    let field_names = display_join(", ", md.interfaces.iter(), |f, (_, v)| {
+                        write!(f, "'{}'", v.name)
+                    });
+                    self.errors
+                        .error(
+                            *name_span,
+                            format!("No such field '{field_name}' on {md_name}. Available fields are {field_names}"),
+                        )
+                        .info_obj((md, self.errors.files));
+
+                    AbstractRankedType::UNKNOWN
+                }
+            }
+        }
+    }
+
+    /// Inner stays the same
+    fn must_be_array(&self, typ: AbstractRankedType, span: Span) -> AbstractRankedType {
+        if let Some(rank_down) = self.unifier.rank_down(typ.rank) {
             // walking_inner = walking_inner;
-            rank_down
+            AbstractRankedType {
+                inner: typ.inner,
+                rank: rank_down,
+            }
         } else {
             // bracket_span.outer_span(), "array access"
             let errors = self.errors;
             let globals = self.globals.globals;
             let link_info = self.link_info;
             self.unifier.delayed_error(move |unifier| {
-                assert!(!matches!(unifier.resolve(rank), Ok(PeanoType::Succ(_))));
                 let found = AbstractRankedType {
-                    inner: unifier.clone_unify(inner),
-                    rank: unifier.clone_unify(rank),
+                    inner: typ.inner,
+                    rank: UniCell::new(PeanoType::Zero),
                 };
-                unifier.fully_substitute_recurse(&found);
+                unifier.fully_substitute(&found.inner);
                 let found = found.display(globals, link_info);
                 errors.error(
                     span,
                     format!("This is not an array. Expected an array but found '{found}'"),
                 );
             });
-            self.extra_allocator.alloc(PeanoType::UNKNOWN)
+            AbstractRankedType::UNKNOWN
         }
     }
 
@@ -984,14 +985,16 @@ impl<'l> TypeCheckingContext<'l> {
                 UnaryOperator::Product => INT_INNER.clone(),
                 _ => unreachable!(),
             });
-            let reduction_rank = self.unifier.rank_down(&input_typ.rank);
+            let rank = self
+                .unifier
+                .rank_down(self.unifier.clone_unify(&input_typ.rank));
             match (
-                reduction_rank,
+                rank,
                 self.unifier.set(&input_typ.inner, &mut reduction_type),
             ) {
-                (Some(reduction_rank), UnifyResult::Success) => AbstractRankedType {
+                (Some(rank), UnifyResult::Success) => AbstractRankedType {
                     inner: reduction_type,
-                    rank: self.unifier.clone_unify(reduction_rank),
+                    rank,
                 },
                 (_, UnifyResult::Failure) | (None, _) => {
                     let errors = self.errors;

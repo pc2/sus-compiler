@@ -1,5 +1,6 @@
 use crate::{
     alloc::zip_eq,
+    let_unwrap,
     prelude::DomainID,
     typing::{
         abstract_type::{
@@ -8,8 +9,8 @@ use crate::{
         domain_type::DomainType,
         template::TemplateKind,
         unifyable_cell::{
-            ResolveError, SubTree, SubstituteRecurse, UniCell, Unifier, UnifierTop, UnifierTopInfo,
-            UnifyRecurse, UnifyResult,
+            Boo, ResolveError, SubTree, SubstituteRecurse, UniCell, Unifier, UnifierTop,
+            UnifierTopInfo, UnifyRecurse, UnifyResult,
         },
     },
 };
@@ -153,10 +154,10 @@ impl<'s, ID: Eq + Copy> UnifyRecurse<'s, AbstractGlobalReference<ID>> for Abstra
         }
         total
     }
-    fn clone_known(&self, in_obj: &'s AbstractGlobalReference<ID>) -> AbstractGlobalReference<ID> {
+    fn clone_known(&self, known: &'s AbstractGlobalReference<ID>) -> AbstractGlobalReference<ID> {
         AbstractGlobalReference {
-            id: in_obj.id,
-            template_arg_types: in_obj.template_arg_types.map(|(_, arg)| match arg {
+            id: known.id,
+            template_arg_types: known.template_arg_types.map(|(_, arg)| match arg {
                 TemplateKind::Type(t) => TemplateKind::Type(self.clone_known(t)),
                 TemplateKind::Value(()) => TemplateKind::Value(()),
             }),
@@ -354,19 +355,20 @@ impl<'s> AbstractUnifier<'s> {
     /// Returns the type of the content of the array
     ///
     /// [None] indicates the input type was not an array.
-    pub fn rank_down(&self, arr_rank: &'s UniCell<PeanoType>) -> Option<&'s UniCell<PeanoType>> {
-        // We'll check if unification failed in resolve below
-        let _ = self.set(
-            arr_rank,
-            &mut UniCell::new(PeanoType::Succ(Box::new(PeanoType::UNKNOWN))),
-        );
-
-        // At this point we can *always* resolve.
-        // Either set succeeded, in which case we should resolve to PeanoType::Succ
-        // Or it failed, in which case we should resolve to PeanoType::Zero
-        match self.resolve(arr_rank).unwrap() {
-            PeanoType::Zero => None,
-            PeanoType::Succ(down_rank) => Some(down_rank),
+    ///
+    /// If rank_down was unsuccessful, this returns None
+    pub fn rank_down(&self, mut arr_rank: UniCell<PeanoType>) -> Option<UniCell<PeanoType>> {
+        match self.try_resolve(&mut arr_rank) {
+            Ok(Some(Boo::Owned(PeanoType::Succ(succ)))) => Some(*succ),
+            Ok(Some(Boo::Borrow(PeanoType::Succ(succ)))) => Some(self.clone_unify(succ)),
+            Ok(Some(Boo::Owned(PeanoType::Zero))) | Ok(Some(Boo::Borrow(PeanoType::Zero))) => None,
+            Ok(None) => Some(PeanoType::UNKNOWN),
+            Err(unknown_cell) => {
+                let set_v =
+                    self.set_hard(unknown_cell, PeanoType::Succ(Box::new(PeanoType::UNKNOWN)));
+                let_unwrap!(PeanoType::Succ(succ), set_v);
+                Some(self.clone_unify(succ))
+            }
         }
     }
 }

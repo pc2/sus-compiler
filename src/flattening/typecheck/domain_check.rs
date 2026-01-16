@@ -81,9 +81,7 @@ impl<'l> TypeCheckingContext<'l> {
                     for wr in writes {
                         let mut target_domain =
                             self.get_wireref_root_domain(&wr.to).unwrap_or_else(|| {
-                                DomainTypeRef::Physical(
-                                    self.extra_allocator.alloc(DomainID::UNKNOWN),
-                                )
+                                DomainTypeRef::Physical(self.domain_alloc.alloc(DomainID::UNKNOWN))
                             });
                         let mut target_span = wr.to.root_span;
 
@@ -93,7 +91,6 @@ impl<'l> TypeCheckingContext<'l> {
                                     self.get_condition_domain(expr.parent_condition)
                                     && let DomainTypeRef::Physical(target_phys) = &target_domain
                                 {
-                                    let target_phys = self.extra_allocator.alloc(target_phys);
                                     self.unify_physicals(
                                         (target_phys, target_span),
                                         condition_domain,
@@ -287,7 +284,7 @@ impl<'l> TypeCheckingContext<'l> {
             WireReferenceRoot::NamedModule(global_ref) => {
                 self.global_ref_must_be_generative(global_ref);
                 Some(DomainTypeRef::Physical(
-                    self.extra_allocator.alloc(DomainID::UNKNOWN),
+                    self.domain_alloc.alloc(DomainID::UNKNOWN),
                 ))
             }
             WireReferenceRoot::Error => None,

@@ -215,6 +215,12 @@ impl<T> From<T> for UniCell<T> {
     }
 }
 
+impl<T> Default for UniCell<T> {
+    fn default() -> Self {
+        Self(UnsafeCell::new(Interior::Unallocated))
+    }
+}
+
 impl<T: Clone> Clone for UniCell<T> {
     #[track_caller]
     fn clone(&self) -> Self {
@@ -350,6 +356,7 @@ pub trait UnifyRecurse<'s, T>: SubstituteRecurse<'s, T> + 's {
 /// - [UnifyRecurse::unify_subtrees]
 /// - [UnifyRecurse::set_subtrees]
 /// - [UnifyRecurse::clone_known]
+/// - [UnifyRecurse::try_clone_known]
 /// - [Unifier::contains_subtree]
 /// - [UnifierTop::get_unifier_info]
 ///
@@ -359,8 +366,10 @@ pub trait UnifyRecurse<'s, T>: SubstituteRecurse<'s, T> + 's {
 /// - [Unifier::unify]
 /// - [Unifier::set]
 /// - [Unifier::clone_unify]
+/// - [Unifier::try_clone_unify]
 /// - [Unifier::resolve]
 /// - [Unifier::resolve_all]
+/// - [Unifier::try_resolve]
 /// - [UnifierTop::delayed_constraint]
 ///
 /// For examples see [PeanoUnifier]
@@ -472,12 +481,16 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     /// Panics if it would resolve to [Interior::Known].
     ///
     /// Useful after a failed [Unifier::resolve]
-    fn set_hard(&self, cell: &UniCell<T>, to: impl Into<T>) {
+    fn set_hard<'o>(&self, cell: &'o UniCell<T>, to: impl Into<T>) -> &'o T
+    where
+        's: 'o,
+    {
         match resolve_chain(self, cell) {
             Ok(_) => panic!("Unifier::set_hard requires `cell` not to have been resolved yet!"),
             Err(terminal_node) => {
                 let constraints = terminal_node.replace_terminal(Interior::Known(to.into()));
                 self.get_unifier_info().mark_constraints_ready(constraints);
+                terminal_node.unwrap()
             }
         }
     }
@@ -499,44 +512,11 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     /// Walks the substitution chains to determine if it ends in a [Interior::Known]. If it does, it returns a reference to the known value.
     ///
     /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
-    fn resolve(&self, obj: &'s UniCell<T>) -> Result<&'s T, ResolveError<'s>> {
+    fn resolve(&self, obj: &'s UniCell<T>) -> Result<&'s T, &'s UniCell<T>> {
         ensure_initialized(self, obj);
         match resolve_chain(self, obj) {
             Ok((obj_known, _)) => Ok(obj_known),
-            Err(obj_last_cell) => Err(ResolveError(obj_last_cell)),
-        }
-    }
-
-    /// Try to [Unifier::resolve] an object not in the `'s` lifetime.
-    /// The &mut ref isn't strictly needed, but it conveniently blocks out the 's lifetimed objects.
-    ///
-    /// Returns:
-    /// - `Ok(known)` if it resolved correctly
-    /// - `Err(None)` if `obj` itself was [Interior::Unallocated] (can't have a delayed constraint depend on non-'s UniCell)
-    /// - `Err(Some(resolve_err))` if `obj` does substitute, and therefore we can wait on
-    ///
-    /// If this was created using [Unifier::clone_unify], or some other way that ensures it is at least [Interior::SubstitutesTo], then it is safe to unwrap() the error.
-    ///
-    /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
-    fn try_resolve<'obj>(
-        &self,
-        obj: &'obj mut UniCell<T>,
-    ) -> Result<&'obj T, Option<ResolveError<'s>>>
-    where
-        's: 'obj,
-    {
-        unsafe {
-            match &*obj.0.get() {
-                Interior::Known(known) => Ok(known),
-                Interior::SubstitutesTo(subs_to) => {
-                    let subs_to: &'s UniCell<T> = &**subs_to;
-                    self.resolve(subs_to).map_err(|e| Some(e))
-                }
-                Interior::Terminal(_) => {
-                    unreachable!("Non-'s UniCells cannot be Terminal. Only those in 's can be")
-                }
-                Interior::Unallocated => Err(None),
-            }
+            Err(obj_last_cell) => Err(obj_last_cell),
         }
     }
 
@@ -546,6 +526,43 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
     fn resolve_all(&self, obj: &'s UniCell<T>) -> Result<(), ResolveError<'s>> {
         let known = self.resolve(obj)?;
         self.resolve_recurse(known)
+    }
+
+    /// Try to [Unifier::resolve] an object not in the `'s` lifetime.
+    /// Takes a `&mut obj`, such that it can return the contents if [Interior::Known].
+    /// If successful, `obj` is destroyed.
+    /// If unsuccessful, `obj` remains identical.
+    ///
+    /// Returns:
+    /// - `Ok(known)` if it resolved correctly
+    /// - `Err(None)` if `obj` itself was [Interior::Unallocated] (can't have a delayed constraint depend on non-'s UniCell)
+    /// - `Err(Some(resolve_err))` if `obj` does substitute, and therefore we can wait on
+    ///
+    /// If this was created using [Unifier::clone_unify], or some other way that ensures it is at least [Interior::SubstitutesTo], then it is safe to unwrap() the error.
+    ///
+    /// Use this for resolving dependencies in [UnifierTop::delayed_constraint]
+    fn try_resolve(&self, obj: &mut UniCell<T>) -> Result<Option<Boo<'s, T>>, &'s UniCell<T>> {
+        let mut_inner = obj.0.get_mut();
+        match mut_inner {
+            Interior::Known(_known) => {
+                let Interior::Known(known) = std::mem::replace(mut_inner, Interior::Unallocated)
+                else {
+                    unreachable!()
+                };
+                Ok(Some(Boo::Owned(known)))
+            }
+            Interior::SubstitutesTo(subs_to) => unsafe {
+                let subs_to: &'s UniCell<T> = &**subs_to;
+                match resolve_chain(self, subs_to) {
+                    Ok((found, _cell)) => Ok(Some(Boo::Borrow(found))),
+                    Err(not_found) => Err(not_found),
+                }
+            },
+            Interior::Terminal(_) => {
+                unreachable!("Non-'s UniCells cannot be Terminal. Only those in 's can be")
+            }
+            Interior::Unallocated => Ok(None),
+        }
     }
 
     /// Substitutes and clones the substitutions such that `obj` actually owns them.
@@ -583,6 +600,29 @@ pub trait Unifier<'s, T: 's>: UnifyRecurse<'s, T> + 's {
         match resolve_chain(self, obj) {
             Ok((known, _)) => self.contains_subtree(known, subtree),
             Err(terminal_cell) => std::ptr::eq(terminal_cell, subtree.0),
+        }
+    }
+}
+
+pub enum Boo<'s, T> {
+    Borrow(&'s T),
+    Owned(T),
+}
+impl<'s, T> Boo<'s, T> {
+    pub fn into_owned(self, unifier: &impl Unifier<'s, T>) -> T {
+        match self {
+            Boo::Borrow(bor) => unifier.clone_known(bor),
+            Boo::Owned(own) => own,
+        }
+    }
+}
+impl<'s, T> Deref for Boo<'s, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Boo::Borrow(b) => b,
+            Boo::Owned(o) => o,
         }
     }
 }
