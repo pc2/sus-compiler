@@ -1,8 +1,7 @@
+use super::*;
 use crate::prelude::*;
 
 use crate::typing::unifyable_cell::UnifyRecurse;
-
-use super::*;
 
 // Exceptional use of these, to make the code below a little terser
 use DomainType::Generative;

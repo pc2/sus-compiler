@@ -17,7 +17,7 @@ use crate::{
     typing::{
         abstract_type::AbstractInnerType,
         abstract_unifier::AbstractUnifier,
-        unifyable_cell::{Unifier, UnifierTop, UnifyResult},
+        unifyable_cell::{SubstituteRecurse, Unifier, UnifierTop, UnifyRecurse, UnifyResult},
     },
 };
 
@@ -54,83 +54,26 @@ impl<'l> TypeCheckingContext<'l> {
         span: Span,
         report: impl UnifyErrorReport,
     ) {
-        self.unify_type_parts_report_error(
-            &found.inner,
-            &found.rank,
-            &expected.inner,
-            &expected.rank,
-            span,
-            report,
-        );
-    }
-    pub fn unify_type_parts_report_error(
-        &self,
-        found_inner: &'l UniCell<AbstractInnerType>,
-        found_rank: &'l UniCell<PeanoType>,
-        expected_inner: &'l UniCell<AbstractInnerType>,
-        expected_rank: &'l UniCell<PeanoType>,
-        span: Span,
-        report: impl UnifyErrorReport,
-    ) {
-        let inner_result = self.unifier.unify(found_inner, expected_inner);
-        let rank_result = self.unifier.unify(found_rank, expected_rank);
+        let result = self.unifier.unify_subtrees(found, expected);
 
-        let expected_inner = self.unifier.clone_unify(expected_inner);
-        let expected_rank = self.unifier.clone_unify(expected_rank);
-        self.report_unify_error(
-            found_inner,
-            found_rank,
-            expected_inner,
-            expected_rank,
-            span,
-            report,
-            inner_result & rank_result,
-        );
+        let expected = self.unifier.clone_known(expected);
+        self.report_unify_error(found, expected, span, report, result);
     }
     pub fn set_type_report_error(
         &self,
         found: &'l AbstractRankedType,
-        expected: AbstractRankedType,
+        mut expected: AbstractRankedType,
         span: Span,
         report: impl UnifyErrorReport,
     ) {
-        self.set_type_parts_report_error(
-            &found.inner,
-            &found.rank,
-            expected.inner,
-            expected.rank,
-            span,
-            report,
-        );
-    }
-    pub fn set_type_parts_report_error(
-        &self,
-        found_inner: &'l UniCell<AbstractInnerType>,
-        found_rank: &'l UniCell<PeanoType>,
-        mut expected_inner: UniCell<AbstractInnerType>,
-        mut expected_rank: UniCell<PeanoType>,
-        span: Span,
-        report: impl UnifyErrorReport,
-    ) {
-        let inner_result = self.unifier.set(found_inner, &mut expected_inner);
-        let rank_result = self.unifier.set(found_rank, &mut expected_rank);
+        let result = self.unifier.set_subtrees(found, &mut expected);
 
-        self.report_unify_error(
-            found_inner,
-            found_rank,
-            expected_inner,
-            expected_rank,
-            span,
-            report,
-            inner_result & rank_result,
-        );
+        self.report_unify_error(found, expected, span, report, result);
     }
     pub fn report_unify_error(
         &self,
-        found_inner: &'l UniCell<AbstractInnerType>,
-        found_rank: &'l UniCell<PeanoType>,
-        expected_inner: UniCell<AbstractInnerType>,
-        expected_rank: UniCell<PeanoType>,
+        found: &'l AbstractRankedType,
+        expected: AbstractRankedType,
         span: Span,
         report: impl UnifyErrorReport,
         unify_result: UnifyResult,
@@ -146,24 +89,17 @@ impl<'l> TypeCheckingContext<'l> {
             context.push_str(": Creating Infinite Types is Forbidden!");
         }
         self.unifier.delayed_error(move |unifier| {
-            unifier.fully_substitute(found_inner);
-            unifier.fully_substitute(found_rank);
-            unifier.fully_substitute(&expected_inner);
-            unifier.fully_substitute(&expected_rank);
+            unifier.fully_substitute_recurse(found);
+            unifier.fully_substitute_recurse(&expected);
 
-            let found_inner = found_inner.display(globals, link_info);
-            let expected_inner = expected_inner.display(globals, link_info);
+            let found = found.display(globals, link_info);
+            let expected = expected.display(globals, link_info);
 
-            errors
-                .error(
-                    span,
-                    format!(
-                        "Typing Error: {context} expects '{expected_inner}{expected_rank}' but was given '{found_inner}{found_rank}'"
-                    ),
-                )
-                .add_info_list(infos);
-                
-            assert!(format!("{expected_inner}{expected_rank}") != format!("{found_inner}{found_rank}"))
+            let msg =
+                format!("Typing Error: {context} expects '{expected}' but was given '{found}'");
+            errors.error(span, msg).add_info_list(infos);
+
+            assert!(expected.to_string() != found.to_string())
         });
     }
 }

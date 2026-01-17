@@ -1064,26 +1064,12 @@ impl<'l> TypeCheckingContext<'l> {
             BinaryOperator::Remainder => (&INT_INNER, &INT_INNER, &INT_INNER),
         };
         let r = &left_typ.rank;
-        let exp_left = UniCell::new(exp_left.clone());
-        let exp_right = UniCell::new(exp_right.clone());
+        let exp_left = exp_left.clone().with_rank(self.unifier.clone_unify(r));
+        let exp_right = exp_right.clone().with_rank(self.unifier.clone_unify(r));
         let out_typ = out_typ.clone().with_rank(self.unifier.clone_unify(r));
 
-        self.set_type_parts_report_error(
-            &left_typ.inner,
-            &left_typ.rank,
-            exp_left,
-            self.unifier.clone_unify(r),
-            left_span,
-            "binop left side",
-        );
-        self.set_type_parts_report_error(
-            &right_typ.inner,
-            &right_typ.rank,
-            exp_right,
-            self.unifier.clone_unify(r),
-            right_span,
-            "binop right side",
-        );
+        self.set_type_report_error(left_typ, exp_left, left_span, "binop left side");
+        self.set_type_report_error(right_typ, exp_right, right_span, "binop right side");
         out_typ
     }
 

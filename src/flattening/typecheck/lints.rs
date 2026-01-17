@@ -3,17 +3,16 @@ use std::collections::hash_map::Entry;
 
 use sus_proc_macro::{get_builtin_const, get_builtin_type};
 
-use crate::dev_aid::ariadne_interface::pretty_print_many_spans;
-use crate::flattening::WriteModifiers;
-use crate::linker::{GlobalRef, IsExtern, LinkerFiles};
-use crate::prelude::*;
-use crate::to_string::FmtWrapper;
-use crate::typing::abstract_type::AbstractInnerType;
-use crate::typing::template::TemplateKind;
-
 use super::*;
+use crate::prelude::*;
 
-use super::{Expression, ExpressionOutput, ExpressionSource, Instruction, WireReferenceRoot};
+use crate::{
+    dev_aid::ariadne_interface::pretty_print_many_spans,
+    flattening::WriteModifiers,
+    linker::{GlobalRef, IsExtern, LinkerFiles},
+    to_string::FmtWrapper,
+    typing::{abstract_type::AbstractInnerType, template::TemplateKind},
+};
 
 pub fn perform_lints(pass: &mut LinkerPass, errors: &ErrorCollector, linker_files: &LinkerFiles) {
     let (working_on, globals) = pass.get_with_context();
