@@ -3,10 +3,7 @@ use crate::{
     instantiation::Instantiator,
     linker::passes::ResolvedGlobals,
     prelude::*,
-    typing::{
-        domain_type::DomainTypeRef,
-        template::{Parameter, TVec},
-    },
+    typing::template::{Parameter, TVec},
 };
 
 pub mod checkpoint;
@@ -149,16 +146,6 @@ impl LinkInfo {
                 _ => "",
             },
             Instruction::IfStatement(_) | Instruction::ForStatement(_) => "",
-        }
-    }
-    pub fn get_instruction_domain<'s>(&'s self, instr_id: FlatID) -> Option<DomainTypeRef<'s>> {
-        match &self.instructions[instr_id] {
-            Instruction::Declaration(decl) => Some(DomainTypeRef::from(&decl.domain)),
-            Instruction::Interface(interface) => Some(DomainTypeRef::Physical(&interface.domain)),
-            Instruction::Expression(expr) => Some(DomainTypeRef::from(expr.domain.get()?)),
-            Instruction::SubModule(_)
-            | Instruction::IfStatement(_)
-            | Instruction::ForStatement(_) => None,
         }
     }
 }

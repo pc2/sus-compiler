@@ -38,30 +38,3 @@ impl DomainID {
     #[allow(clippy::declare_interior_mutable_const)]
     pub const UNKNOWN: UniCell<DomainID> = UniCell::UNKNOWN;
 }
-
-#[derive(Debug, Clone, Copy)]
-/// Equivalent to [DomainType], but used to pass references to the inner [DomainType::Physical]
-pub enum DomainTypeRef<'s> {
-    /// Generative conflicts with nothing
-    Generative,
-    /// This object is a real wire. It corresponds to a certain (clock) domain. It can only affect wires in the same domain.
-    Physical(&'s UniCell<DomainID>),
-}
-
-impl<'dt> DomainTypeRef<'dt> {
-    pub fn is_generative(&self) -> bool {
-        match self {
-            DomainTypeRef::Generative => true,
-            DomainTypeRef::Physical(_) => false,
-        }
-    }
-}
-
-impl<'dt> From<&'dt DomainType> for DomainTypeRef<'dt> {
-    fn from(d: &'dt DomainType) -> Self {
-        match d {
-            DomainType::Generative => DomainTypeRef::Generative,
-            DomainType::Physical(cell) => DomainTypeRef::Physical(cell),
-        }
-    }
-}

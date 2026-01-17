@@ -28,7 +28,6 @@ struct TypeCheckingContext<'l> {
     instructions: &'l FlatAlloc<Instruction, FlatIDMarker>,
     domains: &'l FlatAlloc<DomainInfo, DomainIDMarker>,
     typ_alloc: &'l Arena<UniCell<AbstractInnerType>>,
-    domain_alloc: &'l Arena<UniCell<DomainID>>,
     unifier: AbstractUnifier<'l>,
 }
 
@@ -173,7 +172,6 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
     let (working_on, globals) = pass.get_with_context();
     let link_info = working_on.get_link_info();
     let typ_alloc = Arena::new();
-    let domain_alloc = Arena::new();
     let domains = if let GlobalObj::Module(md) = working_on {
         &md.domains
     } else {
@@ -186,7 +184,6 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
         link_info,
         domains,
         typ_alloc: &typ_alloc,
-        domain_alloc: &domain_alloc,
         unifier: AbstractUnifier::new(),
     };
 

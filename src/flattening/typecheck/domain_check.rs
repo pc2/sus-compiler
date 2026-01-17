@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use crate::typing::domain_type::DomainTypeRef;
+use crate::typing::unifyable_cell::UnifyRecurse;
 
 use super::*;
 
@@ -25,11 +25,11 @@ impl<'l> TypeCheckingContext<'l> {
                 }
             }
             Instruction::Expression(expr) => {
-                let mut total_physical_domain =
+                let mut total_physical_domain: Option<(UniCell<DomainID>, Span)> =
                     if let ExpressionSource::WireRef(wire_ref) = &expr.source {
                         match self.get_wireref_root_domain(wire_ref) {
-                            Some(DomainTypeRef::Physical(phys)) => Some((phys, wire_ref.root_span)),
-                            None | Some(DomainTypeRef::Generative) => None,
+                            Some(DomainType::Physical(phys)) => Some((phys, wire_ref.root_span)),
+                            None | Some(DomainType::Generative) => None,
                         }
                     } else {
                         None
@@ -39,12 +39,19 @@ impl<'l> TypeCheckingContext<'l> {
                     let expr = self.instructions[id].unwrap_subexpression();
                     let expr_domain = expr.domain.unwrap();
 
-                    match (total_physical_domain, expr_domain) {
+                    match (&mut total_physical_domain, expr_domain) {
                         (None, DomainType::Physical(phys)) => {
-                            total_physical_domain = Some((phys, expr.span));
+                            total_physical_domain =
+                                Some((self.unifier.clone_unify(phys), expr.span));
                         }
                         (Some(phys_total), DomainType::Physical(expr_phys)) => {
-                            self.unify_physicals(phys_total, (expr_phys, expr.span), "expression");
+                            self.set_physicals(
+                                &mut phys_total.0,
+                                phys_total.1,
+                                expr_phys,
+                                expr.span,
+                                "expression",
+                            );
                         }
                         (None, DomainType::Generative) | (Some(_), DomainType::Generative) => {} // No conflict
                     }
@@ -57,10 +64,12 @@ impl<'l> TypeCheckingContext<'l> {
                         if let Some(condition_domain) =
                             self.get_condition_domain(expr.parent_condition)
                         {
-                            if let Some(phys_total) = total_physical_domain {
-                                self.unify_physicals(
-                                    phys_total,
-                                    condition_domain,
+                            if let Some(phys_total) = &mut total_physical_domain {
+                                self.set_physicals(
+                                    &mut phys_total.0,
+                                    phys_total.1,
+                                    condition_domain.0,
+                                    condition_domain.1,
                                     "the runtime condition for function calls",
                                 );
                             }
@@ -71,7 +80,7 @@ impl<'l> TypeCheckingContext<'l> {
                 }
 
                 let resulting_domain = match total_physical_domain {
-                    Some(phys) => DomainType::Physical(self.unifier.clone_unify(phys.0)),
+                    Some(phys) => DomainType::Physical(phys.0),
                     None => DomainType::Generative,
                 };
                 expr.domain.set_initial(resulting_domain);
@@ -79,36 +88,31 @@ impl<'l> TypeCheckingContext<'l> {
                 // Regular "writes"
                 if let ExpressionOutput::MultiWrite(writes) = &expr.output {
                     for wr in writes {
-                        let mut target_domain =
-                            self.get_wireref_root_domain(&wr.to).unwrap_or_else(|| {
-                                DomainTypeRef::Physical(self.domain_alloc.alloc(DomainID::UNKNOWN))
-                            });
+                        let mut target_domain: DomainType = self
+                            .get_wireref_root_domain(&wr.to)
+                            .unwrap_or(DomainType::Physical(DomainID::UNKNOWN));
                         let mut target_span = wr.to.root_span;
 
                         match wr.write_modifiers {
                             WriteModifiers::Connection { .. } => {
                                 if let Some(condition_domain) =
                                     self.get_condition_domain(expr.parent_condition)
-                                    && let DomainTypeRef::Physical(target_phys) = &target_domain
+                                    && let DomainType::Physical(target_phys) = &mut target_domain
                                 {
-                                    self.unify_physicals(
-                                        (target_phys, target_span),
-                                        condition_domain,
+                                    self.set_physicals(
+                                        target_phys,
+                                        target_span,
+                                        condition_domain.0,
+                                        condition_domain.1,
                                         "the runtime condition",
                                     );
                                 }
                             }
                             WriteModifiers::Initial { initial_kw_span } => {
-                                target_domain = DomainTypeRef::Generative;
+                                target_domain = DomainType::Generative;
                                 target_span = initial_kw_span;
                             }
                         }
-                        let target_domain = match target_domain {
-                            DomainTypeRef::Generative => DomainType::Generative,
-                            DomainTypeRef::Physical(phys) => {
-                                DomainType::Physical(self.unifier.clone_unify(phys))
-                            }
-                        };
                         wr.target_domain.set_initial(target_domain);
                         let target_domain = wr.target_domain.unwrap();
 
@@ -240,15 +244,18 @@ impl<'l> TypeCheckingContext<'l> {
     /// - Writing:
     ///   The output_typ domain should be generative when wire_ref.root is generative, or a generative value is required such as with "initial"
     ///   When wire_ref.root is not generative, it should be an unknown domain variable
-    fn get_wireref_root_domain(&self, wire_ref: &'l WireReference) -> Option<DomainTypeRef<'l>> {
+    fn get_wireref_root_domain(&self, wire_ref: &'l WireReference) -> Option<DomainType> {
         match &wire_ref.root {
-            WireReferenceRoot::LocalDecl(id) => Some(DomainTypeRef::from(
-                &self.instructions[*id].unwrap_declaration().domain,
-            )),
+            WireReferenceRoot::LocalDecl(id) => Some(
+                self.unifier
+                    .clone_known(&self.instructions[*id].unwrap_declaration().domain),
+            ),
             WireReferenceRoot::LocalInterface(id) => {
                 let interface = self.instructions[*id].unwrap_interface();
 
-                Some(DomainTypeRef::Physical(&interface.domain))
+                Some(DomainType::Physical(
+                    self.unifier.clone_unify(&interface.domain),
+                ))
             }
             WireReferenceRoot::LocalSubmodule(local_submod) => {
                 let submod = self.instructions[*local_submod].unwrap_submodule();
@@ -256,7 +263,9 @@ impl<'l> TypeCheckingContext<'l> {
                 let local_domain_map = submod.local_domain_map.get().unwrap();
                 if local_domain_map.len() == 1 {
                     let [singular_domain] = local_domain_map.cast_to_array();
-                    return Some(DomainTypeRef::Physical(singular_domain));
+                    return Some(DomainType::Physical(
+                        self.unifier.clone_unify(singular_domain),
+                    ));
                 }
 
                 for p in &wire_ref.path {
@@ -266,8 +275,9 @@ impl<'l> TypeCheckingContext<'l> {
                                 if let Some(domain_in_submod) =
                                     submod_ref.md.interfaces[*interface].domain
                                 {
-                                    return Some(DomainTypeRef::Physical(
-                                        &local_domain_map[domain_in_submod],
+                                    return Some(DomainType::Physical(
+                                        self.unifier
+                                            .clone_unify(&local_domain_map[domain_in_submod]),
                                     ));
                                 }
                             }
@@ -279,13 +289,11 @@ impl<'l> TypeCheckingContext<'l> {
             }
             WireReferenceRoot::NamedConstant(global_ref) => {
                 self.global_ref_must_be_generative(global_ref);
-                Some(DomainTypeRef::Generative)
+                Some(DomainType::Generative)
             }
             WireReferenceRoot::NamedModule(global_ref) => {
                 self.global_ref_must_be_generative(global_ref);
-                Some(DomainTypeRef::Physical(
-                    self.domain_alloc.alloc(DomainID::UNKNOWN),
-                ))
+                Some(DomainType::Physical(DomainID::UNKNOWN))
             }
             WireReferenceRoot::Error => None,
         }
@@ -294,21 +302,47 @@ impl<'l> TypeCheckingContext<'l> {
     /// Used to quickly combine domains with each other. Also performs unification
     pub fn unify_physicals(
         &self,
-        a: (&'l UniCell<DomainID>, Span),
-        b: (&'l UniCell<DomainID>, Span),
+        (a_dom, a_span): (&'l UniCell<DomainID>, Span),
+        (b_dom, b_span): (&'l UniCell<DomainID>, Span),
         context: &str,
     ) {
-        if self.unifier.unify(a.0, b.0) != UnifyResult::Success {
-            // Given that there *was* a unification failure, both a and b should be resolvable.
-            let a_dom = self.unifier.resolve(a.0).unwrap();
-            let b_dom = self.unifier.resolve(b.0).unwrap();
-
-            let expected_name = a_dom.display(self.domains);
-            let found_name = b_dom.display(self.domains);
-            self.errors
-                .error(b.1, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"))
-                .info(a.1, "Conflicting with");
+        if self.unifier.unify(a_dom, b_dom) != UnifyResult::Success {
+            self.report_domains_error(a_dom, a_span, b_dom, b_span, context);
         }
+    }
+
+    /// Used to quickly combine domains with each other. Also performs unification
+    pub fn set_physicals(
+        &self,
+        a_dom: &mut UniCell<DomainID>,
+        a_span: Span,
+        b_dom: &'l UniCell<DomainID>,
+        b_span: Span,
+        context: &str,
+    ) {
+        // I swapped the arguments here, because I didn't want the error message to change. (It's more intuitive right now)
+        if self.unifier.set(b_dom, a_dom) != UnifyResult::Success {
+            self.report_domains_error(a_dom, a_span, b_dom, b_span, context);
+        }
+    }
+
+    fn report_domains_error(
+        &self,
+        a_dom: &UniCell<DomainID>,
+        a_span: Span,
+        b_dom: &UniCell<DomainID>,
+        b_span: Span,
+        context: &str,
+    ) {
+        // Given that there *was* a unification failure, both a and b should be resolvable.
+        assert!(self.unifier.fully_substitute(a_dom));
+        assert!(self.unifier.fully_substitute(b_dom));
+
+        let expected_name = a_dom.display(self.domains);
+        let found_name = b_dom.display(self.domains);
+        self.errors
+            .error(b_span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"))
+            .info(a_span, "Conflicting with");
     }
 
     fn global_ref_must_be_generative<ID>(&self, global_ref: &'l GlobalReference<ID>) {

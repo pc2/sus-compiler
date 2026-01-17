@@ -1,32 +1,26 @@
+use crate::prelude::*;
+
 use colored::Colorize;
 use ibig::IBig;
 use sus_proc_macro::kw;
 
-use crate::alloc::zip_eq;
-use crate::dev_aid::ariadne_interface::pretty_print_many_spans;
-use crate::instantiation::{
-    InferenceResult, InstantiatedModule, IsPort, ModuleTypingContext, MultiplexerSource,
-    PartialBound, RealWire, RealWireDataSource, RealWirePathElem, SubModule, SubModuleOrWire,
+use crate::{
+    alloc::zip_eq,
+    dev_aid::ariadne_interface::pretty_print_many_spans,
+    file_position::FileText,
+    flattening::*,
+    instantiation::*,
+    latency::port_latency_inference::*,
+    linker::{GlobalUUID, IsExtern, LinkInfo, LinkerFiles, LinkerGlobals},
+    typing::{
+        abstract_type::*,
+        concrete_type::{ConcreteGlobalReference, ConcreteType, SubtypeRelation},
+        domain_type::DomainType,
+        template::*,
+        unifyable_cell::UniCell,
+    },
+    value::Value,
 };
-use crate::latency::port_latency_inference::{
-    InferenceCandidate, InferenceTarget, InferenceTargetPath, SubtypeInferencePathElem,
-    ValueInferStrategy,
-};
-use crate::prelude::*;
-
-use crate::file_position::FileText;
-use crate::typing::abstract_type::{AbstractGlobalReference, AbstractInnerType, PeanoType};
-use crate::typing::concrete_type::{ConcreteGlobalReference, SubtypeRelation};
-use crate::typing::domain_type::{DomainType, DomainTypeRef};
-use crate::typing::template::{
-    GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind,
-};
-use crate::typing::unifyable_cell::UniCell;
-use crate::value::Value;
-
-use crate::flattening::*;
-use crate::linker::{GlobalUUID, IsExtern, LinkInfo, LinkerFiles, LinkerGlobals};
-use crate::typing::{abstract_type::AbstractRankedType, concrete_type::ConcreteType};
 
 use std::fmt::{Display, Formatter, Write};
 
@@ -754,11 +748,13 @@ impl LinkInfo {
         instr_id: FlatID,
         domains: &'s FlatAlloc<DomainInfo, DomainIDMarker>,
     ) -> impl Display + 's {
-        let domain = self.get_instruction_domain(instr_id);
-        FmtWrapper(move |f| match domain {
-            Some(DomainTypeRef::Generative) => write!(f, "gen"),
-            Some(DomainTypeRef::Physical(phys)) => write!(f, "{}", phys.display(domains)),
-            None => Ok(()),
+        FmtWrapper(move |f| match &self.instructions[instr_id] {
+            Instruction::Declaration(decl) => decl.domain.display(domains).fmt(f),
+            Instruction::Interface(interface) => interface.domain.display(domains).fmt(f),
+            Instruction::Expression(expr) => expr.domain.display(domains).fmt(f),
+            Instruction::SubModule(_)
+            | Instruction::IfStatement(_)
+            | Instruction::ForStatement(_) => Ok(()),
         })
     }
     pub fn fmt_instructions(
