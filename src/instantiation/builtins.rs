@@ -1,10 +1,15 @@
 use crate::prelude::*;
 
-use ibig::{IBig, UBig};
+use ibig::{IBig, UBig, ops::NextPowerOfTwo};
 use sus_proc_macro::get_builtin_const;
 
-use crate::typing::abstract_type::{AbstractRankedType, BOOL_SCALAR, INT_SCALAR};
-use crate::{typing::concrete_type::ConcreteGlobalReference, value::Value};
+use crate::{
+    typing::{
+        abstract_type::{AbstractRankedType, BOOL_SCALAR, INT_SCALAR},
+        concrete_type::ConcreteGlobalReference,
+    },
+    value::Value,
+};
 
 pub fn evaluate_builtin_constant(
     cst_ref: &ConcreteGlobalReference<ConstantUUID>,
@@ -35,6 +40,14 @@ pub fn evaluate_builtin_constant(
             let [base, exponent] = cst_ref.template_args.cast_to_int_array();
             let exponent = must_be_small_uint::<usize>(exponent, "E", usize::MAX)?;
             Ok((Value::Integer(base.pow(exponent)), INT_SCALAR.clone()))
+        }
+        get_builtin_const!("nextPow2") => {
+            let [value] = cst_ref.template_args.cast_to_int_array();
+            let value = must_be_positive(value, "V")?;
+            Ok((
+                Value::Integer(value.next_power_of_two().into()),
+                INT_SCALAR.clone(),
+            ))
         }
         get_builtin_const!("factorial") => {
             let [n] = cst_ref.template_args.cast_to_int_array();

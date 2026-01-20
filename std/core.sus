@@ -52,6 +52,9 @@ __builtin__ const int pow2 #(int E) {}
 /// Computes `B^E` at compile-time
 __builtin__ const int pow #(int B, int E) {}
 
+/// Returns the smallest power of two greater or equal to the input value. `nextPow2#(V) >= V`. 
+__builtin__ const int nextPow2 #(int V) {}
+
 /// Computes `N!`
 __builtin__ const int factorial #(int N) {}
 

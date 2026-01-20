@@ -4,13 +4,12 @@
 //!
 //! As for typing, it only instantiates written types and leaves the rest for further typechecking.
 
-use super::*;
-
 use std::borrow::Cow;
 use std::ops::{Deref, Index, IndexMut, Range};
 
 use crate::{
     flattening::*,
+    instantiation::*,
     latency::port_latency_inference::ValueInferStrategy,
     linker::{GlobalUUID, IsExtern, LinkInfo},
     to_string::FmtWrapper,

@@ -10,15 +10,15 @@ use ibig::IBig;
 
 use crate::{
     errors::ErrorReference,
-    instantiation::PartSelectDirection,
+    instantiation::{
+        ModuleTypingContext, PartSelectDirection, RealWire, RealWireDataSource, RealWirePathElem,
+    },
     typing::{
         concrete_type::{ConcreteType, IntBounds},
         unifyable_cell::UniCell,
     },
     value::Value,
 };
-
-use super::{ModuleTypingContext, RealWire, RealWireDataSource, RealWirePathElem};
 
 /// Takes a type, and a bunch of slicing operations applied to it, and it returns the resulting type
 fn make_output_typ<'c>(typ: &'c ConcreteType, path: &[RealWirePathElem]) -> Cow<'c, ConcreteType> {

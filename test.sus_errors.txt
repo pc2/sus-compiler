@@ -168,6 +168,7 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated ReceiveZerosArray #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestZerosArrays #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestUnknownArraySize #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestNextPow2 #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -2921,9 +2922,9 @@ Warning: Unused port 'bits'
       │                               │  
       │                               ╰── b declared here
       │
-      ├─[ core.sus:272:55 ]
+      ├─[ core.sus:275:55 ]
       │
-  272 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
+  275 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                                       ──┬─  
       │                                                         ╰─── Port 'bits' declared here
 ──────╯
@@ -2936,9 +2937,9 @@ Warning: Unused port 'value'
       │                               │  
       │                               ╰── b declared here
       │
-      ├─[ core.sus:272:26 ]
+      ├─[ core.sus:275:26 ]
       │
-  272 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
+  275 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
       │                          ──┬──  
       │                            ╰──── Port 'value' declared here
 ──────╯
@@ -3899,6 +3900,20 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │           ┬  
       │           ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1764:2 ]
+      │
+ 1764 │     nextPow2#(V: -1)
+      │     ────────┬───────  
+      │             ╰───────── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Error: nextPow2 #(V: -1): V must be positive! Found -1
+      ╭─[ test.sus:1764:2 ]
+      │
+ 1764 │     nextPow2#(V: -1)
+      │     ────────┬───────  
+      │             ╰───────── nextPow2 #(V: -1): V must be positive! Found -1
+──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen test_various_assignments #() due to errors!
@@ -3974,3 +3989,4 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [ERROR sus_compiler::codegen] Cannot codegen NonGenerativeSliceBoundsMustNotICE #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen InstantiatesItself #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen TestUnknownArraySize #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen TestNextPow2 #() due to errors!
