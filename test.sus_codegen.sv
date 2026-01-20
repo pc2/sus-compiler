@@ -67,6 +67,8 @@ module ReceiveZerosArray(
 	// (zero sized) input values
 );
 
+// PATCH XRT 2.16 over-zealous empty module DRC
+initial begin end
 endmodule
 
 // TestGenArrayOps #()
@@ -74,6 +76,8 @@ module TestGenArrayOps(
 	input clk
 );
 
+// PATCH XRT 2.16 over-zealous empty module DRC
+initial begin end
 endmodule
 
 // ModuleWithInitialStates #()
@@ -132,6 +136,8 @@ module testShifts(
 	input clk
 );
 
+// PATCH XRT 2.16 over-zealous empty module DRC
+initial begin end
 endmodule
 
 // test_all_modulos #()
@@ -1221,6 +1227,8 @@ module no_main_interface(
 	input clk
 );
 
+// PATCH XRT 2.16 over-zealous empty module DRC
+initial begin end
 endmodule
 
 // instruction_decoder #()
@@ -1229,6 +1237,8 @@ module instruction_decoder(
 	input wire[31:0] instr
 );
 
+// PATCH XRT 2.16 over-zealous empty module DRC
+initial begin end
 endmodule
 
 // use_permute #()
@@ -1390,6 +1400,8 @@ module mod_with_unused_interface(
 	input clk
 );
 
+// PATCH XRT 2.16 over-zealous empty module DRC
+initial begin end
 endmodule
 
 // no_port_module #()
@@ -1397,6 +1409,8 @@ module no_port_module(
 	input clk
 );
 
+// PATCH XRT 2.16 over-zealous empty module DRC
+initial begin end
 endmodule
 
 // offset_backwards #()
@@ -2475,6 +2489,8 @@ module doNothing(
 	input clk
 );
 
+// PATCH XRT 2.16 over-zealous empty module DRC
+initial begin end
 endmodule
 
 // submodule #()
@@ -4109,6 +4125,8 @@ module UIntToBits_NUM_BITS_0(
 	// (zero sized) output bits
 );
 
+// PATCH XRT 2.16 over-zealous empty module DRC
+initial begin end
 endmodule
 
 // CrossActionNoData #()

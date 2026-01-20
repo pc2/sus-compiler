@@ -5,6 +5,7 @@ use ibig::{IBig, UBig};
 use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::zip_eq;
+use crate::codegen::patches::patch_empty_modules_should_have_content;
 use crate::latency::AbsLat;
 use crate::linker::{IsExtern, LinkInfo};
 use crate::prelude::*;
@@ -20,6 +21,24 @@ use crate::typing::template::{TVec, TemplateKind};
 use crate::{typing::concrete_type::ConcreteType, value::Value};
 
 use std::fmt::{Display, Write};
+
+pub fn gen_verilog_code(instance: &InstantiatedModule, linker: &Linker) -> String {
+    let mut ctx = CodeGenerationContext {
+        md: &linker.modules[instance.global_ref.id],
+        instance,
+        linker,
+        program_text: String::new(),
+        genvars: VariableAlloc::new("_g"),
+        for_vars: VariableAlloc::new("_v"),
+        needed_untils: instance.compute_needed_untils(),
+    };
+
+    crate::debug::debug_context("codegen", instance.name.clone(), || {
+        ctx.write_verilog_code();
+    });
+
+    ctx.program_text
+}
 
 struct VariableAlloc {
     pub var_names: Vec<Rc<str>>,
@@ -581,6 +600,9 @@ impl<'g> CodeGenerationContext<'g> {
     fn write_generative_decls_for(&mut self, f: impl FnOnce(&mut Self)) {
         let store_program_text_temporary = std::mem::take(&mut self.program_text);
         f(self);
+
+        // Patch XRT 2.16's over-zealous DRC for empty modules.
+        patch_empty_modules_should_have_content(&mut self.program_text);
         let added_text = std::mem::replace(&mut self.program_text, store_program_text_temporary);
 
         for var in &self.genvars.var_names {
@@ -1411,22 +1433,4 @@ impl RealWireDataSource {
             _ => "wire", // Has to be "wire", because `logic[5:0] v = other_wire;` would *initialize* v to other_wire, so we need to use `wire`
         }
     }
-}
-
-pub fn gen_verilog_code(instance: &InstantiatedModule, linker: &Linker) -> String {
-    let mut ctx = CodeGenerationContext {
-        md: &linker.modules[instance.global_ref.id],
-        instance,
-        linker,
-        program_text: String::new(),
-        genvars: VariableAlloc::new("_g"),
-        for_vars: VariableAlloc::new("_v"),
-        needed_untils: instance.compute_needed_untils(),
-    };
-
-    crate::debug::debug_context("codegen", instance.name.clone(), || {
-        ctx.write_verilog_code();
-    });
-
-    ctx.program_text
 }

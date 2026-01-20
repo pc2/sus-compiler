@@ -21,3 +21,17 @@ pub fn patch_combinatorial_write_one_bit_dont_care(
         Ok(())
     })
 }
+
+pub fn patch_empty_modules_should_have_content(module_content: &mut String) {
+    if module_content.lines().all(|l| {
+        let l = l.trim();
+        l.starts_with("//") || l.is_empty()
+    }) {
+        use std::fmt::Write;
+        writeln!(
+            module_content,
+            "// PATCH XRT 2.16 over-zealous empty module DRC\ninitial begin end"
+        )
+        .unwrap();
+    }
+}
