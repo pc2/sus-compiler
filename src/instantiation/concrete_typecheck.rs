@@ -1,24 +1,29 @@
+use super::*;
+
 use ibig::IBig;
 use ibig::ops::DivRem;
 use sus_proc_macro::get_builtin_type;
 
-use crate::alloc::{zip_eq, zip_eq3};
-use crate::dev_aid::dot_graphs::display_latency_count_graph;
-use crate::instantiation::instantiator::InstantiateError;
-use crate::latency::LatencyInferenceProblem;
-use crate::latency::port_latency_inference::{
-    InferenceCandidate, InferenceTarget, InferenceTargetPath, ValueInferStrategy,
+use crate::{
+    alloc::{zip_eq, zip_eq3},
+    dev_aid::dot_graphs::display_latency_count_graph,
+    instantiation::instantiator::InstantiateError,
+    latency::{
+        LatencyInferenceProblem,
+        port_latency_inference::{
+            InferenceCandidate, InferenceTarget, InferenceTargetPath, ValueInferStrategy,
+        },
+    },
+    to_string::display_all_infer_params,
+    typing::{
+        concrete_type::{ConcreteType, SubtypeRelation},
+        template::TemplateKind,
+        unifyable_cell::{SubstituteRecurse, Unifier, UnifierTop, UnifyResult},
+        value_unifier::ValueUnifier,
+    },
+    util::{all_equal, ceil_div, floor_div},
+    value::MAX_SHIFT,
 };
-use crate::to_string::display_all_infer_params;
-use crate::typing::concrete_type::SubtypeRelation;
-use crate::typing::template::TemplateKind;
-use crate::typing::{concrete_type::ConcreteType, value_unifier::ValueUnifier};
-use crate::util::{all_equal, ceil_div, floor_div};
-use crate::value::MAX_SHIFT;
-
-use crate::typing::unifyable_cell::{SubstituteRecurse, Unifier, UnifierTop, UnifyResult};
-
-use super::*;
 
 macro_rules! assert_due_to_variable_clones {
     ($cond:expr) => {

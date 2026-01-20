@@ -4,12 +4,12 @@ use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::rc::Rc;
 
-use crate::config::config;
-use crate::linker::{LinkerFiles, LinkerGlobals};
-use crate::to_string::FmtWrapper;
-use crate::typing::concrete_type::ConcreteGlobalReference;
-
-use super::InstantiatedModule;
+use crate::{
+    config::config,
+    linker::{LinkerFiles, LinkerGlobals},
+    to_string::FmtWrapper,
+    typing::concrete_type::ConcreteGlobalReference,
+};
 
 /// Stored per module [crate::flattening::Module].
 /// With this you can instantiate a module for different sets of template arguments.

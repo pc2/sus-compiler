@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use crate::typing::unifyable_cell::UniCell;
 
+mod builtins;
 mod concrete_typecheck;
 mod execute;
 mod final_checks;
@@ -12,23 +13,26 @@ pub use instantiator::Instantiator;
 use ibig::IBig;
 use unique_names::UniqueNames;
 
-use crate::instantiation::concrete_typecheck::ModuleTypingSuperContext;
-use crate::latency::{AbsLat, InferenceFailure};
-use crate::linker::{LinkInfo, LinkerGlobals};
-use crate::typing::template::TVec;
+use crate::{
+    errors::ErrorStore,
+    flattening::{
+        BinaryOperator, Direction, Expression, ExpressionSource, GlobalReference, Instruction,
+        Module, PartSelectDirection, UnaryOperator, WireReference, WireReferenceRoot,
+    },
+    instantiation::concrete_typecheck::ModuleTypingSuperContext,
+    latency::{AbsLat, InferenceFailure},
+    linker::{LinkInfo, LinkerGlobals},
+    typing::{
+        concrete_type::{ConcreteGlobalReference, ConcreteType, IntBounds},
+        template::TVec,
+    },
+    value::Value,
+};
 
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashSet;
 use std::fmt::Write;
 use std::rc::Rc;
-
-use crate::flattening::{
-    BinaryOperator, Direction, Expression, ExpressionSource, GlobalReference, Instruction, Module,
-    PartSelectDirection, UnaryOperator, WireReference, WireReferenceRoot,
-};
-use crate::{errors::ErrorStore, value::Value};
-
-use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType, IntBounds};
 
 /// In valid programs, this becomes [PartialBound::Known] after concrete typecheck
 #[derive(Debug, Clone)]

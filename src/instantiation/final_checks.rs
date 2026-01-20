@@ -2,6 +2,8 @@
 //! - Check all subtype relations
 //! - Check array bounds
 
+use crate::prelude::*;
+
 use std::borrow::Cow;
 
 use ibig::IBig;
@@ -17,8 +19,6 @@ use crate::{
 };
 
 use super::{ModuleTypingContext, RealWire, RealWireDataSource, RealWirePathElem};
-
-use crate::prelude::*;
 
 /// Takes a type, and a bunch of slicing operations applied to it, and it returns the resulting type
 fn make_output_typ<'c>(typ: &'c ConcreteType, path: &[RealWirePathElem]) -> Cow<'c, ConcreteType> {
