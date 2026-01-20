@@ -85,15 +85,7 @@ pub struct ConfigStruct {
     pub recursion_limit: usize,
 }
 
-pub const VERSION_INFO: &str = concat!(
-    env!("CARGO_PKG_VERSION"),
-    " (",
-    env!("GIT_HASH"),
-    ") built at ",
-    env!("BUILD_DATE"),
-    " ",
-    env!("BUILD_FEATURES")
-);
+pub const VERSION_INFO: &str = concat!(env!("CARGO_PKG_VERSION"), env!("EXTRA_VERSION_STRING"));
 
 fn command_builder() -> Command {
     Command::new("SUS Compiler")

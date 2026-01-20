@@ -15,24 +15,28 @@ fn main() -> Result<(), String> {
         home_dir.to_str().unwrap()
     );
 
-    let features_str = if std::env::var_os("CARGO_FEATURE_LSP").is_some() {
-        ""
-    } else {
-        " without LSP Support"
-    };
-    println!("cargo:rustc-env=BUILD_FEATURES={features_str}");
+    let version_str = std::env::var_os("CARGO_PKG_VERSION").unwrap();
+    if version_str.to_str().unwrap().ends_with("-devel") {
+        let build_features = if std::env::var_os("CARGO_FEATURE_LSP").is_some() {
+            ""
+        } else {
+            " without LSP Support"
+        };
+        let git_hash = std::process::Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .unwrap();
+        let git_hash = String::from_utf8(git_hash.stdout).unwrap();
+        let git_hash = git_hash.trim();
+        let build_date = chrono::Local::now().format("%Y-%m-%d_%H:%M:%S");
 
-    // note: add error checking yourself.
-    let output = std::process::Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .output()
-        .unwrap();
-    let git_hash = String::from_utf8(output.stdout).unwrap();
-    println!("cargo:rustc-env=GIT_HASH={git_hash}");
-    println!(
-        "cargo:rustc-env=BUILD_DATE={}",
-        chrono::Local::now().format("%Y-%m-%d_%H:%M:%S")
-    );
+        println!(
+            "cargo:rustc-env=EXTRA_VERSION_STRING= ({git_hash}) built at {build_date}{build_features}"
+        );
+    } else {
+        println!("cargo:rustc-env=EXTRA_VERSION_STRING=");
+    }
+
     Ok(())
 }
 
