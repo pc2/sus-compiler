@@ -3,7 +3,7 @@ use crate::prelude::*;
 use std::cell::OnceCell;
 use std::ffi::OsStr;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::config::EarlyExitUpTo;
 use crate::linker::checkpoint::{
@@ -76,11 +76,6 @@ impl Linker {
         );
     }
 
-    pub fn add_file(&mut self, file_path: &Path) {
-        let file_identifier = UniqueFileID::from_path(file_path);
-        self.add_or_update_file_from_disk(file_identifier);
-    }
-
     pub fn add_all_files_in_directory(&mut self, directory: &PathBuf) {
         let dir_read = std::fs::read_dir(directory);
         let dir_read = match dir_read {
@@ -101,7 +96,8 @@ impl Linker {
         for file in files {
             let file_path = file.canonicalize().unwrap();
             if file_path.is_file() && file_path.extension() == Some(OsStr::new("sus")) {
-                self.add_file(&file_path);
+                let file_identifier = UniqueFileID::from_path(&file_path);
+                self.add_or_update_file_from_disk(file_identifier);
             }
         }
     }
@@ -116,19 +112,22 @@ impl Linker {
         let mut parser = Parser::new();
         parser.set_language(&tree_sitter_sus::language()).unwrap();
         let tree = parser.parse(&text, None).unwrap();
+        let file_text = FileText::new(text);
 
         let file_id = if let Some(file_id) = self.find_file(&file_identifier) {
             let file_data = self.remove_everything_in_file(file_id);
 
+            // overwrite file_identifier with updated file_identifier, such that renames are caught.
+            file_data.file_identifier = file_identifier;
             file_data.parsing_errors = ErrorStore::new();
-            file_data.file_text = FileText::new(text);
+            file_data.file_text = file_text;
             file_data.tree = tree;
 
             file_id
         } else {
             self.files.alloc(FileData {
                 file_identifier,
-                file_text: FileText::new(text),
+                file_text,
                 tree,
                 associated_values: Vec::new(),
                 parsing_errors: ErrorStore::new(),

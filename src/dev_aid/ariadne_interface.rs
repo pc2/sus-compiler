@@ -1,4 +1,7 @@
-use crate::{linker::LinkerFiles, prelude::*};
+use crate::{
+    linker::{LinkerFiles, UniqueFileID},
+    prelude::*,
+};
 use ariadne::*;
 // disambiguate Span - it's ours, from ariadne's
 use crate::prelude::Span;
@@ -53,7 +56,8 @@ pub fn compile_all(linker: &mut Linker, file_paths: Vec<PathBuf>) {
     linker.add_standard_library();
 
     for file_path in file_paths {
-        linker.add_file(&file_path);
+        let file_identifier = UniqueFileID::from_path(&file_path);
+        linker.add_or_update_file_from_disk(file_identifier);
     }
 
     linker.recompile_all();

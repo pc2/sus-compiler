@@ -212,7 +212,8 @@ fn initialize_all_files(linker: &mut Linker, init_params: &InitializeParams) {
                 );
                 continue;
             };
-            linker.add_file(&path);
+            let file_identifier = UniqueFileID::from_path(&path);
+            linker.add_or_update_file_from_disk(file_identifier);
         }
     } else if let Some(workspace_folder) = &init_params.workspace_folders {
         for folder in workspace_folder {
@@ -562,6 +563,7 @@ fn handle_notification(
                 if event.typ == FileChangeType::CREATED || event.typ == FileChangeType::CHANGED {
                     linker.add_or_update_file_from_disk(file_identifier);
                 } else if event.typ == FileChangeType::DELETED {
+                    // Can't actually reliably find the FileUUID that was deleted, since it's deleted before the notification is sent. That's why below we iterate through all files to look for the deleted one.
                     if let Some(existing_file_id) = linker
                         .files
                         .find(|_, data| data.file_identifier.name == file_identifier.name)
@@ -572,6 +574,16 @@ fn handle_notification(
                     unreachable!()
                 }
             }
+            linker.files.retain(|_, v| {
+                if v.file_identifier.inode.is_some() {
+                    match std::fs::exists(&v.file_identifier.name) {
+                        Ok(true) => true,
+                        Ok(false) | Err(_) => false,
+                    }
+                } else {
+                    true // String-based inodes are not file backed
+                }
+            });
             linker.recompile_all();
 
             push_all_errors(connection, linker)?;

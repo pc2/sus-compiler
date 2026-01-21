@@ -356,6 +356,15 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
             .find(|(id, v)| predicate(*id, v))
             .map(|(id, _)| id)
     }
+    pub fn retain(&mut self, mut should_retain: impl FnMut(UUID<IndexMarker>, &mut T) -> bool) {
+        for (idx, v_opt) in self.data.iter_mut().enumerate() {
+            let Some(v) = v_opt else { continue };
+            if !should_retain(UUID(idx, PhantomData), v) {
+                *v_opt = None;
+                self.free_slots.push(idx);
+            }
+        }
+    }
     #[track_caller]
     pub fn get_disjoint_mut<const N: usize>(
         &mut self,
