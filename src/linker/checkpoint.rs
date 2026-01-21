@@ -1,6 +1,6 @@
 use crate::{
     errors::ErrorStore,
-    linker::{GlobalUUID, Linker},
+    linker::{GlobalUUID, LinkerGlobals},
 };
 
 use super::{LinkInfo, ResolvedGlobals};
@@ -63,10 +63,10 @@ impl LinkInfo {
     }
 }
 
-impl Linker {
+impl LinkerGlobals {
     pub fn checkpoint(&mut self, global_ids: &[GlobalUUID], checkpoint_id: usize) {
         for id in global_ids {
-            let link_info = &mut self.globals[*id];
+            let link_info = &mut self[*id];
 
             let expected_checkpoint = link_info.checkpoints.len();
             assert!(

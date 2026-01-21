@@ -2,13 +2,14 @@ use crate::prelude::*;
 
 use std::cell::OnceCell;
 use std::ffi::OsStr;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use crate::config::EarlyExitUpTo;
-use crate::linker::GlobalObj;
 use crate::linker::checkpoint::{
     AFTER_FLATTEN_CP, AFTER_INITIAL_PARSE_CP, AFTER_LINTS_CP, AFTER_TYPE_CHECK_CP,
 };
+use crate::linker::{GlobalObj, UniqueFileID};
 use crate::typing::concrete_type::ConcreteGlobalReference;
 
 use sus_proc_macro::{get_builtin_const, get_builtin_type};
@@ -22,32 +23,13 @@ pub fn get_std_dir() -> PathBuf {
     config().sus_home.join("std")
 }
 
-/// Any extra operations that should happen when files are added or removed from the linker. Such as caching line offsets.
-pub trait LinkerExtraFileInfoManager {
-    /// This is there to give an acceptable identifier that can be printed
-    fn convert_filename(&self, path: &Path) -> String;
-    fn on_file_added(&mut self, _file_id: FileUUID, _linker: &Linker) {}
-    fn on_file_updated(&mut self, _file_id: FileUUID, _linker: &Linker) {}
-    #[allow(unused)]
-    fn before_file_remove(&mut self, _file_id: FileUUID, _linker: &Linker) {}
-}
-
-impl LinkerExtraFileInfoManager for () {
-    fn convert_filename(&self, path: &Path) -> String {
-        path.to_string_lossy().to_string()
-    }
-}
-
 impl Linker {
-    pub fn add_standard_library<ExtraInfoManager: LinkerExtraFileInfoManager>(
-        &mut self,
-        info_mngr: &mut ExtraInfoManager,
-    ) {
+    pub fn add_standard_library(&mut self) {
         assert!(self.modules.is_empty());
         assert!(self.types.is_empty());
         assert!(self.constants.is_empty());
         let std_lib_path = get_std_dir();
-        self.add_all_files_in_directory(&std_lib_path, info_mngr);
+        self.add_all_files_in_directory(&std_lib_path);
         for (_, f) in &mut self.files {
             f.is_std = true; // Mark standard library files
         }
@@ -94,21 +76,12 @@ impl Linker {
         );
     }
 
-    pub fn add_file<ExtraInfoManager: LinkerExtraFileInfoManager>(
-        &mut self,
-        file_path: &Path,
-        info_mngr: &mut ExtraInfoManager,
-    ) {
-        let file_text = std::fs::read_to_string(file_path).unwrap();
-        let file_identifier = info_mngr.convert_filename(file_path);
-        self.add_file_text(file_identifier, file_text, info_mngr);
+    pub fn add_file(&mut self, file_path: &Path) {
+        let file_identifier = UniqueFileID::from_path(file_path);
+        self.add_or_update_file_from_disk(file_identifier);
     }
 
-    pub fn add_all_files_in_directory<ExtraInfoManager: LinkerExtraFileInfoManager>(
-        &mut self,
-        directory: &PathBuf,
-        info_mngr: &mut ExtraInfoManager,
-    ) {
+    pub fn add_all_files_in_directory(&mut self, directory: &PathBuf) {
         let dir_read = std::fs::read_dir(directory);
         let dir_read = match dir_read {
             Ok(d) => d,
@@ -128,92 +101,74 @@ impl Linker {
         for file in files {
             let file_path = file.canonicalize().unwrap();
             if file_path.is_file() && file_path.extension() == Some(OsStr::new("sus")) {
-                self.add_file(&file_path, info_mngr);
+                self.add_file(&file_path);
             }
         }
     }
 
-    pub fn add_file_text<ExtraInfoManager: LinkerExtraFileInfoManager>(
+    // When --feature lsp is not used, this gives a warning
+    #[allow(dead_code)]
+    pub fn add_or_update_file_text(
         &mut self,
-        file_identifier: String,
+        file_identifier: UniqueFileID,
         text: String,
-        info_mngr: &mut ExtraInfoManager,
     ) -> FileUUID {
-        // File doesn't yet exist
-        assert!(
-            !self
-                .files
-                .iter()
-                .any(|fd| fd.1.file_identifier == file_identifier)
-        );
-
         let mut parser = Parser::new();
         parser.set_language(&tree_sitter_sus::language()).unwrap();
         let tree = parser.parse(&text, None).unwrap();
 
-        let file_id = self.files.alloc(FileData {
-            file_identifier,
-            file_text: FileText::new(text),
-            tree,
-            associated_values: Vec::new(),
-            parsing_errors: ErrorStore::new(),
-            is_std: false,
-            ariadne_source: OnceCell::new(),
-        });
+        let file_id = if let Some(file_id) = self.find_file(&file_identifier) {
+            let file_data = self.remove_everything_in_file(file_id);
+
+            file_data.parsing_errors = ErrorStore::new();
+            file_data.file_text = FileText::new(text);
+            file_data.tree = tree;
+
+            file_id
+        } else {
+            self.files.alloc(FileData {
+                file_identifier,
+                file_text: FileText::new(text),
+                tree,
+                associated_values: Vec::new(),
+                parsing_errors: ErrorStore::new(),
+                is_std: false,
+                ariadne_source: OnceCell::new(),
+            })
+        };
 
         self.with_file_builder(file_id, |builder| {
             crate::debug::debug_context(
-                "gather_initial_file_data in add_file",
-                builder.file_data.file_identifier.clone(),
+                "gather_initial_file_data in update_file",
+                builder.file_data.file_identifier.name.clone(),
                 || gather_initial_file_data(builder),
             );
         });
-        let assoc_vals = self.files[file_id].associated_values.clone();
-        self.checkpoint(&assoc_vals, AFTER_INITIAL_PARSE_CP);
-
-        info_mngr.on_file_added(file_id, self);
+        let assoc_vals = &self.files[file_id].associated_values;
+        self.globals.checkpoint(assoc_vals, AFTER_INITIAL_PARSE_CP);
 
         file_id
     }
 
     // When --feature lsp is not used, this gives a warning
     #[allow(dead_code)]
-    pub fn add_or_update_file<ExtraInfoManager: LinkerExtraFileInfoManager>(
-        &mut self,
-        file_identifier: &str,
-        text: String,
-        info_mngr: &mut ExtraInfoManager,
-    ) {
-        if let Some(file_id) = self.find_file(file_identifier) {
-            let file_data = self.remove_everything_in_file(file_id);
+    pub fn add_or_update_file_from_disk(&mut self, mut file_identifier: UniqueFileID) -> FileUUID {
+        let file = file_identifier.inode.as_mut().unwrap().as_file_mut();
+        let mut file_content = String::new();
 
-            let mut parser = Parser::new();
-            parser.set_language(&tree_sitter_sus::language()).unwrap();
-            let tree = parser.parse(&text, None).unwrap();
+        if let Err(reason) = file.read_to_string(&mut file_content) {
+            let file_path_disp = &file_identifier.name;
+            panic!(
+                "Could not open file '{file_path_disp}' for syntax highlighting because {reason}"
+            )
+        };
 
-            file_data.parsing_errors = ErrorStore::new();
-            file_data.file_text = FileText::new(text);
-            file_data.tree = tree;
-
-            self.with_file_builder(file_id, |builder| {
-                crate::debug::debug_context(
-                    "gather_initial_file_data in update_file",
-                    builder.file_data.file_identifier.clone(),
-                    || gather_initial_file_data(builder),
-                );
-            });
-            let assoc_vals = self.files[file_id].associated_values.clone();
-            self.checkpoint(&assoc_vals, AFTER_INITIAL_PARSE_CP);
-
-            info_mngr.on_file_updated(file_id, self);
-        } else {
-            self.add_file_text(file_identifier.to_owned(), text, info_mngr);
-        }
+        self.add_or_update_file_text(file_identifier, file_content)
     }
 
-    pub fn find_file(&self, file_identifier: &str) -> Option<FileUUID> {
+    pub fn find_file(&self, file_identifier: &UniqueFileID) -> Option<FileUUID> {
         self.files
-            .find(|_id, f| f.file_identifier == file_identifier)
+            .find(|_id, f| &f.file_identifier == file_identifier)
     }
 
     pub fn recompile_all(&mut self) {
@@ -235,7 +190,7 @@ impl Linker {
 
         flatten_all_globals(self);
 
-        self.checkpoint(&global_ids, AFTER_FLATTEN_CP);
+        self.globals.checkpoint(&global_ids, AFTER_FLATTEN_CP);
         if config.early_exit == EarlyExitUpTo::Flatten {
             return;
         }
@@ -252,7 +207,7 @@ impl Linker {
                 }
             });
         }
-        self.checkpoint(&global_ids, AFTER_TYPE_CHECK_CP);
+        self.globals.checkpoint(&global_ids, AFTER_TYPE_CHECK_CP);
 
         for (_, md) in &self.modules {
             md.assert_valid();
@@ -267,7 +222,7 @@ impl Linker {
                 crate::flattening::typecheck::perform_lints(pass, errors, files);
             });
         }
-        self.checkpoint(&global_ids, AFTER_LINTS_CP);
+        self.globals.checkpoint(&global_ids, AFTER_LINTS_CP);
 
         if config.early_exit == EarlyExitUpTo::Lint {
             return;

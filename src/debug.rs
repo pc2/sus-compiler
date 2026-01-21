@@ -261,7 +261,7 @@ fn create_dump(linker_files: &LinkerFiles) {
         if file_data.is_std {
             continue;
         }
-        let filename = file_data.file_identifier.replace("/", "_");
+        let filename = file_data.file_identifier.to_string().replace("/", "_");
         let path = dump_dir.join(&filename);
         if let Ok(mut f) = fs::File::create(&path) {
             let _ = f.write_all(file_data.file_text.file_text.as_bytes());

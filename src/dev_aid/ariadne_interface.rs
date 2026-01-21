@@ -6,7 +6,6 @@ use crate::prelude::Span;
 use std::path::PathBuf;
 
 use crate::{
-    compiler_top::LinkerExtraFileInfoManager,
     config::config,
     errors::{CompileError, ErrorLevel},
 };
@@ -24,15 +23,12 @@ impl Cache<FileUUID> for &LinkerFiles {
     }
     fn display<'a>(&self, file_id: &'a FileUUID) -> Option<impl std::fmt::Display + 'a> {
         let file_data = &self[*file_id];
+        let file_name = &file_data.file_identifier.name;
         if config().ci {
-            let filename = file_data
-                .file_identifier
-                .rsplit("/")
-                .next()
-                .unwrap_or(file_data.file_identifier.as_str());
+            let filename = file_name.rsplit("/").next().unwrap_or(file_name.as_str());
             Some(filename.to_string())
         } else {
-            Some(file_data.file_identifier.clone())
+            Some(file_name.clone())
         }
     }
 }
@@ -54,20 +50,10 @@ impl ariadne::Span for Span {
 }
 
 pub fn compile_all(linker: &mut Linker, file_paths: Vec<PathBuf>) {
-    linker.add_standard_library(&mut ());
+    linker.add_standard_library();
 
     for file_path in file_paths {
-        let file_text = match std::fs::read_to_string(&file_path) {
-            Ok(file_text) => file_text,
-            Err(reason) => {
-                let file_path_disp = file_path.display();
-                panic!(
-                    "Could not open file '{file_path_disp}' for syntax highlighting because {reason}"
-                )
-            }
-        };
-
-        linker.add_file_text(().convert_filename(&file_path), file_text, &mut ());
+        linker.add_file(&file_path);
     }
 
     linker.recompile_all();

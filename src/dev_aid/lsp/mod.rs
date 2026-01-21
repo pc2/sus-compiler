@@ -4,10 +4,9 @@ mod tree_walk;
 
 use crate::{
     alloc::zip_eq,
-    compiler_top::LinkerExtraFileInfoManager,
     config::{ConnectionMethod, lsp_config},
     dev_aid::ariadne_interface::{pretty_print_many_spans, pretty_print_span},
-    linker::GlobalUUID,
+    linker::{GlobalUUID, UniqueFileID},
     prelude::*,
     util::contains_duplicates,
 };
@@ -15,7 +14,7 @@ use crate::{
 use hover_info::hover;
 use lsp_types::{notification::*, request::Request, *};
 use semantic_tokens::{make_semantic_tokens, semantic_token_capabilities};
-use std::{collections::HashMap, error::Error, net::SocketAddr, path::Path};
+use std::{collections::HashMap, error::Error, net::SocketAddr};
 
 use crate::{
     config::config,
@@ -53,7 +52,7 @@ fn cvt_location_list(location_vec: Vec<Span>, linker: &Linker) -> Vec<Location> 
         .into_iter()
         .map(|span| {
             let file = &linker.files[span.file];
-            let uri = Url::parse(&file.file_identifier).unwrap();
+            let uri = file.file_identifier.to_uri();
             let range = span_to_lsp_range(&file.file_text, span);
             Location { uri, range }
         })
@@ -70,7 +69,7 @@ fn cvt_location_list_of_lists(
     let mut result = Vec::with_capacity(result_len);
     for (file_id, vec) in location_vec {
         let file = &linker.files[file_id];
-        let uri = Url::parse(&file.file_identifier).unwrap();
+        let uri = file.file_identifier.to_uri();
         for span in vec {
             let range = span_to_lsp_range(&file.file_text, span);
             result.push(Location {
@@ -82,22 +81,29 @@ fn cvt_location_list_of_lists(
     result
 }
 
-impl Linker {
-    fn find_uri(&self, uri: &Url) -> Option<FileUUID> {
-        self.find_file(uri.as_str())
+impl UniqueFileID {
+    fn from_uri(uri: &Url) -> UniqueFileID {
+        if let Ok(path) = uri.to_file_path() {
+            UniqueFileID::from_path(&path)
+        } else {
+            UniqueFileID::from_non_path_str(uri.to_string())
+        }
     }
-    fn update_text(&mut self, uri: &Url, new_file_text: String, manager: &mut LSPFileManager) {
-        self.add_or_update_file(uri.as_str(), new_file_text, manager);
+    fn to_uri(&self) -> Url {
+        if self.inode.is_some() {
+            Url::from_file_path(&self.name).unwrap()
+        } else {
+            Url::parse(&self.name).unwrap()
+        }
+    }
+}
 
-        self.recompile_all();
-    }
-    fn ensure_contains_file(&mut self, uri: &Url, manager: &mut LSPFileManager) -> FileUUID {
-        if let Some(found) = self.find_uri(uri) {
+impl Linker {
+    fn ensure_contains_file(&mut self, identifier: UniqueFileID) -> FileUUID {
+        if let Some(found) = self.find_file(&identifier) {
             found
         } else {
-            let file_text = std::fs::read_to_string(uri.to_file_path().unwrap()).unwrap();
-
-            let file_uuid = self.add_file_text(uri.to_string(), file_text, manager);
+            let file_uuid = self.add_or_update_file_from_disk(identifier);
             self.recompile_all();
             file_uuid
         }
@@ -105,9 +111,9 @@ impl Linker {
     fn location_in_file(
         &mut self,
         text_pos: &lsp_types::TextDocumentPositionParams,
-        manager: &mut LSPFileManager,
     ) -> (FileUUID, usize) {
-        let file_id = self.ensure_contains_file(&text_pos.text_document.uri, manager);
+        let identifier = UniqueFileID::from_uri(&text_pos.text_document.uri);
+        let file_id = self.ensure_contains_file(identifier);
         let file_data = &self.files[file_id];
 
         let position = file_data
@@ -145,7 +151,7 @@ fn convert_diagnostic(err: CompileError, main_file_text: &FileText, linker: &Lin
         );
         let info_pos = span_to_lsp_range(&info_file.file_text, info_span);
         let location = Location {
-            uri: Url::parse(&info_file.file_identifier).unwrap(),
+            uri: info_file.file_identifier.to_uri(),
             range: info_pos,
         };
         related_info.push(DiagnosticRelatedInformation {
@@ -177,7 +183,7 @@ fn push_all_errors(
             .collect();
 
         let params = &PublishDiagnosticsParams {
-            uri: Url::parse(&file_data.file_identifier).unwrap(),
+            uri: file_data.file_identifier.to_uri(),
             diagnostics: diag_vec,
             version: None,
         };
@@ -193,18 +199,8 @@ fn push_all_errors(
     Ok(())
 }
 
-struct LSPFileManager {}
-
-impl LinkerExtraFileInfoManager for LSPFileManager {
-    fn convert_filename(&self, path: &Path) -> String {
-        Url::from_file_path(path).unwrap().into()
-    }
-}
-
-fn initialize_all_files(linker: &mut Linker, init_params: &InitializeParams) -> LSPFileManager {
-    let mut manager = LSPFileManager {};
-
-    linker.add_standard_library(&mut manager);
+fn initialize_all_files(linker: &mut Linker, init_params: &InitializeParams) {
+    linker.add_standard_library();
 
     let files = &config().files;
     if !files.is_empty() {
@@ -216,7 +212,7 @@ fn initialize_all_files(linker: &mut Linker, init_params: &InitializeParams) -> 
                 );
                 continue;
             };
-            linker.add_file(&path, &mut manager);
+            linker.add_file(&path);
         }
     } else if let Some(workspace_folder) = &init_params.workspace_folders {
         for folder in workspace_folder {
@@ -224,12 +220,11 @@ fn initialize_all_files(linker: &mut Linker, init_params: &InitializeParams) -> 
                 continue;
             };
 
-            linker.add_all_files_in_directory(&path, &mut manager);
+            linker.add_all_files_in_directory(&path);
         }
     }
 
     linker.recompile_all();
-    manager
 }
 
 fn gather_completions(linker: &Linker, position: usize) -> Vec<CompletionItem> {
@@ -399,7 +394,6 @@ fn handle_request(
     method: &str,
     params: serde_json::Value,
     linker: &mut Linker,
-    manager: &mut LSPFileManager,
 ) -> Result<serde_json::Value, serde_json::Error> {
     match method {
         request::HoverRequest::METHOD => {
@@ -407,8 +401,7 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("HoverRequest");
 
-            let (file_uuid, pos) =
-                linker.location_in_file(&params.text_document_position_params, manager);
+            let (file_uuid, pos) = linker.location_in_file(&params.text_document_position_params);
             let file_data = &linker.files[file_uuid];
             let mut hover_list: Vec<MarkedString> = Vec::new();
 
@@ -433,8 +426,7 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("GotoDefinition");
 
-            let (file_uuid, pos) =
-                linker.location_in_file(&params.text_document_position_params, manager);
+            let (file_uuid, pos) = linker.location_in_file(&params.text_document_position_params);
 
             let goto_definition_list = goto_definition(linker, file_uuid, pos);
 
@@ -448,7 +440,8 @@ fn handle_request(
             let params: SemanticTokensParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
 
-            let uuid = linker.ensure_contains_file(&params.text_document.uri, manager);
+            let identifier = UniqueFileID::from_uri(&params.text_document.uri);
+            let uuid = linker.ensure_contains_file(identifier);
 
             serde_json::to_value(SemanticTokensResult::Tokens(make_semantic_tokens(
                 uuid, linker,
@@ -459,8 +452,7 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("DocumentHighlight");
 
-            let (file_id, pos) =
-                linker.location_in_file(&params.text_document_position_params, manager);
+            let (file_id, pos) = linker.location_in_file(&params.text_document_position_params);
             let file_data = &linker.files[file_id];
 
             let ref_locations = gather_all_references_in_one_file(linker, file_id, pos);
@@ -479,7 +471,7 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("FindAllReferences");
 
-            let (file_id, pos) = linker.location_in_file(&params.text_document_position, manager);
+            let (file_id, pos) = linker.location_in_file(&params.text_document_position);
 
             let ref_locations = gather_all_references_across_all_files(linker, file_id, pos);
 
@@ -490,7 +482,7 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("Rename");
 
-            let (file_id, pos) = linker.location_in_file(&params.text_document_position, manager);
+            let (file_id, pos) = linker.location_in_file(&params.text_document_position);
 
             let ref_locations_lists = gather_all_references_across_all_files(linker, file_id, pos);
 
@@ -499,7 +491,7 @@ fn handle_request(
                 .map(|(file, spans)| {
                     let file_data = &linker.files[file];
                     (
-                        Url::parse(&file_data.file_identifier).unwrap(),
+                        file_data.file_identifier.to_uri(),
                         spans
                             .into_iter()
                             .map(|span| TextEdit {
@@ -524,8 +516,7 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("Completion");
 
-            let (_file_uuid, position) =
-                linker.location_in_file(&params.text_document_position, manager);
+            let (_file_uuid, position) = linker.location_in_file(&params.text_document_position);
 
             serde_json::to_value(CompletionResponse::Array(gather_completions(
                 linker, position,
@@ -542,8 +533,7 @@ fn handle_notification(
     connection: &lsp_server::Connection,
     notification: lsp_server::Notification,
     linker: &mut Linker,
-    manager: &mut LSPFileManager,
-    initialize_params: &InitializeParams,
+    _initialize_params: &InitializeParams,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
     match notification.method.as_str() {
         notification::DidChangeTextDocument::METHOD => {
@@ -555,14 +545,34 @@ fn handle_notification(
             let only_change = content_change_iter.next().unwrap();
             assert!(content_change_iter.next().is_none());
             assert!(only_change.range.is_none());
-            linker.update_text(&params.text_document.uri, only_change.text, manager);
+
+            let file_identifier = UniqueFileID::from_uri(&params.text_document.uri);
+            linker.add_or_update_file_text(file_identifier, only_change.text);
+            linker.recompile_all();
 
             push_all_errors(connection, linker)?;
         }
         notification::DidChangeWatchedFiles::METHOD => {
-            info!("Workspace Files modified");
-            *linker = Linker::new();
-            *manager = initialize_all_files(linker, initialize_params);
+            info!("Workspace Files modified {}", notification.params);
+            let params: DidChangeWatchedFilesParams = serde_json::from_value(notification.params)
+                .expect("JSON Encoding Error while parsing params");
+
+            for event in params.changes {
+                let file_identifier = UniqueFileID::from_uri(&event.uri);
+                if event.typ == FileChangeType::CREATED || event.typ == FileChangeType::CHANGED {
+                    linker.add_or_update_file_from_disk(file_identifier);
+                } else if event.typ == FileChangeType::DELETED {
+                    if let Some(existing_file_id) = linker
+                        .files
+                        .find(|_, data| data.file_identifier.name == file_identifier.name)
+                    {
+                        linker.remove_file(existing_file_id);
+                    }
+                } else {
+                    unreachable!()
+                }
+            }
+            linker.recompile_all();
 
             push_all_errors(connection, linker)?;
         }
@@ -584,7 +594,7 @@ fn main_loop(
 
     let mut linker = Linker::new();
     crate::debug::create_dump_on_panic(&mut linker, |linker| {
-        let mut manager = initialize_all_files(linker, &initialize_params);
+        initialize_all_files(linker, &initialize_params);
 
         push_all_errors(&connection, &*linker)?;
 
@@ -597,8 +607,7 @@ fn main_loop(
                         return Ok(());
                     }
 
-                    let response_value =
-                        handle_request(&req.method, req.params, linker, &mut manager);
+                    let response_value = handle_request(&req.method, req.params, linker);
 
                     let result = response_value.unwrap();
                     let response = lsp_server::Response {
@@ -614,13 +623,7 @@ fn main_loop(
                     info!("got response: {resp:?}");
                 }
                 lsp_server::Message::Notification(notification) => {
-                    handle_notification(
-                        &connection,
-                        notification,
-                        linker,
-                        &mut manager,
-                        &initialize_params,
-                    )?;
+                    handle_notification(&connection, notification, linker, &initialize_params)?;
                 }
             }
 

@@ -12,7 +12,9 @@ pub mod passes;
 use std::{
     cell::{OnceCell, RefCell},
     collections::{HashMap, HashSet},
+    fmt::Display,
     ops::{Deref, DerefMut, Index, IndexMut},
+    path::Path,
 };
 
 use tree_sitter::Tree;
@@ -150,11 +152,45 @@ impl LinkInfo {
     }
 }
 
+pub struct UniqueFileID {
+    pub inode: Option<same_file::Handle>,
+    pub name: String,
+}
+impl UniqueFileID {
+    pub fn from_path(path: &Path) -> UniqueFileID {
+        UniqueFileID {
+            inode: same_file::Handle::from_path(path).ok(),
+            name: path.to_string_lossy().to_string(),
+        }
+    }
+    pub fn from_non_path_str(identifier: String) -> UniqueFileID {
+        UniqueFileID {
+            inode: None,
+            name: identifier,
+        }
+    }
+}
+impl Display for UniqueFileID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.name.fmt(f)
+    }
+}
+impl PartialEq for UniqueFileID {
+    fn eq(&self, other: &Self) -> bool {
+        match (&self.inode, &other.inode) {
+            (None, None) => self.name == other.name,
+            (None, Some(_)) | (Some(_), None) => false,
+            (Some(a), Some(b)) => a == b,
+        }
+    }
+}
+impl Eq for UniqueFileID {}
+
 /// Data associated with a file. Such as the text, the parse tree, and all [Module]s, [StructType]s, or [NamedConstant]s.
 ///
 /// All FileDatas are stored in [Linker::files], and indexed by [FileUUID]
 pub struct FileData {
-    pub file_identifier: String,
+    pub file_identifier: UniqueFileID,
     pub file_text: FileText,
     pub parsing_errors: ErrorStore,
     /// In source file order
@@ -589,7 +625,6 @@ impl Linker {
         file_data
     }
 
-    #[allow(dead_code)]
     pub fn remove_file(&mut self, file_uuid: FileUUID) {
         self.remove_everything_in_file(file_uuid);
         self.files.free(file_uuid);
