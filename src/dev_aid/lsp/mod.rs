@@ -92,9 +92,9 @@ impl UniqueFileID {
     }
     fn to_uri(&self) -> Url {
         if self.inode.is_some() {
-            Url::from_file_path(&self.name).unwrap()
+            Url::from_file_path(&self.name).expect(&self.name)
         } else {
-            Url::parse(&self.name).unwrap()
+            Url::parse(&self.name).expect(&self.name)
         }
     }
 }
@@ -549,21 +549,23 @@ fn handle_notification(
                 .expect("JSON Encoding Error while parsing params");
 
             for event in params.changes {
-                let file_identifier = UniqueFileID::from_uri(&event.uri);
                 if event.typ == FileChangeType::CREATED || event.typ == FileChangeType::CHANGED {
+                    let file_identifier = UniqueFileID::from_uri(&event.uri);
                     linker.add_or_update_file_from_disk(file_identifier);
                 } else if event.typ == FileChangeType::DELETED {
-                    // Can't actually reliably find the FileUUID that was deleted, since it's deleted before the notification is sent. That's why below we iterate through all files to look for the deleted one.
-                    if let Some(existing_file_id) = linker
-                        .files
-                        .find(|_, data| data.file_identifier.name == file_identifier.name)
-                    {
+                    let uri_as_string = event.uri.to_string();
+                    // Delete URIs that don't have a file backing
+                    if let Some(existing_file_id) = linker.files.find(|_, data| {
+                        data.file_identifier.inode.is_none()
+                            && data.file_identifier.name == uri_as_string
+                    }) {
                         linker.remove_file(existing_file_id);
                     }
                 } else {
                     unreachable!()
                 }
             }
+            // Delete files that no longer exist. We have to do it like this because the path received from a deletion event is already deleted, and it could be through several symlinks, so we couldn't use it for identity matching.
             linker.files.retain(|_, v| {
                 if v.file_identifier.inode.is_some() {
                     match std::fs::exists(&v.file_identifier.name) {

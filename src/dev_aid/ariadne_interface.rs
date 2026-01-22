@@ -1,7 +1,4 @@
-use crate::{
-    linker::LinkerFiles,
-    prelude::*,
-};
+use crate::{linker::LinkerFiles, prelude::*};
 use ariadne::*;
 // disambiguate Span - it's ours, from ariadne's
 use crate::prelude::Span;

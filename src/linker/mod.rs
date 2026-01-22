@@ -162,9 +162,15 @@ impl UniqueFileID {
         if path.extension() != Some(OsStr::new("sus")) {
             panic!("{} is not a .sus file!", path.to_string_lossy());
         }
-        UniqueFileID {
-            inode: same_file::Handle::from_path(path).ok(),
-            name: path.to_string_lossy().to_string(),
+        match path.canonicalize() {
+            Ok(absolute_path) => UniqueFileID {
+                inode: Some(same_file::Handle::from_path(path).unwrap()),
+                name: absolute_path.to_string_lossy().to_string(),
+            },
+            Err(err) => fatal_exit!(
+                "'{}' is not an existing file? {err}",
+                path.to_string_lossy()
+            ),
         }
     }
     pub fn from_non_path_str(identifier: String) -> UniqueFileID {
