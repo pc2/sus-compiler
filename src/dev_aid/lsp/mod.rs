@@ -629,6 +629,11 @@ fn main_loop(
                         break;
                     }
 
+                    if require_recompile {
+                        linker.recompile_all();
+                        push_all_errors(&connection, linker)?;
+                    }
+                    require_recompile = false;
                     let response_value = handle_request(&req.method, req.params, linker);
 
                     let result = response_value.unwrap();
