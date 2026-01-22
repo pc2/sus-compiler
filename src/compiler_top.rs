@@ -107,16 +107,14 @@ impl Linker {
     pub fn add_file_or_directory(&mut self, path: &Path) {
         if path.is_dir() {
             self.add_all_files_in_directory_recurse(path);
+        } else if path.is_file() {
+            let file_identifier = UniqueFileID::from_path(path);
+            self.add_or_update_file_from_disk(file_identifier);
         } else {
-            if path.is_file() {
-                let file_identifier = UniqueFileID::from_path(&path);
-                self.add_or_update_file_from_disk(file_identifier);
-            } else {
-                fatal_exit!(
-                    "{} is neither a file nor a directory!",
-                    path.to_string_lossy()
-                )
-            }
+            fatal_exit!(
+                "{} is neither a file nor a directory!",
+                path.to_string_lossy()
+            )
         }
     }
 

@@ -1,5 +1,5 @@
 use crate::{
-    linker::{LinkerFiles, UniqueFileID},
+    linker::LinkerFiles,
     prelude::*,
 };
 use ariadne::*;
