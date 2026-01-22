@@ -11,6 +11,7 @@ use crate::{
     util::contains_duplicates,
 };
 
+use crossbeam_channel::{RecvError, TryRecvError};
 use hover_info::hover;
 use lsp_types::{notification::*, request::Request, *};
 use semantic_tokens::{make_semantic_tokens, semantic_token_capabilities};
@@ -224,8 +225,6 @@ fn initialize_all_files(linker: &mut Linker, init_params: &InitializeParams) {
             linker.add_all_files_in_directory(&path);
         }
     }
-
-    linker.recompile_all();
 }
 
 fn gather_completions(linker: &Linker, position: usize) -> Vec<CompletionItem> {
@@ -530,12 +529,12 @@ fn handle_request(
     }
 }
 
+/// Returns `true` if a recompile is required
 fn handle_notification(
-    connection: &lsp_server::Connection,
     notification: lsp_server::Notification,
     linker: &mut Linker,
     _initialize_params: &InitializeParams,
-) -> Result<(), Box<dyn Error + Sync + Send>> {
+) -> bool {
     match notification.method.as_str() {
         notification::DidChangeTextDocument::METHOD => {
             info!("DidChangeTextDocument");
@@ -549,9 +548,8 @@ fn handle_notification(
 
             let file_identifier = UniqueFileID::from_uri(&params.text_document.uri);
             linker.add_or_update_file_text(file_identifier, only_change.text);
-            linker.recompile_all();
 
-            push_all_errors(connection, linker)?;
+            true
         }
         notification::DidChangeWatchedFiles::METHOD => {
             info!("Workspace Files modified {}", notification.params);
@@ -584,15 +582,14 @@ fn handle_notification(
                     true // String-based inodes are not file backed
                 }
             });
-            linker.recompile_all();
 
-            push_all_errors(connection, linker)?;
+            true
         }
         other => {
             info!("got other notification: {other:?}");
+            false
         }
     }
-    Ok(())
 }
 
 fn main_loop(
@@ -608,15 +605,34 @@ fn main_loop(
     crate::debug::create_dump_on_panic(&mut linker, |linker| {
         initialize_all_files(linker, &initialize_params);
 
-        push_all_errors(&connection, &*linker)?;
-
         info!("starting LSP main loop");
-        for msg in &connection.receiver {
+        let mut require_recompile = true;
+        loop {
+            let msg = match connection.receiver.try_recv() {
+                Ok(msg) => msg,
+                Err(TryRecvError::Empty) => {
+                    if require_recompile {
+                        linker.recompile_all();
+                        push_all_errors(&connection, linker)?;
+                    }
+                    require_recompile = false;
+                    match connection.receiver.recv() {
+                        Ok(msg) => msg,
+                        Err(RecvError) => {
+                            break;
+                        }
+                    }
+                }
+                Err(TryRecvError::Disconnected) => {
+                    break;
+                }
+            };
+
             match msg {
                 lsp_server::Message::Request(req) => {
                     if connection.handle_shutdown(&req)? {
                         info!("Shutdown request");
-                        return Ok(());
+                        break;
                     }
 
                     let response_value = handle_request(&req.method, req.params, linker);
@@ -635,7 +651,8 @@ fn main_loop(
                     info!("got response: {resp:?}");
                 }
                 lsp_server::Message::Notification(notification) => {
-                    handle_notification(&connection, notification, linker, &initialize_params)?;
+                    require_recompile |=
+                        handle_notification(notification, linker, &initialize_params);
                 }
             }
 
