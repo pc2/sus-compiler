@@ -12,6 +12,7 @@ pub mod passes;
 use std::{
     cell::{OnceCell, RefCell},
     collections::{HashMap, HashSet},
+    ffi::OsStr,
     fmt::Display,
     ops::{Deref, DerefMut, Index, IndexMut},
     path::Path,
@@ -158,6 +159,9 @@ pub struct UniqueFileID {
 }
 impl UniqueFileID {
     pub fn from_path(path: &Path) -> UniqueFileID {
+        if path.extension() != Some(OsStr::new("sus")) {
+            panic!("{} is not a .sus file!", path.to_string_lossy());
+        }
         UniqueFileID {
             inode: same_file::Handle::from_path(path).ok(),
             name: path.to_string_lossy().to_string(),

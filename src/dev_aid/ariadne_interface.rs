@@ -56,8 +56,7 @@ pub fn compile_all(linker: &mut Linker, file_paths: Vec<PathBuf>) {
     linker.add_standard_library();
 
     for file_path in file_paths {
-        let file_identifier = UniqueFileID::from_path(&file_path);
-        linker.add_or_update_file_from_disk(file_identifier);
+        linker.add_file_or_directory(&file_path);
     }
 
     linker.recompile_all();

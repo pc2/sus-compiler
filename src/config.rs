@@ -164,13 +164,17 @@ fn command_builder() -> Command {
             .value_parser(|file_path_str : &str| {
                 let file_path = PathBuf::from(file_path_str);
                 if !file_path.exists() {
-                    Err("File does not exist")
-                } else if !file_path.is_file() {
-                    Err("Is a directory")
-                } else if file_path.extension() != Some(OsStr::new("sus")) {
-                    Err("Source files must end in .sus")
-                } else {
+                    Err(format!("File {} does not exist", file_path.to_string_lossy()))
+                } else if file_path.is_dir() {
                     Ok(file_path)
+                } else if file_path.is_file() {
+                    if file_path.extension() == Some(OsStr::new("sus")) {
+                        Ok(file_path)
+                    } else {
+                        Err(format!("Invalid .sus file {}. Source files must end in .sus", file_path.to_string_lossy()))
+                    }
+                } else {
+                    Err(format!("{} exists, but is neither a file or a directory?", file_path.to_string_lossy()))
                 }
             }))
         .arg(Arg::new("sus-home")
@@ -256,13 +260,7 @@ pub fn parse_args() {
     let use_color = !matches.get_flag("nocolor") && !matches.get_flag("lsp");
     let files: Vec<PathBuf> = match matches.get_many("files") {
         Some(files) => files.cloned().collect(),
-        None => std::fs::read_dir(".")
-            .unwrap()
-            .map(|file| file.unwrap().path())
-            .filter(|file_path| {
-                file_path.is_file() && file_path.extension() == Some("sus".as_ref())
-            })
-            .collect(),
+        None => Vec::new(),
     };
 
     let codegen_file: Option<PathBuf> = matches.get_one("o").cloned();

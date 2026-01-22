@@ -204,25 +204,17 @@ fn initialize_all_files(linker: &mut Linker, init_params: &InitializeParams) {
     linker.add_standard_library();
 
     let files = &config().files;
-    if !files.is_empty() {
-        for f in files {
-            let Ok(path) = f.canonicalize() else {
-                warn!(
-                    "Previously existing file {} no longer exists??? Ignoring",
-                    f.to_string_lossy()
-                );
-                continue;
-            };
-            let file_identifier = UniqueFileID::from_path(&path);
-            linker.add_or_update_file_from_disk(file_identifier);
-        }
-    } else if let Some(workspace_folder) = &init_params.workspace_folders {
+    if files.is_empty()
+        && let Some(workspace_folder) = &init_params.workspace_folders
+    {
         for folder in workspace_folder {
-            let Ok(path) = folder.uri.to_file_path() else {
-                continue;
-            };
-
-            linker.add_all_files_in_directory(&path);
+            if let Ok(path) = folder.uri.to_file_path() {
+                linker.add_file_or_directory(&path);
+            }
+        }
+    } else {
+        for f in files {
+            linker.add_file_or_directory(f);
         }
     }
 }

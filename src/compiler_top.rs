@@ -3,7 +3,7 @@ use crate::prelude::*;
 use std::cell::OnceCell;
 use std::ffi::OsStr;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::config::EarlyExitUpTo;
 use crate::linker::checkpoint::{
@@ -29,7 +29,7 @@ impl Linker {
         assert!(self.types.is_empty());
         assert!(self.constants.is_empty());
         let std_lib_path = get_std_dir();
-        self.add_all_files_in_directory(&std_lib_path);
+        self.add_all_files_in_directory_recurse(&std_lib_path);
         for (_, f) in &mut self.files {
             f.is_std = true; // Mark standard library files
         }
@@ -76,16 +76,16 @@ impl Linker {
         );
     }
 
-    pub fn add_all_files_in_directory(&mut self, directory: &PathBuf) {
+    pub fn add_all_files_in_directory_recurse(&mut self, directory: &Path) {
         let dir_read = std::fs::read_dir(directory);
         let dir_read = match dir_read {
             Ok(d) => d,
-            Err(_) => panic!("Can't read directory {}", directory.to_string_lossy()),
+            Err(_) => fatal_exit!("Can't read directory {}", directory.to_string_lossy()),
         };
         let mut files: Vec<_> = dir_read
             .map(|res| match res {
                 Ok(path) => path.path(),
-                Err(err) => panic!(
+                Err(err) => fatal_exit!(
                     "No such file or directory {} in {}",
                     err,
                     directory.to_string_lossy()
@@ -95,9 +95,27 @@ impl Linker {
         files.sort();
         for file in files {
             let file_path = file.canonicalize().unwrap();
-            if file_path.is_file() && file_path.extension() == Some(OsStr::new("sus")) {
+            if file_path.is_dir() {
+                self.add_all_files_in_directory_recurse(&file_path);
+            } else if file_path.is_file() && file_path.extension() == Some(OsStr::new("sus")) {
                 let file_identifier = UniqueFileID::from_path(&file_path);
                 self.add_or_update_file_from_disk(file_identifier);
+            }
+        }
+    }
+
+    pub fn add_file_or_directory(&mut self, path: &Path) {
+        if path.is_dir() {
+            self.add_all_files_in_directory_recurse(path);
+        } else {
+            if path.is_file() {
+                let file_identifier = UniqueFileID::from_path(&path);
+                self.add_or_update_file_from_disk(file_identifier);
+            } else {
+                fatal_exit!(
+                    "{} is neither a file nor a directory!",
+                    path.to_string_lossy()
+                )
             }
         }
     }
@@ -157,7 +175,7 @@ impl Linker {
 
         if let Err(reason) = file.read_to_string(&mut file_content) {
             let file_path_disp = &file_identifier.name;
-            panic!(
+            fatal_exit!(
                 "Could not open file '{file_path_disp}' for syntax highlighting because {reason}"
             )
         };
