@@ -97,3 +97,127 @@ module SlowState #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
     }
 }
 
+/// This module lets you create pipelined feedback loops of variable latency. 
+///
+/// Use as follows:
+/// ```sus
+/// FIFO input_fifo
+/// trigger outflow: int assoc_data
+/// 
+/// ParallelWhile pw
+/// ParallelState cur_iter
+/// ParallelStore associated_data
+/// when pw.may_start {
+///     // gather up data
+///     when input_fifo.may_pop {
+///         int num_iters = input_fifo.pop()
+///         cur_iter.init(num_iters)
+///         associated_data.init(num_iters)
+///         pw.start()
+///     }
+/// }
+/// 
+/// when pw.iter : int iteration {
+///     cur_iter.link(iteration)
+///     associated_data.link(iteration)
+///     int num_iters_left = cur_iter.old
+///     when num_iters_left > 0 {
+///         reg reg reg cur_iter.new = UnsafeIntCast#(FROM: 0, TO)(num_iters_left - 1)
+///         pw.continue()
+///     } else {
+///         outflow(associated_data.old)
+///     }
+/// }
+/// ```
+/// 
+///
+/// The order in which results arrive is not the same as the order of inputs, due to some taking more cycles to execute.
+module ParallelWhile #(int COMPUTATION_LATENCY, int REQUEST_DATA_LATENCY) {
+    domain iter_domain
+    gen int TOTAL_CYCLES = COMPUTATION_LATENCY + REQUEST_DATA_LATENCY
+    state int#(FROM: 0, TO: TOTAL_CYCLES) cur_iter_st
+    initial cur_iter_st = 0
+
+    bool should_continue'COMPUTATION_LATENCY
+    bool do_continue'-REQUEST_DATA_LATENCY = LatencyOffset#(OFFSET: -TOTAL_CYCLES)(should_continue)
+
+    // Increment by one every cycle, no matter if we're processing or not
+    cur_iter_st = (cur_iter_st + 1) % TOTAL_CYCLES
+
+    trigger iter'0 : int #(FROM: 0, TO: TOTAL_CYCLES) cur_iter'0 {
+        action continue'COMPUTATION_LATENCY {
+            should_continue = true
+        } else {
+            should_continue = false
+        }
+    } else {
+        should_continue = false
+    }
+
+    trigger may_start'-REQUEST_DATA_LATENCY
+
+    action start'0 {
+        iter(cur_iter_st)
+    } else when do_continue {
+        iter(cur_iter_st)
+    }
+
+    when !do_continue {
+        may_start()
+    }
+
+    domain clk
+    CrossActionNoData rst_act
+    action rst {
+        rst_act.in()
+    }
+    // Reset, overwrite valid_slots completely
+    when rst_act.out {
+        should_continue = false
+    }
+}
+
+/// See [ParallelWhile]
+///
+/// Similar to [ParallelStore]
+///
+/// Must be initialized simultaneously with [ParallelWhile::start] (with [ParallelState::init]).
+/// Old data can be read from [ParallelState::old]
+/// Data must be updated through [ParallelState::new] every cycle
+module ParallelState #(T, int NUM_PARALLEL_STATES, int LATENCY) {
+    assert #(C: LATENCY <= NUM_PARALLEL_STATES)
+    assert #(C: LATENCY >= 0)
+
+    RAM #(DEPTH: NUM_PARALLEL_STATES) st
+
+    action link'0 : int#(FROM: 0, TO: NUM_PARALLEL_STATES) cur_iter_id'0 {
+        output T old'2
+
+        action init'0 : T initial_data'0 {
+            old = initial_data
+        } else {
+            old = st.read(cur_iter_id)
+        }
+
+        input T new'LATENCY
+        st.write(cur_iter_id, new)
+    }
+}
+
+/// See [ParallelWhile]
+///
+/// Similar to [ParallelState], but only initialized once, simultaneously with [ParallelWhile::start].
+/// Data is returned every cycle on [ParallelStore::old]. 
+/// Old data can be read from [ParallelState::old]
+module ParallelStore #(T, int NUM_PARALLEL_STATES) {
+    RAM #(DEPTH: NUM_PARALLEL_STATES) st
+
+    action link'0 : int#(FROM: 0, TO: NUM_PARALLEL_STATES) cur_iter_id'0 {
+        // By being a few cycles later, we ensure that the initial data is written before we access it
+        output T old'3 = st.read(cur_iter_id)
+
+        action init'0 : T initial_data'0 {
+            st.write(cur_iter_id, initial_data)
+        }
+    }
+}
