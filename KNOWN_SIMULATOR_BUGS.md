@@ -93,6 +93,7 @@ The code generator may generate 1-bit integers, and combinatorial conditional as
 
 # XRT DRC violation on empty modules. 
 ## Affects: XRT 2.16
+## Workaround in: SUS 0.3.7 (crate::codegen::patches::patch_empty_modules_should_have_content) #155
 
 When an empty SystemVerilog module is code-generated, XRT produces an unneccecary error. See [https://github.com/pc2/sus-compiler/issues/155](https://github.com/pc2/sus-compiler/issues/155). 
 

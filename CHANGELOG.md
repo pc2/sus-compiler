@@ -1,4 +1,29 @@
 # Changelog
+## 0.3.7: Bugfix Bonanza
+- No longer report errors when submodule instantiation fails (#146)
+- Make array sizes optional in declarations
+- Improved performance on heavy projects, batch LSP changes (#85)
+- `sus_compiler` now also accepts directories
+- Fix release builds now only list the version, no git hash or build date. (So currently: `SUS Compiler 0.3.7`) (#142)
+- Fix different file paths pointing to the same inode not resolving to the same file (#129)
+- Fix VSCode on windows' random temporary files confusing the compiler (#136)
+- Fix ICE on execute erroneously non-generative slice bound (#145)
+- Fix ICE on infinite recursion (#144)
+- Put reasonable limit on recursion in general (#143)
+- Fix ICE on codegen of zero-sized arrays (Fix #148)
+- Fix not-quite-correct implementation of STL FIFO
+- Codegen: Patch XRT which would error out on empty modules due to an overly-strict DRC rule. 
+
+### Standard Library
+- Add `nextPow2` (#156)
+- Add `ParallelWhile`, `ParallelState` and `ParallelStore`
+
+### Technical changes
+- [src/typing/unifyable_cell.rs](unifyable_cell.rs) replaced all other typecheckers internally. 
+- Span now has `(Range<usize>, FileUUID)`. 
+- Everything now falls under `crate::debug::create_dump_on_panic` (#149)
+- Recursive instantiation is now handled explicitly with an instantiation stack, and no longer implicitly abusing Rust's stack. 
+
 ## 0.3.6
 - Codegen: Fix incorrect codegen for output state initial values (#141)
 - Codegen: Again output bitwidths for decimal numbers (#140)
