@@ -13,6 +13,7 @@ use crate::{
 
 use crossbeam_channel::{RecvError, TryRecvError};
 use hover_info::hover;
+use lsp_server::{ErrorCode, ResponseError};
 use lsp_types::{notification::*, request::Request, *};
 use semantic_tokens::{make_semantic_tokens, semantic_token_capabilities};
 use std::{collections::HashMap, error::Error, net::SocketAddr};
@@ -83,11 +84,11 @@ fn cvt_location_list_of_lists(
 }
 
 impl UniqueFileID {
-    fn from_uri(uri: &Url) -> UniqueFileID {
-        if let Ok(path) = uri.to_file_path() {
-            UniqueFileID::from_path(&path)
+    fn from_uri(uri: &Url) -> Result<UniqueFileID, String> {
+        if uri.scheme() == "file" {
+            UniqueFileID::from_path(&uri.to_file_path().unwrap())
         } else {
-            UniqueFileID::from_non_path_str(uri.to_string())
+            Ok(UniqueFileID::from_non_path_str(uri.to_string()))
         }
     }
     fn to_uri(&self) -> Url {
@@ -112,8 +113,8 @@ impl Linker {
     fn location_in_file(
         &mut self,
         text_pos: &lsp_types::TextDocumentPositionParams,
-    ) -> (FileUUID, usize) {
-        let identifier = UniqueFileID::from_uri(&text_pos.text_document.uri);
+    ) -> Result<(FileUUID, usize), String> {
+        let identifier = UniqueFileID::from_uri(&text_pos.text_document.uri)?;
         let file_id = self.ensure_contains_file(identifier);
         let file_data = &self.files[file_id];
 
@@ -121,7 +122,7 @@ impl Linker {
             .file_text
             .linecol_to_byte_clamp(from_position(text_pos.position));
 
-        (file_id, position)
+        Ok((file_id, position))
     }
 }
 
@@ -386,14 +387,15 @@ fn handle_request(
     method: &str,
     params: serde_json::Value,
     linker: &mut Linker,
-) -> Result<serde_json::Value, serde_json::Error> {
-    match method {
+) -> Result<serde_json::Value, String> {
+    let result = match method {
         request::HoverRequest::METHOD => {
             let params: HoverParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("HoverRequest");
 
-            let (file_uuid, pos) = linker.location_in_file(&params.text_document_position_params);
+            let (file_uuid, pos) =
+                linker.location_in_file(&params.text_document_position_params)?;
             let file_data = &linker.files[file_uuid];
             let mut hover_list: Vec<MarkedString> = Vec::new();
 
@@ -418,7 +420,8 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("GotoDefinition");
 
-            let (file_uuid, pos) = linker.location_in_file(&params.text_document_position_params);
+            let (file_uuid, pos) =
+                linker.location_in_file(&params.text_document_position_params)?;
 
             let goto_definition_list = goto_definition(linker, file_uuid, pos);
 
@@ -432,7 +435,7 @@ fn handle_request(
             let params: SemanticTokensParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
 
-            let identifier = UniqueFileID::from_uri(&params.text_document.uri);
+            let identifier = UniqueFileID::from_uri(&params.text_document.uri)?;
             let uuid = linker.ensure_contains_file(identifier);
 
             serde_json::to_value(SemanticTokensResult::Tokens(make_semantic_tokens(
@@ -444,7 +447,7 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("DocumentHighlight");
 
-            let (file_id, pos) = linker.location_in_file(&params.text_document_position_params);
+            let (file_id, pos) = linker.location_in_file(&params.text_document_position_params)?;
             let file_data = &linker.files[file_id];
 
             let ref_locations = gather_all_references_in_one_file(linker, file_id, pos);
@@ -463,7 +466,7 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("FindAllReferences");
 
-            let (file_id, pos) = linker.location_in_file(&params.text_document_position);
+            let (file_id, pos) = linker.location_in_file(&params.text_document_position)?;
 
             let ref_locations = gather_all_references_across_all_files(linker, file_id, pos);
 
@@ -474,7 +477,7 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("Rename");
 
-            let (file_id, pos) = linker.location_in_file(&params.text_document_position);
+            let (file_id, pos) = linker.location_in_file(&params.text_document_position)?;
 
             let ref_locations_lists = gather_all_references_across_all_files(linker, file_id, pos);
 
@@ -508,7 +511,7 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("Completion");
 
-            let (_file_uuid, position) = linker.location_in_file(&params.text_document_position);
+            let (_file_uuid, position) = linker.location_in_file(&params.text_document_position)?;
 
             serde_json::to_value(CompletionResponse::Array(gather_completions(
                 linker, position,
@@ -518,7 +521,8 @@ fn handle_request(
             info!("Other request: {req:?}");
             Ok(serde_json::Value::Null)
         }
-    }
+    };
+    Ok(result.unwrap())
 }
 
 /// Returns `true` if a recompile is required
@@ -538,7 +542,9 @@ fn handle_notification(
             assert!(content_change_iter.next().is_none());
             assert!(only_change.range.is_none());
 
-            let file_identifier = UniqueFileID::from_uri(&params.text_document.uri);
+            let Ok(file_identifier) = UniqueFileID::from_uri(&params.text_document.uri) else {
+                return false;
+            };
             linker.add_or_update_file_text(file_identifier, only_change.text);
 
             true
@@ -550,7 +556,9 @@ fn handle_notification(
 
             for event in params.changes {
                 if event.typ == FileChangeType::CREATED || event.typ == FileChangeType::CHANGED {
-                    let file_identifier = UniqueFileID::from_uri(&event.uri);
+                    let Ok(file_identifier) = UniqueFileID::from_uri(&event.uri) else {
+                        continue;
+                    };
                     linker.add_or_update_file_from_disk(file_identifier);
                 } else if event.typ == FileChangeType::DELETED {
                     let uri_as_string = event.uri.to_string();
@@ -635,12 +643,21 @@ fn main_loop(
                     }
                     require_recompile = false;
                     let response_value = handle_request(&req.method, req.params, linker);
-
-                    let result = response_value.unwrap();
-                    let response = lsp_server::Response {
-                        id: req.id,
-                        result: Some(result),
-                        error: None,
+                    let response = match response_value {
+                        Ok(result) => lsp_server::Response {
+                            id: req.id,
+                            result: Some(result),
+                            error: None,
+                        },
+                        Err(message) => lsp_server::Response {
+                            id: req.id,
+                            result: None,
+                            error: Some(ResponseError {
+                                code: ErrorCode::RequestFailed as i32,
+                                message,
+                                data: None,
+                            }),
+                        },
                     };
                     connection
                         .sender
