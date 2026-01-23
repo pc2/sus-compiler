@@ -574,16 +574,20 @@ fn handle_notification(
                 }
             }
             // Delete files that no longer exist. We have to do it like this because the path received from a deletion event is already deleted, and it could be through several symlinks, so we couldn't use it for identity matching.
-            linker.files.retain(|_, v| {
-                if v.file_identifier.inode.is_some() {
-                    match std::fs::exists(&v.file_identifier.name) {
-                        Ok(true) => true,
-                        Ok(false) | Err(_) => false,
+            let mut to_delete: Vec<FileUUID> = Vec::new();
+            for (id, f) in &linker.files {
+                if f.file_identifier.inode.is_some() {
+                    match std::fs::exists(&f.file_identifier.name) {
+                        Ok(true) => {}
+                        Ok(false) | Err(_) => to_delete.push(id),
                     }
                 } else {
-                    true // String-based inodes are not file backed
+                    // String-based inodes are not file backed
                 }
-            });
+            }
+            for f_id in to_delete {
+                linker.remove_file(f_id);
+            }
 
             true
         }
