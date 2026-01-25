@@ -105,7 +105,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 DeclarationKind::Port { direction, .. } => details_vec.push(direction.to_string()),
                 DeclarationKind::TemplateParameter(_) => details_vec.push("param".to_owned()),
                 DeclarationKind::RegularWire { .. }
-                | DeclarationKind::RegularGenerative { .. }
+                | DeclarationKind::RegularGenerative
                 | DeclarationKind::StructField(_)
                 | DeclarationKind::ConditionalBinding { .. } => {}
             }

@@ -784,6 +784,10 @@
             "named": false
           },
           {
+            "type": "split",
+            "named": false
+          },
+          {
             "type": "state",
             "named": false
           }
@@ -2254,6 +2258,10 @@
     "type": "single_line_comment",
     "named": true,
     "extra": true
+  },
+  {
+    "type": "split",
+    "named": false
   },
   {
     "type": "state",

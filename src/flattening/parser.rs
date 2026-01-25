@@ -318,7 +318,7 @@ impl<'t> Cursor<'t> {
         }
     }
 
-    pub fn extract_gathered_comments(&mut self) -> Documentation {
+    pub fn extract_gathered_docs(&mut self) -> Documentation {
         let gathered = self.gathered_comments.clone().into_boxed_slice();
         self.gathered_comments.clear();
         Documentation { gathered }

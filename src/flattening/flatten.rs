@@ -436,9 +436,19 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         }
     }
 
+    fn kw_once(&mut self, kw: &mut Option<Span>, span: Span) {
+        if let Some(prev_span) = kw {
+            self.errors
+                .error(span, "Duplicate keyword!")
+                .info(*prev_span, "Previously used here");
+        } else {
+            *kw = Some(span);
+        }
+    }
     fn flatten_declaration<const ALLOW_MODULES: bool>(
         &mut self,
         decl_context: DeclarationKind,
+        mut read_only: bool,
         declaration_itself_is_not_written_to: bool,
         cursor: &mut Cursor<'c>,
     ) -> FlatID {
@@ -450,23 +460,23 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             let mut output_kw = None;
             let mut gen_kw = None;
             let mut state_kw = None;
+            let mut num_splits = 0;
+            let mut last_split_kw = None;
 
             if cursor.optional_field(field!("declaration_modifiers")) {
                 cursor.list(kind!("declaration_modifiers"), |cursor| {
                     let (kind, span) = cursor.kind_span();
-                    let selected_kw = match kind {
-                        kw!("input") => &mut input_kw,
-                        kw!("output") => &mut output_kw,
-                        kw!("gen") => &mut gen_kw,
-                        kw!("state") => &mut state_kw,
+                    match kind {
+                        kw!("split") => {
+                            num_splits += 1;
+                            last_split_kw = Some(span);
+                        }
+                        kw!("input") => self.kw_once(&mut input_kw, span),
+                        kw!("output") => self.kw_once(&mut output_kw, span),
+                        kw!("gen") => self.kw_once(&mut gen_kw, span),
+                        kw!("state") => self.kw_once(&mut state_kw, span),
                         _ => cursor.could_not_match(),
-                    };
-                    if let Some(prev_span) = *selected_kw {
-                        self.errors
-                            .error(span, "Duplicate keyword!")
-                            .info(prev_span, "Previously used here");
                     }
-                    *selected_kw = Some(span);
                 })
             };
 
@@ -479,7 +489,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             let latency_specifier = span_latency_specifier.map(|(ls, _)| ls);
             // Parsing components done
 
-            let documentation = cursor.extract_gathered_comments();
+            let documentation = cursor.extract_gathered_docs();
 
             let declaration_instruction = self.instructions.get_next_alloc_id();
 
@@ -519,11 +529,13 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             let decl_kind = match decl_context {
                 DeclarationKind::RegularWire { .. } => {
                     if gen_kw.is_some() {
-                        self.forbid_keyword(input_kw, "on a generative declaration.");
-                        self.forbid_keyword(output_kw, "on a generative declaration.");
-                        self.forbid_keyword(state_kw, "on a generative declaration.");
-                        DeclarationKind::RegularGenerative { read_only: false }
+                        self.forbid_keyword(input_kw, "on a generative declaration");
+                        self.forbid_keyword(output_kw, "on a generative declaration");
+                        self.forbid_keyword(state_kw, "on a generative declaration");
+                        self.forbid_keyword(last_split_kw, "on a generative declaration");
+                        DeclarationKind::RegularGenerative
                     } else if input_kw.is_some() | output_kw.is_some() {
+                        self.forbid_keyword(last_split_kw, "on a port");
                         let (direction, is_state) = if input_kw.is_some() {
                             self.forbid_keyword(
                                 output_kw,
@@ -533,6 +545,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 state_kw,
                                 "on an input port, because it is read-only",
                             );
+                            read_only = true;
                             (Direction::Input, false)
                         } else {
                             (Direction::Output, state_kw.is_some())
@@ -565,7 +578,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         let is_state = state_kw.is_some();
                         DeclarationKind::RegularWire {
                             is_state,
-                            read_only: false,
+                            num_splits,
                         }
                     }
                 }
@@ -573,8 +586,9 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     self.forbid_keyword(input_kw, "in struct fields");
                     self.forbid_keyword(output_kw, "in struct fields");
                     self.forbid_keyword(state_kw, "in struct fields");
+                    self.forbid_keyword(last_split_kw, "in struct fields");
                     if gen_kw.is_some() {
-                        DeclarationKind::RegularGenerative { read_only: false }
+                        DeclarationKind::RegularGenerative
                     } else {
                         DeclarationKind::StructField(self.fields.alloc(StructField {
                             name: name.to_owned(),
@@ -590,12 +604,14 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     self.forbid_keyword(input_kw, "on a conditional binding");
                     self.forbid_keyword(output_kw, "on a conditional binding");
                     self.forbid_keyword(gen_kw, "on a conditional binding");
+                    self.forbid_keyword(last_split_kw, "on a conditional binding");
                     let is_state = match direction {
                         Direction::Input => {
                             self.forbid_keyword(
                                 state_kw,
                                 "on input conditional bindings, because they are read-only",
                             );
+                            read_only = true;
                             false
                         }
                         Direction::Output => state_kw.is_some(),
@@ -622,12 +638,14 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     self.forbid_keyword(input_kw, port_ctx);
                     self.forbid_keyword(output_kw, port_ctx);
                     self.forbid_keyword(gen_kw, "on ports");
+                    self.forbid_keyword(last_split_kw, "on ports");
                     let is_state = match direction {
                         Direction::Input => {
                             self.forbid_keyword(
                                 state_kw,
                                 "on input ports, because they are read-only",
                             );
+                            read_only = true;
                             false
                         }
                         Direction::Output => state_kw.is_some(),
@@ -649,7 +667,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         is_standalone_port: false,
                     }
                 }
-                d @ DeclarationKind::RegularGenerative { .. } => {
+                d @ DeclarationKind::RegularGenerative
+                | d @ DeclarationKind::TemplateParameter(_) => {
                     self.forbid_keyword(input_kw, "in a generative context");
                     self.forbid_keyword(output_kw, "in a generative context");
                     self.forbid_keyword(
@@ -657,16 +676,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         "in a generative context, it is already generative!",
                     );
                     self.forbid_keyword(state_kw, "in a generative context");
-                    d
-                }
-                d @ DeclarationKind::TemplateParameter(_) => {
-                    self.forbid_keyword(input_kw, "in template parameters");
-                    self.forbid_keyword(output_kw, "in template parameters");
-                    self.forbid_keyword(
-                        gen_kw,
-                        "in a template parameter, it is already generative!",
-                    );
-                    self.forbid_keyword(state_kw, "in template parameters");
+                    self.forbid_keyword(last_split_kw, "in a generative context");
                     d
                 }
             };
@@ -686,10 +696,11 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     typ: AbstractRankedType::UNKNOWN,
                     domain,
                     declaration_itself_is_not_written_to,
-                    decl_kind,
                     name: name.to_owned(),
                     name_span,
                     decl_span,
+                    decl_kind,
+                    read_only,
                     latency_specifier,
                     documentation,
                 }),
@@ -1377,7 +1388,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let for_kw_span = cursor.span();
         cursor.field(field!("for_decl"));
         let loop_var_decl = self.flatten_declaration::<false>(
-            DeclarationKind::RegularGenerative { read_only: true },
+            DeclarationKind::RegularGenerative,
+            true,
             true,
             cursor,
         );
@@ -1495,7 +1507,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             Span::new_overarching(interface_kw_span, name_span)
         };
 
-        let documentation = cursor.extract_gathered_comments();
+        let documentation = cursor.extract_gathered_docs();
 
         let declaration_instruction = self.instructions.get_next_alloc_id();
         match &mut interface_kind {
@@ -1688,8 +1700,12 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 cursor.field(field!("expr_or_decl"));
                 let (kind, to_span) = cursor.kind_span();
                 let to = if kind == kind!("declaration") {
-                    let root =
-                        self.flatten_declaration::<false>(self.default_decl_kind, true, cursor);
+                    let root = self.flatten_declaration::<false>(
+                        self.default_decl_kind,
+                        false,
+                        true,
+                        cursor,
+                    );
                     let flat_root_decl = self.instructions[root].unwrap_declaration();
                     WireReference {
                         root: WireReferenceRoot::LocalDecl(root),
@@ -1731,7 +1747,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 let kind = cursor.kind();
 
                 if kind == kind!("declaration") {
-                    let _ = self.flatten_declaration::<true>(self.default_decl_kind, true, cursor);
+                    let _ = self.flatten_declaration::<true>(self.default_decl_kind, false, true, cursor);
                 } else { // It's _expression
                     self.flatten_assign_to_expr(Vec::new(), cursor);
                 }
@@ -1747,7 +1763,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     ) -> Vec<FlatID> {
         if cursor.optional_field(field) {
             cursor.collect_list(kind!("declaration_list"), |cursor| {
-                self.flatten_declaration::<false>(default_decl_kind, true, cursor)
+                self.flatten_declaration::<false>(default_decl_kind, false, true, cursor)
             })
         } else {
             Vec::new()
@@ -1849,6 +1865,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         let decl_id = self.flatten_declaration::<false>(
                             DeclarationKind::TemplateParameter(next_param_id),
                             true,
+                            true,
                             cursor,
                         );
                         let decl = self.instructions[decl_id].unwrap_declaration();
@@ -1885,9 +1902,10 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             name_span,
                             name: name.to_owned(),
                             declaration_itself_is_not_written_to: true,
-                            decl_kind: DeclarationKind::RegularGenerative { read_only: false },
+                            decl_kind: DeclarationKind::RegularGenerative,
+                            read_only: false,
                             latency_specifier: None,
-                            documentation: const_type_cursor.extract_gathered_comments(),
+                            documentation: const_type_cursor.extract_gathered_docs(),
                         }));
 
                 self.alloc_local_name(name_span, name, NamedLocal::Declaration(module_output_decl));
@@ -1950,9 +1968,9 @@ fn flatten_global(
     let default_decl_kind = match cursor.kind() {
         kw!("module") => DeclarationKind::RegularWire {
             is_state: false,
-            read_only: false,
+            num_splits: usize::MAX, // Never read
         },
-        kind!("const_and_type") => DeclarationKind::RegularGenerative { read_only: false },
+        kind!("const_and_type") => DeclarationKind::RegularGenerative,
         kw!("struct") => DeclarationKind::StructField(UUID::PLACEHOLDER),
         _other => cursor.could_not_match(),
     };

@@ -43,7 +43,7 @@ impl LintContext<'_> {
         match &wire_ref.root {
             WireReferenceRoot::LocalDecl(decl_id) => {
                 let decl = self.working_on.instructions[*decl_id].unwrap_declaration();
-                if is_writing_to && decl.decl_kind.is_read_only() {
+                if is_writing_to && decl.read_only {
                     self.errors
                         .error(wire_ref.root_span, format!("'{}' is read-only", decl.name))
                         .info_obj(decl);

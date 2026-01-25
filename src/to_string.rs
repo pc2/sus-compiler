@@ -418,13 +418,13 @@ impl core::fmt::Debug for DeclarationKind {
         match self {
             DeclarationKind::RegularWire {
                 is_state,
-                read_only,
+                num_splits,
             } => {
                 if *is_state {
                     f.write_str("state ")?;
                 }
-                if *read_only {
-                    f.write_str("read_only ")?;
+                for _ in 0..*num_splits {
+                    f.write_str("split ")?;
                 }
                 f.write_str("wire")
             }
@@ -451,10 +451,7 @@ impl core::fmt::Debug for DeclarationKind {
                 }
                 write!(f, "{direction} binding(in when {when_id:?})")
             }
-            DeclarationKind::RegularGenerative { read_only } => {
-                if *read_only {
-                    f.write_str("read_only ")?;
-                }
+            DeclarationKind::RegularGenerative => {
                 write!(f, "gen")
             }
             DeclarationKind::TemplateParameter(template_id) => {

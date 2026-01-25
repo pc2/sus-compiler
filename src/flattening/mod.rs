@@ -582,7 +582,8 @@ impl Expression {
 pub enum DeclarationKind {
     RegularWire {
         is_state: bool,
-        read_only: bool,
+        /// Describes how many 'split' keywords have been used for this wire.
+        num_splits: usize,
     },
     StructField(FieldID),
     Port {
@@ -597,9 +598,7 @@ pub enum DeclarationKind {
         direction: Direction,
         is_state: bool,
     },
-    RegularGenerative {
-        read_only: bool,
-    },
+    RegularGenerative,
     TemplateParameter(TemplateID),
 }
 
@@ -612,25 +611,13 @@ impl DeclarationKind {
             None
         }
     }
-    pub fn is_read_only(&self) -> bool {
-        match self {
-            DeclarationKind::RegularWire { read_only, .. } => *read_only,
-            DeclarationKind::ConditionalBinding { direction, .. } => *direction == Direction::Input,
-            DeclarationKind::StructField(_) => false,
-            DeclarationKind::Port { direction, .. } => *direction == Direction::Input,
-            DeclarationKind::RegularGenerative { read_only } => *read_only,
-            DeclarationKind::TemplateParameter(_) => true,
-        }
-    }
     pub fn is_generative(&self) -> bool {
         match self {
             DeclarationKind::RegularWire { .. }
             | DeclarationKind::ConditionalBinding { .. }
             | DeclarationKind::StructField(_)
             | DeclarationKind::Port { .. } => false,
-            DeclarationKind::RegularGenerative { .. } | DeclarationKind::TemplateParameter(..) => {
-                true
-            }
+            DeclarationKind::RegularGenerative | DeclarationKind::TemplateParameter(..) => true,
         }
     }
     pub fn is_state(&self) -> bool {
@@ -639,7 +626,7 @@ impl DeclarationKind {
             | DeclarationKind::Port { is_state, .. }
             | DeclarationKind::ConditionalBinding { is_state, .. } => *is_state,
             DeclarationKind::StructField(_)
-            | DeclarationKind::RegularGenerative { .. }
+            | DeclarationKind::RegularGenerative
             | DeclarationKind::TemplateParameter(..) => false,
         }
     }
@@ -663,6 +650,7 @@ pub struct Declaration {
     /// If the program text already covers the write, then lsp stuff on this declaration shouldn't use it.
     pub declaration_itself_is_not_written_to: bool,
     pub decl_kind: DeclarationKind,
+    pub read_only: bool,
     pub latency_specifier: Option<FlatID>,
     pub documentation: Documentation,
 }

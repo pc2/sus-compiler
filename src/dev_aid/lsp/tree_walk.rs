@@ -53,7 +53,7 @@ impl From<LocationInfo<'_>> for RefersTo {
         match info {
             LocationInfo::InGlobal(obj_id, _, flat_id, InGlobal::NamedLocal(decl)) => {
                 match decl.decl_kind {
-                    DeclarationKind::RegularGenerative { .. }
+                    DeclarationKind::RegularGenerative
                     | DeclarationKind::ConditionalBinding { .. }
                     | DeclarationKind::RegularWire { .. }
                     | DeclarationKind::StructField(..) => {}

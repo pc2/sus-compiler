@@ -76,7 +76,7 @@ fn initialize_global_object(
     let link_info = LinkInfo {
         parameters: FlatAlloc::new(),
         instructions: FlatAlloc::new(),
-        documentation: cursor.extract_gathered_comments(),
+        documentation: cursor.extract_gathered_docs(),
         name,
         name_span,
         span,

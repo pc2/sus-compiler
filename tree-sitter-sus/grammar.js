@@ -207,6 +207,7 @@ module.exports = grammar({
             optional(field('latency_specifier', $.latency_specifier))
         ),
         declaration_modifiers: $ => repeat1(field('item', choice(
+            'split',
             'state',
             'gen',
             'input',
