@@ -16,7 +16,7 @@ fn main() -> Result<(), String> {
     );
 
     let version_str = std::env::var_os("CARGO_PKG_VERSION").unwrap();
-    if version_str.to_str().unwrap().ends_with("-devel") {
+    if version_str.to_str().unwrap().ends_with("-dev") {
         let build_features = if std::env::var_os("CARGO_FEATURE_LSP").is_some() {
             ""
         } else {
