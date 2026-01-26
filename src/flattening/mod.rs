@@ -620,6 +620,16 @@ impl DeclarationKind {
             DeclarationKind::RegularGenerative | DeclarationKind::TemplateParameter(..) => true,
         }
     }
+    pub fn num_splits(&self) -> usize {
+        match self {
+            DeclarationKind::RegularWire { num_splits, .. } => *num_splits,
+            DeclarationKind::StructField(_)
+            | DeclarationKind::Port { .. }
+            | DeclarationKind::ConditionalBinding { .. }
+            | DeclarationKind::RegularGenerative
+            | DeclarationKind::TemplateParameter(_) => 0,
+        }
+    }
     pub fn is_state(&self) -> bool {
         match self {
             DeclarationKind::RegularWire { is_state, .. }

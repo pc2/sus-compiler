@@ -29,6 +29,7 @@ pub fn perform_lints(pass: &mut LinkerPass, errors: &ErrorCollector, linker_file
     ctx.no_duplicate_ports();
     ctx.check_unsynthesizeable_types();
     ctx.no_calling_local_actions();
+    ctx.splits_are_used_correctly();
 }
 
 struct LintContext<'l> {
@@ -604,6 +605,80 @@ impl LintContext<'_> {
                         );
                 }
                 InterfaceKind::Trigger(_) => {}
+            }
+        }
+    }
+
+    // ==== splits ====
+    fn check_splits_for_wire_ref(&self, wr: &WireReference) {
+        let mut path_iter = wr.path.iter();
+        let decl = match &wr.root {
+            WireReferenceRoot::LocalDecl(decl_id) => {
+                self.working_on.instructions[*decl_id].unwrap_declaration()
+            }
+            WireReferenceRoot::LocalSubmodule(_)
+            | WireReferenceRoot::LocalInterface(_)
+            | WireReferenceRoot::NamedConstant(_)
+            | WireReferenceRoot::NamedModule(_)
+            | WireReferenceRoot::Error => return,
+        };
+
+        let decl_name = &decl.name;
+        let num_splits = decl.decl_kind.num_splits();
+        for _ in 0..num_splits {
+            match path_iter.next() {
+                Some(WireReferencePathElement::FieldAccess { name_span, .. }) => {
+                    self.errors
+                        .error(*name_span, format!("All split dimensions must be indexed. {decl_name} has {num_splits} splits."))
+                        .info_obj(decl);
+                }
+                None => {
+                    self.errors
+                        .error(wr.root_span, format!("All split dimensions must be indexed. {decl_name} has {num_splits} splits."))
+                        .info_obj(decl);
+                }
+                Some(WireReferencePathElement::ArraySlice { bracket_span, .. })
+                | Some(WireReferencePathElement::ArrayPartSelect { bracket_span, .. }) => {
+                    self.errors
+                        .error(bracket_span.inner_span(), format!("Split dimensions cannot be sliced. {decl_name} has {num_splits} splits."))
+                        .info_obj(decl);
+                }
+                Some(WireReferencePathElement::ArrayAccess { idx, bracket_span }) => {
+                    let idx = self.working_on.instructions[*idx].unwrap_subexpression();
+                    if !idx.domain.is_generative() {
+                        self.errors
+                        .error(bracket_span.inner_span(), format!("Indexing a split dimension must be generative. {decl_name} has {num_splits} splits."))
+                        .info_obj(decl);
+                    }
+                }
+            }
+        }
+    }
+    fn splits_are_used_correctly(&self) {
+        for (_, instr) in &self.working_on.instructions {
+            match instr {
+                Instruction::Declaration(decl) => {
+                    if let Some(num_arrays) = decl.typ.rank.count() {
+                        let num_splits = decl.decl_kind.num_splits();
+                        if num_arrays < num_splits {
+                            self.errors.error(decl.decl_span, format!("`split` requires the declaration's type to have as many array levels as `split` keywords provided. Found {num_arrays} arrays, and {num_splits} splits."));
+                        }
+                    }
+                }
+                Instruction::Expression(expression) => {
+                    if let ExpressionSource::WireRef(wr) = &expression.source {
+                        self.check_splits_for_wire_ref(wr);
+                    }
+                    if let ExpressionOutput::MultiWrite(mr) = &expression.output {
+                        for w in mr {
+                            self.check_splits_for_wire_ref(&w.to);
+                        }
+                    }
+                }
+                Instruction::SubModule(_)
+                | Instruction::Interface(_)
+                | Instruction::IfStatement(_)
+                | Instruction::ForStatement(_) => {}
             }
         }
     }

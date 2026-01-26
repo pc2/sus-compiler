@@ -152,7 +152,7 @@ impl PeanoType {
     #[allow(clippy::declare_interior_mutable_const)]
     pub const UNKNOWN: UniCell<PeanoType> = UniCell::UNKNOWN;
 
-    pub fn count(&self) -> usize {
+    pub fn count_unwrap(&self) -> usize {
         let mut cur = self;
         let mut sum = 0;
 
@@ -174,6 +174,20 @@ impl PeanoType {
     }
 }
 
+impl UniCell<PeanoType> {
+    pub fn count(&self) -> Option<usize> {
+        let mut cur = self.get()?;
+        let mut sum = 0;
+
+        while let PeanoType::Succ(succ) = cur {
+            cur = succ.get()?;
+            sum += 1;
+        }
+
+        Some(sum)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AbstractGlobalReference<ID> {
     pub id: ID,
@@ -190,7 +204,7 @@ impl AbstractRankedType {
             AbstractInnerType::Template(id) => args[*id]
                 .unwrap_type()
                 .clone()
-                .rank_up_multi(self.rank.count()),
+                .rank_up_multi(self.rank.count_unwrap()),
             AbstractInnerType::Named(named_ref) => {
                 AbstractInnerType::Named(named_ref.substitute_template_args(args))
                     .with_rank(self.rank.unwrap().clone())

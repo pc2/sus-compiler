@@ -206,7 +206,7 @@ impl Value {
         abs_typ: &AbstractRankedType,
         template_args: &TVec<ConcreteTemplateArg>,
     ) -> Result<ConcreteType, String> {
-        let array_depth = abs_typ.rank.count();
+        let array_depth = abs_typ.rank.count_unwrap();
         let mut tensor_sizes = Vec::with_capacity(array_depth);
 
         let content_typ = match abs_typ.inner.unwrap() {

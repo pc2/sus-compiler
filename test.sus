@@ -1763,3 +1763,13 @@ module TestNextPow2 {
 	// Should error
 	nextPow2#(V: -1)
 }
+
+module TestSplits {
+	input bool y
+	split bool[5] x
+
+	x[0] = y
+	for int i in 1..5 {
+		reg x[i] = x[i-1]
+	}
+}

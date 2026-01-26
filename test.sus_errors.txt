@@ -169,6 +169,7 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestZerosArrays #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestUnknownArraySize #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestNextPow2 #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestSplits #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -3914,6 +3915,44 @@ Error: nextPow2 #(V: -1): V must be positive! Found -1
       │     ────────┬───────  
       │             ╰───────── nextPow2 #(V: -1): V must be positive! Found -1
 ──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1768:13 ]
+      │
+ 1768 │     input bool y
+      │                ┬  
+      │                ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: This instruction is part of a net-positive latency cycle of +1
+
+x'1
+-> x'2 (+1)
+
+Which conflicts with the starting latency
+      ╭─[ test.sus:1769:16 ]
+      │
+ 1769 │     split bool[5] x
+      │                   ┬  
+      │                   ╰── This instruction is part of a net-positive latency cycle of +1
+
+x'1
+-> x'2 (+1)
+
+Which conflicts with the starting latency
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1769:16 ]
+      │
+ 1769 │     split bool[5] x
+      │                   ┬  
+      │                   ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1772:10 ]
+      │
+ 1772 │     for int i in 1..5 {
+      │             ┬  
+      │             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen test_various_assignments #() due to errors!
@@ -3990,3 +4029,4 @@ Error: nextPow2 #(V: -1): V must be positive! Found -1
 [ERROR sus_compiler::codegen] Cannot codegen InstantiatesItself #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen TestUnknownArraySize #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen TestNextPow2 #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen TestSplits #() due to errors!
