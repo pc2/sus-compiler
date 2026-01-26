@@ -47,7 +47,9 @@ impl HoverCollector<'_> {
             for (_template_args, inst) in self.linker.instantiator.iter_for_module(md_id) {
                 if is_generative {
                     let value_str = match &inst.generation_state[id] {
-                        SubModuleOrWire::SubModule(_) | SubModuleOrWire::Wire(_) => {
+                        SubModuleOrWire::SubModule(_)
+                        | SubModuleOrWire::Wire(_)
+                        | SubModuleOrWire::SplitWire(_) => {
                             unreachable!()
                         }
                         SubModuleOrWire::CompileTimeValue(v) => format!(" = {v}"),

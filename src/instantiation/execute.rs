@@ -5,8 +5,10 @@
 //! As for typing, it only instantiates written types and leaves the rest for further typechecking.
 
 use std::borrow::Cow;
+use std::fmt::Binary;
 use std::ops::{Deref, Index, IndexMut, Range};
 
+use crate::to_string::display_join;
 use crate::{
     flattening::*,
     instantiation::*,
@@ -338,9 +340,7 @@ impl GenerationState<'_> {
         Ok(unwrap_single_element(flattened_result_tensor))
     }
     fn get_generation_value(&self, v: FlatID) -> ExecutionResult<&Value> {
-        let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] else {
-            unreachable!()
-        };
+        let vv = &self.generation_state[v].unwrap_generation_value();
 
         if let Value::Unset = vv {
             Err((self.span_of(v), "This variable is unset!".to_owned()))
@@ -352,6 +352,9 @@ impl GenerationState<'_> {
         match &self.generation_state[v] {
             SubModuleOrWire::SubModule(_) => unreachable!(),
             SubModuleOrWire::Unassigned => unreachable!(),
+            SubModuleOrWire::SplitWire(_) => {
+                unreachable!("Split wires *must* be indexed, and so cannot be used here")
+            }
             SubModuleOrWire::Wire(wire_id) => Ok(WireOrInt::Wire(*wire_id)),
             SubModuleOrWire::CompileTimeValue(value) => {
                 if let Value::Unset = value {
@@ -590,7 +593,9 @@ impl<'l> ExecutionContext<'l> {
 
     /// Uses the current context to turn a [AbstractRankedType] + maybe [WrittenType] into a [ConcreteType].
     ///
-    /// When no [WrittenType] is provided, this cannot error
+    /// When no [WrittenType] is provided, this cannot error.
+    ///
+    /// The returned type is a valid [UniCell] "prototype".
     fn concretize_type(
         &mut self,
         abs: &AbstractRankedType,
@@ -725,11 +730,59 @@ impl<'l> ExecutionContext<'l> {
         self.link_info.instructions[original_instruction]
             .get_span()
             .debug();
-        let (port_interface, port_span, path) = self.execute_wire_ref_path(wire_ref)?;
+        let (port_interface, port_span, mut path) = self.execute_wire_ref_path(wire_ref)?;
         let wire_id = match &wire_ref.root {
             &WireReferenceRoot::LocalDecl(decl_id) => {
-                let _ = self.link_info.instructions[decl_id].unwrap_declaration();
-                self.get_wire_or_constant_as_wire(decl_id, domain)?
+                let decl = self.link_info.instructions[decl_id].unwrap_declaration();
+                let num_splits = decl.decl_kind.num_splits();
+                if num_splits != 0 {
+                    let split_index: Vec<IBig> = path
+                        .drain(0..num_splits)
+                        .map(|idx| {
+                            let_unwrap!(RealWirePathElem::ConstIndex { span: _, idx }, idx);
+                            idx
+                        })
+                        .collect();
+                    let_unwrap!(
+                        SubModuleOrWire::SplitWire(split),
+                        &mut self.generation_state[decl_id]
+                    );
+                    let wire_id = split
+                        .contained_wires
+                        .entry(split_index.into_boxed_slice())
+                        .or_insert_with_key(|split_index| {
+                            let original_decl = self.link_info.instructions[split.original_decl]
+                                .unwrap_declaration();
+                            let is_state = if original_decl.decl_kind.is_state() {
+                                Some(split.element_typ_prototype.get_initial_val())
+                            } else {
+                                None
+                            };
+                            let split_index_str =
+                                display_join("_", split_index, |f, idx| write!(f, "{idx}"));
+                            let name_proto = &split.name_prototype;
+                            let name = self
+                                .unique_name_producer
+                                .get_unique_name(format!("{name_proto}_split_{split_index_str}"));
+
+                            self.wires.alloc(RealWire {
+                                source: RealWireDataSource::Multiplexer {
+                                    is_state,
+                                    sources: Vec::new(),
+                                },
+                                original_instruction: split.original_decl,
+                                typ: split.element_typ_prototype.clone_prototype(),
+                                name,
+                                domain,
+                                specified_latency: split.specified_latency_prototype,
+                                absolute_latency: AbsLat::UNKNOWN,
+                                is_port: split.is_port_prototype,
+                            })
+                        });
+                    *wire_id
+                } else {
+                    self.get_wire_or_constant_as_wire(decl_id, domain)?
+                }
             }
             WireReferenceRoot::LocalSubmodule(submod_id) => {
                 let submod = self.link_info.instructions[*submod_id].unwrap_submodule();
@@ -908,6 +961,9 @@ impl<'l> ExecutionContext<'l> {
         match &self.generation_state[original_instruction] {
             SubModuleOrWire::SubModule(_) => unreachable!(),
             SubModuleOrWire::Unassigned => unreachable!(),
+            SubModuleOrWire::SplitWire(_) => {
+                unreachable!("Split wires *must* be indexed, and so cannot be used here")
+            }
             SubModuleOrWire::Wire(w) => Ok(*w),
             SubModuleOrWire::CompileTimeValue(v) => {
                 let value = v.clone();
@@ -1275,20 +1331,6 @@ impl<'l> ExecutionContext<'l> {
                 };
             SubModuleOrWire::CompileTimeValue(value)
         } else {
-            let source = if wire_decl.decl_kind.is_io_port() == Some(Direction::Input) {
-                RealWireDataSource::ReadOnly
-            } else {
-                let is_state = if wire_decl.decl_kind.is_state() {
-                    Some(typ.get_initial_val())
-                } else {
-                    None
-                };
-                RealWireDataSource::Multiplexer {
-                    is_state,
-                    sources: Vec::new(),
-                }
-            };
-
             let specified_latency = self.get_specified_latency(wire_decl.latency_specifier)?;
 
             let is_port = if let DeclarationKind::Port {
@@ -1300,17 +1342,57 @@ impl<'l> ExecutionContext<'l> {
                 IsPort::PlainWire
             };
 
-            let wire_id = self.wires.alloc(RealWire {
-                name: self.unique_name_producer.get_unique_name(&wire_decl.name),
-                typ,
-                original_instruction,
-                domain: wire_decl.domain.unwrap_physical(),
-                source,
-                specified_latency,
-                absolute_latency: AbsLat::UNKNOWN,
-                is_port,
-            });
-            SubModuleOrWire::Wire(wire_id)
+            let decl_num_splits = wire_decl.decl_kind.num_splits();
+            if decl_num_splits != 0 {
+                let mut element_typ_prototype = typ;
+                let mut bounds = Vec::new();
+                for _ in 0..decl_num_splits {
+                    let_unwrap!(ConcreteType::Array(arr_box), element_typ_prototype);
+                    let (content, sz) = *arr_box;
+                    element_typ_prototype = content;
+                    bounds.push(if let Some(sz) = sz.try_into_inner() {
+                        let_unwrap!(Value::Integer(sz), sz);
+                        PartialBound::Known(IBig::from(0), sz)
+                    } else {
+                        PartialBound::From(IBig::from(0))
+                    })
+                }
+                SubModuleOrWire::SplitWire(Box::new(SplitWire {
+                    specified_latency_prototype: specified_latency,
+                    is_port_prototype: is_port,
+                    original_decl: original_instruction,
+                    element_typ_prototype,
+                    name_prototype: self.unique_name_producer.get_unique_name(&wire_decl.name),
+                    bounds,
+                    contained_wires: HashMap::new(),
+                }))
+            } else {
+                let source = if wire_decl.decl_kind.is_io_port() == Some(Direction::Input) {
+                    RealWireDataSource::ReadOnly
+                } else {
+                    let is_state = if wire_decl.decl_kind.is_state() {
+                        Some(typ.get_initial_val())
+                    } else {
+                        None
+                    };
+                    RealWireDataSource::Multiplexer {
+                        is_state,
+                        sources: Vec::new(),
+                    }
+                };
+
+                let wire_id = self.wires.alloc(RealWire {
+                    name: self.unique_name_producer.get_unique_name(&wire_decl.name),
+                    typ,
+                    original_instruction,
+                    domain: wire_decl.domain.unwrap_physical(),
+                    source,
+                    specified_latency,
+                    absolute_latency: AbsLat::UNKNOWN,
+                    is_port,
+                });
+                SubModuleOrWire::Wire(wire_id)
+            }
         })
     }
 

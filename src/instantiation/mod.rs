@@ -29,10 +29,13 @@ use crate::{
     value::Value,
 };
 
-use std::cell::{OnceCell, RefCell};
 use std::collections::HashSet;
 use std::fmt::Write;
 use std::rc::Rc;
+use std::{
+    cell::{OnceCell, RefCell},
+    collections::HashMap,
+};
 
 /// In valid programs, this becomes [PartialBound::Known] after concrete typecheck
 #[derive(Debug, Clone)]
@@ -248,11 +251,23 @@ pub struct InstantiatedModule {
     pub generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
 }
 
+#[derive(Debug, Clone)]
+pub struct SplitWire {
+    specified_latency_prototype: AbsLat,
+    is_port_prototype: IsPort,
+    element_typ_prototype: ConcreteType,
+    name_prototype: String,
+    bounds: Vec<PartialBound>,
+    original_decl: FlatID,
+    contained_wires: HashMap<Box<[IBig]>, WireID>,
+}
+
 /// See [GenerationState]
 #[derive(Debug, Clone)]
 pub enum SubModuleOrWire {
     SubModule(SubModuleID),
     Wire(WireID),
+    SplitWire(Box<SplitWire>),
     CompileTimeValue(Value),
     // Variable doesn't exist yet
     Unassigned,
@@ -261,24 +276,17 @@ pub enum SubModuleOrWire {
 impl SubModuleOrWire {
     #[track_caller]
     pub fn unwrap_wire(&self) -> WireID {
-        let Self::Wire(result) = self else {
-            unreachable!("SubModuleOrWire::unwrap_wire failed! Is {self:?} instead")
-        };
+        let_unwrap!(Self::Wire(result), self);
         *result
     }
-    #[allow(unused)]
     #[track_caller]
     pub fn unwrap_generation_value(&self) -> &Value {
-        let Self::CompileTimeValue(result) = self else {
-            unreachable!("SubModuleOrWire::unwrap_generation_value failed! Is {self:?} instead")
-        };
+        let_unwrap!(Self::CompileTimeValue(result), self);
         result
     }
     #[track_caller]
     pub fn unwrap_submodule_instance(&self) -> SubModuleID {
-        let Self::SubModule(result) = self else {
-            unreachable!("SubModuleOrWire::unwrap_submodule_instance failed! Is {self:?} instead")
-        };
+        let_unwrap!(Self::SubModule(result), self);
         *result
     }
 }

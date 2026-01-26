@@ -1,3 +1,613 @@
+// CountBitsWithSplits #()
+module CountBitsWithSplits(
+	input clk,
+	input wire[19:0] bits,
+	output /*mux_wire*/ logic[4:0] total
+);
+
+wire _1 = bits[0];
+/*mux_wire*/ logic _BoolToInt_i;
+wire[0:0] _BoolToInt_o;
+/*mux_wire*/ logic[0:0] sums_split_0;
+wire _3 = bits[1];
+/*mux_wire*/ logic _BoolToInt_2_i;
+wire[0:0] _BoolToInt_2_o;
+wire[1:0] _4;
+assign _4 = sums_split_0 + _BoolToInt_2_o;
+/*mux_wire*/ logic[1:0] sums_split_1;
+wire _6 = bits[2];
+/*mux_wire*/ logic _BoolToInt_3_i;
+wire[0:0] _BoolToInt_3_o;
+wire[1:0] _7;
+assign _7 = sums_split_1 + _BoolToInt_3_o;
+/*mux_wire*/ logic[1:0] sums_split_2;
+wire _9 = bits[3];
+/*mux_wire*/ logic _BoolToInt_4_i;
+wire[0:0] _BoolToInt_4_o;
+wire[2:0] _10;
+assign _10 = sums_split_2 + _BoolToInt_4_o;
+/*mux_wire*/ logic[2:0] sums_split_3;
+wire _12 = bits[4];
+/*mux_wire*/ logic _BoolToInt_5_i;
+wire[0:0] _BoolToInt_5_o;
+wire[2:0] _13;
+assign _13 = sums_split_3 + _BoolToInt_5_o;
+/*mux_wire*/ logic[2:0] sums_split_4;
+wire _15 = bits[5];
+/*mux_wire*/ logic _BoolToInt_6_i;
+wire[0:0] _BoolToInt_6_o;
+wire[2:0] _16;
+assign _16 = sums_split_4 + _BoolToInt_6_o;
+/*mux_wire*/ logic[2:0] sums_split_5;
+wire _18 = bits[6];
+/*mux_wire*/ logic _BoolToInt_7_i;
+wire[0:0] _BoolToInt_7_o;
+wire[2:0] _19;
+assign _19 = sums_split_5 + _BoolToInt_7_o;
+/*mux_wire*/ logic[2:0] sums_split_6;
+wire _21 = bits[7];
+/*mux_wire*/ logic _BoolToInt_8_i;
+wire[0:0] _BoolToInt_8_o;
+wire[3:0] _22;
+assign _22 = sums_split_6 + _BoolToInt_8_o;
+/*mux_wire*/ logic[3:0] sums_split_7;
+wire _24 = bits[8];
+/*mux_wire*/ logic _BoolToInt_9_i;
+wire[0:0] _BoolToInt_9_o;
+wire[3:0] _25;
+assign _25 = sums_split_7 + _BoolToInt_9_o;
+/*mux_wire*/ logic[3:0] sums_split_8;
+wire _27 = bits[9];
+/*mux_wire*/ logic _BoolToInt_10_i;
+wire[0:0] _BoolToInt_10_o;
+wire[3:0] _28;
+assign _28 = sums_split_8 + _BoolToInt_10_o;
+/*mux_wire*/ logic[3:0] sums_split_9;
+wire _30 = bits[10];
+/*mux_wire*/ logic _BoolToInt_11_i;
+wire[0:0] _BoolToInt_11_o;
+wire[3:0] _31;
+assign _31 = sums_split_9 + _BoolToInt_11_o;
+/*mux_wire*/ logic[3:0] sums_split_10;
+wire _33 = bits[11];
+/*mux_wire*/ logic _BoolToInt_12_i;
+wire[0:0] _BoolToInt_12_o;
+wire[3:0] _34;
+assign _34 = sums_split_10 + _BoolToInt_12_o;
+/*mux_wire*/ logic[3:0] sums_split_11;
+wire _36 = bits[12];
+/*mux_wire*/ logic _BoolToInt_13_i;
+wire[0:0] _BoolToInt_13_o;
+wire[3:0] _37;
+assign _37 = sums_split_11 + _BoolToInt_13_o;
+/*mux_wire*/ logic[3:0] sums_split_12;
+wire _39 = bits[13];
+/*mux_wire*/ logic _BoolToInt_14_i;
+wire[0:0] _BoolToInt_14_o;
+wire[3:0] _40;
+assign _40 = sums_split_12 + _BoolToInt_14_o;
+/*mux_wire*/ logic[3:0] sums_split_13;
+wire _42 = bits[14];
+/*mux_wire*/ logic _BoolToInt_15_i;
+wire[0:0] _BoolToInt_15_o;
+wire[3:0] _43;
+assign _43 = sums_split_13 + _BoolToInt_15_o;
+/*mux_wire*/ logic[3:0] sums_split_14;
+wire _45 = bits[15];
+/*mux_wire*/ logic _BoolToInt_16_i;
+wire[0:0] _BoolToInt_16_o;
+wire[4:0] _46;
+assign _46 = sums_split_14 + _BoolToInt_16_o;
+/*mux_wire*/ logic[4:0] sums_split_15;
+wire _48 = bits[16];
+/*mux_wire*/ logic _BoolToInt_17_i;
+wire[0:0] _BoolToInt_17_o;
+wire[4:0] _49;
+assign _49 = sums_split_15 + _BoolToInt_17_o;
+/*mux_wire*/ logic[4:0] sums_split_16;
+wire _51 = bits[17];
+/*mux_wire*/ logic _BoolToInt_18_i;
+wire[0:0] _BoolToInt_18_o;
+wire[4:0] _52;
+assign _52 = sums_split_16 + _BoolToInt_18_o;
+/*mux_wire*/ logic[4:0] sums_split_17;
+wire _54 = bits[18];
+/*mux_wire*/ logic _BoolToInt_19_i;
+wire[0:0] _BoolToInt_19_o;
+wire[4:0] _55;
+assign _55 = sums_split_17 + _BoolToInt_19_o;
+/*mux_wire*/ logic[4:0] sums_split_18;
+wire _57 = bits[19];
+/*mux_wire*/ logic _BoolToInt_20_i;
+wire[0:0] _BoolToInt_20_o;
+wire[4:0] _58;
+assign _58 = sums_split_18 + _BoolToInt_20_o;
+/*mux_wire*/ logic[4:0] sums_split_19;
+BoolToInt BoolToInt(
+	.clk(clk),
+	.i(_BoolToInt_i),
+	.o(_BoolToInt_o)
+);
+BoolToInt BoolToInt_2(
+	.clk(clk),
+	.i(_BoolToInt_2_i),
+	.o(_BoolToInt_2_o)
+);
+BoolToInt BoolToInt_3(
+	.clk(clk),
+	.i(_BoolToInt_3_i),
+	.o(_BoolToInt_3_o)
+);
+BoolToInt BoolToInt_4(
+	.clk(clk),
+	.i(_BoolToInt_4_i),
+	.o(_BoolToInt_4_o)
+);
+BoolToInt BoolToInt_5(
+	.clk(clk),
+	.i(_BoolToInt_5_i),
+	.o(_BoolToInt_5_o)
+);
+BoolToInt BoolToInt_6(
+	.clk(clk),
+	.i(_BoolToInt_6_i),
+	.o(_BoolToInt_6_o)
+);
+BoolToInt BoolToInt_7(
+	.clk(clk),
+	.i(_BoolToInt_7_i),
+	.o(_BoolToInt_7_o)
+);
+BoolToInt BoolToInt_8(
+	.clk(clk),
+	.i(_BoolToInt_8_i),
+	.o(_BoolToInt_8_o)
+);
+BoolToInt BoolToInt_9(
+	.clk(clk),
+	.i(_BoolToInt_9_i),
+	.o(_BoolToInt_9_o)
+);
+BoolToInt BoolToInt_10(
+	.clk(clk),
+	.i(_BoolToInt_10_i),
+	.o(_BoolToInt_10_o)
+);
+BoolToInt BoolToInt_11(
+	.clk(clk),
+	.i(_BoolToInt_11_i),
+	.o(_BoolToInt_11_o)
+);
+BoolToInt BoolToInt_12(
+	.clk(clk),
+	.i(_BoolToInt_12_i),
+	.o(_BoolToInt_12_o)
+);
+BoolToInt BoolToInt_13(
+	.clk(clk),
+	.i(_BoolToInt_13_i),
+	.o(_BoolToInt_13_o)
+);
+BoolToInt BoolToInt_14(
+	.clk(clk),
+	.i(_BoolToInt_14_i),
+	.o(_BoolToInt_14_o)
+);
+BoolToInt BoolToInt_15(
+	.clk(clk),
+	.i(_BoolToInt_15_i),
+	.o(_BoolToInt_15_o)
+);
+BoolToInt BoolToInt_16(
+	.clk(clk),
+	.i(_BoolToInt_16_i),
+	.o(_BoolToInt_16_o)
+);
+BoolToInt BoolToInt_17(
+	.clk(clk),
+	.i(_BoolToInt_17_i),
+	.o(_BoolToInt_17_o)
+);
+BoolToInt BoolToInt_18(
+	.clk(clk),
+	.i(_BoolToInt_18_i),
+	.o(_BoolToInt_18_o)
+);
+BoolToInt BoolToInt_19(
+	.clk(clk),
+	.i(_BoolToInt_19_i),
+	.o(_BoolToInt_19_o)
+);
+BoolToInt BoolToInt_20(
+	.clk(clk),
+	.i(_BoolToInt_20_i),
+	.o(_BoolToInt_20_o)
+);
+always_comb begin // combinatorial _BoolToInt_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_i = 1'bx;
+	_BoolToInt_i = _1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_i = _BoolToInt_i;
+end
+always_comb begin // combinatorial sums_split_0
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_0 = 1'dx;
+	sums_split_0 = _BoolToInt_o;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	sums_split_0 = sums_split_0;
+end
+always_comb begin // combinatorial _BoolToInt_2_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_2_i = 1'bx;
+	_BoolToInt_2_i = _3;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_2_i = _BoolToInt_2_i;
+end
+always_comb begin // combinatorial sums_split_1
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_1 = 2'dx;
+	sums_split_1 = _4;
+end
+always_comb begin // combinatorial _BoolToInt_3_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_3_i = 1'bx;
+	_BoolToInt_3_i = _6;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_3_i = _BoolToInt_3_i;
+end
+always_comb begin // combinatorial sums_split_2
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_2 = 2'dx;
+	sums_split_2 = _7;
+end
+always_comb begin // combinatorial _BoolToInt_4_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_4_i = 1'bx;
+	_BoolToInt_4_i = _9;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_4_i = _BoolToInt_4_i;
+end
+always_comb begin // combinatorial sums_split_3
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_3 = 3'dx;
+	sums_split_3 = _10;
+end
+always_comb begin // combinatorial _BoolToInt_5_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_5_i = 1'bx;
+	_BoolToInt_5_i = _12;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_5_i = _BoolToInt_5_i;
+end
+always_comb begin // combinatorial sums_split_4
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_4 = 3'dx;
+	sums_split_4 = _13;
+end
+always_comb begin // combinatorial _BoolToInt_6_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_6_i = 1'bx;
+	_BoolToInt_6_i = _15;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_6_i = _BoolToInt_6_i;
+end
+always_comb begin // combinatorial sums_split_5
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_5 = 3'dx;
+	sums_split_5 = _16;
+end
+always_comb begin // combinatorial _BoolToInt_7_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_7_i = 1'bx;
+	_BoolToInt_7_i = _18;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_7_i = _BoolToInt_7_i;
+end
+always_comb begin // combinatorial sums_split_6
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_6 = 3'dx;
+	sums_split_6 = _19;
+end
+always_comb begin // combinatorial _BoolToInt_8_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_8_i = 1'bx;
+	_BoolToInt_8_i = _21;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_8_i = _BoolToInt_8_i;
+end
+always_comb begin // combinatorial sums_split_7
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_7 = 4'dx;
+	sums_split_7 = _22;
+end
+always_comb begin // combinatorial _BoolToInt_9_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_9_i = 1'bx;
+	_BoolToInt_9_i = _24;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_9_i = _BoolToInt_9_i;
+end
+always_comb begin // combinatorial sums_split_8
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_8 = 4'dx;
+	sums_split_8 = _25;
+end
+always_comb begin // combinatorial _BoolToInt_10_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_10_i = 1'bx;
+	_BoolToInt_10_i = _27;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_10_i = _BoolToInt_10_i;
+end
+always_comb begin // combinatorial sums_split_9
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_9 = 4'dx;
+	sums_split_9 = _28;
+end
+always_comb begin // combinatorial _BoolToInt_11_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_11_i = 1'bx;
+	_BoolToInt_11_i = _30;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_11_i = _BoolToInt_11_i;
+end
+always_comb begin // combinatorial sums_split_10
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_10 = 4'dx;
+	sums_split_10 = _31;
+end
+always_comb begin // combinatorial _BoolToInt_12_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_12_i = 1'bx;
+	_BoolToInt_12_i = _33;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_12_i = _BoolToInt_12_i;
+end
+always_comb begin // combinatorial sums_split_11
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_11 = 4'dx;
+	sums_split_11 = _34;
+end
+always_comb begin // combinatorial _BoolToInt_13_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_13_i = 1'bx;
+	_BoolToInt_13_i = _36;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_13_i = _BoolToInt_13_i;
+end
+always_comb begin // combinatorial sums_split_12
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_12 = 4'dx;
+	sums_split_12 = _37;
+end
+always_comb begin // combinatorial _BoolToInt_14_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_14_i = 1'bx;
+	_BoolToInt_14_i = _39;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_14_i = _BoolToInt_14_i;
+end
+always_comb begin // combinatorial sums_split_13
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_13 = 4'dx;
+	sums_split_13 = _40;
+end
+always_comb begin // combinatorial _BoolToInt_15_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_15_i = 1'bx;
+	_BoolToInt_15_i = _42;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_15_i = _BoolToInt_15_i;
+end
+always_comb begin // combinatorial sums_split_14
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_14 = 4'dx;
+	sums_split_14 = _43;
+end
+always_comb begin // combinatorial _BoolToInt_16_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_16_i = 1'bx;
+	_BoolToInt_16_i = _45;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_16_i = _BoolToInt_16_i;
+end
+always_comb begin // combinatorial sums_split_15
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_15 = 5'dx;
+	sums_split_15 = _46;
+end
+always_comb begin // combinatorial _BoolToInt_17_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_17_i = 1'bx;
+	_BoolToInt_17_i = _48;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_17_i = _BoolToInt_17_i;
+end
+always_comb begin // combinatorial sums_split_16
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_16 = 5'dx;
+	sums_split_16 = _49;
+end
+always_comb begin // combinatorial _BoolToInt_18_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_18_i = 1'bx;
+	_BoolToInt_18_i = _51;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_18_i = _BoolToInt_18_i;
+end
+always_comb begin // combinatorial sums_split_17
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_17 = 5'dx;
+	sums_split_17 = _52;
+end
+always_comb begin // combinatorial _BoolToInt_19_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_19_i = 1'bx;
+	_BoolToInt_19_i = _54;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_19_i = _BoolToInt_19_i;
+end
+always_comb begin // combinatorial sums_split_18
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_18 = 5'dx;
+	sums_split_18 = _55;
+end
+always_comb begin // combinatorial _BoolToInt_20_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_BoolToInt_20_i = 1'bx;
+	_BoolToInt_20_i = _57;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_BoolToInt_20_i = _BoolToInt_20_i;
+end
+always_comb begin // combinatorial sums_split_19
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sums_split_19 = 5'dx;
+	sums_split_19 = _58;
+end
+always_comb begin // combinatorial total
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	total = 5'dx;
+	total = sums_split_19;
+end
+endmodule
+
+// TestSplits #()
+module TestSplits(
+	input clk,
+	input wire y
+);
+
+/*mux_wire*/ logic x_split_0;
+/*latency*/ logic _x_split_0_D5; always_ff @(posedge clk) begin _x_split_0_D5 <= x_split_0; end
+/*mux_wire*/ logic x_unknowns_split_0;
+/*latency*/ logic _x_unknowns_split_0_D5; always_ff @(posedge clk) begin _x_unknowns_split_0_D5 <= x_unknowns_split_0; end
+/*mux_wire*/ logic x_with_latency_split_0;
+/*mux_wire*/ logic x_split_1;
+/*latency*/ logic _x_split_1_D6; always_ff @(posedge clk) begin _x_split_1_D6 <= x_split_1; end
+/*mux_wire*/ logic x_unknowns_split_1;
+/*latency*/ logic _x_unknowns_split_1_D6; always_ff @(posedge clk) begin _x_unknowns_split_1_D6 <= x_unknowns_split_1; end
+/*mux_wire*/ logic x_with_latency_split_1;
+/*mux_wire*/ logic x_split_2;
+/*latency*/ logic _x_split_2_D7; always_ff @(posedge clk) begin _x_split_2_D7 <= x_split_2; end
+/*mux_wire*/ logic x_unknowns_split_2;
+/*latency*/ logic _x_unknowns_split_2_D7; always_ff @(posedge clk) begin _x_unknowns_split_2_D7 <= x_unknowns_split_2; end
+/*mux_wire*/ logic x_with_latency_split_2;
+/*mux_wire*/ logic x_split_3;
+/*latency*/ logic _x_split_3_D8; always_ff @(posedge clk) begin _x_split_3_D8 <= x_split_3; end
+/*mux_wire*/ logic x_unknowns_split_3;
+/*latency*/ logic _x_unknowns_split_3_D8; always_ff @(posedge clk) begin _x_unknowns_split_3_D8 <= x_unknowns_split_3; end
+/*mux_wire*/ logic x_with_latency_split_3;
+/*mux_wire*/ logic x_split_4;
+/*mux_wire*/ logic x_unknowns_split_4;
+/*mux_wire*/ logic x_with_latency_split_4;
+always_comb begin // combinatorial x_split_0
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_split_0 = 1'bx;
+	x_split_0 = y;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_split_0 = x_split_0;
+end
+always_comb begin // combinatorial x_unknowns_split_0
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_unknowns_split_0 = 1'bx;
+	x_unknowns_split_0 = y;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_unknowns_split_0 = x_unknowns_split_0;
+end
+always_comb begin // combinatorial x_with_latency_split_0
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_with_latency_split_0 = 1'bx;
+	x_with_latency_split_0 = y;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_with_latency_split_0 = x_with_latency_split_0;
+end
+always_comb begin // combinatorial x_split_1
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_split_1 = 1'bx;
+	x_split_1 = _x_split_0_D5;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_split_1 = x_split_1;
+end
+always_comb begin // combinatorial x_unknowns_split_1
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_unknowns_split_1 = 1'bx;
+	x_unknowns_split_1 = _x_unknowns_split_0_D5;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_unknowns_split_1 = x_unknowns_split_1;
+end
+always_comb begin // combinatorial x_with_latency_split_1
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_with_latency_split_1 = 1'bx;
+	x_with_latency_split_1 = x_with_latency_split_0;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_with_latency_split_1 = x_with_latency_split_1;
+end
+always_comb begin // combinatorial x_split_2
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_split_2 = 1'bx;
+	x_split_2 = _x_split_1_D6;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_split_2 = x_split_2;
+end
+always_comb begin // combinatorial x_unknowns_split_2
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_unknowns_split_2 = 1'bx;
+	x_unknowns_split_2 = _x_unknowns_split_1_D6;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_unknowns_split_2 = x_unknowns_split_2;
+end
+always_comb begin // combinatorial x_with_latency_split_2
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_with_latency_split_2 = 1'bx;
+	x_with_latency_split_2 = x_with_latency_split_1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_with_latency_split_2 = x_with_latency_split_2;
+end
+always_comb begin // combinatorial x_split_3
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_split_3 = 1'bx;
+	x_split_3 = _x_split_2_D7;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_split_3 = x_split_3;
+end
+always_comb begin // combinatorial x_unknowns_split_3
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_unknowns_split_3 = 1'bx;
+	x_unknowns_split_3 = _x_unknowns_split_2_D7;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_unknowns_split_3 = x_unknowns_split_3;
+end
+always_comb begin // combinatorial x_with_latency_split_3
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_with_latency_split_3 = 1'bx;
+	x_with_latency_split_3 = x_with_latency_split_2;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_with_latency_split_3 = x_with_latency_split_3;
+end
+always_comb begin // combinatorial x_split_4
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_split_4 = 1'bx;
+	x_split_4 = _x_split_3_D8;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_split_4 = x_split_4;
+end
+always_comb begin // combinatorial x_unknowns_split_4
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_unknowns_split_4 = 1'bx;
+	x_unknowns_split_4 = _x_unknowns_split_3_D8;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_unknowns_split_4 = x_unknowns_split_4;
+end
+always_comb begin // combinatorial x_with_latency_split_4
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_with_latency_split_4 = 1'bx;
+	x_with_latency_split_4 = x_with_latency_split_3;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_with_latency_split_4 = x_with_latency_split_4;
+end
+endmodule
+
 // TestZerosArrays #()
 module TestZerosArrays(
 	input clk

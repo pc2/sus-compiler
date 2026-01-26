@@ -252,7 +252,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Latency Offset
 - [x] Latency Cuts & Latency Counting for "disjoint Input-Output blocks"
 - [x] Latency Count Inference
-- [ ] Split Latencies
+- [x] Split Latencies
 
 ### Rank Polymorphism
 - [x] Operator Rank Polymorphism

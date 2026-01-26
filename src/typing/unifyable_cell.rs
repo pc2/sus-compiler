@@ -164,12 +164,17 @@ impl<T> UniCell<T> {
     pub fn unwrap(&self) -> &T {
         self.get().unwrap()
     }
+    pub fn try_into_inner(self) -> Option<T> {
+        if let Interior::Known(v) = self.0.into_inner() {
+            Some(v)
+        } else {
+            None
+        }
+    }
     #[track_caller]
     pub fn into_inner(self) -> T {
-        let Interior::Known(v) = self.0.into_inner() else {
-            unreachable!("UniCell::into_inner on not a Interior::Known");
-        };
-        v
+        self.try_into_inner()
+            .expect("UniCell::into_inner on not a Interior::Known")
     }
 
     /// `self` must be [UniCell::UNKNOWN]

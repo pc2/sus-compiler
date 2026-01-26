@@ -169,7 +169,8 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestZerosArrays #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestUnknownArraySize #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestNextPow2 #()
-[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestSplits #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TestSplits #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated CountBitsWithSplits #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -3922,23 +3923,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                ┬  
       │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: This instruction is part of a net-positive latency cycle of +1
-
-x'1
--> x'2 (+1)
-
-Which conflicts with the starting latency
-      ╭─[ test.sus:1769:16 ]
-      │
- 1769 │     split bool[5] x
-      │                   ┬  
-      │                   ╰── This instruction is part of a net-positive latency cycle of +1
-
-x'1
--> x'2 (+1)
-
-Which conflicts with the starting latency
-──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1769:16 ]
       │
@@ -3947,9 +3931,23 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                   ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1772:10 ]
+      ╭─[ test.sus:1770:15 ]
       │
- 1772 │     for int i in 1..5 {
+ 1770 │     split bool[] x_unknowns
+      │                  ─────┬────  
+      │                       ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1771:15 ]
+      │
+ 1771 │     split bool[] x_with_latency'4
+      │                  ───────┬──────  
+      │                         ╰──────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1776:10 ]
+      │
+ 1776 │     for int i in 1..5 {
       │             ┬  
       │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
@@ -4029,4 +4027,3 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [ERROR sus_compiler::codegen] Cannot codegen InstantiatesItself #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen TestUnknownArraySize #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen TestNextPow2 #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen TestSplits #() due to errors!

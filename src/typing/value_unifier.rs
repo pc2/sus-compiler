@@ -44,6 +44,39 @@ impl ConcreteType {
         let _ = unifier.fully_substitute_recurse(self);
         self.display(globals)
     }
+    pub fn get_value_args<const N: usize>(&self, expected: TypeUUID) -> [&UniCell<Value>; N] {
+        let_unwrap!(ConcreteType::Named(typ), &self);
+        assert_eq!(typ.id, expected);
+        typ.template_args
+            .cast_to_array::<N>()
+            .each_ref()
+            .map(|v| v.unwrap_value())
+    }
+    pub fn clone_prototype(&self) -> Self {
+        match self {
+            ConcreteType::Named(named) => ConcreteType::Named(named.clone_prototype()),
+            ConcreteType::Array(arr_box) => {
+                let (content, sz) = arr_box.deref();
+                ConcreteType::Array(Box::new((content.clone_prototype(), sz.clone_prototype())))
+            }
+        }
+    }
+}
+impl<ID: Copy> ConcreteGlobalReference<ID> {
+    pub fn clone_prototype(&self) -> Self {
+        Self {
+            id: self.id,
+            template_args: self.template_args.map(|(_, arg)| match arg {
+                TemplateKind::Type(t) => TemplateKind::Type(t.clone_prototype()),
+                TemplateKind::Value(v) => TemplateKind::Value(v.clone_prototype()),
+            }),
+        }
+    }
+}
+impl UniCell<Value> {
+    pub fn clone_prototype(&self) -> Self {
+        self.clone_prototype_step(|s| s.clone())
+    }
 }
 
 impl<'s> UnifierTop<'s> for ValueUnifier<'s> {
@@ -473,17 +506,6 @@ impl<'s, ID> SubstituteRecurse<'s, ConcreteGlobalReference<ID>> for ValueUnifier
 
     fn resolve_recurse(&self, v: &'s ConcreteGlobalReference<ID>) -> Result<(), ResolveError<'s>> {
         self.resolve_recurse(&v.template_args)
-    }
-}
-
-impl ConcreteType {
-    pub fn get_value_args<const N: usize>(&self, expected: TypeUUID) -> [&UniCell<Value>; N] {
-        let_unwrap!(ConcreteType::Named(typ), &self);
-        assert_eq!(typ.id, expected);
-        typ.template_args
-            .cast_to_array::<N>()
-            .each_ref()
-            .map(|v| v.unwrap_value())
     }
 }
 

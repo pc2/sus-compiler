@@ -1767,9 +1767,34 @@ module TestNextPow2 {
 module TestSplits {
 	input bool y
 	split bool[5] x
+	split bool[] x_unknowns
+	split bool[] x_with_latency'4
 
 	x[0] = y
+	x_unknowns[0] = y
+	x_with_latency[0] = y
 	for int i in 1..5 {
 		reg x[i] = x[i-1]
+		reg x_unknowns[i] = x_unknowns[i-1]
+		x_with_latency[i] = x_with_latency[i-1]
 	}
 }
+
+module CountBitsWithSplits{
+	input bool[20] bits
+
+	split int[] sums
+
+	
+	sums[0] = BoolToInt(bits[0])
+	for int i in 1..20 {
+		sums[i] = sums[i - 1] + BoolToInt(bits[i])
+	}
+
+	output int total = sums[19]
+}
+/*
+module TestGenUnknownSizeArray {
+	gen int[] values
+}
+*/
