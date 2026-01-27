@@ -19,7 +19,7 @@ tree-sitter-sus = {version = "~0.3.8-dev", path = "../tree-sitter-sus"}
 regex = "1.11.1"
 
 # proc_macro utils
-syn = "1.0"
+syn = "2.0"
 quote = "1.0"
 
 [lib]
