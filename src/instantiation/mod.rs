@@ -247,7 +247,7 @@ pub struct InstantiatedModule {
     pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
     pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
-    /// See [GenerationState]
+    /// Extracted From [execute::GenerationState]
     pub generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
 }
 
@@ -262,7 +262,7 @@ pub struct SplitWire {
     contained_wires: HashMap<Box<[IBig]>, WireID>,
 }
 
-/// See [GenerationState]
+/// See [execute::GenerationState]
 #[derive(Debug, Clone)]
 pub enum SubModuleOrWire {
     SubModule(SubModuleID),

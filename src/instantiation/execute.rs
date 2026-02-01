@@ -5,7 +5,6 @@
 //! As for typing, it only instantiates written types and leaves the rest for further typechecking.
 
 use std::borrow::Cow;
-use std::fmt::Binary;
 use std::ops::{Deref, Index, IndexMut, Range};
 
 use crate::to_string::display_join;

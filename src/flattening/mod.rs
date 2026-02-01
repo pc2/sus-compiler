@@ -768,12 +768,12 @@ impl<ID: Copy> GlobalReference<ID> {
     }
 
     pub fn resolve_template_args(&self, errors: &ErrorCollector, target: &LinkInfo) {
-        let full_object_name = target.display_full_name();
+        let target_name = target.display_full_name();
 
         let mut previous_uses: TVec<Option<Span>> = target.parameters.map(|_| None);
 
         for arg in &self.template_args {
-            let name = &arg.name;
+            let arg_name = &arg.name;
             if let Some(refers_to) = target.parameters.find(|_, param| param.name == arg.name) {
                 arg.refers_to.set(refers_to).unwrap();
             }
@@ -787,14 +787,14 @@ impl<ID: Copy> GlobalReference<ID> {
                             .error(
                                 arg.name_span,
                                 format!(
-                                "'{name}' is not a value. `type` keyword cannot be used for values"
+                                "'{arg_name}' is not a value. `type` keyword cannot be used for values"
                             ),
                             )
                             .info(param.name_span, "Declared here");
                     }
                     (TemplateKind::Type(_), Some(TemplateKind::Value(_))) => {
                         errors
-                            .error(arg.name_span, format!("'{name}' is not a type. To use template type arguments use the `type` keyword like `T: type int[123]`"))
+                            .error(arg.name_span, format!("'{arg_name}' is not a type. To use template type arguments use the `type` keyword like `T: type int[123]`"))
                             .info(param.name_span, "Declared here");
                     }
                     _ => {}
@@ -804,9 +804,9 @@ impl<ID: Copy> GlobalReference<ID> {
                     errors
                         .error(
                             arg.name_span,
-                            format!("'{name}' has already been defined previously"),
+                            format!("'{arg_name}' has already been defined previously"),
                         )
-                        .info(prev_use, format!("'{name}' specified here previously"));
+                        .info(prev_use, format!("'{arg_name}' specified here previously"));
                 } else {
                     previous_uses[refer_to] = Some(arg.name_span);
                 }
@@ -814,7 +814,7 @@ impl<ID: Copy> GlobalReference<ID> {
                 errors
                     .error(
                         arg.name_span,
-                        format!("'{name}' is not a valid template argument of {full_object_name}"),
+                        format!("{target_name} has no template argument named '{arg_name}'"),
                     )
                     .info_obj(target);
             }

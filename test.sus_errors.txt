@@ -1428,12 +1428,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                      ────┬───  
      │                          ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: 'beep' is not a valid template argument of int
+Error: int has no template argument named 'beep'
      ╭─[ test.sus:767:30 ]
      │
  767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
      │                              ──┬─  
-     │                                ╰─── 'beep' is not a valid template argument of int
+     │                                ╰─── int has no template argument named 'beep'
      │
      ├─[ core.sus:8:20 ]
      │
@@ -1441,12 +1441,12 @@ Error: 'beep' is not a valid template argument of int
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
-Error: 'BEEP' is not a valid template argument of int
+Error: int has no template argument named 'BEEP'
      ╭─[ test.sus:767:44 ]
      │
  767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
      │                                            ──┬─  
-     │                                              ╰─── 'BEEP' is not a valid template argument of int
+     │                                              ╰─── int has no template argument named 'BEEP'
      │
      ├─[ core.sus:8:20 ]
      │
@@ -1507,12 +1507,12 @@ Error: 'beep' is read-only
      │               ──┬─  
      │                 ╰─── 'beep' declared here
 ─────╯
-Error: 'BITWIDTH' is not a valid template argument of FIFO
+Error: FIFO has no template argument named 'BITWIDTH'
      ╭─[ test.sus:775:9 ]
      │
  775 │     FIFO #(BITWIDTH: 4) badoop
      │            ────┬───  
-     │                ╰───── 'BITWIDTH' is not a valid template argument of FIFO
+     │                ╰───── FIFO has no template argument named 'BITWIDTH'
      │
      ├─[ memory.sus:29:8 ]
      │
@@ -1941,12 +1941,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │             ┬  
      │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: 'BEEEP' is not a valid template argument of SUM_UP
+Error: SUM_UP has no template argument named 'BEEEP'
      ╭─[ test.sus:950:38 ]
      │
  950 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
      │                                         ──┬──  
-     │                                           ╰──── 'BEEEP' is not a valid template argument of SUM_UP
+     │                                           ╰──── SUM_UP has no template argument named 'BEEEP'
      │
      ├─[ test.sus:950:38 ]
      │
@@ -1954,25 +1954,25 @@ Error: 'BEEEP' is not a valid template argument of SUM_UP
      │           ───┬──  
      │              ╰──── 'SUM_UP' defined here
 ─────╯
-Error: 'ABC' is not a valid template argument of int
-     ╭─[ test.sus:952:8 ]
-     │
- 952 │     int #(ABC) x
-     │           ─┬─  
-     │            ╰─── 'ABC' is not a valid template argument of int
-     │
-     ├─[ core.sus:8:20 ]
-     │
-   8 │ __builtin__ struct int #(int FROM, int TO) {}
-     │                    ─┬─  
-     │                     ╰─── 'int' defined here
-─────╯
 Error: ABC does not name a Type or a Value.
      ╭─[ test.sus:952:8 ]
      │
  952 │     int #(ABC) x
      │           ─┬─  
      │            ╰─── ABC does not name a Type or a Value.
+─────╯
+Error: int has no template argument named 'ABC'
+     ╭─[ test.sus:952:8 ]
+     │
+ 952 │     int #(ABC) x
+     │           ─┬─  
+     │            ╰─── int has no template argument named 'ABC'
+     │
+     ├─[ core.sus:8:20 ]
+     │
+   8 │ __builtin__ struct int #(int FROM, int TO) {}
+     │                    ─┬─  
+     │                     ╰─── 'int' defined here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:952:13 ]
@@ -2196,12 +2196,12 @@ Warning: Not Instantiating example_FIFO #() due to abstract typing errors
       │        ──────┬─────  
       │              ╰─────── Not Instantiating example_FIFO #() due to abstract typing errors
 ──────╯
-Error: 'READY_SLACK' is not a valid template argument of FIFO
+Error: FIFO has no template argument named 'READY_SLACK'
       ╭─[ test.sus:1050:19 ]
       │
  1050 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │                      ─────┬─────  
-      │                           ╰─────── 'READY_SLACK' is not a valid template argument of FIFO
+      │                           ╰─────── FIFO has no template argument named 'READY_SLACK'
       │
       ├─[ memory.sus:29:8 ]
       │
@@ -2923,12 +2923,12 @@ Warning: Not Instantiating use_FIFO #() due to abstract typing errors
       │        ────┬───  
       │            ╰───── Not Instantiating use_FIFO #() due to abstract typing errors
 ──────╯
-Error: 'READY_SLACK' is not a valid template argument of FIFO
+Error: FIFO has no template argument named 'READY_SLACK'
       ╭─[ test.sus:1368:23 ]
       │
  1368 │     FIFO #(DEPTH: 53, READY_SLACK: 3) f
       │                       ─────┬─────  
-      │                            ╰─────── 'READY_SLACK' is not a valid template argument of FIFO
+      │                            ╰─────── FIFO has no template argument named 'READY_SLACK'
       │
       ├─[ memory.sus:29:8 ]
       │

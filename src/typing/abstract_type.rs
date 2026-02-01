@@ -23,7 +23,7 @@ use crate::{
 /// Not to be confused with [crate::typing::concrete_type::ConcreteType], which is the
 /// post-instantiation type.
 ///
-/// [AbstractType]s don't actually get converted to [crate::typing::concrete_type::ConcreteType]s.
+/// [AbstractRankedType]s don't actually get converted to [crate::typing::concrete_type::ConcreteType]s.
 /// Instead [crate::typing::concrete_type::ConcreteType] gets created from [WrittenType] directly.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AbstractInnerType {
