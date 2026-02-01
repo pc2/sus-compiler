@@ -1,3 +1,70 @@
+// UseModWithDomains #()
+module UseModWithDomains(
+	input clk
+);
+
+wire _mwd_b_trig;
+wire _mwd_b_data;
+/*mux_wire*/ logic d;
+/*mux_wire*/ logic _mwd_a_act;
+/*mux_wire*/ logic _mwd_a_data;
+ModWithDomains mwd(
+	.b(clk),
+	.b_trig(_mwd_b_trig),
+	.b_data(_mwd_b_data),
+	.a_act(_mwd_a_act),
+	.a_data(_mwd_a_data)
+);
+always_comb begin // combinatorial d
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	d = 1'bx;
+	if(_mwd_b_trig) d = _mwd_b_data;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	d = d;
+end
+always_comb begin // combinatorial _mwd_a_act
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_mwd_a_act = 1'bx;
+	_mwd_a_act = 1'b0;
+	_mwd_a_act = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_mwd_a_act = _mwd_a_act;
+end
+always_comb begin // combinatorial _mwd_a_data
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_mwd_a_data = 1'bx;
+	_mwd_a_data = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_mwd_a_data = _mwd_a_data;
+end
+endmodule
+
+// ModWithDomains #()
+module ModWithDomains(
+	input b,
+	output /*mux_wire*/ logic b_trig,
+	output /*mux_wire*/ logic b_data,
+	input wire a_act,
+	input wire a_data
+);
+
+always_comb begin // combinatorial b_trig
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	b_trig = 1'bx;
+	b_trig = 1'b0;
+	if(a_act) b_trig = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	b_trig = b_trig;
+end
+always_comb begin // combinatorial b_data
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	b_data = 1'bx;
+	if(a_act) b_data = a_data;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	b_data = b_data;
+end
+endmodule
+
 // CountBitsWithSplits #()
 module CountBitsWithSplits(
 	input clk,

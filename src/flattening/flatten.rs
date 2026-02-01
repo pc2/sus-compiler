@@ -150,6 +150,8 @@ struct FlatteningContext<'l, 'errs> {
     current_parent_condition: Option<ParentCondition>,
 }
 
+const SINGULAR_CLOCK_DOMAIN: DomainID = DomainID::from_hidden_value(0);
+
 // Otherwise clippy reports silly things like kind!("number") | kind!("float") | kind!("bool_array_literal") as "make this a range" errors
 #[allow(clippy::manual_range_patterns)]
 impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
@@ -682,7 +684,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             };
 
             let domain = if let DeclarationKind::Port { .. } = decl_kind {
-                DomainType::Physical(UniCell::new(self.current_domain))
+                DomainType::Physical(UniCell::new(SINGULAR_CLOCK_DOMAIN))
             } else if decl_kind.is_generative() {
                 DomainType::Generative
             } else {
@@ -1551,7 +1553,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 is_local,
                 inputs: Vec::new(),
                 outputs: Vec::new(),
-                domain: UniCell::new(self.current_domain),
+                domain: UniCell::new(SINGULAR_CLOCK_DOMAIN),
                 then_block: FlatIDRange::PLACEHOLDER,
                 else_block: FlatIDRange::PLACEHOLDER,
                 then_span: Some(Span::PLACEHOLDER),

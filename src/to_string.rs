@@ -1020,21 +1020,20 @@ impl Module {
                 }
 
                 for (_, interface) in &self.interfaces {
+                    if interface.domain != Some(domain_id) {
+                        continue;
+                    }
                     match interface.declaration_instruction {
                         Some(InterfaceDeclKind::Interface(decl_id)) => {
                             let interface = self.link_info.instructions[decl_id].unwrap_interface();
-                            if *interface.domain.unwrap() == domain_id {
-                                let info = self.display_interface_info(interface, file_text, false);
-                                write!(f, "\n{info}")?;
-                            }
+                            let info = self.display_interface_info(interface, file_text, false);
+                            write!(f, "\n{info}")?;
                         }
                         Some(InterfaceDeclKind::SinglePort(decl_id)) => {
                             let single_port =
                                 self.link_info.instructions[decl_id].unwrap_declaration();
-                            if single_port.domain.unwrap_physical() == domain_id {
-                                let info = self.display_port_info(single_port, file_text);
-                                write!(f, "\n{info}")?;
-                            }
+                            let info = self.display_port_info(single_port, file_text);
+                            write!(f, "\n{info}")?;
                         }
                         None => {}
                     }

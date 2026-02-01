@@ -1798,3 +1798,23 @@ module TestGenUnknownSizeArray {
 	gen int[] values
 }
 */
+
+module ModWithDomains {
+	domain b
+
+	trigger b_trig : bool b_data
+	
+	domain a
+
+	action a_act : bool a_data {
+		b_trig(a_data)
+	}
+}
+
+module UseModWithDomains {
+	ModWithDomains mwd
+
+	when mwd.b_trig : bool d {}
+
+	mwd.a_act(true)
+}

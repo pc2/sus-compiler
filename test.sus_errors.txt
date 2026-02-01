@@ -171,6 +171,8 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestNextPow2 #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestSplits #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated CountBitsWithSplits #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated ModWithDomains #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated UseModWithDomains #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -4069,6 +4071,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1776 │     for int i in 1..5 {
       │             ┬  
       │             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1817:25 ]
+      │
+ 1817 │     when mwd.b_trig : bool d {}
+      │                            ┬  
+      │                            ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
