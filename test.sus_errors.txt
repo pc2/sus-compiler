@@ -237,13 +237,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: 'i' is read-only
      ╭─[ test.sus:159:11 ]
      │
- 142 │     interface generative : int#(FROM: 0, TO: 100) i -> int o, int o2
-     │                                                   ┬  
-     │                                                   ╰── 'i' declared here
-     │ 
  159 │     if test {i = 5}
      │              ┬  
      │              ╰── 'i' is read-only
+     │
+     ├─[ test.sus:159:11 ]
+     │
+ 142 │     interface generative : int#(FROM: 0, TO: 100) i -> int o, int o2
+     │                                                   ┬  
+     │                                                   ╰── 'i' declared here
 ─────╯
 Error: Some parameters of 'v' were still unknown: int #(FROM: ?, TO: ?)
      ╭─[ test.sus:175:44 ]
@@ -661,13 +663,15 @@ Warning: Not Instantiating contains_submodule_submodule #() due to abstract typi
 Error: A function call expects this to be a callable interface, the interface `doNothing` is not callable
      ╭─[ test.sus:445:2 ]
      │
- 431 │ module doNothing {}
-     │        ────┬────  
-     │            ╰────── Interface 'doNothing' declared here
-     │ 
  445 │     doNothing()
      │     ────┬────  
      │         ╰────── A function call expects this to be a callable interface, the interface `doNothing` is not callable
+     │
+     ├─[ test.sus:445:2 ]
+     │
+ 431 │ module doNothing {}
+     │        ────┬────  
+     │            ╰────── Interface 'doNothing' declared here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:462:7 ]
@@ -686,6 +690,12 @@ Warning: Not Instantiating use_submodule_named_ports #() due to abstract typing 
 Error: No such field 'port_a' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
      ╭─[ test.sus:590:5 ]
      │
+ 590 │     sm.port_a = i
+     │        ───┬──  
+     │           ╰──── No such field 'port_a' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
+     │
+     ├─[ test.sus:590:5 ]
+     │
  576 │ module submodule_named_ports {
      │        ──────────┬──────────  
      │                  ╰──────────── Module 'submodule_named_ports' defined here. module submodule_named_ports #():
@@ -695,14 +705,16 @@ interface submodule_named_ports:
 	input int#(FROM: 0, TO: 100) port_b
 	->
 	output int port_c
-     │ 
- 590 │     sm.port_a = i
-     │        ───┬──  
-     │           ╰──── No such field 'port_a' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
 ─────╯
 Error: No such field 'port_b' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
      ╭─[ test.sus:592:5 ]
      │
+ 592 │     sm.port_b = i
+     │        ───┬──  
+     │           ╰──── No such field 'port_b' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
+     │
+     ├─[ test.sus:592:5 ]
+     │
  576 │ module submodule_named_ports {
      │        ──────────┬──────────  
      │                  ╰──────────── Module 'submodule_named_ports' defined here. module submodule_named_ports #():
@@ -712,14 +724,16 @@ interface submodule_named_ports:
 	input int#(FROM: 0, TO: 100) port_b
 	->
 	output int port_c
-     │ 
- 592 │     sm.port_b = i
-     │        ───┬──  
-     │           ╰──── No such field 'port_b' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
 ─────╯
 Error: No such field 'port_c' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
      ╭─[ test.sus:594:9 ]
      │
+ 594 │     o = sm.port_c
+     │            ───┬──  
+     │               ╰──── No such field 'port_c' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
+     │
+     ├─[ test.sus:594:9 ]
+     │
  576 │ module submodule_named_ports {
      │        ──────────┬──────────  
      │                  ╰──────────── Module 'submodule_named_ports' defined here. module submodule_named_ports #():
@@ -729,21 +743,19 @@ interface submodule_named_ports:
 	input int#(FROM: 0, TO: 100) port_b
 	->
 	output int port_c
-     │ 
- 594 │     o = sm.port_c
-     │            ───┬──  
-     │               ╰──── No such field 'port_c' on submodule_named_ports #(). Available fields are 'submodule_named_ports'
 ─────╯
 Error: 'contains_submodule_submodule' conflicts with other declarations:
      ╭─[ test.sus:597:8 ]
      │
- 441 │ module contains_submodule_submodule {
-     │        ──────────────┬─────────────  
-     │                      ╰─────────────── Conflicts with
-     │ 
  597 │ module contains_submodule_submodule {
      │        ──────────────┬─────────────  
      │                      ╰─────────────── 'contains_submodule_submodule' conflicts with other declarations:
+     │
+     ├─[ test.sus:597:8 ]
+     │
+ 441 │ module contains_submodule_submodule {
+     │        ──────────────┬─────────────  
+     │                      ╰─────────────── Conflicts with
 ─────╯
 Warning: Not Instantiating contains_submodule_submodule #() due to abstract typing errors
      ╭─[ test.sus:597:8 ]
@@ -755,13 +767,15 @@ Warning: Not Instantiating contains_submodule_submodule #() due to abstract typi
 Error: A function call expects this to be a callable interface, the interface `doNothing` is not callable
      ╭─[ test.sus:601:2 ]
      │
- 431 │ module doNothing {}
-     │        ────┬────  
-     │            ╰────── Interface 'doNothing' declared here
-     │ 
  601 │     doNothing()
      │     ────┬────  
      │         ╰────── A function call expects this to be a callable interface, the interface `doNothing` is not callable
+     │
+     ├─[ test.sus:601:2 ]
+     │
+ 431 │ module doNothing {}
+     │        ────┬────  
+     │            ╰────── Interface 'doNothing' declared here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:608:22 ]
@@ -851,28 +865,38 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: Can only use conditional bindings on triggers. 'write' is an interface
      ╭─[ test.sus:636:7 ]
      │
- 632 │     interface write : bool write, bool[20] wr_data, int#(FROM:0, TO: 511) wr_addr
-     │               ──┬──  
-     │                 ╰──── Interface 'write' defined here
-     │ 
  636 │     when write {
      │          ──┬──  
      │            ╰──── Can only use conditional bindings on triggers. 'write' is an interface
+     │
+     ├─[ test.sus:636:7 ]
+     │
+ 632 │     interface write : bool write, bool[20] wr_data, int#(FROM:0, TO: 511) wr_addr
+     │               ──┬──  
+     │                 ╰──── Interface 'write' defined here
 ─────╯
 Error: Too few bindings. This interface provides 3 read-only bindings, but 0 were provided.
      ╭─[ test.sus:636:7 ]
      │
- 632 │     interface write : bool write, bool[20] wr_data, int#(FROM:0, TO: 511) wr_addr
-     │               ──┬──  
-     │                 ╰──── Interface 'write' defined here
-     │ 
  636 │     when write {
      │          ──┬──  
      │            ╰──── Too few bindings. This interface provides 3 read-only bindings, but 0 were provided.
+     │
+     ├─[ test.sus:636:7 ]
+     │
+ 632 │     interface write : bool write, bool[20] wr_data, int#(FROM:0, TO: 511) wr_addr
+     │               ──┬──  
+     │                 ╰──── Interface 'write' defined here
 ─────╯
 Error: No such field 'i' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
      ╭─[ test.sus:641:7 ]
      │
+ 641 │     cr_m.i = mem
+     │          ┬  
+     │          ╰── No such field 'i' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
+     │
+     ├─[ test.sus:641:7 ]
+     │
  618 │ module cross_memory {
      │        ──────┬─────  
      │              ╰─────── Module 'cross_memory' defined here. module cross_memory #():
@@ -882,46 +906,54 @@ interface in:
 interface out:
 	->
 	output bool[20][512] o'0
-     │ 
- 641 │     cr_m.i = mem
-     │          ┬  
-     │          ╰── No such field 'i' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
 ─────╯
 Error: Can only use conditional bindings on triggers. 'read' is an interface
      ╭─[ test.sus:642:7 ]
      │
- 634 │     interface read : bool read, int#(FROM:0, TO: 511) rd_addr -> bool[20] rd_data
-     │               ──┬─  
-     │                 ╰─── Interface 'read' defined here
-     │ 
  642 │     when read {
      │          ──┬─  
      │            ╰─── Can only use conditional bindings on triggers. 'read' is an interface
+     │
+     ├─[ test.sus:642:7 ]
+     │
+ 634 │     interface read : bool read, int#(FROM:0, TO: 511) rd_addr -> bool[20] rd_data
+     │               ──┬─  
+     │                 ╰─── Interface 'read' defined here
 ─────╯
 Error: Too few bindings. This interface provides 1 writable bindings, but 0 were provided.
      ╭─[ test.sus:642:7 ]
      │
- 634 │     interface read : bool read, int#(FROM:0, TO: 511) rd_addr -> bool[20] rd_data
-     │               ──┬─  
-     │                 ╰─── Interface 'read' defined here
-     │ 
  642 │     when read {
      │          ──┬─  
      │            ╰─── Too few bindings. This interface provides 1 writable bindings, but 0 were provided.
-─────╯
-Error: Too few bindings. This interface provides 2 read-only bindings, but 0 were provided.
-     ╭─[ test.sus:642:7 ]
+     │
+     ├─[ test.sus:642:7 ]
      │
  634 │     interface read : bool read, int#(FROM:0, TO: 511) rd_addr -> bool[20] rd_data
      │               ──┬─  
      │                 ╰─── Interface 'read' defined here
-     │ 
+─────╯
+Error: Too few bindings. This interface provides 2 read-only bindings, but 0 were provided.
+     ╭─[ test.sus:642:7 ]
+     │
  642 │     when read {
      │          ──┬─  
      │            ╰─── Too few bindings. This interface provides 2 read-only bindings, but 0 were provided.
+     │
+     ├─[ test.sus:642:7 ]
+     │
+ 634 │     interface read : bool read, int#(FROM:0, TO: 511) rd_addr -> bool[20] rd_data
+     │               ──┬─  
+     │                 ╰─── Interface 'read' defined here
 ─────╯
 Error: No such field 'o' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
      ╭─[ test.sus:643:18 ]
+     │
+ 643 │        rd_data = cr_m.o[rd_addr]
+     │                       ┬  
+     │                       ╰── No such field 'o' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
+     │
+     ├─[ test.sus:643:18 ]
      │
  618 │ module cross_memory {
      │        ──────┬─────  
@@ -932,10 +964,6 @@ interface in:
 interface out:
 	->
 	output bool[20][512] o'0
-     │ 
- 643 │        rd_data = cr_m.o[rd_addr]
-     │                       ┬  
-     │                       ╰── No such field 'o' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
 ─────╯
 Warning: Not Instantiating use_fifo #() due to abstract typing errors
      ╭─[ test.sus:647:8 ]
@@ -1029,22 +1057,11 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:667:5 ]
      │
- 607 │ module cross_bool {
-     │        ─────┬────  
-     │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
-domain clk:
-interface in:
-	input bool i'0
-interface out:
-	->
-	output bool o'0
-     │ 
  667 │     ci.i = domain3
      │        ┬  
      │        ╰── No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
-─────╯
-Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
-     ╭─[ test.sus:668:15 ]
+     │
+     ├─[ test.sus:667:5 ]
      │
  607 │ module cross_bool {
      │        ─────┬────  
@@ -1055,10 +1072,25 @@ interface in:
 interface out:
 	->
 	output bool o'0
-     │ 
+─────╯
+Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+     ╭─[ test.sus:668:15 ]
+     │
  668 │     domain4 = ci.o
      │                  ┬  
      │                  ╰── No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+     │
+     ├─[ test.sus:668:15 ]
+     │
+ 607 │ module cross_bool {
+     │        ─────┬────  
+     │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
+domain clk:
+interface in:
+	input bool i'0
+interface out:
+	->
+	output bool o'0
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:670:7 ]
@@ -1084,13 +1116,15 @@ Warning: Not Instantiating use_no_input_module #() due to abstract typing errors
 Error: A function call expects this to be a callable interface, the interface `no_port_module` is not callable
      ╭─[ test.sus:678:2 ]
      │
- 675 │ module no_port_module {}
-     │        ───────┬──────  
-     │               ╰──────── Interface 'no_port_module' declared here
-     │ 
  678 │     no_port_module()
      │     ───────┬──────  
      │            ╰──────── A function call expects this to be a callable interface, the interface `no_port_module` is not callable
+     │
+     ├─[ test.sus:678:2 ]
+     │
+ 675 │ module no_port_module {}
+     │        ───────┬──────  
+     │               ╰──────── Interface 'no_port_module' declared here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:681:6 ]
@@ -1102,13 +1136,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: A function call expects this to be a callable interface, the interface `no_port_module` is not callable
      ╭─[ test.sus:681:10 ]
      │
- 675 │ module no_port_module {}
-     │        ───────┬──────  
-     │               ╰──────── Interface 'no_port_module' declared here
-     │ 
  681 │     int x = no_port()
      │             ───┬───  
      │                ╰───── A function call expects this to be a callable interface, the interface `no_port_module` is not callable
+     │
+     ├─[ test.sus:681:10 ]
+     │
+ 675 │ module no_port_module {}
+     │        ───────┬──────  
+     │               ╰──────── Interface 'no_port_module' declared here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:686:40 ]
@@ -1164,6 +1200,12 @@ Warning: The result of this expression is not used. Only function calls can retu
 Error: No such field 'a' on mod_with_unused_interface #(). Available fields are 'mod_with_unused_interface', 'v'
      ╭─[ test.sus:707:5 ]
      │
+ 707 │     mm.a
+     │        ┬  
+     │        ╰── No such field 'a' on mod_with_unused_interface #(). Available fields are 'mod_with_unused_interface', 'v'
+     │
+     ├─[ test.sus:707:5 ]
+     │
  684 │ module mod_with_unused_interface {
      │        ────────────┬────────────  
      │                    ╰────────────── Module 'mod_with_unused_interface' defined here. module mod_with_unused_interface #():
@@ -1172,10 +1214,6 @@ interface v:
 	input int#(FROM: 0, TO: 100) a
 	->
 	output int b
-     │ 
- 707 │     mm.a
-     │        ┬  
-     │        ╰── No such field 'a' on mod_with_unused_interface #(). Available fields are 'mod_with_unused_interface', 'v'
 ─────╯
 Warning: Not Instantiating sequenceDownFrom #() due to abstract typing errors
      ╭─[ test.sus:720:8 ]
@@ -1219,6 +1257,12 @@ Error: Can't write to an interface. Use a function call or interface connector i
 Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:730:11 ]
      │
+ 730 │     start_cr.i = start
+     │              ┬  
+     │              ╰── No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+     │
+     ├─[ test.sus:730:11 ]
+     │
  607 │ module cross_bool {
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
@@ -1228,14 +1272,16 @@ interface in:
 interface out:
 	->
 	output bool o'0
-     │ 
- 730 │     start_cr.i = start
-     │              ┬  
-     │              ╰── No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
 ─────╯
 Error: No such field 'i' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
      ╭─[ test.sus:733:10 ]
      │
+ 733 │     upTo_cr.i = upTo
+     │             ┬  
+     │             ╰── No such field 'i' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
+     │
+     ├─[ test.sus:733:10 ]
+     │
  612 │ module cross_int {
      │        ────┬────  
      │            ╰────── Module 'cross_int' defined here. module cross_int #():
@@ -1245,14 +1291,16 @@ interface in:
 interface out:
 	->
 	output int o'0
-     │ 
- 733 │     upTo_cr.i = upTo
-     │             ┬  
-     │             ╰── No such field 'i' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
 ─────╯
 Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:736:19 ]
      │
+ 736 │     ready = ready_cr.o
+     │                      ┬  
+     │                      ╰── No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+     │
+     ├─[ test.sus:736:19 ]
+     │
  607 │ module cross_bool {
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
@@ -1262,30 +1310,15 @@ interface in:
 interface out:
 	->
 	output bool o'0
-     │ 
- 736 │     ready = ready_cr.o
-     │                      ┬  
-     │                      ╰── No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
 ─────╯
 Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test.sus:739:11 ]
      │
- 607 │ module cross_bool {
-     │        ─────┬────  
-     │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
-domain clk:
-interface in:
-	input bool i'0
-interface out:
-	->
-	output bool o'0
-     │ 
  739 │     ready_cr.i = !valid
      │              ┬  
      │              ╰── No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
-─────╯
-Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
-     ╭─[ test.sus:744:16 ]
+     │
+     ├─[ test.sus:739:11 ]
      │
  607 │ module cross_bool {
      │        ─────┬────  
@@ -1296,13 +1329,34 @@ interface in:
 interface out:
 	->
 	output bool o'0
-     │ 
+─────╯
+Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+     ╭─[ test.sus:744:16 ]
+     │
  744 │     when start_cr.o {
      │                   ┬  
      │                   ╰── No such field 'o' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
+     │
+     ├─[ test.sus:744:16 ]
+     │
+ 607 │ module cross_bool {
+     │        ─────┬────  
+     │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
+domain clk:
+interface in:
+	input bool i'0
+interface out:
+	->
+	output bool o'0
 ─────╯
 Error: No such field 'o' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
      ╭─[ test.sus:745:19 ]
+     │
+ 745 │        index = upTo_cr.o
+     │                        ┬  
+     │                        ╰── No such field 'o' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
+     │
+     ├─[ test.sus:745:19 ]
      │
  612 │ module cross_int {
      │        ────┬────  
@@ -1313,10 +1367,6 @@ interface in:
 interface out:
 	->
 	output int o'0
-     │ 
- 745 │        index = upTo_cr.o
-     │                        ┬  
-     │                        ╰── No such field 'o' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
 ─────╯
 Warning: Not Instantiating sumUpTo #() due to abstract typing errors of submodules:
 - sequenceDownFrom
@@ -1427,13 +1477,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: 'MY_INPUT' is read-only
      ╭─[ test.sus:769:2 ]
      │
- 766 │ module test #(T, int MY_INPUT) {
-     │                      ────┬───  
-     │                          ╰───── 'MY_INPUT' declared here
-     │ 
  769 │     MY_INPUT = 3
      │     ────┬───  
      │         ╰───── 'MY_INPUT' is read-only
+     │
+     ├─[ test.sus:769:2 ]
+     │
+ 766 │ module test #(T, int MY_INPUT) {
+     │                      ────┬───  
+     │                          ╰───── 'MY_INPUT' declared here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:771:12 ]
@@ -1445,13 +1497,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: 'beep' is read-only
      ╭─[ test.sus:773:2 ]
      │
- 771 │     input int beep
-     │               ──┬─  
-     │                 ╰─── 'beep' declared here
-     │ 
  773 │     beep = 3
      │     ──┬─  
      │       ╰─── 'beep' is read-only
+     │
+     ├─[ test.sus:773:2 ]
+     │
+ 771 │     input int beep
+     │               ──┬─  
+     │                 ╰─── 'beep' declared here
 ─────╯
 Error: 'BITWIDTH' is not a valid template argument of FIFO
      ╭─[ test.sus:775:9 ]
@@ -1483,18 +1537,28 @@ Error: Could not fully figure out the type of this object. ?[...]
 Warning: Unused port 'o'
      ╭─[ test.sus:791:25 ]
      │
+ 791 │     tinyTestMod #(beep: 3) a
+     │                            ┬  
+     │                            ╰── Unused port 'o'
+     │
+     ├─[ test.sus:791:25 ]
+     │
  786 │     output int o = beep
      │                ┬  
      │                ╰── Port 'o' declared here
      │ 
  791 │     tinyTestMod #(beep: 3) a
      │                            ┬  
-     │                            ╰── Unused port 'o'
-     │                            │  
      │                            ╰── a declared here
 ─────╯
 Warning: Unused port 'o'
      ╭─[ test.sus:792:25 ]
+     │
+ 792 │     tinyTestMod #(beep: 4) b
+     │                            ┬  
+     │                            ╰── Unused port 'o'
+     │
+     ├─[ test.sus:792:25 ]
      │
  786 │     output int o = beep
      │                ┬  
@@ -1502,12 +1566,16 @@ Warning: Unused port 'o'
      │ 
  792 │     tinyTestMod #(beep: 4) b
      │                            ┬  
-     │                            ╰── Unused port 'o'
-     │                            │  
      │                            ╰── b declared here
 ─────╯
 Warning: Unused port 'o'
      ╭─[ test.sus:793:25 ]
+     │
+ 793 │     tinyTestMod #(beep: 3) c
+     │                            ┬  
+     │                            ╰── Unused port 'o'
+     │
+     ├─[ test.sus:793:25 ]
      │
  786 │     output int o = beep
      │                ┬  
@@ -1515,8 +1583,6 @@ Warning: Unused port 'o'
      │ 
  793 │     tinyTestMod #(beep: 3) c
      │                            ┬  
-     │                            ╰── Unused port 'o'
-     │                            │  
      │                            ╰── c declared here
 ─────╯
 Error: Some parameters of 'values' were still unknown: int #(FROM: ?, TO: ?)[1]
@@ -1618,13 +1684,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test.sus:894:7 ]
      │
- 883 │     interface is_jump
-     │               ───┬───  
-     │                  ╰───── Interface 'is_jump' defined here
-     │ 
  894 │     when decoder.is_jump() : int target_addr {
      │          ────────┬────────  
      │                  ╰────────── Excess output targets. Function returns 0 results, but 1 targets were given.
+     │
+     ├─[ test.sus:894:7 ]
+     │
+ 883 │     interface is_jump
+     │               ───┬───  
+     │                  ╰───── Interface 'is_jump' defined here
 ─────╯
 Error: Cannot use conditional bingings because the condition isn't an action or a trigger
      ╭─[ test.sus:894:25 ]
@@ -1643,13 +1711,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test.sus:897:7 ]
      │
- 884 │     interface is_load
-     │               ───┬───  
-     │                  ╰───── Interface 'is_load' defined here
-     │ 
  897 │     when decoder.is_load() : int reg_to, int addr {
      │          ────────┬────────  
      │                  ╰────────── Excess output targets. Function returns 0 results, but 1 targets were given.
+     │
+     ├─[ test.sus:897:7 ]
+     │
+ 884 │     interface is_load
+     │               ───┬───  
+     │                  ╰───── Interface 'is_load' defined here
 ─────╯
 Error: Cannot use conditional bingings because the condition isn't an action or a trigger
      ╭─[ test.sus:897:25 ]
@@ -1675,13 +1745,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test.sus:900:7 ]
      │
- 885 │     interface is_arith
-     │               ────┬───  
-     │                   ╰───── Interface 'is_arith' defined here
-     │ 
  900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
      │          ─────────┬────────  
      │                   ╰────────── Excess output targets. Function returns 0 results, but 1 targets were given.
+     │
+     ├─[ test.sus:900:7 ]
+     │
+ 885 │     interface is_arith
+     │               ────┬───  
+     │                   ╰───── Interface 'is_arith' defined here
 ─────╯
 Error: Cannot use conditional bingings because the condition isn't an action or a trigger
      ╭─[ test.sus:900:26 ]
@@ -1735,13 +1807,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: A function call expects this to be a callable interface, the interface `no_main_interface` is not callable
      ╭─[ test.sus:913:10 ]
      │
- 906 │ module no_main_interface {
-     │        ────────┬────────  
-     │                ╰────────── Interface 'no_main_interface' declared here
-     │ 
  913 │     int x = no_interface_named()
      │             ─────────┬────────  
      │                      ╰────────── A function call expects this to be a callable interface, the interface `no_main_interface` is not callable
+     │
+     ├─[ test.sus:913:10 ]
+     │
+ 906 │ module no_main_interface {
+     │        ────────┬────────  
+     │                ╰────────── Interface 'no_main_interface' declared here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:914:6 ]
@@ -1753,13 +1827,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: A function call expects this to be a callable interface, the interface `no_main_interface` is not callable
      ╭─[ test.sus:914:10 ]
      │
- 906 │ module no_main_interface {
-     │        ────────┬────────  
-     │                ╰────────── Interface 'no_main_interface' declared here
-     │ 
  914 │     int y = no_main_interface()
      │             ────────┬────────  
      │                     ╰────────── A function call expects this to be a callable interface, the interface `no_main_interface` is not callable
+     │
+     ├─[ test.sus:914:10 ]
+     │
+ 906 │ module no_main_interface {
+     │        ────────┬────────  
+     │                ╰────────── Interface 'no_main_interface' declared here
 ─────╯
 Warning: Not Instantiating moduleWithBadDeclaration #() due to abstract typing errors
      ╭─[ test.sus:917:8 ]
@@ -1868,13 +1944,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: 'BEEEP' is not a valid template argument of SUM_UP
      ╭─[ test.sus:950:38 ]
      │
- 933 │ const int SUM_UP #(int SIZE, int[SIZE] DATA) {
-     │           ───┬──  
-     │              ╰──── 'SUM_UP' defined here
-     │ 
  950 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
      │                                         ──┬──  
      │                                           ╰──── 'BEEEP' is not a valid template argument of SUM_UP
+     │
+     ├─[ test.sus:950:38 ]
+     │
+ 933 │ const int SUM_UP #(int SIZE, int[SIZE] DATA) {
+     │           ───┬──  
+     │              ╰──── 'SUM_UP' defined here
 ─────╯
 Error: 'ABC' is not a valid template argument of int
      ╭─[ test.sus:952:8 ]
@@ -2005,13 +2083,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
       ╭─[ test.sus:1008:9 ]
       │
- 1006 │     input int bad_port
-      │     ─────────┬────────  
-      │              ╰────────── A domain should be explicitly defined before this port
-      │ 
  1008 │     domain bad_domain
       │            ─────┬────  
       │                 ╰────── When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
+      │
+      ├─[ test.sus:1008:9 ]
+      │
+ 1006 │     input int bad_port
+      │     ─────────┬────────  
+      │              ╰────────── A domain should be explicitly defined before this port
 ──────╯
 Warning: Not Instantiating conflicting_domain_with_port_name #() due to abstract typing errors
       ╭─[ test.sus:1013:8 ]
@@ -2023,12 +2103,15 @@ Warning: Not Instantiating conflicting_domain_with_port_name #() due to abstract
 Error: This declaration conflicts with a previous declaration in the same scope
       ╭─[ test.sus:1015:12 ]
       │
- 1014 │     domain my_domain
-      │            ────┬────  
-      │                ╰────── Domain 'my_domain' declared here
  1015 │     input int my_domain
       │               ────┬────  
       │                   ╰────── This declaration conflicts with a previous declaration in the same scope
+      │
+      ├─[ test.sus:1015:12 ]
+      │
+ 1014 │     domain my_domain
+      │            ────┬────  
+      │                ╰────── Domain 'my_domain' declared here
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1015:12 ]
@@ -2040,13 +2123,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: This declaration conflicts with a previous declaration in the same scope
       ╭─[ test.sus:1017:9 ]
       │
- 1014 │     domain my_domain
-      │            ────┬────  
-      │                ╰────── Domain 'my_domain' declared here
-      │ 
  1017 │     domain my_domain
       │            ────┬────  
       │                ╰────── This declaration conflicts with a previous declaration in the same scope
+      │
+      ├─[ test.sus:1017:9 ]
+      │
+ 1014 │     domain my_domain
+      │            ────┬────  
+      │                ╰────── Domain 'my_domain' declared here
 ──────╯
 Warning: Not Instantiating make_infinite_type #() due to abstract typing errors
       ╭─[ test.sus:1027:8 ]
@@ -2240,17 +2325,20 @@ Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
       ╭─[ test.sus:1108:21 ]
       │
- 1107 │     interface x : bool a -> bool b
-      │                        ┬         ┬  
-      │                        ╰──────────── 'a' declared here
-      │                                  │  
-      │                                  ╰── 'b' declared here
  1108 │     interface y : bool c -> bool d
       │                        ┬  
       │                        ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      │
+      ├─[ test.sus:1108:21 ]
+      │
+ 1107 │     interface x : bool a -> bool b
+      │                        ┬         ┬  
+      │                        ╰──────────── 'a' declared here
+      │                                  │  
+      │                                  ╰── 'b' declared here
 ──────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
@@ -2258,17 +2346,20 @@ Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
       ╭─[ test.sus:1108:31 ]
       │
- 1107 │     interface x : bool a -> bool b
-      │                        ┬         ┬  
-      │                        ╰──────────── 'a' declared here
-      │                                  │  
-      │                                  ╰── 'b' declared here
  1108 │     interface y : bool c -> bool d
       │                                  ┬  
       │                                  ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      │
+      ├─[ test.sus:1108:31 ]
+      │
+ 1107 │     interface x : bool a -> bool b
+      │                        ┬         ┬  
+      │                        ╰──────────── 'a' declared here
+      │                                  │  
+      │                                  ╰── 'b' declared here
 ──────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
@@ -2276,17 +2367,20 @@ Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
       ╭─[ test.sus:1118:21 ]
       │
- 1117 │     interface x : bool a -> bool b
-      │                        ┬         ┬  
-      │                        ╰──────────── 'a' declared here
-      │                                  │  
-      │                                  ╰── 'b' declared here
  1118 │     interface y : bool c -> bool d
       │                        ┬  
       │                        ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      │
+      ├─[ test.sus:1118:21 ]
+      │
+ 1117 │     interface x : bool a -> bool b
+      │                        ┬         ┬  
+      │                        ╰──────────── 'a' declared here
+      │                                  │  
+      │                                  ╰── 'b' declared here
 ──────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
@@ -2294,17 +2388,20 @@ Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
       ╭─[ test.sus:1118:31 ]
       │
- 1117 │     interface x : bool a -> bool b
-      │                        ┬         ┬  
-      │                        ╰──────────── 'a' declared here
-      │                                  │  
-      │                                  ╰── 'b' declared here
  1118 │     interface y : bool c -> bool d
       │                                  ┬  
       │                                  ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      │
+      ├─[ test.sus:1118:31 ]
+      │
+ 1117 │     interface x : bool a -> bool b
+      │                        ┬         ┬  
+      │                        ╰──────────── 'a' declared here
+      │                                  │  
+      │                                  ╰── 'b' declared here
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1122:11 ]
@@ -2528,6 +2625,12 @@ Error: While parsing 'interface_statement', parser found a syntax error in a nod
 Error: No such field 'process' on MultiStateLoop #(T: type ?[...], II: _). Available fields are 'MultiStateLoop', 'may_process', 'next_state', 'request_output'
       ╭─[ test.sus:1257:12 ]
       │
+ 1257 │     when loop.process : float cur_state {
+      │               ───┬───  
+      │                  ╰───── No such field 'process' on MultiStateLoop #(T: type ?[...], II: _). Available fields are 'MultiStateLoop', 'may_process', 'next_state', 'request_output'
+      │
+      ├─[ test.sus:1257:12 ]
+      │
  1239 │ module MultiStateLoop #(T, int II) {
       │        ───────┬──────  
       │               ╰──────── Module 'MultiStateLoop' defined here. module MultiStateLoop #(T, int II):
@@ -2538,10 +2641,6 @@ action next_state'II:
 	input T next_state_value
 action request_output:
 	input T result
-      │ 
- 1257 │     when loop.process : float cur_state {
-      │               ───┬───  
-      │                  ╰───── No such field 'process' on MultiStateLoop #(T: type ?[...], II: _). Available fields are 'MultiStateLoop', 'may_process', 'next_state', 'request_output'
 ──────╯
 Error: Cannot use conditional bingings because the condition isn't an action or a trigger
       ╭─[ test.sus:1257:20 ]
@@ -2874,6 +2973,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: Cannot write to compiletime variable through runtime 'when' blocks
       ╭─[ test.sus:1379:3 ]
       │
+ 1379 │        a = true
+      │        ┬  
+      │        ╰── Cannot write to compiletime variable through runtime 'when' blocks
+      │
+      ├─[ test.sus:1379:3 ]
+      │
  1374 │     gen bool a
       │              ┬  
       │              ╰── 'a' declared here
@@ -2881,19 +2986,19 @@ Error: Cannot write to compiletime variable through runtime 'when' blocks
  1378 │     when b {
       │     ──┬─  
       │       ╰─── Assignment passes through this 'when'
- 1379 │        a = true
-      │        ┬  
-      │        ╰── Cannot write to compiletime variable through runtime 'when' blocks
 ──────╯
 Error: This declaration conflicts with a previous declaration in the same scope
       ╭─[ test.sus:1384:13 ]
       │
- 1383 │ module SameNameAsType #(NUM_INPUTS) {
-      │                         ─────┬────  
-      │                              ╰────── Parameter 'NUM_INPUTS' declared here
  1384 │     gen int NUM_INPUTS = 500
       │             ─────┬────  
       │                  ╰────── This declaration conflicts with a previous declaration in the same scope
+      │
+      ├─[ test.sus:1384:13 ]
+      │
+ 1383 │ module SameNameAsType #(NUM_INPUTS) {
+      │                         ─────┬────  
+      │                              ╰────── Parameter 'NUM_INPUTS' declared here
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1384:13 ]
@@ -2921,14 +3026,18 @@ Warning: Unused port 'bits'
  1389 │     ToBits#(T: type bool[60]) b
       │                               ┬  
       │                               ╰── Unused port 'bits'
-      │                               │  
-      │                               ╰── b declared here
       │
       ├─[ core.sus:275:55 ]
       │
   275 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                                       ──┬─  
       │                                                         ╰─── Port 'bits' declared here
+      │
+      ├─[ test.sus:1389:28 ]
+      │
+ 1389 │     ToBits#(T: type bool[60]) b
+      │                               ┬  
+      │                               ╰── b declared here
 ──────╯
 Warning: Unused port 'value'
       ╭─[ test.sus:1389:28 ]
@@ -2936,14 +3045,18 @@ Warning: Unused port 'value'
  1389 │     ToBits#(T: type bool[60]) b
       │                               ┬  
       │                               ╰── Unused port 'value'
-      │                               │  
-      │                               ╰── b declared here
       │
       ├─[ core.sus:275:26 ]
       │
   275 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
       │                          ──┬──  
       │                            ╰──── Port 'value' declared here
+      │
+      ├─[ test.sus:1389:28 ]
+      │
+ 1389 │     ToBits#(T: type bool[60]) b
+      │                               ┬  
+      │                               ╰── b declared here
 ──────╯
 Error: Some submodule parameters of c were still unknown: ToBits #(T: type int #(FROM: ?, TO: ?)[3][3][5])
 T can be inferred from:
@@ -3157,13 +3270,15 @@ Warning: Not Instantiating duplicate_port_names #() due to abstract typing error
 Error: Duplicate port 'port_a' declaration
       ╭─[ test.sus:1505:14 ]
       │
- 1503 │        output bool port_a
-      │                    ───┬──  
-      │                       ╰──── port 'port_a' declared here
-      │ 
  1505 │        input bool port_a
       │                   ───┬──  
       │                      ╰──── Duplicate port 'port_a' declaration
+      │
+      ├─[ test.sus:1505:14 ]
+      │
+ 1503 │        output bool port_a
+      │                    ───┬──  
+      │                       ╰──── port 'port_a' declared here
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1505:14 ]
@@ -3175,13 +3290,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: Duplicate interface 'interf' declaration
       ╭─[ test.sus:1511:13 ]
       │
- 1509 │        interface interf
-      │                  ───┬──  
-      │                     ╰──── interface 'interf' declared here
-      │ 
  1511 │        interface interf
       │                  ───┬──  
       │                     ╰──── Duplicate interface 'interf' declaration
+      │
+      ├─[ test.sus:1511:13 ]
+      │
+ 1509 │        interface interf
+      │                  ───┬──  
+      │                     ╰──── interface 'interf' declared here
 ──────╯
 Error: Duplicate interface 'port_interf' declaration
       ╭─[ test.sus:1514:12 ]
@@ -3218,13 +3335,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: Duplicate interface 'preeee' declaration
       ╭─[ test.sus:1518:13 ]
       │
- 1516 │        interface proooot: bool preeee
-      │                                ───┬──  
-      │                                   ╰──── port 'preeee' declared here
-      │ 
  1518 │        interface preeee
       │                  ───┬──  
       │                     ╰──── Duplicate interface 'preeee' declaration
+      │
+      ├─[ test.sus:1518:13 ]
+      │
+ 1516 │        interface proooot: bool preeee
+      │                                ───┬──  
+      │                                   ╰──── port 'preeee' declared here
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1523:12 ]
