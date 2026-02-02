@@ -12,18 +12,18 @@
 //!
 //! An example type hierarchy for your custom unifier would then be:
 //! ```
-//! /// This Unifier unifies structures containing both `UniCell<PeanoType>` and `UniCell<DomainType>`
+//! /// This Unifier unifies structures containing both `UniCell<PeanoType>` and `UniCell<ClockDomain>`
 //! struct MyUnifier<'s> {
 //!     unifier_info: UnifierTopInfo<'s, Self>,
 //! }
 //!
 //! impl<'s> UnifierTop for MyUnifier<'s> {}
 //! impl<'s> SubstituteRecurse<'s, PeanoType> for MyUnifier<'s> {}
-//! impl<'s> SubstituteRecurse<'s, DomainType> for MyUnifier<'s> {}
+//! impl<'s> SubstituteRecurse<'s, ClockDomain> for MyUnifier<'s> {}
 //! impl<'s> UnifyRecurse<'s, PeanoType> for MyUnifier<'s> {}
-//! impl<'s> UnifyRecurse<'s, DomainType> for MyUnifier<'s> {}
+//! impl<'s> UnifyRecurse<'s, ClockDomain> for MyUnifier<'s> {}
 //! impl<'s> Unifier<'s, PeanoType> for MyUnifier<'s> {}
-//! impl<'s> Unifier<'s, DomainType> for MyUnifier<'s> {}
+//! impl<'s> Unifier<'s, ClockDomain> for MyUnifier<'s> {}
 //! ```
 //!
 //! The Lifecycle of [UniCell]s goes through the following 3 stages:

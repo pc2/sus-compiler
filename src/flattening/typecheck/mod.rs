@@ -26,7 +26,7 @@ struct TypeCheckingContext<'l> {
     errors: &'l ErrorCollector<'l>,
     link_info: &'l LinkInfo,
     instructions: &'l FlatAlloc<Instruction, FlatIDMarker>,
-    domains: &'l FlatAlloc<DomainInfo, DomainIDMarker>,
+    domains: &'l FlatAlloc<ClockInfo, ClockIDMarker>,
     typ_alloc: &'l Arena<UniCell<AbstractInnerType>>,
     unifier: AbstractUnifier<'l>,
 }
@@ -109,7 +109,7 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
     let link_info = working_on.get_link_info();
     let typ_alloc = Arena::new();
     let domains = if let GlobalObj::Module(md) = working_on {
-        &md.domains
+        &md.clocks
     } else {
         &FlatAlloc::EMPTY_FLAT_ALLOC
     };

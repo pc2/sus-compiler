@@ -146,7 +146,7 @@ pub struct RealWire {
     pub original_instruction: FlatID,
     pub typ: ConcreteType,
     pub name: String,
-    pub domain: DomainID,
+    pub clock: ClockID,
     /// non i64::MIN values specify specified latency
     pub specified_latency: AbsLat,
     /// The computed latencies after latency counting
@@ -226,7 +226,7 @@ pub struct InstantiatedPort {
     pub wire: WireID,
     pub direction: Direction,
     pub absolute_latency: AbsLat,
-    pub domain: DomainID,
+    pub domain: ClockID,
 }
 
 /// [InstantiatedModule] are the final product we're trying to produce with the compiler.
@@ -451,7 +451,7 @@ impl<'l> ModuleTypingContext<'l> {
                 wire: *wire_id,
                 direction: port.direction,
                 absolute_latency: wire.absolute_latency,
-                domain: wire.domain,
+                domain: wire.clock,
             })
         });
 

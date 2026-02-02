@@ -273,7 +273,7 @@ fn custom_render_latency_count_graph(
             if let Some(inst) = sm.instance.get() {
                 let inst_name = &inst.name;
                 let sm_name = &sm.name;
-                let inputs_outputs_per_domain = sm_md.domains.map(|(domain_id, domain)| {
+                let inputs_outputs_per_domain = sm_md.clocks.map(|(domain_id, domain)| {
                     let mut inputs = Vec::new();
                     let mut outputs = Vec::new();
                     for (_, p) in inst.interface_ports.iter_valids() {
@@ -344,7 +344,7 @@ fn custom_render_latency_count_graph(
                     let (Some(maps_to), Some(port)) = (maps_to, port) else {
                         continue;
                     };
-                    let port_domain_name = &sm_md.domains[port.domain].name;
+                    let port_domain_name = &sm_md.clocks[port.domain].name;
                     let p_name = &inst.wires[port.wire].name;
                     let node =
                         &mut node_ids[lc_problem.map_wire_to_latency_node[maps_to.maps_to_wire]];

@@ -121,7 +121,7 @@ enum IDEIdentifierType {
 }
 
 impl IDEIdentifierType {
-    fn make_local(is_state: bool, domain: DomainID) -> IDEIdentifierType {
+    fn make_local(is_state: bool, domain: ClockID) -> IDEIdentifierType {
         IDEIdentifierType::Local {
             is_state,
             domain: domain.get_hidden_value() as u32,
@@ -142,7 +142,7 @@ fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifier
                     } else {
                         IDEIdentifierType::make_local(
                             decl.decl_kind.is_state(),
-                            decl.domain.unwrap_physical(),
+                            decl.clock_domain.unwrap_physical(),
                         )
                     }
                 }
@@ -169,7 +169,7 @@ fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifier
                     InterfaceDeclKind::SinglePort(decl_id) => {
                         let domain = md.link_info.instructions[decl_id]
                             .unwrap_declaration()
-                            .domain
+                            .clock_domain
                             .unwrap_physical();
                         IDEIdentifierType::make_local(false, domain)
                     }

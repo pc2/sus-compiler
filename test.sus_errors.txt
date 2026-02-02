@@ -112,7 +112,13 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_infer_me #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated infer_me #(A: 5)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated infer_from_local_context #()
-[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate instantiate_fifo #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated CrossDomain #(T: type int #(FROM: 0, TO: 30))
+[INFO  sus_compiler::instantiation::instantiator] Instantiated CrossDomain #(T: type int #(FROM: 0, TO: 6))
+[INFO  sus_compiler::instantiation::instantiator] Instantiated CrossAction2 #(T1: type int #(FROM: 0, TO: 30), T2: type int #(FROM: 0, TO: 6))
+[INFO  sus_compiler::instantiation::instantiator] Instantiated RAM #(T: type int #(FROM: 0, TO: 6), DEPTH: 30)
+[INFO  sus_compiler::instantiation::instantiator] Instantiated LatencyOffset #(T: type bool #(), OFFSET: -8)
+[INFO  sus_compiler::instantiation::instantiator] Instantiated FIFO #(T: type int #(FROM: 0, TO: 6), DEPTH: 30, MAY_PUSH_LATENCY: 8)
+[INFO  sus_compiler::instantiation::instantiator] Instantiated instantiate_fifo #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated infer_me #(A: 2)
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate inference_edge_case #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated specified_latencies_not_ports_edge_case #()
@@ -701,7 +707,7 @@ Error: No such field 'port_a' on submodule_named_ports #(). Available fields are
  576 │ module submodule_named_ports {
      │        ──────────┬──────────  
      │                  ╰──────────── Module 'submodule_named_ports' defined here. module submodule_named_ports #():
-domain clk:
+domain default:
 interface submodule_named_ports:
 	input int#(FROM: 0, TO: 100) port_a
 	input int#(FROM: 0, TO: 100) port_b
@@ -720,7 +726,7 @@ Error: No such field 'port_b' on submodule_named_ports #(). Available fields are
  576 │ module submodule_named_ports {
      │        ──────────┬──────────  
      │                  ╰──────────── Module 'submodule_named_ports' defined here. module submodule_named_ports #():
-domain clk:
+domain default:
 interface submodule_named_ports:
 	input int#(FROM: 0, TO: 100) port_a
 	input int#(FROM: 0, TO: 100) port_b
@@ -739,7 +745,7 @@ Error: No such field 'port_c' on submodule_named_ports #(). Available fields are
  576 │ module submodule_named_ports {
      │        ──────────┬──────────  
      │                  ╰──────────── Module 'submodule_named_ports' defined here. module submodule_named_ports #():
-domain clk:
+domain default:
 interface submodule_named_ports:
 	input int#(FROM: 0, TO: 100) port_a
 	input int#(FROM: 0, TO: 100) port_b
@@ -902,7 +908,7 @@ Error: No such field 'i' on cross_memory #(). Available fields are 'cross_memory
  618 │ module cross_memory {
      │        ──────┬─────  
      │              ╰─────── Module 'cross_memory' defined here. module cross_memory #():
-domain clk:
+domain default:
 interface in:
 	input bool[20][512] i'0
 interface out:
@@ -960,7 +966,7 @@ Error: No such field 'o' on cross_memory #(). Available fields are 'cross_memory
  618 │ module cross_memory {
      │        ──────┬─────  
      │              ╰─────── Module 'cross_memory' defined here. module cross_memory #():
-domain clk:
+domain default:
 interface in:
 	input bool[20][512] i'0
 interface out:
@@ -1068,7 +1074,7 @@ Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', '
  607 │ module cross_bool {
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
-domain clk:
+domain default:
 interface in:
 	input bool i'0
 interface out:
@@ -1087,7 +1093,7 @@ Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', '
  607 │ module cross_bool {
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
-domain clk:
+domain default:
 interface in:
 	input bool i'0
 interface out:
@@ -1211,7 +1217,7 @@ Error: No such field 'a' on mod_with_unused_interface #(). Available fields are 
  684 │ module mod_with_unused_interface {
      │        ────────────┬────────────  
      │                    ╰────────────── Module 'mod_with_unused_interface' defined here. module mod_with_unused_interface #():
-domain clk:
+domain default:
 interface v:
 	input int#(FROM: 0, TO: 100) a
 	->
@@ -1268,7 +1274,7 @@ Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', '
  607 │ module cross_bool {
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
-domain clk:
+domain default:
 interface in:
 	input bool i'0
 interface out:
@@ -1287,7 +1293,7 @@ Error: No such field 'i' on cross_int #(). Available fields are 'cross_int', 'in
  612 │ module cross_int {
      │        ────┬────  
      │            ╰────── Module 'cross_int' defined here. module cross_int #():
-domain clk:
+domain default:
 interface in:
 	input int#(FROM: 0, TO: 100) i'0
 interface out:
@@ -1306,7 +1312,7 @@ Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', '
  607 │ module cross_bool {
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
-domain clk:
+domain default:
 interface in:
 	input bool i'0
 interface out:
@@ -1325,7 +1331,7 @@ Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', '
  607 │ module cross_bool {
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
-domain clk:
+domain default:
 interface in:
 	input bool i'0
 interface out:
@@ -1344,7 +1350,7 @@ Error: No such field 'o' on cross_bool #(). Available fields are 'cross_bool', '
  607 │ module cross_bool {
      │        ─────┬────  
      │             ╰────── Module 'cross_bool' defined here. module cross_bool #():
-domain clk:
+domain default:
 interface in:
 	input bool i'0
 interface out:
@@ -1363,7 +1369,7 @@ Error: No such field 'o' on cross_int #(). Available fields are 'cross_int', 'in
  612 │ module cross_int {
      │        ────┬────  
      │            ╰────── Module 'cross_int' defined here. module cross_int #():
-domain clk:
+domain default:
 interface in:
 	input int#(FROM: 0, TO: 100) i'0
 interface out:
@@ -2082,12 +2088,25 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │               ────┬───  
       │                   ╰───── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
+Error: When using explicit clocks, no port is allowed to be declared on the implicit 'clk' clock.
       ╭─[ test.sus:1008:9 ]
       │
  1008 │     domain bad_domain
       │            ─────┬────  
-      │                 ╰────── When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
+      │                 ╰────── When using explicit clocks, no port is allowed to be declared on the implicit 'clk' clock.
+      │
+      ├─[ test.sus:1008:9 ]
+      │
+ 1006 │     input int bad_port
+      │     ─────────┬────────  
+      │              ╰────────── A domain should be explicitly defined before this port
+──────╯
+Error: When using explicit latency domains, no port is allowed to be declared on the implicit 'default' latency domain.
+      ╭─[ test.sus:1008:9 ]
+      │
+ 1008 │     domain bad_domain
+      │            ─────┬────  
+      │                 ╰────── When using explicit latency domains, no port is allowed to be declared on the implicit 'default' latency domain.
       │
       ├─[ test.sus:1008:9 ]
       │
@@ -2113,7 +2132,7 @@ Error: This declaration conflicts with a previous declaration in the same scope
       │
  1014 │     domain my_domain
       │            ────┬────  
-      │                ╰────── Domain 'my_domain' declared here
+      │                ╰────── Latency Domain 'my_domain' declared here
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1015:12 ]
@@ -2133,7 +2152,7 @@ Error: This declaration conflicts with a previous declaration in the same scope
       │
  1014 │     domain my_domain
       │            ────┬────  
-      │                ╰────── Domain 'my_domain' declared here
+      │                ╰────── Latency Domain 'my_domain' declared here
 ──────╯
 Warning: Not Instantiating make_infinite_type #() due to abstract typing errors
       ╭─[ test.sus:1027:8 ]
@@ -2263,7 +2282,7 @@ Error: No such field 'iter' on Iterator #(MAX: _). Available fields are 'Iterato
     2 │ module Iterator #(int MAX) {
       │        ────┬───  
       │            ╰───── Module 'Iterator' defined here. module Iterator #(int MAX):
-domain clk:
+domain default:
 output state bool may_next'0
 action start'0:
 	input int #(FROM: 0, TO: MAX + 2) up_to'0
@@ -2437,13 +2456,6 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │               ────┬───  
       │                   ╰───── Interface 'infer_me' defined here
 ──────╯
-Warning: Not Instantiating instantiate_fifo #() due to abstract typing errors
-      ╭─[ test.sus:1152:8 ]
-      │
- 1152 │ module instantiate_fifo {
-      │        ────────┬───────  
-      │                ╰───────── Not Instantiating instantiate_fifo #() due to abstract typing errors
-──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1153:51 ]
       │
@@ -2451,36 +2463,81 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                                                      ──────┬──────  
       │                                                            ╰──────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Used 'when' in a generative context, use 'if' instead
-      ╭─[ test.sus:1157:2 ]
+Warning: Unused port 'may_pop'
+      ╭─[ test.sus:1155:20 ]
       │
- 1157 │     when fifo.ready {
-      │     ──┬─  
-      │       ╰─── Used 'when' in a generative context, use 'if' instead
+ 1155 │     FIFO #(DEPTH: 30) fifo
+      │                       ──┬─  
+      │                         ╰─── Unused port 'may_pop'
+      │
+      ├─[ memory.sus:57:17 ]
+      │
+   57 │     output bool may_pop'0 = read_addr != cross_write_addr.out
+      │                 ───┬───  
+      │                    ╰───── Port 'may_pop' declared here
+      │
+      ├─[ test.sus:1155:20 ]
+      │
+ 1155 │     FIFO #(DEPTH: 30) fifo
+      │                       ──┬─  
+      │                         ╰─── fifo declared here
 ──────╯
-Error: No such field 'ready' on FIFO #(T: type ?[...], DEPTH: _, MAY_PUSH_LATENCY: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
-      ╭─[ test.sus:1157:12 ]
+Warning: Unused port 'pop'
+      ╭─[ test.sus:1155:20 ]
       │
- 1157 │     when fifo.ready {
-      │               ──┬──  
-      │                 ╰──── No such field 'ready' on FIFO #(T: type ?[...], DEPTH: _, MAY_PUSH_LATENCY: _). Available fields are 'FIFO', 'rst', 'may_push', 'push', 'may_pop', 'pop'
+ 1155 │     FIFO #(DEPTH: 30) fifo
+      │                       ──┬─  
+      │                         ╰─── Unused port 'pop'
       │
-      ├─[ memory.sus:29:8 ]
+      ├─[ memory.sus:58:12 ]
       │
-   29 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
-      │        ──┬─  
-      │          ╰─── Module 'FIFO' defined here. module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY):
-domain clk:
-action rst'0:
-domain write:
-output bool may_push'-MAY_PUSH_LATENCY
-action push'0:
-	input T push_data'0
-domain read:
-output bool may_pop'0
-action pop'0:
-	->
-	output T pop_data'0
+   58 │     action pop'0 : -> T pop_data'0 {
+      │            ─┬─  
+      │             ╰─── Port 'pop' declared here
+      │
+      ├─[ test.sus:1155:20 ]
+      │
+ 1155 │     FIFO #(DEPTH: 30) fifo
+      │                       ──┬─  
+      │                         ╰─── fifo declared here
+──────╯
+Warning: Unused port 'pop_data'
+      ╭─[ test.sus:1155:20 ]
+      │
+ 1155 │     FIFO #(DEPTH: 30) fifo
+      │                       ──┬─  
+      │                         ╰─── Unused port 'pop_data'
+      │
+      ├─[ memory.sus:58:25 ]
+      │
+   58 │     action pop'0 : -> T pop_data'0 {
+      │                         ────┬───  
+      │                             ╰───── Port 'pop_data' declared here
+      │
+      ├─[ test.sus:1155:20 ]
+      │
+ 1155 │     FIFO #(DEPTH: 30) fifo
+      │                       ──┬─  
+      │                         ╰─── fifo declared here
+──────╯
+Warning: Unused port 'rst'
+      ╭─[ test.sus:1155:20 ]
+      │
+ 1155 │     FIFO #(DEPTH: 30) fifo
+      │                       ──┬─  
+      │                         ╰─── Unused port 'rst'
+      │
+      ├─[ memory.sus:33:12 ]
+      │
+   33 │     action rst'0 {
+      │            ─┬─  
+      │             ╰─── Port 'rst' declared here
+      │
+      ├─[ test.sus:1155:20 ]
+      │
+ 1155 │     FIFO #(DEPTH: 30) fifo
+      │                       ──┬─  
+      │                         ╰─── fifo declared here
 ──────╯
 Error: Conflicting specified latency
 
@@ -2636,7 +2693,7 @@ Error: No such field 'process' on MultiStateLoop #(T: type ?[...], II: _). Avail
  1239 │ module MultiStateLoop #(T, int II) {
       │        ───────┬──────  
       │               ╰──────── Module 'MultiStateLoop' defined here. module MultiStateLoop #(T, int II):
-domain clk:
+domain default:
 trigger may_process'0:
 	output T cur_state
 action next_state'II:
@@ -4131,7 +4188,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [ERROR sus_compiler::codegen] Cannot codegen latency_counting_disjoint_blocks #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen latency_counting_disjoint_blocks_merge_error #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen use_infer_me #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen instantiate_fifo #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen inference_edge_case #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen instantiate_infer_me_with_poison_output #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen use_MultiStateLoop #() due to errors!

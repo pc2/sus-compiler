@@ -15,7 +15,7 @@ use crate::{
     typing::{
         abstract_type::*,
         concrete_type::{ConcreteGlobalReference, ConcreteType, SubtypeRelation},
-        domain_type::DomainType,
+        domain_type::ClockDomain,
         template::*,
         unifyable_cell::UniCell,
     },
@@ -351,10 +351,10 @@ impl Display for IsExtern {
     }
 }
 
-impl DomainID {
+impl ClockID {
     pub fn display<'d>(
         &'d self,
-        domains: &'d FlatAlloc<DomainInfo, DomainIDMarker>,
+        domains: &'d FlatAlloc<ClockInfo, ClockIDMarker>,
     ) -> impl Display + 'd {
         FmtWrapper(move |f| {
             if let Some(physical_domain) = domains.get(*self) {
@@ -365,10 +365,10 @@ impl DomainID {
         })
     }
 }
-impl UniCell<DomainID> {
+impl UniCell<ClockID> {
     pub fn display<'d>(
         &'d self,
-        domains: &'d FlatAlloc<DomainInfo, DomainIDMarker>,
+        domains: &'d FlatAlloc<ClockInfo, ClockIDMarker>,
     ) -> impl Display + 'd {
         FmtWrapper(move |f| match self.get() {
             Some(d) => d.display(domains).fmt(f),
@@ -376,21 +376,21 @@ impl UniCell<DomainID> {
         })
     }
 }
-impl DomainType {
+impl ClockDomain {
     pub fn display<'d>(
         &'d self,
-        domains: &'d FlatAlloc<DomainInfo, DomainIDMarker>,
+        domains: &'d FlatAlloc<ClockInfo, ClockIDMarker>,
     ) -> impl Display + 'd {
         FmtWrapper(move |f| match self {
-            DomainType::Generative => f.write_str("gen"),
-            DomainType::Physical(physical_id) => physical_id.display(domains).fmt(f),
+            ClockDomain::Generative => f.write_str("gen"),
+            ClockDomain::Physical(physical_id) => physical_id.display(domains).fmt(f),
         })
     }
 }
-impl UniCell<DomainType> {
+impl UniCell<ClockDomain> {
     pub fn display<'d>(
         &'d self,
-        domains: &'d FlatAlloc<DomainInfo, DomainIDMarker>,
+        domains: &'d FlatAlloc<ClockInfo, ClockIDMarker>,
     ) -> impl Display + 'd {
         FmtWrapper(move |f| match self.get() {
             Some(d) => d.display(domains).fmt(f),
@@ -435,6 +435,7 @@ impl core::fmt::Debug for DeclarationKind {
                 port_id,
                 parent_interface,
                 is_standalone_port: _,
+                latency_domain: _,
             } => {
                 if *is_state {
                     f.write_str("state")?;
@@ -743,12 +744,12 @@ impl LinkInfo {
     fn display_domain_of<'s>(
         &'s self,
         instr_id: FlatID,
-        domains: &'s FlatAlloc<DomainInfo, DomainIDMarker>,
+        domains: &'s FlatAlloc<ClockInfo, ClockIDMarker>,
     ) -> impl Display + 's {
         FmtWrapper(move |f| match &self.instructions[instr_id] {
-            Instruction::Declaration(decl) => decl.domain.display(domains).fmt(f),
-            Instruction::Interface(interface) => interface.domain.display(domains).fmt(f),
-            Instruction::Expression(expr) => expr.domain.display(domains).fmt(f),
+            Instruction::Declaration(decl) => decl.clock_domain.display(domains).fmt(f),
+            Instruction::Interface(interface) => interface.clock_domain.display(domains).fmt(f),
+            Instruction::Expression(expr) => expr.clock_domain.display(domains).fmt(f),
             Instruction::SubModule(_)
             | Instruction::IfStatement(_)
             | Instruction::ForStatement(_) => Ok(()),
@@ -757,7 +758,7 @@ impl LinkInfo {
     pub fn fmt_instructions(
         &self,
         f: &mut Formatter<'_>,
-        domains: &FlatAlloc<DomainInfo, DomainIDMarker>,
+        domains: &FlatAlloc<ClockInfo, ClockIDMarker>,
         linker_files: &LinkerFiles,
         globals: &LinkerGlobals,
     ) -> std::fmt::Result {
@@ -785,14 +786,14 @@ impl LinkInfo {
                 Instruction::SubModule(SubModuleInstance {
                     module_ref,
                     name,
-                    local_domain_map,
+                    submodule_clock_map: local_domain_map,
                     typ: _,
                     ..
                 }) => {
                     let disp_md_ref = module_ref.display(globals, self);
                     let name = name.green();
                     write!(f, "{disp_md_ref} {name}")?;
-                    let submod_domains = &globals[module_ref.id].domains;
+                    let submod_domains = &globals[module_ref.id].clocks;
                     if let Some(local_domain_map) = local_domain_map.get() {
                         let domain_map = display_join(
                             ", ",
@@ -948,15 +949,32 @@ impl Module {
             write!(f, "'{lat_spec_text}")
         })
     }
-    pub fn display_port_info(&self, decl: &Declaration, file_text: &FileText) -> impl Display {
+    fn display_latency_domain(
+        &self,
+        latency_domain: LatDomID,
+        may_print_domain: bool,
+    ) -> impl Display {
+        display_if(may_print_domain, move |f| {
+            write!(f, "{{{}}} ", self.latency_domains[latency_domain].name)
+        })
+    }
+    pub fn display_port_info(
+        &self,
+        decl: &Declaration,
+        file_text: &FileText,
+        may_print_domain: bool,
+    ) -> impl Display {
         let_unwrap!(
             DeclarationKind::Port {
                 direction,
                 is_state,
+                latency_domain,
                 ..
             },
             decl.decl_kind
         );
+
+        let domain = self.display_latency_domain(latency_domain, may_print_domain);
 
         let state_kw = if is_state { "state " } else { "" };
 
@@ -964,7 +982,12 @@ impl Module {
         let name = &decl.name;
 
         let lat_spec = self.display_latency(&decl.latency_specifier, file_text);
-        FmtWrapper(move |f| write!(f, "{direction} {state_kw}{written_typ} {name}{lat_spec}"))
+        FmtWrapper(move |f| {
+            write!(
+                f,
+                "{domain}{direction} {state_kw}{written_typ} {name}{lat_spec}"
+            )
+        })
     }
 
     pub fn display_interface_info(
@@ -973,9 +996,7 @@ impl Module {
         file_text: &FileText,
         may_print_domain: bool,
     ) -> impl Display {
-        let domain = display_if(may_print_domain, |f| {
-            write!(f, "{{{}}} ", self.domains[*interface.domain.unwrap()].name)
-        });
+        let domain = self.display_latency_domain(interface.latency_domain, may_print_domain);
         let interface_kind = interface.interface_kind;
         let name = &file_text[interface.name_span];
         let lat_spec = self.display_latency(&interface.latency_specifier, file_text);
@@ -983,14 +1004,14 @@ impl Module {
             write!(f, "{domain}{interface_kind} {name}{lat_spec}:")?;
             for decl_id in &interface.inputs {
                 let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
-                let port_info = self.display_port_info(port_decl, file_text);
+                let port_info = self.display_port_info(port_decl, file_text, false);
                 write!(f, "\n\t{port_info}")?;
             }
             if !interface.outputs.is_empty() {
                 write!(f, "\n\t->")?;
                 for decl_id in &interface.outputs {
                     let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
-                    let port_info = self.display_port_info(port_decl, file_text);
+                    let port_info = self.display_port_info(port_decl, file_text, false);
                     write!(f, "\n\t{port_info}")?;
                 }
             }
@@ -998,29 +1019,18 @@ impl Module {
         })
     }
 
-    pub fn display_all_ports_info<'s>(
-        &'s self,
-        file_text: &'s FileText,
-        local_domains_used_in_parent_module: Option<InterfaceToDomainMap>,
-    ) -> impl Display {
+    pub fn display_all_ports_info<'s>(&'s self, file_text: &'s FileText) -> impl Display {
         let full_name_with_args = self.link_info.display_full_name_and_args(file_text);
 
         FmtWrapper(move |f| {
             write!(f, "module {full_name_with_args}:")?;
 
-            for (domain_id, domain) in &self.domains {
+            for (domain_id, domain) in &self.latency_domains {
                 let name = &domain.name;
-                if let Some(domain_map) = &local_domains_used_in_parent_module {
-                    let submod_name = &self.link_info.name;
-                    let name_in_parent =
-                        domain_map.local_domain_map[domain_id].display(domain_map.domains);
-                    write!(f, "\ndomain {submod_name}.{name} = {name_in_parent}:")?;
-                } else {
-                    write!(f, "\ndomain {name}:")?;
-                }
+                write!(f, "\ndomain {name}:")?;
 
                 for (_, interface) in &self.interfaces {
-                    if interface.domain != Some(domain_id) {
+                    if interface.lat_dom != Some(domain_id) {
                         continue;
                     }
                     match interface.declaration_instruction {
@@ -1030,9 +1040,8 @@ impl Module {
                             write!(f, "\n{info}")?;
                         }
                         Some(InterfaceDeclKind::SinglePort(decl_id)) => {
-                            let single_port =
-                                self.link_info.instructions[decl_id].unwrap_declaration();
-                            let info = self.display_port_info(single_port, file_text);
+                            let port = self.link_info.instructions[decl_id].unwrap_declaration();
+                            let info = self.display_port_info(port, file_text, false);
                             write!(f, "\n{info}")?;
                         }
                         None => {}
@@ -1050,14 +1059,11 @@ impl Module {
             writeln!(
                 f,
                 "{}",
-                self.display_all_ports_info(
-                    &linker_files[self.link_info.span.file].file_text,
-                    None
-                )
+                self.display_all_ports_info(&linker_files[self.link_info.span.file].file_text)
             )?;
             writeln!(f, "Instructions:")?;
             self.link_info
-                .fmt_instructions(f, &self.domains, linker_files, globals)
+                .fmt_instructions(f, &self.clocks, linker_files, globals)
         });
 
         eprintln!("{disp}");
@@ -1201,7 +1207,7 @@ impl ModuleTypingContext<'_> {
                 original_instruction,
                 typ,
                 name,
-                domain,
+                clock: domain,
                 specified_latency: _,
                 absolute_latency,
                 is_port,
@@ -1214,7 +1220,7 @@ impl ModuleTypingContext<'_> {
                 "".purple()
             };
             let typ_str = typ.display(self.globals).to_string().red();
-            let domain_name = domain.display(&self.md.domains);
+            let domain_name = domain.display(&self.md.clocks);
             let name = name.green();
             write!(
                 f,

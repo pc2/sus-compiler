@@ -1,12 +1,12 @@
 use crate::{
     alloc::zip_eq,
     let_unwrap,
-    prelude::DomainID,
+    prelude::ClockID,
     typing::{
         abstract_type::{
             AbstractGlobalReference, AbstractInnerType, AbstractRankedType, PeanoType,
         },
-        domain_type::DomainType,
+        domain_type::ClockDomain,
         template::TemplateKind,
         unifyable_cell::{
             Boo, ResolveError, SubTree, SubstituteRecurse, UniCell, Unifier, UnifierTop,
@@ -282,71 +282,71 @@ impl<'s> Unifier<'s, AbstractInnerType> for AbstractUnifier<'s> {
     }
 }
 
-impl<'s> SubstituteRecurse<'s, DomainType> for AbstractUnifier<'s> {
-    fn fully_substitute_recurse(&self, _: &DomainType) -> bool {
+impl<'s> SubstituteRecurse<'s, ClockDomain> for AbstractUnifier<'s> {
+    fn fully_substitute_recurse(&self, _: &ClockDomain) -> bool {
         true
     }
 
-    fn resolve_recurse(&self, _: &DomainType) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, _: &ClockDomain) -> Result<(), ResolveError<'s>> {
         Ok(())
     }
 }
-impl<'s> UnifyRecurse<'s, DomainType> for AbstractUnifier<'s> {
-    fn unify_subtrees(&self, a: &'s DomainType, b: &'s DomainType) -> UnifyResult {
+impl<'s> UnifyRecurse<'s, ClockDomain> for AbstractUnifier<'s> {
+    fn unify_subtrees(&self, a: &'s ClockDomain, b: &'s ClockDomain) -> UnifyResult {
         match (a, b) {
-            (DomainType::Generative, DomainType::Generative) => UnifyResult::Success,
-            (DomainType::Physical(a), DomainType::Physical(b)) => self.unify(a, b),
+            (ClockDomain::Generative, ClockDomain::Generative) => UnifyResult::Success,
+            (ClockDomain::Physical(a), ClockDomain::Physical(b)) => self.unify(a, b),
             _ => UnifyResult::Failure,
         }
     }
 
-    fn set_subtrees(&self, a: &'s DomainType, b: &mut DomainType) -> UnifyResult {
+    fn set_subtrees(&self, a: &'s ClockDomain, b: &mut ClockDomain) -> UnifyResult {
         match (a, b) {
-            (DomainType::Generative, DomainType::Generative) => UnifyResult::Success,
-            (DomainType::Physical(a), DomainType::Physical(b)) => self.set(a, b),
+            (ClockDomain::Generative, ClockDomain::Generative) => UnifyResult::Success,
+            (ClockDomain::Physical(a), ClockDomain::Physical(b)) => self.set(a, b),
             _ => UnifyResult::Failure,
         }
     }
 
-    fn clone_known(&self, known: &'s DomainType) -> DomainType {
+    fn clone_known(&self, known: &'s ClockDomain) -> ClockDomain {
         match known {
-            DomainType::Generative => DomainType::Generative,
-            DomainType::Physical(phys) => DomainType::Physical(self.clone_unify(phys)),
+            ClockDomain::Generative => ClockDomain::Generative,
+            ClockDomain::Physical(phys) => ClockDomain::Physical(self.clone_unify(phys)),
         }
     }
 }
 
-impl<'s> Unifier<'s, DomainType> for AbstractUnifier<'s> {
-    fn contains_subtree(&self, _in_obj: &DomainType, _subtree: SubTree<DomainType>) -> bool {
+impl<'s> Unifier<'s, ClockDomain> for AbstractUnifier<'s> {
+    fn contains_subtree(&self, _in_obj: &ClockDomain, _subtree: SubTree<ClockDomain>) -> bool {
         false
     }
 }
 
-impl<'s> SubstituteRecurse<'s, DomainID> for AbstractUnifier<'s> {
-    fn fully_substitute_recurse(&self, _: &DomainID) -> bool {
+impl<'s> SubstituteRecurse<'s, ClockID> for AbstractUnifier<'s> {
+    fn fully_substitute_recurse(&self, _: &ClockID) -> bool {
         true
     }
 
-    fn resolve_recurse(&self, _: &DomainID) -> Result<(), ResolveError<'s>> {
+    fn resolve_recurse(&self, _: &ClockID) -> Result<(), ResolveError<'s>> {
         Ok(())
     }
 }
-impl<'s> UnifyRecurse<'s, DomainID> for AbstractUnifier<'s> {
-    fn unify_subtrees(&self, a: &'s DomainID, b: &'s DomainID) -> UnifyResult {
+impl<'s> UnifyRecurse<'s, ClockID> for AbstractUnifier<'s> {
+    fn unify_subtrees(&self, a: &'s ClockID, b: &'s ClockID) -> UnifyResult {
         UnifyResult::from(a == b)
     }
 
-    fn set_subtrees(&self, a: &'s DomainID, b: &mut DomainID) -> UnifyResult {
+    fn set_subtrees(&self, a: &'s ClockID, b: &mut ClockID) -> UnifyResult {
         UnifyResult::from(a == b)
     }
 
-    fn clone_known(&self, known: &'s DomainID) -> DomainID {
+    fn clone_known(&self, known: &'s ClockID) -> ClockID {
         *known
     }
 }
 
-impl<'s> Unifier<'s, DomainID> for AbstractUnifier<'s> {
-    fn contains_subtree(&self, _in_obj: &DomainID, _subtree: SubTree<DomainID>) -> bool {
+impl<'s> Unifier<'s, ClockID> for AbstractUnifier<'s> {
+    fn contains_subtree(&self, _in_obj: &ClockID, _subtree: SubTree<ClockID>) -> bool {
         false
     }
 }

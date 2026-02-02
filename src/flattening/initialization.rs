@@ -92,7 +92,8 @@ fn initialize_global_object(
                 link_info,
                 ports: FlatAlloc::new(),
                 inference_info: PortLatencyInferenceInfo::default(),
-                domains: FlatAlloc::new(),
+                clocks: FlatAlloc::new(),
+                latency_domains: FlatAlloc::new(),
                 interfaces: FlatAlloc::new(),
             });
         }

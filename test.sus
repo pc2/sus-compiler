@@ -1154,7 +1154,7 @@ module instantiate_fifo {
 
 	FIFO #(DEPTH: 30) fifo
 
-	when fifo.ready {
+	when fifo.may_push {
 		reg reg reg reg reg int heavy_computation = request_data()
 
 		fifo.push(heavy_computation)

@@ -8,8 +8,8 @@ use std::fmt::Display;
 use crate::typing::template::Parameter;
 
 use crate::flattening::{
-    Declaration, DomainInfo, Instruction, Interface, InterfaceDeclaration, Module, Port,
-    SubModuleInstance,
+    ClockInfo, Declaration, Instruction, Interface, InterfaceDeclaration, LatencyDomainInfo,
+    Module, Port, SubModuleInstance,
 };
 use crate::linker::{LinkInfo, checkpoint::ErrorCheckpoint};
 
@@ -354,11 +354,20 @@ impl ErrorInfoObject for &Instruction {
     }
 }
 
-impl ErrorInfoObject for &DomainInfo {
+impl ErrorInfoObject for &ClockInfo {
     fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
             span: self.name_span?,
-            info: format!("Domain '{}' declared here", self.name),
+            info: format!("Clock '{}' declared here", self.name),
+        })
+    }
+}
+
+impl ErrorInfoObject for &LatencyDomainInfo {
+    fn make_info(self) -> Option<ErrorInfo> {
+        Some(ErrorInfo {
+            span: self.name_span?,
+            info: format!("Latency Domain '{}' declared here", self.name),
         })
     }
 }
@@ -401,7 +410,7 @@ impl ErrorInfoObject for &LinkInfo {
 impl ErrorInfoObject for (&Module, &LinkerFiles) {
     fn make_info(self) -> Option<ErrorInfo> {
         let (md, files) = self;
-        let ports_str = md.display_all_ports_info(&files[md.link_info.span.file].file_text, None);
+        let ports_str = md.display_all_ports_info(&files[md.link_info.span.file].file_text);
 
         Some(ErrorInfo {
             span: md.link_info.name_span,

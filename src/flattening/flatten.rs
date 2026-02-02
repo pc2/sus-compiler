@@ -28,7 +28,7 @@ enum NamedLocal {
     SubModule(FlatID),
     LocalInterface(FlatID),
     TemplateType(TemplateID),
-    DomainDecl(DomainID),
+    LatDomainDecl(LatDomID),
 }
 
 enum LocalOrGlobal {
@@ -136,8 +136,10 @@ struct FlatteningContext<'l, 'errs> {
     parameters: TVec<Parameter>,
     instructions: FlatAlloc<Instruction, FlatIDMarker>,
 
-    domains: FlatAlloc<DomainInfo, DomainIDMarker>,
-    current_domain: DomainID,
+    clocks: FlatAlloc<ClockInfo, ClockIDMarker>,
+    latency_domains: FlatAlloc<LatencyDomainInfo, LatDomIDMarker>,
+    //current_clock: ClockID // TODO Clocks See [SINGULAR_CLOCK_DOMAIN]
+    current_latency_domain: LatDomID,
 
     fields: FlatAlloc<StructField, FieldIDMarker>,
     ports: FlatAlloc<Port, PortIDMarker>,
@@ -150,7 +152,7 @@ struct FlatteningContext<'l, 'errs> {
     current_parent_condition: Option<ParentCondition>,
 }
 
-const SINGULAR_CLOCK_DOMAIN: DomainID = DomainID::from_hidden_value(0);
+const SINGULAR_CLOCK_DOMAIN: ClockID = ClockID::from_hidden_value(0);
 
 // Otherwise clippy reports silly things like kind!("number") | kind!("float") | kind!("bool_array_literal") as "make this a range" errors
 #[allow(clippy::manual_range_patterns)]
@@ -187,7 +189,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 parent_condition: self.current_parent_condition,
                                 output: ExpressionOutput::SubExpression(AbstractRankedType::UNKNOWN),
                                 span: name_span,
-                                domain: DomainType::UNKNOWN,
+                                clock_domain: ClockDomain::UNKNOWN,
                                 source: ExpressionSource::WireRef(WireReference {
                                     root: WireReferenceRoot::LocalDecl(decl_id),
                                     root_span: name_span,
@@ -202,9 +204,9 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 .info_obj(self.instructions[sm].unwrap_submodule());
                             None
                         }
-                        Some(NamedLocal::DomainDecl(dom)) => {
+                        Some(NamedLocal::LatDomainDecl(dom)) => {
                             self.errors.error(name_span, format!("{name} does not name a Type or a Value. Domains are not allowed!"))
-                                .info_obj(&self.domains[dom]);
+                                .info_obj(&self.latency_domains[dom]);
                             None
                         }
                         Some(NamedLocal::LocalInterface(interf)) => {
@@ -351,13 +353,13 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
                         ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
                     }
-                    LocalOrGlobal::Local(span, NamedLocal::DomainDecl(domain_id)) => {
+                    LocalOrGlobal::Local(span, NamedLocal::LatDomainDecl(domain_id)) => {
                         self.errors
                             .error(
                                 span,
                                 format!("This is not a {accepted_text}, it is a domain instead!"),
                             )
-                            .info_obj(&self.domains[domain_id]);
+                            .info_obj(&self.latency_domains[domain_id]);
 
                         ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
                     }
@@ -424,8 +426,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 NamedLocal::TemplateType(template_id) => {
                     err_ref.info_obj(&self.parameters[template_id]);
                 }
-                NamedLocal::DomainDecl(domain_id) => {
-                    err_ref.info_obj(&self.domains[domain_id]);
+                NamedLocal::LatDomainDecl(domain_id) => {
+                    err_ref.info_obj(&self.latency_domains[domain_id]);
                 }
             }
         }
@@ -509,7 +511,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         name: name.to_owned(),
                         name_span,
                         module_ref,
-                        local_domain_map: OnceCell::new(),
+                        submodule_clock_map: OnceCell::new(),
                         typ: AbstractRankedType::UNKNOWN,
                         documentation,
                     };
@@ -557,14 +559,15 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             name_span,
                             decl_span,
                             direction,
-                            domain: self.current_domain,
+                            lat_dom: self.current_latency_domain,
                             declaration_instruction,
                             latency_specifier,
                         });
                         let parent_interface = self.interfaces.alloc(Interface {
                             name_span,
                             name: name.to_owned(),
-                            domain: Some(self.current_domain),
+                            lat_dom: Some(self.current_latency_domain),
+                            clock: Some(SINGULAR_CLOCK_DOMAIN),
                             declaration_instruction: Some(InterfaceDeclKind::SinglePort(
                                 declaration_instruction,
                             )),
@@ -575,6 +578,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             port_id,
                             parent_interface,
                             is_standalone_port: true,
+                            latency_domain: self.current_latency_domain,
                         }
                     } else {
                         let is_state = state_kw.is_some();
@@ -657,7 +661,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         name_span,
                         decl_span,
                         direction,
-                        domain: self.current_domain,
+                        lat_dom: self.current_latency_domain,
                         declaration_instruction,
                         latency_specifier,
                     });
@@ -667,6 +671,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         port_id,
                         parent_interface,
                         is_standalone_port: false,
+                        latency_domain: self.current_latency_domain,
                     }
                 }
                 d @ DeclarationKind::RegularGenerative
@@ -683,12 +688,12 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 }
             };
 
-            let domain = if let DeclarationKind::Port { .. } = decl_kind {
-                DomainType::Physical(UniCell::new(SINGULAR_CLOCK_DOMAIN))
+            let clock_domain = if let DeclarationKind::Port { .. } = decl_kind {
+                ClockDomain::Physical(UniCell::new(SINGULAR_CLOCK_DOMAIN))
             } else if decl_kind.is_generative() {
-                DomainType::Generative
+                ClockDomain::Generative
             } else {
-                DomainType::Physical(DomainID::UNKNOWN)
+                ClockDomain::Physical(ClockID::UNKNOWN)
             };
             self.instructions.alloc_next_alloc_id(
                 declaration_instruction,
@@ -696,7 +701,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     parent_condition: self.current_parent_condition,
                     typ_expr,
                     typ: AbstractRankedType::UNKNOWN,
-                    domain,
+                    clock_domain,
                     declaration_itself_is_not_written_to,
                     name: name.to_owned(),
                     name_span,
@@ -802,7 +807,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let (source, span) = self.flatten_expr_source(cursor);
         let wire_instance = Expression {
             parent_condition: self.current_parent_condition,
-            domain: DomainType::UNKNOWN,
+            clock_domain: ClockDomain::UNKNOWN,
             span,
             source,
             output: ExpressionOutput::SubExpression(AbstractRankedType::UNKNOWN),
@@ -837,7 +842,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let wire_instance = Expression {
             parent_condition: self.current_parent_condition,
             span,
-            domain: DomainType::UNKNOWN,
+            clock_domain: ClockDomain::UNKNOWN,
             source,
             output,
         };
@@ -861,7 +866,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             span: root_span,
             parent_condition: self.current_parent_condition,
             source: ExpressionSource::WireRef(wire_ref),
-            domain: DomainType::UNKNOWN,
+            clock_domain: ClockDomain::UNKNOWN,
             output: ExpressionOutput::SubExpression(AbstractRankedType::UNKNOWN),
         }))
     }
@@ -1141,8 +1146,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 .info_obj(&self.parameters[template_id]);
                             self.new_error(expr_span)
                         }
-                        NamedLocal::DomainDecl(domain_id) => {
-                            let domain = &self.domains[domain_id];
+                        NamedLocal::LatDomainDecl(domain_id) => {
+                            let domain = &self.latency_domains[domain_id];
                             self.errors
                                 .error(
                                     span,
@@ -1151,7 +1156,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                         domain.name
                                     ),
                                 )
-                                .info(span, format!("Domain {} declared here", domain.name));
+                                .info_obj(domain);
                             self.new_error(expr_span)
                         }
                     },
@@ -1520,7 +1525,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     name_span,
                     decl_span: interface_decl_span,
                     direction: Direction::Input,
-                    domain: self.current_domain,
+                    lat_dom: self.current_latency_domain,
                     declaration_instruction,
                     latency_specifier,
                 });
@@ -1531,7 +1536,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     name_span,
                     decl_span: interface_decl_span,
                     direction: Direction::Output,
-                    domain: self.current_domain,
+                    lat_dom: self.current_latency_domain,
                     declaration_instruction,
                     latency_specifier,
                 });
@@ -1553,7 +1558,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 is_local,
                 inputs: Vec::new(),
                 outputs: Vec::new(),
-                domain: UniCell::new(SINGULAR_CLOCK_DOMAIN),
+                clock_domain: UniCell::new(SINGULAR_CLOCK_DOMAIN),
+                latency_domain: self.current_latency_domain,
                 then_block: FlatIDRange::PLACEHOLDER,
                 else_block: FlatIDRange::PLACEHOLDER,
                 then_span: Some(Span::PLACEHOLDER),
@@ -1566,7 +1572,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let new_interface = Interface {
             name_span,
             name: name.to_owned(),
-            domain: Some(self.current_domain),
+            lat_dom: Some(self.current_latency_domain),
+            clock: Some(SINGULAR_CLOCK_DOMAIN),
             declaration_instruction: Some(InterfaceDeclKind::Interface(declaration_instruction)),
         };
         let interface_id = if name == self.name {
@@ -1637,23 +1644,35 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     fn parse_domain(&mut self, cursor: &mut Cursor<'c>) {
         let (domain_name_span, domain_name) =
             cursor.field_span(field!("name"), kind!("identifier"));
-        if self.domains.is_empty()
+        if self.clocks.is_empty() {
+            if let Some(existing_port) = self.ports.iter().next() {
+                // Sad Path: Having ports on the implicit clk domain is not allowed.
+                self.errors.error(domain_name_span, "When using explicit clocks, no port is allowed to be declared on the implicit 'clk' clock.")
+                    .info(existing_port.1.decl_span, "A domain should be explicitly defined before this port");
+            }
+            self.clocks.alloc(ClockInfo {
+                name: domain_name.to_owned(),
+                name_span: Some(domain_name_span),
+            });
+        }
+        if self.latency_domains.is_empty()
             && let Some(existing_port) = self.ports.iter().next()
         {
             // Sad Path: Having ports on the implicit clk domain is not allowed.
-            self.errors.error(domain_name_span, "When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.")
-                        .info(existing_port.1.decl_span, "A domain should be explicitly defined before this port");
+            self.errors.error(domain_name_span, "When using explicit latency domains, no port is allowed to be declared on the implicit 'default' latency domain.")
+                .info(existing_port.1.decl_span, "A domain should be explicitly defined before this port");
         }
-        let domain_id = self.domains.alloc(DomainInfo {
+        let lat_dom_id = self.latency_domains.alloc(LatencyDomainInfo {
             name: domain_name.to_owned(),
+            clock: SINGULAR_CLOCK_DOMAIN,
             name_span: Some(domain_name_span),
         });
-        self.current_domain = domain_id;
+        self.current_latency_domain = lat_dom_id;
 
         self.alloc_local_name(
             domain_name_span,
             domain_name,
-            NamedLocal::DomainDecl(domain_id),
+            NamedLocal::LatDomainDecl(lat_dom_id),
         );
     }
 
@@ -1723,7 +1742,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     to,
                     to_span,
                     write_modifiers,
-                    target_domain: DomainType::UNKNOWN,
+                    target_domain: ClockDomain::UNKNOWN,
                 }
             })
         })
@@ -1790,6 +1809,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     parent_interface,
                     port_id: UUID::PLACEHOLDER,
                     is_standalone_port: false,
+                    latency_domain: self.current_latency_domain,
                 },
                 cursor,
             );
@@ -1802,6 +1822,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     parent_interface,
                     port_id: UUID::PLACEHOLDER,
                     is_standalone_port: false,
+                    latency_domain: self.current_latency_domain,
                 },
                 cursor,
             );
@@ -1899,7 +1920,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             parent_condition: self.current_parent_condition,
                             typ_expr,
                             typ: AbstractRankedType::UNKNOWN,
-                            domain: DomainType::Generative,
+                            clock_domain: ClockDomain::Generative,
                             decl_span,
                             name_span,
                             name: name.to_owned(),
@@ -1917,7 +1938,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         self.interfaces.alloc(Interface {
             name_span,
             name: name.to_owned(),
-            domain: None,
+            lat_dom: None,
+            clock: Some(SINGULAR_CLOCK_DOMAIN),
             declaration_instruction: None,
         });
 
@@ -1992,12 +2014,13 @@ fn flatten_global(
         fields: FlatAlloc::new(),
         ports: FlatAlloc::new(),
         interfaces: FlatAlloc::new(),
-        domains: FlatAlloc::new(),
+        clocks: FlatAlloc::new(),
+        latency_domains: FlatAlloc::new(),
         default_decl_kind,
         errors,
         instructions: FlatAlloc::new(),
         parameters: FlatAlloc::new(),
-        current_domain: UUID::from_hidden_value(0),
+        current_latency_domain: UUID::from_hidden_value(0),
         local_variable_context: LocalVariableContext::new_initial(),
     };
 
@@ -2005,7 +2028,8 @@ fn flatten_global(
 
     let instructions = context.instructions;
     let parameters = context.parameters;
-    let mut domains = context.domains;
+    let mut clocks = context.clocks;
+    let mut latency_domains = context.latency_domains;
     let interfaces = context.interfaces;
     let ports = context.ports;
     let fields = context.fields;
@@ -2013,13 +2037,21 @@ fn flatten_global(
     let mut working_on_mut = pass.get_mut();
     match &mut working_on_mut {
         GlobalObj::Module(md) => {
-            if domains.is_empty() {
-                domains.alloc(DomainInfo {
+            if clocks.is_empty() {
+                clocks.alloc(ClockInfo {
                     name: "clk".to_string(),
                     name_span: None,
                 });
             }
-            md.domains = domains;
+            if latency_domains.is_empty() {
+                latency_domains.alloc(LatencyDomainInfo {
+                    name: "default".to_string(),
+                    clock: SINGULAR_CLOCK_DOMAIN,
+                    name_span: None,
+                });
+            }
+            md.clocks = clocks;
+            md.latency_domains = latency_domains;
             md.interfaces = interfaces;
             md.ports = ports;
 

@@ -230,7 +230,7 @@ fn expression_to_param_linearity(
 
 #[derive(Debug, Clone)]
 struct FullPortLatencyLinearity {
-    domain: DomainID,
+    latency_domain: LatDomID,
     direction: Direction,
     latency_linearity: Option<ParamLinearity>,
 }
@@ -335,7 +335,7 @@ fn make_latency_inference_info(
 
     for (from_id, from) in port_latency_linearities {
         for (to_id, to) in port_latency_linearities {
-            if from.domain != to.domain {
+            if from.latency_domain != to.latency_domain {
                 continue;
             }
 
@@ -437,7 +437,7 @@ fn make_latency_inference_info(
         dfs_fanout(&not_poison_edges, from_id, &mut reachable_from_from);
 
         for (to_id, to) in port_latency_linearities {
-            if from.domain == to.domain
+            if from.latency_domain == to.latency_domain
                 && !reachable_from_from[to_id]
                 && from.direction == Direction::Input
                 && to.direction == Direction::Output
@@ -619,7 +619,7 @@ impl PortLatencyInferenceInfo {
             });
 
             FullPortLatencyLinearity {
-                domain: port.domain,
+                latency_domain: port.lat_dom,
                 direction: port.direction,
                 latency_linearity,
             }
@@ -720,13 +720,13 @@ mod tests {
             },
             list_of_lists::ListOfLists,
         },
-        prelude::{DomainID, PortIDMarker, WireID},
+        prelude::{ClockID, PortIDMarker, WireID},
     };
 
     use super::{FullPortLatencyLinearity, ParamLinearity, PortLatencyInferenceInfo};
 
     fn mk_input_linearity(
-        domain: DomainID,
+        domain: ClockID,
         const_factor: i64,
         arg_factors: Vec<i64>,
     ) -> FullPortLatencyLinearity {
@@ -740,7 +740,7 @@ mod tests {
         }
     }
     fn mk_output_linearity(
-        domain: DomainID,
+        domain: ClockID,
         const_factor: i64,
         arg_factors: Vec<i64>,
     ) -> FullPortLatencyLinearity {

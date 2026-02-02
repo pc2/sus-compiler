@@ -17,7 +17,7 @@ use crate::{
     typing::{
         abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType},
         concrete_type::{ConcreteTemplateArg, ConcreteType},
-        domain_type::DomainType,
+        domain_type::ClockDomain,
         template::{TVec, TemplateKind},
         unifyable_cell::UniCell,
     },
@@ -724,7 +724,7 @@ impl<'l> ExecutionContext<'l> {
         &mut self,
         wire_ref: &'l WireReference,
         original_instruction: FlatID,
-        domain: DomainID,
+        domain: ClockID,
     ) -> ExecutionResult<(WireID, Vec<RealWirePathElem>)> {
         self.link_info.instructions[original_instruction]
             .get_span()
@@ -772,7 +772,7 @@ impl<'l> ExecutionContext<'l> {
                                 original_instruction: split.original_decl,
                                 typ: split.element_typ_prototype.clone_prototype(),
                                 name,
-                                domain,
+                                clock: domain,
                                 specified_latency: split.specified_latency_prototype,
                                 absolute_latency: AbsLat::UNKNOWN,
                                 is_port: split.is_port_prototype,
@@ -793,10 +793,10 @@ impl<'l> ExecutionContext<'l> {
                 );
                 let port_decl = submod_md.link_info.instructions[port_decl].unwrap_declaration();
                 let_unwrap!(DeclarationKind::Port { port_id, .. }, port_decl.decl_kind);
-                let local_domain_map = submod.local_domain_map.get().unwrap();
-                let domain = &local_domain_map[submod_interface.domain.unwrap()];
+                let local_domain_map = submod.submodule_clock_map.get().unwrap();
+                let clock = &local_domain_map[submod_interface.clock.unwrap()];
                 let submod_id = self.generation_state[*submod_id].unwrap_submodule_instance();
-                self.get_submodule_port(submod_id, port_id, Some(port_span), *domain.unwrap())
+                self.get_submodule_port(submod_id, port_id, Some(port_span), *clock.unwrap())
             }
             WireReferenceRoot::NamedConstant(cst) => {
                 let (value, typ) = self.get_named_constant_value(cst)?;
@@ -850,7 +850,7 @@ impl<'l> ExecutionContext<'l> {
         original_instruction: FlatID,
         from: WireID,
         write_span: Span,
-        domain: DomainID,
+        domain: ClockID,
     ) -> ExecutionResult<()> {
         let_unwrap!(
             WriteModifiers::Connection {
@@ -908,7 +908,7 @@ impl<'l> ExecutionContext<'l> {
         value: Value,
         abs_typ: &AbstractRankedType,
         original_instruction: FlatID,
-        domain: DomainID,
+        domain: ClockID,
         const_span: Span,
     ) -> ExecutionResult<WireID> {
         if value.contains_unset() {
@@ -929,21 +929,21 @@ impl<'l> ExecutionContext<'l> {
                 .map_err(|msg| (const_span, msg))?,
             source: RealWireDataSource::Constant { value },
             original_instruction,
-            domain,
+            clock: domain,
             name: self.unique_name_producer.get_unique_name(name_hint),
             specified_latency: AbsLat::UNKNOWN,
             absolute_latency: AbsLat::UNKNOWN,
             is_port: IsPort::PlainWire,
         }))
     }
-    fn alloc_bool(&mut self, v: bool, original_instruction: FlatID, domain: DomainID) -> WireID {
+    fn alloc_bool(&mut self, v: bool, original_instruction: FlatID, domain: ClockID) -> WireID {
         self.wires.alloc(RealWire {
             typ: ConcreteType::BOOL,
             source: RealWireDataSource::Constant {
                 value: Value::Bool(v),
             },
             original_instruction,
-            domain,
+            clock: domain,
             name: self.unique_name_producer.get_unique_name(""),
             specified_latency: AbsLat::UNKNOWN,
             absolute_latency: AbsLat::UNKNOWN,
@@ -955,7 +955,7 @@ impl<'l> ExecutionContext<'l> {
     fn get_wire_or_constant_as_wire(
         &mut self,
         original_instruction: FlatID,
-        domain: DomainID,
+        domain: ClockID,
     ) -> ExecutionResult<WireID> {
         match &self.generation_state[original_instruction] {
             SubModuleOrWire::SubModule(_) => unreachable!(),
@@ -985,7 +985,7 @@ impl<'l> ExecutionContext<'l> {
         sub_module_id: SubModuleID,
         port_id: PortID,
         port_name_span: Option<Span>,
-        domain: DomainID,
+        domain: ClockID,
     ) -> WireID {
         let submod_instance = &mut self.submodules[sub_module_id]; // Separately grab the same submodule every time because we take a &mut in for get_wire_or_constant_as_wire
         let wire_found = &mut submod_instance.port_map[port_id];
@@ -1041,7 +1041,7 @@ impl<'l> ExecutionContext<'l> {
             let new_wire = self.wires.alloc(RealWire {
                 source,
                 original_instruction,
-                domain,
+                clock: domain,
                 typ,
                 name,
                 specified_latency: AbsLat::UNKNOWN,
@@ -1082,7 +1082,7 @@ impl<'l> ExecutionContext<'l> {
         submod_id: SubModuleID,
         interface_id: InterfaceID,
         interface_span: Span,
-        domain: DomainID,
+        domain: ClockID,
     ) -> InterfaceWires {
         add_to_small_set(
             &mut self.submodules[submod_id].interface_call_sites[interface_id],
@@ -1137,7 +1137,7 @@ impl<'l> ExecutionContext<'l> {
         &mut self,
         interface_ref: &'l WireReference,
         original_instruction: FlatID,
-        domain: DomainID,
+        domain: ClockID,
     ) -> ExecutionResult<InterfaceWires> {
         match &interface_ref.root {
             WireReferenceRoot::LocalSubmodule(submod_decl_id) => {
@@ -1212,12 +1212,12 @@ impl<'l> ExecutionContext<'l> {
         &mut self,
         expression: &'l Expression,
         original_instruction: FlatID,
-        domain: DomainID,
+        clock: ClockID,
     ) -> ExecutionResult<Vec<WireID>> {
         let source = match &expression.source {
             ExpressionSource::WireRef(wire_ref) => {
                 let (root_wire, path) =
-                    self.wire_ref_to_real_path(wire_ref, original_instruction, domain)?;
+                    self.wire_ref_to_real_path(wire_ref, original_instruction, clock)?;
 
                 RealWireDataSource::Select {
                     root: root_wire,
@@ -1225,7 +1225,7 @@ impl<'l> ExecutionContext<'l> {
                 }
             }
             ExpressionSource::UnaryOp { op, rank, right } => {
-                let right = self.get_wire_or_constant_as_wire(*right, domain)?;
+                let right = self.get_wire_or_constant_as_wire(*right, clock)?;
                 RealWireDataSource::UnaryOp {
                     op: *op,
                     rank: self.alloc_array_dimensions_stack(rank),
@@ -1238,8 +1238,8 @@ impl<'l> ExecutionContext<'l> {
                 left,
                 right,
             } => {
-                let left = self.get_wire_or_constant_as_wire(*left, domain)?;
-                let right = self.get_wire_or_constant_as_wire(*right, domain)?;
+                let left = self.get_wire_or_constant_as_wire(*left, clock)?;
+                let right = self.get_wire_or_constant_as_wire(*right, clock)?;
                 RealWireDataSource::BinaryOp {
                     op: *op,
                     rank: self.alloc_array_dimensions_stack(rank),
@@ -1251,10 +1251,10 @@ impl<'l> ExecutionContext<'l> {
                 let func_expr =
                     self.link_info.instructions[fc.func_wire_ref].unwrap_subexpression();
                 let_unwrap!(ExpressionSource::WireRef(f_wr), &func_expr.source);
-                let func_interface = self.get_interface(f_wr, fc.func_wire_ref, domain)?;
+                let func_interface = self.get_interface(f_wr, fc.func_wire_ref, clock)?;
 
                 if let Some(condition) = func_interface.condition_wire {
-                    let true_wire = self.alloc_bool(true, original_instruction, domain);
+                    let true_wire = self.alloc_bool(true, original_instruction, clock);
 
                     self.instantiate_write_to_wire(
                         condition,
@@ -1267,7 +1267,7 @@ impl<'l> ExecutionContext<'l> {
 
                 for (port_wire, arg) in zip_eq(&func_interface.inputs, &fc.arguments) {
                     let arg_span = self.link_info.instructions[*arg].get_span();
-                    let from = self.get_wire_or_constant_as_wire(*arg, domain)?;
+                    let from = self.get_wire_or_constant_as_wire(*arg, clock)?;
                     self.instantiate_write_to_wire(*port_wire, Vec::new(), from, 0, arg_span);
                 }
 
@@ -1276,7 +1276,7 @@ impl<'l> ExecutionContext<'l> {
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut array_wires = Vec::with_capacity(arr.len());
                 for v_id in arr {
-                    let wire_id = self.get_wire_or_constant_as_wire(*v_id, domain)?;
+                    let wire_id = self.get_wire_or_constant_as_wire(*v_id, clock)?;
                     array_wires.push(wire_id);
                 }
                 RealWireDataSource::ConstructArray { array_wires }
@@ -1293,7 +1293,7 @@ impl<'l> ExecutionContext<'l> {
             name: self.unique_name_producer.get_unique_name(""),
             typ,
             original_instruction,
-            domain,
+            clock,
             source,
             specified_latency: AbsLat::UNKNOWN,
             absolute_latency: AbsLat::UNKNOWN,
@@ -1384,7 +1384,7 @@ impl<'l> ExecutionContext<'l> {
                     name: self.unique_name_producer.get_unique_name(&wire_decl.name),
                     typ,
                     original_instruction,
-                    domain: wire_decl.domain.unwrap_physical(),
+                    clock: wire_decl.clock_domain.unwrap_physical(),
                     source,
                     specified_latency,
                     absolute_latency: AbsLat::UNKNOWN,
@@ -1532,21 +1532,21 @@ impl<'l> ExecutionContext<'l> {
             // Interface execution is up to whoever calls it
             return Ok(SubModuleOrWire::Unassigned);
         }
-        Ok(match expr.domain.unwrap() {
-            DomainType::Generative => {
+        Ok(match expr.clock_domain.unwrap() {
+            ClockDomain::Generative => {
                 let value_computed = self.compute_compile_time(expr)?;
                 match &expr.output {
                     ExpressionOutput::SubExpression(_full_type) => {} // Simply returning value_computed is enough
                     ExpressionOutput::MultiWrite(write_tos) => {
                         if let Some(single_write) = write_tos.first() {
                             match single_write.target_domain.unwrap() {
-                                DomainType::Generative => {
+                                ClockDomain::Generative => {
                                     self.write_generative(
                                         single_write,
                                         value_computed.clone(), // We do an extra clone, maybe not needed, such that we can show the value in GenerationState
                                     )?;
                                 }
-                                DomainType::Physical(domain) => {
+                                ClockDomain::Physical(domain) => {
                                     let value_as_wire = self.alloc_wire_for_const(
                                         value_computed.clone(),
                                         &single_write.to.output_typ,
@@ -1568,7 +1568,7 @@ impl<'l> ExecutionContext<'l> {
                 }
                 SubModuleOrWire::CompileTimeValue(value_computed)
             }
-            DomainType::Physical(domain) => {
+            ClockDomain::Physical(domain) => {
                 let output_wires =
                     self.expression_to_real_wire(expr, original_instruction, *domain.unwrap())?;
                 match &expr.output {
@@ -1717,12 +1717,12 @@ impl<'l> ExecutionContext<'l> {
                             },
                             _ => unreachable!(),
                         };
-                        let domain = *interface.domain.unwrap();
+                        let domain = *interface.clock_domain.unwrap();
                         let condition_wire = self.wires.alloc(RealWire {
                             name: self.unique_name_producer.get_unique_name(&interface.name),
                             typ: ConcreteType::BOOL,
                             original_instruction,
-                            domain,
+                            clock: domain,
                             source,
                             specified_latency,
                             absolute_latency: AbsLat::UNKNOWN,

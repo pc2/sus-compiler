@@ -188,7 +188,7 @@ impl LatencyCountingProblem {
                 // The module has already been instantiated, so we know all local absolute latencies
                 // No inference edges, No poison edges
 
-                for d in sm_md.domains.id_range() {
+                for d in sm_md.clocks.id_range() {
                     for (_, port, wire) in
                         crate::alloc::zip_eq(&instance.interface_ports, &sm.port_map)
                     {
@@ -230,12 +230,12 @@ impl LatencyCountingProblem {
     }
 
     fn make_ports_per_domain(&self, ctx: &ModuleTypingContext) -> Vec<Vec<usize>> {
-        let mut ports_per_domain_flat = ctx.md.domains.map(|_| Vec::new());
+        let mut ports_per_domain_flat = ctx.md.latency_domains.map(|_| Vec::new());
         for (_id, port) in &ctx.md.ports {
             if let SubModuleOrWire::Wire(port_w) =
                 ctx.generation_state[port.declaration_instruction]
             {
-                ports_per_domain_flat[port.domain].push(self.map_wire_to_latency_node[port_w]);
+                ports_per_domain_flat[port.lat_dom].push(self.map_wire_to_latency_node[port_w]);
             }
         }
         let mut ports_per_domain = ports_per_domain_flat.into_vec();

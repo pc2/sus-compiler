@@ -11,7 +11,7 @@ use crate::{
     latency::port_latency_inference::PortLatencyInferenceInfo,
     linker::{Documentation, LinkInfo},
     typing::abstract_type::{AbstractGlobalReference, AbstractRankedType, PeanoType},
-    typing::domain_type::DomainType,
+    typing::domain_type::ClockDomain,
     typing::template::{TVec, TemplateKind},
     typing::unifyable_cell::UniCell,
     value::Value,
@@ -55,7 +55,9 @@ pub struct Module {
     pub inference_info: PortLatencyInferenceInfo,
 
     /// Created in Stage 2: Initialization
-    pub domains: FlatAlloc<DomainInfo, DomainIDMarker>,
+    pub clocks: FlatAlloc<ClockInfo, ClockIDMarker>,
+
+    pub latency_domains: FlatAlloc<LatencyDomainInfo, LatDomIDMarker>,
 
     /// Created in Stage 2: Initialization
     ///
@@ -68,7 +70,7 @@ impl Module {
     ///
     /// See #7
     pub fn get_clock_name(&self) -> &str {
-        &self.domains.iter().next().unwrap().1.name
+        &self.clocks.iter().next().unwrap().1.name
     }
     pub fn get_fn_interface(&self, interface_id: InterfaceID) -> &InterfaceDeclaration {
         let interface = &self.interfaces[interface_id];
@@ -144,22 +146,25 @@ pub struct NamedConstant {
     pub output_decl: FlatID,
 }
 
-/// Information about a (clock) domain.
+/// Information about a clock domain.
 ///
-/// Right now this only contains the domain name, but when actual clock domains are implemented (#7),
-/// this will contain information about the Clock.
+/// Right now this only contains the clock name, but when actual clock domains are implemented (#7),
+/// this will contain information about the Clock, like if its an input or output clock.
 #[derive(Debug, Clone)]
-pub struct DomainInfo {
+pub struct ClockInfo {
     pub name: String,
     /// May be [None] for the default `clk` domain
     pub name_span: Option<Span>,
 }
-
-/// With this struct, we convert the domains of a submodule, to their connecting domains in the containing module
-#[derive(Clone, Copy)]
-pub struct InterfaceToDomainMap<'linker> {
-    pub local_domain_map: &'linker FlatAlloc<DomainType, DomainIDMarker>,
-    pub domains: &'linker FlatAlloc<DomainInfo, DomainIDMarker>,
+/// Information about a latency domain.
+///
+/// It's a name and what clock it falls under
+#[derive(Debug, Clone)]
+pub struct LatencyDomainInfo {
+    pub name: String,
+    pub clock: ClockID,
+    /// May be [None] for the default `clk` domain
+    pub name_span: Option<Span>,
 }
 
 /// A port of a module. Not to be confused with [PortReference], which is a reference to a submodule port.
@@ -189,7 +194,7 @@ pub struct Port {
     pub name_span: Span,
     pub decl_span: Span,
     pub direction: Direction,
-    pub domain: DomainID,
+    pub lat_dom: LatDomID,
     /// Points to a [Declaration]
     pub declaration_instruction: FlatID,
     pub latency_specifier: Option<FlatID>,
@@ -252,7 +257,8 @@ pub enum InterfaceDeclKind {
 pub struct Interface {
     pub name_span: Span,
     pub name: String,
-    pub domain: Option<DomainID>,
+    pub lat_dom: Option<LatDomID>,
+    pub clock: Option<ClockID>,
     pub declaration_instruction: Option<InterfaceDeclKind>,
 }
 
@@ -430,7 +436,7 @@ pub struct WriteTo {
     pub to: WireReference,
     pub to_span: Span,
     pub write_modifiers: WriteModifiers,
-    pub target_domain: UniCell<DomainType>,
+    pub target_domain: UniCell<ClockDomain>,
 }
 
 /// -x
@@ -540,7 +546,7 @@ pub struct Expression {
     pub parent_condition: Option<ParentCondition>,
     pub source: ExpressionSource,
     /// Means [Self::source] can be computed at compiletime, not that [Self::output] neccesarily requires a generative result
-    pub domain: UniCell<DomainType>,
+    pub clock_domain: UniCell<ClockDomain>,
 
     /// If [None], then this function returns a single result like a normal expression
     /// If Some(outputs), then this function is a dead-end expression, and does it's outputs manually
@@ -560,7 +566,7 @@ impl Expression {
         };
         Some(SingleOutputExpression {
             typ,
-            domain: &self.domain,
+            domain: &self.clock_domain,
             span: self.span,
             source: &self.source,
         })
@@ -592,6 +598,7 @@ pub enum DeclarationKind {
         port_id: PortID,
         parent_interface: InterfaceID,
         is_standalone_port: bool,
+        latency_domain: LatDomID,
     },
     ConditionalBinding {
         when_id: FlatID,
@@ -653,7 +660,7 @@ pub struct Declaration {
     pub typ_expr: WrittenType,
     pub typ: AbstractRankedType,
     /// In a declaration, we immediately known if we're generative, but not the exact physical domain.
-    pub domain: DomainType,
+    pub clock_domain: ClockDomain,
     pub decl_span: Span,
     pub name_span: Span,
     pub name: String,
@@ -681,10 +688,10 @@ pub struct SubModuleInstance {
     pub name_span: Span,
     /// Maps each of the module's local domains to the domain that it is used in.
     ///
-    /// `local_domain_map[submodule_domain] = parent_domain`
+    /// `submodule_clock_map[submodule_clock] = parent_clock`
     ///
-    /// These are *always* [DomainType::Physical] (of course, start out as [DomainType::Unknown] before typing)
-    pub local_domain_map: OnceCell<FlatAlloc<UniCell<DomainID>, DomainIDMarker>>,
+    /// These are *always* [ClockDomain::Physical] (of course, start out as [ClockDomain::UNKNOWN] before typing)
+    pub submodule_clock_map: OnceCell<FlatAlloc<UniCell<ClockID>, ClockIDMarker>>,
     pub typ: AbstractRankedType,
     pub documentation: Documentation,
 }
@@ -936,7 +943,8 @@ pub struct InterfaceDeclaration {
     pub else_block: FlatIDRange,
     pub then_span: Option<Span>,
     pub else_span: Option<Span>,
-    pub domain: UniCell<DomainID>,
+    pub clock_domain: UniCell<ClockID>,
+    pub latency_domain: LatDomID,
 }
 
 /// When a module has been parsed and flattened, it is turned into a large list of instructions,
@@ -963,7 +971,7 @@ pub enum Instruction {
 #[derive(Debug, Clone, Copy)]
 pub struct SingleOutputExpression<'e> {
     pub typ: &'e AbstractRankedType,
-    pub domain: &'e UniCell<DomainType>,
+    pub domain: &'e UniCell<ClockDomain>,
     pub span: Span,
     pub source: &'e ExpressionSource,
 }
@@ -984,7 +992,7 @@ impl Instruction {
         };
         SingleOutputExpression {
             typ,
-            domain: &expr.domain,
+            domain: &expr.clock_domain,
             span: expr.span,
             source: &expr.source,
         }

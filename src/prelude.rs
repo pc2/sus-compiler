@@ -94,16 +94,18 @@ impl InterfaceID {
     pub const MAIN_INTERFACE: InterfaceID = UUID(0, PhantomData);
 }
 
-pub struct DomainIDMarker;
-impl UUIDMarker for DomainIDMarker {
-    const DISPLAY_NAME: &'static str = "domain_";
+pub struct ClockIDMarker;
+impl UUIDMarker for ClockIDMarker {
+    const DISPLAY_NAME: &'static str = "clock_";
 }
-/// Interfaces are also indexed using DomainIDs. But in general, these refer to (clock/latency counting) domains
-pub type DomainID = UUID<DomainIDMarker>;
+pub type ClockID = UUID<ClockIDMarker>;
 
-impl DomainID {
-    pub const MAIN_DOMAIN: DomainID = UUID(0, PhantomData);
+pub struct LatDomIDMarker;
+impl UUIDMarker for LatDomIDMarker {
+    const DISPLAY_NAME: &'static str = "latdom_";
 }
+pub type LatDomID = UUID<LatDomIDMarker>;
+
 pub struct FieldIDMarker;
 impl UUIDMarker for FieldIDMarker {
     const DISPLAY_NAME: &'static str = "field_";

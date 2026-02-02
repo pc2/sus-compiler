@@ -4,20 +4,20 @@ use crate::prelude::*;
 use crate::typing::unifyable_cell::UnifyRecurse;
 
 // Exceptional use of these, to make the code below a little terser
-use DomainType::Generative;
-use DomainType::Physical;
+use ClockDomain::Generative;
+use ClockDomain::Physical;
 
 impl<'l> TypeCheckingContext<'l> {
     pub fn domain_check_instr(&self, instr: &'l Instruction) {
         match instr {
             Instruction::SubModule(sub_module_instance) => {
                 sub_module_instance
-                    .local_domain_map
+                    .submodule_clock_map
                     .set(
                         self.globals
                             .get_module(sub_module_instance.module_ref.id)
-                            .domains
-                            .map(|_| DomainID::UNKNOWN),
+                            .clocks
+                            .map(|_| ClockID::UNKNOWN),
                     )
                     .unwrap();
             }
@@ -84,14 +84,14 @@ impl<'l> TypeCheckingContext<'l> {
 
                 // Remove mutability
                 let resulting_domain = resulting_domain;
-                expr.domain.set_initial(resulting_domain);
+                expr.clock_domain.set_initial(resulting_domain);
 
                 // Regular "writes"
                 if let ExpressionOutput::MultiWrite(writes) = &expr.output {
                     for wr in writes {
-                        let mut target_domain: DomainType = self
+                        let mut target_domain: ClockDomain = self
                             .get_wireref_root_domain(&wr.to)
-                            .unwrap_or(Physical(DomainID::UNKNOWN));
+                            .unwrap_or(Physical(ClockID::UNKNOWN));
                         let mut target_span = wr.to.root_span;
 
                         match wr.write_modifiers {
@@ -130,7 +130,7 @@ impl<'l> TypeCheckingContext<'l> {
                         self.write_to_domain(
                             target_domain,
                             target_span,
-                            expr.domain.unwrap(),
+                            expr.clock_domain.unwrap(),
                             expr.span,
                         );
                     }
@@ -160,7 +160,7 @@ impl<'l> TypeCheckingContext<'l> {
                     for b in if_statement.iter_all_bindings() {
                         let binding_decl = self.link_info.instructions[b].unwrap_declaration();
                         // If the binding was generative, then that should have been its own error.
-                        if let Physical(binding_domain) = &binding_decl.domain {
+                        if let Physical(binding_domain) = &binding_decl.clock_domain {
                             self.unify_physicals(
                                 phys_condition,
                                 condition.span,
@@ -182,9 +182,9 @@ impl<'l> TypeCheckingContext<'l> {
 
     fn write_to_domain(
         &self,
-        target_domain: &'l DomainType,
+        target_domain: &'l ClockDomain,
         target_span: Span,
-        expr_domain: &'l DomainType,
+        expr_domain: &'l ClockDomain,
         expr_span: Span,
     ) {
         match (target_domain, expr_domain) {
@@ -208,10 +208,10 @@ impl<'l> TypeCheckingContext<'l> {
     fn get_condition_domain(
         &self,
         mut parent_condition: Option<ParentCondition>,
-    ) -> Option<(&'l UniCell<DomainID>, Span)> {
+    ) -> Option<(&'l UniCell<ClockID>, Span)> {
         while let Some(p_cond) = parent_condition {
             match &self.instructions[p_cond.parent_when] {
-                Instruction::Interface(decl) => return Some((&decl.domain, decl.name_span)),
+                Instruction::Interface(decl) => return Some((&decl.clock_domain, decl.name_span)),
                 Instruction::IfStatement(when) => {
                     let when_cond_expr = self.instructions[when.condition].unwrap_subexpression();
                     if let Physical(when_cond_physical) = when_cond_expr.domain.unwrap() {
@@ -242,23 +242,23 @@ impl<'l> TypeCheckingContext<'l> {
     /// - Writing:
     ///   The output_typ domain should be generative when wire_ref.root is generative, or a generative value is required such as with "initial"
     ///   When wire_ref.root is not generative, it should be an unknown domain variable
-    fn get_wireref_root_domain(&self, wire_ref: &'l WireReference) -> Option<DomainType> {
+    fn get_wireref_root_domain(&self, wire_ref: &'l WireReference) -> Option<ClockDomain> {
         match &wire_ref.root {
             WireReferenceRoot::LocalDecl(id) => Some(
                 self.unifier
-                    .clone_known(&self.instructions[*id].unwrap_declaration().domain),
+                    .clone_known(&self.instructions[*id].unwrap_declaration().clock_domain),
             ),
             WireReferenceRoot::LocalInterface(id) => {
                 let interface = self.instructions[*id].unwrap_interface();
 
-                Some(Physical(self.unifier.clone_unify(&interface.domain)))
+                Some(Physical(self.unifier.clone_unify(&interface.clock_domain)))
             }
             WireReferenceRoot::LocalSubmodule(local_submod) => {
                 let submod = self.instructions[*local_submod].unwrap_submodule();
                 let submod_ref = self.globals.get_declared_submodule(submod);
-                let local_domain_map = submod.local_domain_map.get().unwrap();
-                if local_domain_map.len() == 1 {
-                    let [singular_domain] = local_domain_map.cast_to_array();
+                let submodule_clock_map = submod.submodule_clock_map.get().unwrap();
+                if submodule_clock_map.len() == 1 {
+                    let [singular_domain] = submodule_clock_map.cast_to_array();
                     return Some(Physical(self.unifier.clone_unify(singular_domain)));
                 }
 
@@ -266,12 +266,11 @@ impl<'l> TypeCheckingContext<'l> {
                     if let WireReferencePathElement::FieldAccess { refers_to, .. } = p {
                         match refers_to.get() {
                             Some(PathElemRefersTo::Interface(_, Some(interface))) => {
-                                if let Some(domain_in_submod) =
-                                    submod_ref.md.interfaces[*interface].domain
-                                {
+                                let interf = &submod_ref.md.interfaces[*interface];
+                                if let Some(domain_in_submod) = interf.clock {
                                     return Some(Physical(
                                         self.unifier
-                                            .clone_unify(&local_domain_map[domain_in_submod]),
+                                            .clone_unify(&submodule_clock_map[domain_in_submod]),
                                     ));
                                 }
                             }
@@ -287,7 +286,7 @@ impl<'l> TypeCheckingContext<'l> {
             }
             WireReferenceRoot::NamedModule(global_ref) => {
                 self.global_ref_must_be_generative(global_ref);
-                Some(Physical(DomainID::UNKNOWN))
+                Some(Physical(ClockID::UNKNOWN))
             }
             WireReferenceRoot::Error => None,
         }
@@ -296,9 +295,9 @@ impl<'l> TypeCheckingContext<'l> {
     /// Used to quickly combine domains with each other. Also performs unification
     pub fn unify_physicals(
         &self,
-        a_dom: &'l UniCell<DomainID>,
+        a_dom: &'l UniCell<ClockID>,
         a_span: Span,
-        b_dom: &'l UniCell<DomainID>,
+        b_dom: &'l UniCell<ClockID>,
         b_span: Span,
         context: &str,
     ) {
@@ -310,9 +309,9 @@ impl<'l> TypeCheckingContext<'l> {
     /// Used to quickly combine domains with each other. Also performs unification
     pub fn set_physicals(
         &self,
-        a_dom: &mut UniCell<DomainID>,
+        a_dom: &mut UniCell<ClockID>,
         a_span: Span,
-        b_dom: &'l UniCell<DomainID>,
+        b_dom: &'l UniCell<ClockID>,
         b_span: Span,
         context: &str,
     ) {
@@ -324,9 +323,9 @@ impl<'l> TypeCheckingContext<'l> {
 
     fn report_domains_error(
         &self,
-        a_dom: &UniCell<DomainID>,
+        a_dom: &UniCell<ClockID>,
         a_span: Span,
-        b_dom: &UniCell<DomainID>,
+        b_dom: &UniCell<ClockID>,
         b_span: Span,
         context: &str,
     ) {
@@ -366,8 +365,8 @@ impl<'l> TypeCheckingContext<'l> {
 
     fn finalize_physical(
         &self,
-        domain: &'l UniCell<DomainID>,
-        id_alloc: &mut UUIDAllocator<DomainIDMarker>,
+        domain: &'l UniCell<ClockID>,
+        id_alloc: &mut UUIDAllocator<ClockIDMarker>,
     ) {
         if self.unifier.resolve(domain).is_err() {
             self.unifier.set_hard(domain, id_alloc.alloc());
@@ -376,8 +375,8 @@ impl<'l> TypeCheckingContext<'l> {
     }
     fn finalize_domain(
         &self,
-        domain: &'l UniCell<DomainType>,
-        id_alloc: &mut UUIDAllocator<DomainIDMarker>,
+        domain: &'l UniCell<ClockDomain>,
+        id_alloc: &mut UUIDAllocator<ClockIDMarker>,
     ) {
         match self.unifier.resolve(domain) {
             Ok(Generative) => {}
@@ -396,16 +395,16 @@ impl<'l> TypeCheckingContext<'l> {
         for (_, instr) in self.instructions {
             match instr {
                 Instruction::SubModule(sm) => {
-                    for (_, d) in sm.local_domain_map.get().unwrap() {
+                    for (_, d) in sm.submodule_clock_map.get().unwrap() {
                         self.finalize_physical(d, &mut unknown_domain_alloc);
                     }
                 }
-                Instruction::Declaration(declaration) => match &declaration.domain {
+                Instruction::Declaration(declaration) => match &declaration.clock_domain {
                     Generative => {}
                     Physical(phys) => self.finalize_physical(phys, &mut unknown_domain_alloc),
                 },
                 Instruction::Expression(expr) => {
-                    self.finalize_domain(&expr.domain, &mut unknown_domain_alloc);
+                    self.finalize_domain(&expr.clock_domain, &mut unknown_domain_alloc);
 
                     if let ExpressionOutput::MultiWrite(writes) = &expr.output {
                         for w in writes {
