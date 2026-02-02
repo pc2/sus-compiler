@@ -22,29 +22,29 @@ module RAM #(T, int DEPTH) {
 }
 
 module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
-	RAM#(T, DEPTH) mem
+	state T[DEPTH] mem
 	state int#(FROM: 0, TO: DEPTH) read_addr
 	state int#(FROM: 0, TO: DEPTH) write_addr
 
     domain clk
-    action rst'0 {
+    action rst {
         write_addr = 0
         read_addr = 0
     }
 
 	int space_remaining = read_addr - (write_addr + 1) mod DEPTH
 
-    domain write
+    domain push_dom
     output bool may_push'-MAY_PUSH_LATENCY = LatencyOffset #(OFFSET: -MAY_PUSH_LATENCY)(space_remaining > MAY_PUSH_LATENCY)
     action push'0 : T push_data'0 {
-        mem.write(write_addr, push_data)
+        mem[write_addr] = push_data
         write_addr = write_addr + 1 mod DEPTH
     }
     
-    domain read
+    domain pop_dom
     output bool may_pop'0 = read_addr != write_addr
     action pop'0 : -> T pop_data'0 {
-        pop_data = mem.read(read_addr)
+        pop_data = mem[read_addr]
         read_addr = read_addr + 1 mod DEPTH
     }
 }
@@ -79,4 +79,64 @@ module RippleFIFO#(T, int DEPTH) {
 		pop_data = datas[DEPTH-1]
 		valids[DEPTH-1] = false
 	}
+}
+
+module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+	gen int OUTFLOW_REGS = 2
+    
+    state T[DEPTH] mem
+	state int#(FROM: 0, TO: DEPTH) read_addr
+	state int#(FROM: 0, TO: DEPTH) write_addr
+
+    /// Data travels from OUTFLOW_REGS down to 0
+    state bool[OUTFLOW_REGS] outflow_path_valids_reg
+    state T[OUTFLOW_REGS] outflow_path_elems_reg
+    bool[OUTFLOW_REGS + 1] outflow_path_valids
+    T[OUTFLOW_REGS + 1] outflow_path_elems
+
+    /// Each index I+1 tells if outflow_path_valids_reg[I] may be shifted into
+    bool[OUTFLOW_REGS + 1] may_shifts
+
+    outflow_path_valids[OUTFLOW_REGS] = read_addr != write_addr
+    outflow_path_elems[OUTFLOW_REGS] = mem[read_addr]
+    for int I in 0..OUTFLOW_REGS {
+        outflow_path_elems[I] = outflow_path_elems_reg[I]
+        outflow_path_valids[I] = outflow_path_valids_reg[I]
+
+        may_shifts[I + 1] = may_shifts[I] | !outflow_path_valids[I]
+
+        when may_shifts[I + 1] {
+            outflow_path_valids_reg[I] = outflow_path_valids[I + 1]
+            outflow_path_elems_reg[I] = outflow_path_elems[I + 1]
+        }
+    }
+
+    domain clk
+    action rst {
+        write_addr = 0
+        read_addr = 0
+        for int I in 0..OUTFLOW_REGS {
+            outflow_path_valids_reg[I] = false
+        }
+    }
+
+	int space_remaining = read_addr - (write_addr + 1) mod DEPTH
+
+    domain write
+    output bool may_push'-MAY_PUSH_LATENCY = LatencyOffset #(OFFSET: -MAY_PUSH_LATENCY)(space_remaining > MAY_PUSH_LATENCY)
+    action push'0 : T push_data'0 {
+        mem[write_addr] = push_data
+        write_addr = write_addr + 1 mod DEPTH
+    }
+    
+    domain read
+    may_shifts[0] = false
+    trigger pop_available'0 : T pop_data'0 {
+        action pop'0 {
+            may_shifts[0] = true
+        }
+    }
+    when outflow_path_valids[0] {
+        pop_available(outflow_path_elems[0])
+    }
 }

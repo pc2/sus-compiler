@@ -1,0 +1,5 @@
+
+module Instantiates {
+    FIFO#(T: type int#(FROM: 0, TO: pow2#(E: 32)), DEPTH: 64, MAY_PUSH_LATENCY: 13) fifo
+    FWFT#(T: type int#(FROM: 0, TO: pow2#(E: 32)), DEPTH: 64, MAY_PUSH_LATENCY: 13) fwft
+}
