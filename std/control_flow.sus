@@ -58,8 +58,6 @@ module SlowState #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
     gen int UPDATE_TOTAL_DEPTH = max#(A: OLD_DELAY, B: OLD_DELAY + NEW_DELAY)
     domain clk
     input bool rst
-    CrossDomain cross_rst
-    cross_rst.in = rst
 
     domain data
     output state T old'-OLD_DELAY
@@ -69,7 +67,7 @@ module SlowState #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
 
     bool update_old'-OLD_DELAY = LatencyOffset#(OFFSET: -UPDATE_TOTAL_DEPTH)(update_s) // Despite their differing absolute latency, they of course need to be set back by the same amount, potentially introducing a pipeline stage
     T new_old'-OLD_DELAY = LatencyOffset#(OFFSET: -UPDATE_TOTAL_DEPTH)(new_s)
-    when cross_rst.out {
+    when rst {
         old = RESET_TO
     } else when update_old {
         old = new_old
@@ -86,7 +84,7 @@ module SlowState #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
     if UPDATE_TOTAL_DEPTH != 0 {
         state bool[UPDATE_TOTAL_DEPTH] cooldown
         may_update = cooldown[0]
-        when update_s | cross_rst.out { // Importantly, there are no pipeline registers on update for the cooldown. Otherwise it could be called twice rapidly in a row
+        when update_s | rst { // Importantly, there are no pipeline registers on update for the cooldown. Otherwise it could be called twice rapidly in a row
             cooldown = Repeat(false)
         } else {
             cooldown[0:UPDATE_TOTAL_DEPTH - 1] = cooldown[1:]
@@ -167,12 +165,8 @@ module ParallelWhile #(int COMPUTATION_LATENCY, int REQUEST_DATA_LATENCY) {
     }
 
     domain clk
-    CrossActionNoData rst_act
-    action rst {
-        rst_act.in()
-    }
     // Reset, overwrite valid_slots completely
-    when rst_act.out {
+    action rst {
         should_continue = false
     }
 }
