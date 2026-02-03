@@ -175,6 +175,7 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated CountBitsWithSplits #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated ModWithDomains #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated UseModWithDomains #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate GenerativeCannotHaveLatencyDeclaration #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -4161,6 +4162,27 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                            ┬  
       │                            ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: Not Instantiating GenerativeCannotHaveLatencyDeclaration #() due to abstract typing errors
+      ╭─[ test.sus:1822:8 ]
+      │
+ 1822 │ module GenerativeCannotHaveLatencyDeclaration {
+      │        ───────────────────┬──────────────────  
+      │                           ╰──────────────────── Not Instantiating GenerativeCannotHaveLatencyDeclaration #() due to abstract typing errors
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1823:10 ]
+      │
+ 1823 │     gen int beep'4
+      │             ──┬─  
+      │               ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Generative Declarations may not have a latency specifier
+      ╭─[ test.sus:1823:15 ]
+      │
+ 1823 │     gen int beep'4
+      │                  ┬  
+      │                  ╰── Generative Declarations may not have a latency specifier
+──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen test_various_assignments #() due to errors!
@@ -4236,3 +4258,4 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [ERROR sus_compiler::codegen] Cannot codegen InstantiatesItself #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen TestUnknownArraySize #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen TestNextPow2 #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen GenerativeCannotHaveLatencyDeclaration #() due to errors!

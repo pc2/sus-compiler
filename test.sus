@@ -1818,3 +1818,7 @@ module UseModWithDomains {
 
 	mwd.a_act(true)
 }
+
+module GenerativeCannotHaveLatencyDeclaration {
+	gen int beep'4
+}

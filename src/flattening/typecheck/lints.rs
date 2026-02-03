@@ -30,6 +30,7 @@ pub fn perform_lints(pass: &mut LinkerPass, errors: &ErrorCollector, linker_file
     ctx.check_unsynthesizeable_types();
     ctx.no_calling_local_actions();
     ctx.splits_are_used_correctly();
+    ctx.disallow_generative_latency_annotation();
 }
 
 struct LintContext<'l> {
@@ -679,6 +680,24 @@ impl LintContext<'_> {
                 | Instruction::Interface(_)
                 | Instruction::IfStatement(_)
                 | Instruction::ForStatement(_) => {}
+            }
+        }
+    }
+    fn disallow_generative_latency_annotation(&self) {
+        for (_, instr) in &self.working_on.instructions {
+            let Instruction::Declaration(declaration) = instr else {
+                continue;
+            };
+
+            if declaration.clock_domain.is_generative()
+                && let Some(lat_spec) = declaration.latency_specifier
+            {
+                let lat_spec_expr = self.working_on.instructions[lat_spec].unwrap_subexpression();
+
+                self.errors.error(
+                    lat_spec_expr.span,
+                    "Generative Declarations may not have a latency specifier",
+                );
             }
         }
     }
