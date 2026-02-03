@@ -10,7 +10,7 @@ use crate::alloc::zip_eq;
 use crate::dev_aid::dot_graphs::display_latency_count_graph;
 use crate::errors::ErrorInfoObject;
 use crate::prelude::*;
-use crate::to_string::display_join;
+use crate::to_string::{FmtWrapper, display_join};
 
 use latency_algorithm::{
     FanInOut, LatencyCountingError, LatencyCountingPorts, SpecifiedLatency,
@@ -71,56 +71,50 @@ impl Default for AbsLat {
     }
 }
 
-struct PathMuxSource<'s> {
-    to_wire: &'s RealWire,
-    to_latency: i64,
-    #[allow(unused)]
-    mux_input: &'s MultiplexerSource,
+struct LatencyPathElem<'s> {
+    wire: &'s RealWire,
+    latency: i64,
 }
 
-fn write_path_elem_to_string(
-    result: &mut String,
+fn display_latency_difference(
     decl_name: &str,
     to_absolute_latency: i64,
     prev_absolute_latency: i64,
-) {
-    use std::fmt::Write;
+) -> impl Display {
+    FmtWrapper(move |f| {
+        let delta_latency = to_absolute_latency - prev_absolute_latency;
 
-    let delta_latency = to_absolute_latency - prev_absolute_latency;
+        let plus_sign = if delta_latency >= 0 { "+" } else { "" };
 
-    let plus_sign = if delta_latency >= 0 { "+" } else { "" };
-
-    writeln!(
-        result,
-        "-> {decl_name}'{to_absolute_latency} ({plus_sign}{delta_latency})"
-    )
-    .unwrap();
+        writeln!(
+            f,
+            "-> {decl_name}'{to_absolute_latency} ({plus_sign}{delta_latency})"
+        )
+    })
 }
 
-fn make_path_info_string(
-    writes: &[PathMuxSource<'_>],
+fn display_latency_difference_path(
+    writes: &[LatencyPathElem<'_>],
     from_latency: i64,
     from_name: &str,
-) -> String {
-    let mut prev_decl_absolute_latency = from_latency;
-    let mut result = format!("{from_name}'{prev_decl_absolute_latency}\n");
+) -> impl Display {
+    FmtWrapper(move |f| {
+        let mut prev_decl_absolute_latency = from_latency;
+        writeln!(f, "{from_name}'{prev_decl_absolute_latency}")?;
 
-    for wr in writes {
-        let decl_name = &wr.to_wire.name;
+        for wr in writes {
+            let decl_name = &wr.wire.name;
 
-        let to_absolute_latency = wr.to_latency;
+            let to_absolute_latency = wr.latency;
 
-        write_path_elem_to_string(
-            &mut result,
-            decl_name,
-            to_absolute_latency,
-            prev_decl_absolute_latency,
-        );
+            display_latency_difference(decl_name, to_absolute_latency, prev_decl_absolute_latency)
+                .fmt(f)?;
 
-        prev_decl_absolute_latency = to_absolute_latency;
-    }
+            prev_decl_absolute_latency = to_absolute_latency;
+        }
 
-    result
+        Ok(())
+    })
 }
 
 /// We do all Domains together, as this simplifies the code.
@@ -188,12 +182,12 @@ impl LatencyCountingProblem {
                 // The module has already been instantiated, so we know all local absolute latencies
                 // No inference edges, No poison edges
 
-                for d in sm_md.clocks.id_range() {
+                for d in sm_md.latency_domains.id_range() {
                     for (_, port, wire) in
                         crate::alloc::zip_eq(&instance.interface_ports, &sm.port_map)
                     {
                         if let (Some(port), Some(wire)) = (port, wire)
-                            && port.domain == d
+                            && port.latency_domain == d
                         {
                             let latency = port.absolute_latency.unwrap();
                             let node = map_wire_to_latency_node[wire.maps_to_wire];
@@ -426,43 +420,61 @@ impl ModuleTypingContext<'_> {
         };
     }
 
-    fn gather_all_mux_inputs(
+    fn filter_path(
         &self,
         latency_node_meanings: &[WireID],
         conflicts: &[SpecifiedLatency],
-    ) -> Vec<PathMuxSource<'_>> {
+    ) -> Vec<LatencyPathElem<'_>> {
         let mut connection_list = Vec::new();
-        for (idx, from) in conflicts.iter().enumerate() {
-            let to = &conflicts[(idx + 1) % conflicts.len()];
-            let from_wire_id = latency_node_meanings[from.node];
-            //let from_wire = &self.wires[from_wire_id];
-            let to_wire_id = latency_node_meanings[to.node];
-            let to_wire = &self.wires[to_wire_id];
-            let RealWireDataSource::Multiplexer {
-                is_state: _,
-                sources,
-            } = &to_wire.source
-            else {
-                continue;
-            }; // We can only name multiplexers
+        for wire_specified in conflicts {
+            let wire_id = latency_node_meanings[wire_specified.node];
+            let wire = &self.wires[wire_id];
 
-            for s in sources {
-                let mut predecessor_found = false;
-                s.for_each_wire(&mut |source| {
-                    if source == from_wire_id {
-                        predecessor_found = true;
-                    }
-                });
-                if predecessor_found {
-                    connection_list.push(PathMuxSource {
-                        to_wire,
-                        mux_input: s,
-                        to_latency: to.latency,
-                    });
+            // Check that the wire has an understandable name
+            match &wire.source {
+                RealWireDataSource::ReadOnly | RealWireDataSource::Multiplexer { .. } => {}
+                _ => continue,
+            }
+
+            connection_list.push(LatencyPathElem {
+                wire,
+                latency: wire_specified.latency,
+            });
+        }
+        connection_list
+    }
+
+    fn rotate_writes(&self, writes_involved: &mut [LatencyPathElem]) {
+        enum Best {
+            None,
+            Wire(usize),
+            SpecifiedWire(usize, i64),
+        }
+
+        let mut best = Best::None;
+        for (idx, w) in writes_involved.iter().enumerate() {
+            if matches!(&w.wire.source, RealWireDataSource::Multiplexer { .. })
+                && matches!(w.wire.is_port, IsPort::PlainWire)
+            {
+                if let Some(abs_lat) = w.wire.specified_latency.get() {
+                    best = Best::SpecifiedWire(idx, abs_lat);
+                } else if let Best::None = best {
+                    best = Best::Wire(idx);
                 }
             }
         }
-        connection_list
+
+        let (rotate_to, starting_abs_lat) = match best {
+            Best::None => return, // No edit
+            Best::Wire(idx) => (idx, 0),
+            Best::SpecifiedWire(idx, lat) => (idx, lat),
+        };
+
+        writes_involved.rotate_left(rotate_to);
+        let diff = starting_abs_lat - writes_involved[0].latency;
+        for w in writes_involved {
+            w.latency += diff;
+        }
     }
 
     fn report_error(&self, latency_node_meanings: &[WireID], err: LatencyCountingError) {
@@ -477,24 +489,23 @@ impl ModuleTypingContext<'_> {
                 conflict_path,
                 net_roundtrip_latency,
             } => {
-                let writes_involved =
-                    self.gather_all_mux_inputs(latency_node_meanings, &conflict_path);
+                let mut writes_involved = self.filter_path(latency_node_meanings, &conflict_path);
                 assert!(!writes_involved.is_empty());
-                let (first_write, later_writes) = writes_involved.split_first().unwrap();
-                let first_write_desired_latency = first_write.to_latency + net_roundtrip_latency;
-                let mut path_message = make_path_info_string(
+                self.rotate_writes(&mut writes_involved);
+                let (loop_completion, later_writes) = writes_involved.split_first().unwrap();
+                let first_write_desired_latency = loop_completion.latency + net_roundtrip_latency;
+                let main_path = display_latency_difference_path(
                     later_writes,
-                    first_write.to_latency,
-                    &first_write.to_wire.name,
+                    loop_completion.latency,
+                    &loop_completion.wire.name,
                 );
-                write_path_elem_to_string(
-                    &mut path_message,
-                    &first_write.to_wire.name,
+                let loop_completion = display_latency_difference(
+                    &loop_completion.wire.name,
                     first_write_desired_latency,
-                    writes_involved.last().unwrap().to_latency,
+                    writes_involved.last().unwrap().latency,
                 );
                 let rest_of_message = format!(
-                    " part of a net-positive latency cycle of +{net_roundtrip_latency}\n\n{path_message}\nWhich conflicts with the starting latency"
+                    " part of a net-positive latency cycle of +{net_roundtrip_latency}\n\n{main_path}{loop_completion}\nWhich conflicts with the starting latency"
                 );
 
                 /*let unique_write_instructions =
@@ -526,8 +537,8 @@ impl ModuleTypingContext<'_> {
                 }*/
                 // Fallback if no register annotations used
                 //if !did_place_error {
-                for wr in writes_involved {
-                    let to_instr = &self.md.link_info.instructions[wr.to_wire.original_instruction];
+                for wr in &writes_involved {
+                    let to_instr = &self.md.link_info.instructions[wr.wire.original_instruction];
                     error(
                         to_instr.get_span(),
                         format!("This instruction is{rest_of_message}"),
@@ -585,9 +596,8 @@ impl ModuleTypingContext<'_> {
                     [end_decl.get_latency_specifier().unwrap()]
                 .unwrap_expression();
 
-                let writes_involved =
-                    self.gather_all_mux_inputs(latency_node_meanings, &conflict_path);
-                let path_message = make_path_info_string(
+                let writes_involved = self.filter_path(latency_node_meanings, &conflict_path[1..]);
+                let path_message = display_latency_difference_path(
                     &writes_involved,
                     start_wire.specified_latency.unwrap(),
                     &start_wire.name,

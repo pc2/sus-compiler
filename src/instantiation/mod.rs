@@ -226,7 +226,7 @@ pub struct InstantiatedPort {
     pub wire: WireID,
     pub direction: Direction,
     pub absolute_latency: AbsLat,
-    pub domain: ClockID,
+    pub latency_domain: LatDomID,
 }
 
 /// [InstantiatedModule] are the final product we're trying to produce with the compiler.
@@ -451,7 +451,7 @@ impl<'l> ModuleTypingContext<'l> {
                 wire: *wire_id,
                 direction: port.direction,
                 absolute_latency: wire.absolute_latency,
-                domain: wire.clock,
+                latency_domain: port.lat_dom,
             })
         });
 

@@ -216,7 +216,7 @@ fn custom_render_latency_count_graph(
     globals: &LinkerGlobals,
     solution: Option<&[i64]>,
     graph_name: &str,
-) -> impl std::fmt::Display {
+) -> impl Display {
     FmtWrapper(move |f| {
         let digraph_name = graph_name;
         writeln!(f, "digraph \"{digraph_name}\" {{")?;
@@ -273,11 +273,11 @@ fn custom_render_latency_count_graph(
             if let Some(inst) = sm.instance.get() {
                 let inst_name = &inst.name;
                 let sm_name = &sm.name;
-                let inputs_outputs_per_domain = sm_md.clocks.map(|(domain_id, domain)| {
+                let inputs_outputs_per_domain = sm_md.latency_domains.map(|(domain_id, domain)| {
                     let mut inputs = Vec::new();
                     let mut outputs = Vec::new();
                     for (_, p) in inst.interface_ports.iter_valids() {
-                        if p.domain != domain_id {
+                        if p.latency_domain != domain_id {
                             continue;
                         }
                         let p_wire = &inst.wires[p.wire];
@@ -290,61 +290,14 @@ fn custom_render_latency_count_graph(
                     (inputs, outputs, &domain.name)
                 });
 
-                fn display_port_list<'l>(list: &'l [&'l RealWire]) -> impl Display + 'l {
-                    FmtWrapper(move |f| {
-                        write!(f, "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\">")?;
-                        for p_wire in list.iter() {
-                            let name = &p_wire.name;
-                            let abs_lat = &p_wire.absolute_latency;
-                            write!(f, "<TR><TD PORT=\"{name}\">{name}'{abs_lat}</TD></TR>")?;
-                        }
-                        write!(f, "</TABLE>")?;
-                        Ok(())
-                    })
-                }
-
-                if let Some([(inputs, outputs, domain)]) =
-                    &inputs_outputs_per_domain.try_cast_to_array()
-                {
-                    // Just a single domain, simplify print
-                    let inputs = display_port_list(inputs);
-                    let outputs = display_port_list(outputs);
-                    write!(
-                        f,
-                        "    {sm_id:?}_{domain}[shape=plain,style=filled,fillcolor=bisque,label=<
-                            <TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" BGCOLOR=\"bisque\">
-                                <TR><TD COLSPAN=\"3\"><B>{inst_name}</B></TD></TR>
-                                <TR><TD CELLPADDING=\"0\" BORDER=\"0\">{inputs}</TD><TD>{sm_name}<BR/>{domain}</TD><TD CELLPADDING=\"0\" BORDER=\"0\">{outputs}</TD></TR>
-                            </TABLE>
-                        >];"
-                    )?;
-                } else {
-                    writeln!(f, "subgraph cluster_{sm_id:?} {{")?;
-                    writeln!(f, "    label=\"{inst_name}\";")?;
-                    writeln!(f, "    style=filled;")?;
-                    writeln!(f, "    color=lightgrey;")?;
-                    for (_, (inputs, outputs, domain)) in &inputs_outputs_per_domain {
-                        // Just a single domain, simplify print
-                        let inputs = display_port_list(inputs);
-                        let outputs = display_port_list(outputs);
-                        write!(
-                            f,
-                            "    {sm_id:?}_{domain}[shape=plain,style=filled,fillcolor=bisque,label=<
-                                <TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" BGCOLOR=\"bisque\">
-                                    <TR><TD CELLPADDING=\"0\" BORDER=\"0\">{inputs}</TD><TD>{sm_name}<BR/>{domain}</TD><TD CELLPADDING=\"0\" BORDER=\"0\">{outputs}</TD></TR>
-                                </TABLE>
-                            >];"
-                        )?;
-                    }
-                    writeln!(f, "}}")?;
-                }
+                display_submodule(sm_id, inst_name, sm_name, inputs_outputs_per_domain).fmt(f)?;
 
                 for (_, maps_to, port) in crate::alloc::zip_eq(&sm.port_map, &inst.interface_ports)
                 {
                     let (Some(maps_to), Some(port)) = (maps_to, port) else {
                         continue;
                     };
-                    let port_domain_name = &sm_md.clocks[port.domain].name;
+                    let port_domain_name = &sm_md.latency_domains[port.latency_domain].name;
                     let p_name = &inst.wires[port.wire].name;
                     let node =
                         &mut node_ids[lc_problem.map_wire_to_latency_node[maps_to.maps_to_wire]];
@@ -471,5 +424,67 @@ fn custom_render_latency_count_graph(
 
         writeln!(f, "}}")?;
         Ok(())
+    })
+}
+
+fn display_port_list<'l>(list: &'l [&'l RealWire]) -> impl Display + 'l {
+    FmtWrapper(move |f| {
+        write!(f, "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\">")?;
+        if list.is_empty() {
+            // Need to have at least one element, seemingly because some dot visualizers need the table to be balanced
+            write!(f, "<TR><TD></TD></TR>")?;
+        } else {
+            for p_wire in list.iter() {
+                let name = &p_wire.name;
+                let abs_lat = &p_wire.absolute_latency;
+                write!(f, "<TR><TD PORT=\"{name}\">{name}'{abs_lat}</TD></TR>")?;
+            }
+        }
+        write!(f, "</TABLE>")
+    })
+}
+
+fn display_submodule(
+    sm_id: UUID<SubModuleIDMarker>,
+    inst_name: &String,
+    sm_name: &String,
+    inputs_outputs_per_domain: FlatAlloc<(Vec<&RealWire>, Vec<&RealWire>, &String), LatDomIDMarker>,
+) -> impl Display {
+    FmtWrapper(move |f| {
+        if let Some([(inputs, outputs, domain)]) = &inputs_outputs_per_domain.try_cast_to_array() {
+            // Just a single domain, simplify print
+            let inputs = display_port_list(inputs);
+            let outputs = display_port_list(outputs);
+            write!(
+                f,
+                r#"
+    {sm_id:?}_{domain}[shape=plain,style=filled,fillcolor=bisque,label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" BGCOLOR="bisque">
+            <TR><TD COLSPAN="3"><B>{inst_name}</B></TD></TR>
+            <TR><TD CELLPADDING="0" BORDER="0">{inputs}</TD><TD>{sm_name}<BR/>{domain}</TD><TD CELLPADDING="0" BORDER="0">{outputs}</TD></TR>
+        </TABLE>
+    >];"#
+            )
+        } else {
+            writeln!(f, "subgraph cluster_{sm_id:?} {{")?;
+            writeln!(f, "    label=\"{inst_name}\";")?;
+            writeln!(f, "    style=filled;")?;
+            writeln!(f, "    color=lightgrey;")?;
+            for (_, (inputs, outputs, domain)) in &inputs_outputs_per_domain {
+                // Just a single domain, simplify print
+                let inputs = display_port_list(inputs);
+                let outputs = display_port_list(outputs);
+                write!(
+                    f,
+                    r#"
+    {sm_id:?}_{domain}[shape=plain,style=filled,fillcolor=bisque,label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" BGCOLOR="bisque">
+            <TR><TD CELLPADDING="0" BORDER="0">{inputs}</TD><TD>{sm_name}<BR/>{domain}</TD><TD CELLPADDING="0" BORDER="0">{outputs}</TD></TR>
+        </TABLE>
+    >];"#
+                )?;
+            }
+            writeln!(f, "\n}}")
+        }
     })
 }

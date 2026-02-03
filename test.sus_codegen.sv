@@ -4788,6 +4788,7 @@ module FIFO_T_type_int_FROM_0_TO_6_DEPTH_30_MAY_PUSH_LATENCY_8(
 	output /*mux_wire*/ logic[2:0] pop_data
 );
 
+/*state*/ logic[2:0] mem[29:0];
 /*state*/ logic[4:0] read_addr;
 /*state*/ logic[4:0] write_addr;
 /*mux_wire*/ logic[4:0] space_remaining;
@@ -4801,43 +4802,32 @@ wire _10;
 assign _10 = space_remaining > 4'd8;
 /*mux_wire*/ logic _LatencyOffset_in;
 wire _LatencyOffset_out;
-/*mux_wire*/ logic _mem_write;
-/*mux_wire*/ logic[4:0] _mem_addr;
-/*mux_wire*/ logic[2:0] _mem_data;
-wire[4:0] _17;
-assign _17 = write_addr + 1'd1;
-wire[4:0] _18;
-assign _18 = (_17 == 30) ? 0 : _17; // == mod 30
-wire _21;
-assign _21 = read_addr != write_addr;
-/*mux_wire*/ logic _mem_read;
-/*mux_wire*/ logic[4:0] _mem_read_addr;
-wire[2:0] _mem_read_data;
-wire[4:0] _27;
-assign _27 = read_addr + 1'd1;
-wire[4:0] _28;
-assign _28 = (_27 == 30) ? 0 : _27; // == mod 30
-RAM_T_type_int_FROM_0_TO_6_DEPTH_30 mem(
-	.clk(clk),
-	.write(_mem_write),
-	.addr(_mem_addr),
-	.data(_mem_data),
-	.read(_mem_read),
-	.read_addr(_mem_read_addr),
-	.read_data(_mem_read_data)
-);
+wire[4:0] _15;
+assign _15 = write_addr + 1'd1;
+wire[4:0] _16;
+assign _16 = (_15 == 30) ? 0 : _15; // == mod 30
+wire _19;
+assign _19 = read_addr != write_addr;
+wire[2:0] _21 = mem[read_addr];
+wire[4:0] _24;
+assign _24 = read_addr + 1'd1;
+wire[4:0] _25;
+assign _25 = (_24 == 30) ? 0 : _24; // == mod 30
 LatencyOffset_T_type_bool_OFFSET_8 LatencyOffset(
 	.clk(clk),
 	.in(_LatencyOffset_in),
 	.out(_LatencyOffset_out)
 );
+always_ff @(posedge clk) begin // state mem
+	if(push) mem[write_addr] <= push_data;
+end
 always_ff @(posedge clk) begin // state read_addr
 	if(rst) read_addr <= 1'd0;
-	if(pop) read_addr <= _28;
+	if(pop) read_addr <= _25;
 end
 always_ff @(posedge clk) begin // state write_addr
 	if(rst) write_addr <= 1'd0;
-	if(push) write_addr <= _18;
+	if(push) write_addr <= _16;
 end
 always_comb begin // combinatorial space_remaining
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -4858,71 +4848,17 @@ always_comb begin // combinatorial _LatencyOffset_in
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_LatencyOffset_in = _LatencyOffset_in;
 end
-always_comb begin // combinatorial _mem_write
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_mem_write = 1'bx;
-	_mem_write = 1'b0;
-	if(push) _mem_write = 1'b1;
-	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
-	_mem_write = _mem_write;
-end
-always_comb begin // combinatorial _mem_addr
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_mem_addr = 5'dx;
-	if(push) _mem_addr = write_addr;
-end
-always_comb begin // combinatorial _mem_data
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_mem_data = 3'dx;
-	if(push) _mem_data = push_data;
-end
 always_comb begin // combinatorial may_pop
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	may_pop = 1'bx;
-	may_pop = _21;
+	may_pop = _19;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	may_pop = may_pop;
 end
 always_comb begin // combinatorial pop_data
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	pop_data = 3'dx;
-	if(pop) pop_data = _mem_read_data;
-end
-always_comb begin // combinatorial _mem_read
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_mem_read = 1'bx;
-	_mem_read = 1'b0;
-	if(pop) _mem_read = 1'b1;
-	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
-	_mem_read = _mem_read;
-end
-always_comb begin // combinatorial _mem_read_addr
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_mem_read_addr = 5'dx;
-	if(pop) _mem_read_addr = read_addr;
-end
-endmodule
-
-// RAM #(T: type int #(FROM: 0, TO: 6), DEPTH: 30)
-module RAM_T_type_int_FROM_0_TO_6_DEPTH_30(
-	input clk,
-	input wire write,
-	input wire[4:0] addr,
-	input wire[2:0] data,
-	input wire read,
-	input wire[4:0] read_addr,
-	output /*mux_wire*/ logic[2:0] read_data
-);
-
-/*state*/ logic[2:0] mem[29:0];
-wire[2:0] _4 = mem[read_addr];
-always_ff @(posedge clk) begin // state mem
-	if(write) mem[addr] <= data;
-end
-always_comb begin // combinatorial read_data
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	read_data = 3'dx;
-	if(read) read_data = _4;
+	if(pop) pop_data = _21;
 end
 endmodule
 

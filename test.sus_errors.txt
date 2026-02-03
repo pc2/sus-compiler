@@ -112,7 +112,6 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_infer_me #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated infer_me #(A: 5)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated infer_from_local_context #()
-[INFO  sus_compiler::instantiation::instantiator] Instantiated RAM #(T: type int #(FROM: 0, TO: 6), DEPTH: 30)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated LatencyOffset #(T: type bool #(), OFFSET: -8)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated FIFO #(T: type int #(FROM: 0, TO: 6), DEPTH: 30, MAY_PUSH_LATENCY: 8)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated instantiate_fifo #()
@@ -569,9 +568,10 @@ Error: Some parameters of '_4' were still unknown: int #(FROM: ?, TO: ?)
 ─────╯
 Error: This instruction is part of a net-positive latency cycle of +5
 
-test'5
--> _module_taking_time_i'0 (-5)
--> test'10 (+10)
+test'0
+-> _module_taking_time_i'-5 (-5)
+-> _module_taking_time_o'0 (+5)
+-> test'5 (+5)
 
 Which conflicts with the starting latency
      ╭─[ test.sus:360:29 ]
@@ -580,17 +580,19 @@ Which conflicts with the starting latency
      │                                ──┬─  
      │                                  ╰─── This instruction is part of a net-positive latency cycle of +5
 
-test'5
--> _module_taking_time_i'0 (-5)
--> test'10 (+10)
+test'0
+-> _module_taking_time_i'-5 (-5)
+-> _module_taking_time_o'0 (+5)
+-> test'5 (+5)
 
 Which conflicts with the starting latency
 ─────╯
 Error: This instruction is part of a net-positive latency cycle of +5
 
-test'5
--> _module_taking_time_i'0 (-5)
--> test'10 (+10)
+test'0
+-> _module_taking_time_i'-5 (-5)
+-> _module_taking_time_o'0 (+5)
+-> test'5 (+5)
 
 Which conflicts with the starting latency
      ╭─[ test.sus:363:9 ]
@@ -599,9 +601,31 @@ Which conflicts with the starting latency
      │            ─────────┬────────  
      │                     ╰────────── This instruction is part of a net-positive latency cycle of +5
 
-test'5
--> _module_taking_time_i'0 (-5)
--> test'10 (+10)
+test'0
+-> _module_taking_time_i'-5 (-5)
+-> _module_taking_time_o'0 (+5)
+-> test'5 (+5)
+
+Which conflicts with the starting latency
+─────╯
+Error: This instruction is part of a net-positive latency cycle of +5
+
+test'0
+-> _module_taking_time_i'-5 (-5)
+-> _module_taking_time_o'0 (+5)
+-> test'5 (+5)
+
+Which conflicts with the starting latency
+     ╭─[ test.sus:363:9 ]
+     │
+ 363 │     test = module_taking_time(test+a)
+     │            ─────────┬────────  
+     │                     ╰────────── This instruction is part of a net-positive latency cycle of +5
+
+test'0
+-> _module_taking_time_i'-5 (-5)
+-> _module_taking_time_o'0 (+5)
+-> test'5 (+5)
 
 Which conflicts with the starting latency
 ─────╯
@@ -2526,7 +2550,7 @@ Warning: Unused port 'rst'
       │
       ├─[ memory.sus:30:12 ]
       │
-   30 │     action rst'0 {
+   30 │     action rst {
       │            ─┬─  
       │             ╰─── Port 'rst' declared here
       │
@@ -2540,9 +2564,11 @@ Error: Conflicting specified latency
 
 a'0
 -> _x_x'0 (+0)
--> loose_inbetween'2 (+2)
+-> _x_y'2 (+2)
+-> loose_inbetween'2 (+0)
 -> _y_x'2 (+0)
--> b'4 (+2)
+-> _y_y'4 (+2)
+-> b'4 (+0)
 
 But this was specified as b'3
       ╭─[ test.sus:1176:52 ]
@@ -2555,9 +2581,11 @@ But this was specified as b'3
 
 a'0
 -> _x_x'0 (+0)
--> loose_inbetween'2 (+2)
+-> _x_y'2 (+2)
+-> loose_inbetween'2 (+0)
 -> _y_x'2 (+0)
--> b'4 (+2)
+-> _y_y'4 (+2)
+-> b'4 (+0)
 
 But this was specified as b'3
 ──────╯
