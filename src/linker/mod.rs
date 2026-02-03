@@ -158,26 +158,20 @@ pub struct UniqueFileID {
     pub name: String,
 }
 impl UniqueFileID {
-    pub fn from_path(path: &Path) -> Result<UniqueFileID, String> {
+    pub fn from_path(path: &Path, name: String) -> Result<UniqueFileID, String> {
         if !path.is_file() || path.extension() != Some(OsStr::new("sus")) {
-            return Err(format!("{} is not a .sus file!", path.to_string_lossy()));
+            return Err(format!("{name} is not a .sus file!"));
         }
-        match path.canonicalize() {
-            Ok(absolute_path) => Ok(UniqueFileID {
-                inode: Some(same_file::Handle::from_path(path).unwrap()),
-                name: absolute_path.to_string_lossy().to_string(),
+        match same_file::Handle::from_path(path) {
+            Ok(inode) => Ok(UniqueFileID {
+                inode: Some(inode),
+                name,
             }),
-            Err(err) => Err(format!(
-                "'{}' is not an existing file? {err}",
-                path.to_string_lossy()
-            )),
+            Err(err) => Err(format!("'{name}' is not an existing file? {err}",)),
         }
     }
-    pub fn from_non_path_str(identifier: String) -> UniqueFileID {
-        UniqueFileID {
-            inode: None,
-            name: identifier,
-        }
+    pub fn from_non_path_str(name: String) -> UniqueFileID {
+        UniqueFileID { inode: None, name }
     }
 }
 impl Display for UniqueFileID {

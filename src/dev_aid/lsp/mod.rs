@@ -86,17 +86,13 @@ fn cvt_location_list_of_lists(
 impl UniqueFileID {
     fn from_uri(uri: &Url) -> Result<UniqueFileID, String> {
         if uri.scheme() == "file" {
-            UniqueFileID::from_path(&uri.to_file_path().unwrap())
+            UniqueFileID::from_path(&uri.to_file_path().unwrap(), uri.to_string())
         } else {
             Ok(UniqueFileID::from_non_path_str(uri.to_string()))
         }
     }
     fn to_uri(&self) -> Url {
-        if self.inode.is_some() {
-            Url::from_file_path(&self.name).expect(&self.name)
-        } else {
-            Url::parse(&self.name).expect(&self.name)
-        }
+        Url::parse(&self.name).expect(&self.name)
     }
 }
 
@@ -217,6 +213,14 @@ fn initialize_all_files(linker: &mut Linker, init_params: &InitializeParams) {
         for f in files {
             linker.add_file_or_directory(f);
         }
+    }
+
+    // Convert all the Path IDs to URIs
+    for (_, f) in &mut linker.files {
+        f.file_identifier.name =
+            Url::from_file_path(std::fs::canonicalize(&f.file_identifier.name).unwrap())
+                .expect(&f.file_identifier.name)
+                .to_string();
     }
 }
 
@@ -562,11 +566,11 @@ fn handle_notification(
                     linker.add_or_update_file_from_disk(file_identifier);
                 } else if event.typ == FileChangeType::DELETED {
                     let uri_as_string = event.uri.to_string();
-                    // Delete URIs that don't have a file backing
-                    if let Some(existing_file_id) = linker.files.find(|_, data| {
-                        data.file_identifier.inode.is_none()
-                            && data.file_identifier.name == uri_as_string
-                    }) {
+                    // Try to delete URIs (including those that that don't have a file backing)
+                    if let Some(existing_file_id) = linker
+                        .files
+                        .find(|_, data| data.file_identifier.name == uri_as_string)
+                    {
                         linker.remove_file(existing_file_id);
                     }
                 } else {
@@ -577,7 +581,7 @@ fn handle_notification(
             let mut to_delete: Vec<FileUUID> = Vec::new();
             for (id, f) in &linker.files {
                 if f.file_identifier.inode.is_some() {
-                    match std::fs::exists(&f.file_identifier.name) {
+                    match std::fs::exists(f.file_identifier.to_uri().path()) {
                         Ok(true) => {}
                         Ok(false) | Err(_) => to_delete.push(id),
                     }

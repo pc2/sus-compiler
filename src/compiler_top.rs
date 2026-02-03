@@ -98,7 +98,9 @@ impl Linker {
             if file_path.is_dir() {
                 self.add_all_files_in_directory_recurse(&file_path);
             } else if file_path.is_file() && file_path.extension() == Some(OsStr::new("sus")) {
-                let file_identifier = UniqueFileID::from_path(&file_path).unwrap();
+                let file_identifier =
+                    UniqueFileID::from_path(&file_path, file_path.to_string_lossy().to_string())
+                        .unwrap();
                 self.add_or_update_file_from_disk(file_identifier);
             }
         }
@@ -108,7 +110,7 @@ impl Linker {
         if path.is_dir() {
             self.add_all_files_in_directory_recurse(path);
         } else {
-            match UniqueFileID::from_path(path) {
+            match UniqueFileID::from_path(path, path.to_string_lossy().to_string()) {
                 Ok(file_identifier) => {
                     self.add_or_update_file_from_disk(file_identifier);
                 }
