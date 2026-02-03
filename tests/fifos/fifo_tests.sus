@@ -1,5 +1,60 @@
 
-module Instantiates {
-    FIFO#(T: type int#(FROM: 0, TO: pow2#(E: 32)), DEPTH: 64, MAY_PUSH_LATENCY: 13) fifo
-    FWFT#(T: type int#(FROM: 0, TO: pow2#(E: 32)), DEPTH: 64, MAY_PUSH_LATENCY: 13) fwft
+module TestFIFO {
+    FIFO#(DEPTH: 16) fifo
+
+    state int cur_v
+
+    action rst'0 {
+        fifo.rst()
+        cur_v = 0
+    }
+
+    trigger push_success'0 : int push_v'0
+    action try_push'0 {
+        when fifo.may_push {
+            reg reg reg reg reg int vv = cur_v
+            fifo.push(vv)
+            push_success(cur_v)
+            cur_v = cur_v + 1 mod pow2#(E: 32)
+        }
+    }
+
+    trigger pop_success'0 : int pop_v'0
+    action try_pop'0 {
+        when fifo.may_pop {
+            int v = fifo.pop()
+
+            pop_success(v)
+        }
+    }
+}
+
+module TestFWFT {
+    FWFT #(DEPTH: 16) fifo
+
+    state int cur_v
+
+    action rst'0 {
+        fifo.rst()
+        cur_v = 0
+    }
+
+    trigger push_success'0 : int push_v'0
+    action try_push'0 {
+        when fifo.may_push {
+            reg reg reg reg reg int vv = cur_v
+            fifo.push(vv)
+            push_success(cur_v)
+            cur_v = cur_v + 1 mod pow2#(E: 32)
+        }
+    }
+
+    trigger pop_available'0: int pop_data'0 {
+        action pop'0 {
+            fifo.pop()
+        }
+    }
+    when fifo.pop_available : int d {
+        pop_available(d)
+    }
 }

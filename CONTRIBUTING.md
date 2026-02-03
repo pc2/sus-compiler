@@ -14,9 +14,9 @@ cargo build
 
 To edit the tree-sitter grammar and regenerate [tree-sitter-sus/src/parser.c](./tree-sitter_sus/src/parser.c), you will need [`tree-sitter-cli`](https://docs.rs/tree-sitter-cli/latest/tree_sitter_cli/). 
 
-To avoid headaches due to mismatching versions, we use `tree-sitter-cli v0.25.8`
+To avoid headaches due to mismatching versions, we use `tree-sitter-cli v0.25.10`
 ```sh
-cargo install tree-sitter-cli@0.25.8
+cargo install tree-sitter-cli@0.25.10
 ```
 
 You can use the [tree-sitter-sus/tree.sh](tree-sitter-sus/tree.sh) script to regenerate the parser, and show some useful information about it. 

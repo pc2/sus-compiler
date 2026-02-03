@@ -94,8 +94,8 @@ module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {
     bool[OUTFLOW_REGS + 1] outflow_path_valids
     T[OUTFLOW_REGS + 1] outflow_path_elems
 
-    /// Each index I+1 tells if outflow_path_valids_reg[I] may be shifted into
-    bool[OUTFLOW_REGS + 1] may_shifts
+    /// Each index I+1 tells if outflow_path_valids_reg[I+1] may be shifted into outflow_path_valids_reg[I]
+    bool[OUTFLOW_REGS + 1] will_shifts
 
     outflow_path_valids[OUTFLOW_REGS] = read_addr != write_addr
     outflow_path_elems[OUTFLOW_REGS] = mem[read_addr]
@@ -103,9 +103,9 @@ module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {
         outflow_path_elems[I] = outflow_path_elems_reg[I]
         outflow_path_valids[I] = outflow_path_valids_reg[I]
 
-        may_shifts[I + 1] = may_shifts[I] | !outflow_path_valids[I]
+        will_shifts[I + 1] = will_shifts[I] | !outflow_path_valids[I]
 
-        when may_shifts[I + 1] {
+        when will_shifts[I + 1] {
             outflow_path_valids_reg[I] = outflow_path_valids[I + 1]
             outflow_path_elems_reg[I] = outflow_path_elems[I + 1]
         }
@@ -128,12 +128,15 @@ module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {
         mem[write_addr] = push_data
         write_addr = write_addr + 1 mod DEPTH
     }
+    when outflow_path_valids[OUTFLOW_REGS] & will_shifts[OUTFLOW_REGS] {
+        read_addr = read_addr + 1 mod DEPTH
+    }
     
     domain read
-    may_shifts[0] = false
+    will_shifts[0] = false
     trigger pop_available'0 : T pop_data'0 {
         action pop'0 {
-            may_shifts[0] = true
+            will_shifts[0] = true
         }
     }
     when outflow_path_valids[0] {

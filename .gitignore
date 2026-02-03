@@ -7,8 +7,8 @@
 **/*.fst
 **/*.dot
 **/*.tmp
-sus-lsp/
+**/*.log
+**/*.jou
+verilog_output/
 crash_dumps/
 dot_output/
-verilog_output/
-tinyTestFile.sus
