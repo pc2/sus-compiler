@@ -33,47 +33,6 @@ impl Linker {
         for (_, f) in &mut self.files {
             f.is_std = true; // Mark standard library files
         }
-
-        // Sanity check for the names the compiler knows internally.
-        // They are defined in std/core.sus
-        // Critically, std/core.sus MUST be the first file to be loaded into the linker. Otherwise the IDs don't point to the correct objects
-        assert_eq!(self.types[get_builtin_type!("int")].link_info.name, "int");
-        assert_eq!(self.types[get_builtin_type!("bool")].link_info.name, "bool");
-        assert_eq!(
-            self.types[get_builtin_type!("float")].link_info.name,
-            "float"
-        );
-        assert_eq!(
-            self.types[get_builtin_type!("double")].link_info.name,
-            "double"
-        );
-
-        assert_eq!(
-            self.constants[get_builtin_const!("true")].link_info.name,
-            "true"
-        );
-        assert_eq!(
-            self.constants[get_builtin_const!("false")].link_info.name,
-            "false"
-        );
-        assert_eq!(
-            self.constants[get_builtin_const!("__crash_compiler")]
-                .link_info
-                .name,
-            "__crash_compiler"
-        );
-        assert_eq!(
-            self.constants[get_builtin_const!("assert")].link_info.name,
-            "assert"
-        );
-        assert_eq!(
-            self.constants[get_builtin_const!("sizeof")].link_info.name,
-            "sizeof"
-        );
-        assert_eq!(
-            self.constants[get_builtin_const!("clog2")].link_info.name,
-            "clog2"
-        );
     }
 
     pub fn add_all_files_in_directory_recurse(&mut self, directory: &Path) {
@@ -188,6 +147,47 @@ impl Linker {
     }
 
     pub fn recompile_all(&mut self) {
+        // Sanity check for the names the compiler knows internally.
+        // They are defined in std/core.sus
+        // Critically, std/core.sus MUST be the first file to be loaded into the linker. Otherwise the IDs don't point to the correct objects
+        assert_eq!(self.types[get_builtin_type!("int")].link_info.name, "int");
+        assert_eq!(self.types[get_builtin_type!("bool")].link_info.name, "bool");
+        assert_eq!(
+            self.types[get_builtin_type!("float")].link_info.name,
+            "float"
+        );
+        assert_eq!(
+            self.types[get_builtin_type!("double")].link_info.name,
+            "double"
+        );
+
+        assert_eq!(
+            self.constants[get_builtin_const!("true")].link_info.name,
+            "true"
+        );
+        assert_eq!(
+            self.constants[get_builtin_const!("false")].link_info.name,
+            "false"
+        );
+        assert_eq!(
+            self.constants[get_builtin_const!("__crash_compiler")]
+                .link_info
+                .name,
+            "__crash_compiler"
+        );
+        assert_eq!(
+            self.constants[get_builtin_const!("assert")].link_info.name,
+            "assert"
+        );
+        assert_eq!(
+            self.constants[get_builtin_const!("sizeof")].link_info.name,
+            "sizeof"
+        );
+        assert_eq!(
+            self.constants[get_builtin_const!("clog2")].link_info.name,
+            "clog2"
+        );
+
         let config = config();
 
         self.instantiator.clear_instances();

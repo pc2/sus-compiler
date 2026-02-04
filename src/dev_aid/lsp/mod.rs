@@ -4,15 +4,14 @@ mod tree_walk;
 
 use crate::{
     alloc::zip_eq,
-    config::config,
-    config::{ConnectionMethod, lsp_config},
+    config::{ConnectionMethod, config, lsp_config},
     dev_aid::ariadne_interface::{pretty_print_many_spans, pretty_print_span},
     errors::{CompileError, ErrorLevel},
     file_position::{FileText, LineCol},
     flattening::Instruction,
-    linker::FileData,
-    linker::{GlobalUUID, UniqueFileID},
+    linker::{FileData, GlobalUUID, UniqueFileID},
     prelude::*,
+    to_string::FmtWrapper,
     util::contains_duplicates,
 };
 
@@ -21,7 +20,7 @@ use hover_info::hover;
 use lsp_server::{ErrorCode, ResponseError};
 use lsp_types::{notification::*, request::Request, *};
 use semantic_tokens::{make_semantic_tokens, semantic_token_capabilities};
-use std::{collections::HashMap, error::Error, net::SocketAddr};
+use std::{collections::HashMap, error::Error, fmt::Display, net::SocketAddr};
 
 use tree_walk::{InGlobal, LocationInfo, get_selected_object};
 
@@ -85,8 +84,8 @@ fn main_loop(
     connection: lsp_server::Connection,
     initialize_params: serde_json::Value,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
-    info!("initialize_params: ");
-    info!("{initialize_params}");
+    //info!("initialize_params: ");
+    //info!("{initialize_params}");
 
     let initialize_params: InitializeParams = serde_json::from_value(initialize_params).unwrap();
 
@@ -152,11 +151,6 @@ fn main_loop(
                 lsp_server::Message::Notification(notification) => {
                     handle_notification(notification, linker, &mut should_recompile);
                 }
-            }
-
-            info!("All loaded files:");
-            for (_id, file) in &linker.files {
-                info!("File: {}", &file.file_identifier);
             }
         }
         Ok(())
@@ -345,7 +339,14 @@ impl Linker {
             ShouldRecompile::NoRecompileNeeded => {}
             ShouldRecompile::ShouldReportErrors => {}
             ShouldRecompile::Dirty => {
+                info!("Recompiling files:");
+                for (_id, file) in &self.files {
+                    info!("    {}", &file.file_identifier);
+                }
+                log::set_max_level(log::LevelFilter::Off);
                 self.recompile_all();
+                log::set_max_level(log::LevelFilter::Info);
+                info!("Recompile finished");
                 *should_recompile = ShouldRecompile::ShouldReportErrors;
             }
         }
@@ -355,18 +356,20 @@ impl Linker {
         should_recompile: &mut ShouldRecompile,
         connection: &lsp_server::Connection,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        self.recompile_if_needed(should_recompile);
         match should_recompile {
-            ShouldRecompile::NoRecompileNeeded => Ok(()),
+            ShouldRecompile::NoRecompileNeeded => {}
             ShouldRecompile::ShouldReportErrors => {
                 *should_recompile = ShouldRecompile::NoRecompileNeeded;
-                push_all_errors(connection, self)
+                info!("Pushing Errors");
+                push_all_errors(connection, self)?;
+                info!("Pushing Errors Finished");
             }
             ShouldRecompile::Dirty => {
-                *should_recompile = ShouldRecompile::NoRecompileNeeded;
-                self.recompile_all();
-                push_all_errors(connection, self)
+                unreachable!()
             }
         }
+        Ok(())
     }
 }
 
@@ -570,7 +573,11 @@ fn handle_request(
         request::HoverRequest::METHOD => {
             let params: HoverParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
-            info!("HoverRequest");
+
+            info!(
+                "HoverRequest: {}",
+                display_text_position(&params.text_document_position_params)
+            );
 
             let (file_uuid, pos) =
                 linker.location_in_file(&params.text_document_position_params, should_recompile)?;
@@ -597,7 +604,11 @@ fn handle_request(
         request::GotoDefinition::METHOD => {
             let params: GotoDefinitionParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
-            info!("GotoDefinition");
+
+            info!(
+                "GotoDefinition: {}",
+                display_text_position(&params.text_document_position_params)
+            );
 
             let (file_uuid, pos) =
                 linker.location_in_file(&params.text_document_position_params, should_recompile)?;
@@ -610,9 +621,10 @@ fn handle_request(
             )))
         }
         request::SemanticTokensFullRequest::METHOD => {
-            info!("SemanticTokensFullRequest: {params}");
             let params: SemanticTokensParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
+
+            info!("SemanticTokensFullRequest: {}", &params.text_document.uri);
 
             let identifier = UniqueFileID::from_uri(&params.text_document.uri)?;
             let uuid = linker.ensure_contains_file(identifier, should_recompile);
@@ -625,7 +637,11 @@ fn handle_request(
         request::DocumentHighlightRequest::METHOD => {
             let params: DocumentHighlightParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
-            info!("DocumentHighlight");
+
+            info!(
+                "DocumentHighlightRequest: {}",
+                display_text_position(&params.text_document_position_params)
+            );
 
             let (file_id, pos) =
                 linker.location_in_file(&params.text_document_position_params, should_recompile)?;
@@ -645,7 +661,11 @@ fn handle_request(
         request::References::METHOD => {
             let params: ReferenceParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
-            info!("FindAllReferences");
+
+            info!(
+                "References: {}",
+                display_text_position(&params.text_document_position)
+            );
 
             let (file_id, pos) =
                 linker.location_in_file(&params.text_document_position, should_recompile)?;
@@ -657,7 +677,11 @@ fn handle_request(
         request::Rename::METHOD => {
             let params: RenameParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
-            info!("Rename");
+
+            info!(
+                "Rename: {}",
+                display_text_position(&params.text_document_position)
+            );
 
             let (file_id, pos) =
                 linker.location_in_file(&params.text_document_position, should_recompile)?;
@@ -692,7 +716,11 @@ fn handle_request(
         request::Completion::METHOD => {
             let params: CompletionParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
-            info!("Completion");
+
+            info!(
+                "Completion: {}",
+                display_text_position(&params.text_document_position)
+            );
 
             let (_file_uuid, position) =
                 linker.location_in_file(&params.text_document_position, should_recompile)?;
@@ -709,6 +737,17 @@ fn handle_request(
     Ok(result.unwrap())
 }
 
+fn display_text_position(
+    text_doc_position: &lsp_types::TextDocumentPositionParams,
+) -> impl Display {
+    FmtWrapper(move |f| {
+        let file = &text_doc_position.text_document.uri;
+        let line = text_doc_position.position.line;
+        let col = text_doc_position.position.character;
+        write!(f, "{file}:{line}:{col}")
+    })
+}
+
 /// Returns `true` if a recompile is required
 fn handle_notification(
     notification: lsp_server::Notification,
@@ -717,9 +756,10 @@ fn handle_notification(
 ) {
     match notification.method.as_str() {
         notification::DidChangeTextDocument::METHOD => {
-            info!("DidChangeTextDocument");
             let params: DidChangeTextDocumentParams = serde_json::from_value(notification.params)
                 .expect("JSON Encoding Error while parsing params");
+
+            info!("DidChangeTextDocument: {}", params.text_document.uri);
 
             let mut content_change_iter = params.content_changes.into_iter();
             let only_change = content_change_iter.next().unwrap();
@@ -734,11 +774,19 @@ fn handle_notification(
             *should_recompile = ShouldRecompile::Dirty;
         }
         notification::DidChangeWatchedFiles::METHOD => {
-            info!("Workspace Files modified {}", notification.params);
             let params: DidChangeWatchedFilesParams = serde_json::from_value(notification.params)
                 .expect("JSON Encoding Error while parsing params");
 
+            info!("DidChangeWatchedFiles:");
+
             for event in params.changes {
+                if event.typ == FileChangeType::CREATED {
+                    info!("- CREATED {}", event.uri);
+                } else if event.typ == FileChangeType::CHANGED {
+                    info!("- CHANGED {}", event.uri);
+                } else if event.typ == FileChangeType::DELETED {
+                    info!("- DELETED {}", event.uri);
+                }
                 if event.typ == FileChangeType::CREATED || event.typ == FileChangeType::CHANGED {
                     let Ok(file_identifier) = UniqueFileID::from_uri(&event.uri) else {
                         continue;
@@ -776,9 +824,10 @@ fn handle_notification(
             *should_recompile = ShouldRecompile::Dirty;
         }
         notification::DidOpenTextDocument::METHOD => {
-            info!("Workspace Files modified {}", notification.params);
             let params: DidOpenTextDocumentParams = serde_json::from_value(notification.params)
                 .expect("JSON Encoding Error while parsing params");
+
+            info!("DidOpenTextDocument: {}", &params.text_document.uri);
 
             let Ok(unique_file_id) = UniqueFileID::from_uri(&params.text_document.uri) else {
                 return;

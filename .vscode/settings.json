@@ -22,8 +22,4 @@
   },
   "rust-analyzer.check.command": "clippy",
   "terminal.integrated.cwd": "${workspaceFolder}",
-  "rust-analyzer.runnables.extraTestBinaryArgs": [
-    "--nocapture",
-    "--show-output"
-  ],
 }
