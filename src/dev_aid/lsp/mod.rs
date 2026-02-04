@@ -832,9 +832,17 @@ fn handle_notification(
             let Ok(unique_file_id) = UniqueFileID::from_uri(&params.text_document.uri) else {
                 return;
             };
-            linker.add_or_update_file_text(unique_file_id, params.text_document.text);
+            if let Some(file_id) = linker.find_file(&unique_file_id)
+                && linker.files[file_id].file_text.file_text == params.text_document.text
+            {
+                // Okay we've just opened a file we already knew about. No need to dirty the internal state for it.
+                // We should however make sure the identifier is whatever the client sent us.
+                linker.files[file_id].file_identifier = unique_file_id;
+            } else {
+                linker.add_or_update_file_text(unique_file_id, params.text_document.text);
 
-            *should_recompile = ShouldRecompile::Dirty;
+                *should_recompile = ShouldRecompile::Dirty;
+            }
         }
         other => {
             info!("got other notification: {other:?}, {}", notification.params);
