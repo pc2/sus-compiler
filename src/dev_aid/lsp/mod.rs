@@ -4,8 +4,13 @@ mod tree_walk;
 
 use crate::{
     alloc::zip_eq,
+    config::config,
     config::{ConnectionMethod, lsp_config},
     dev_aid::ariadne_interface::{pretty_print_many_spans, pretty_print_span},
+    errors::{CompileError, ErrorLevel},
+    file_position::{FileText, LineCol},
+    flattening::Instruction,
+    linker::FileData,
     linker::{GlobalUUID, UniqueFileID},
     prelude::*,
     util::contains_duplicates,
@@ -18,17 +23,225 @@ use lsp_types::{notification::*, request::Request, *};
 use semantic_tokens::{make_semantic_tokens, semantic_token_capabilities};
 use std::{collections::HashMap, error::Error, net::SocketAddr};
 
-use crate::{
-    config::config,
-    errors::{CompileError, ErrorLevel},
-    file_position::{FileText, LineCol},
-    flattening::Instruction,
-    linker::FileData,
-};
-
 use tree_walk::{InGlobal, LocationInfo, get_selected_object};
 
 use self::tree_walk::RefersTo;
+
+pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
+    let cfg = lsp_config();
+
+    info!("starting LSP server");
+
+    // Create the transport.
+    let (connection, io_threads) = match cfg.connection_method {
+        ConnectionMethod::Stdio => {
+            info!("LSP communicating over stdio");
+            lsp_server::Connection::stdio()
+        }
+        ConnectionMethod::Tcp {
+            port,
+            should_listen,
+        } => {
+            let addr = SocketAddr::from(([127, 0, 0, 1], port));
+            let result = if should_listen {
+                info!("LSP Listening on {addr}");
+                lsp_server::Connection::listen(addr)?
+            } else {
+                info!("LSP Attempting to connect on {addr}");
+                lsp_server::Connection::connect(addr)?
+            };
+
+            info!("LSP socket connection established");
+            result
+        }
+    };
+
+    // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
+    let server_capabilities = serde_json::to_value(ServerCapabilities {
+        definition_provider: Some(OneOf::Left(true)),
+        document_highlight_provider: Some(OneOf::Left(true)),
+        references_provider: Some(OneOf::Left(true)),
+        hover_provider: Some(HoverProviderCapability::Simple(true)),
+        rename_provider: Some(OneOf::Left(true)),
+        semantic_tokens_provider: Some(semantic_token_capabilities()),
+        completion_provider: Some(CompletionOptions {
+            resolve_provider: Some(true),
+            ..Default::default()
+        }),
+        text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
+        ..Default::default()
+    })
+    .unwrap();
+    let initialization_params = connection.initialize(server_capabilities)?;
+    main_loop(connection, initialization_params)?;
+    io_threads.join()?;
+
+    // Shut down gracefully.
+    info!("shutting down server");
+    Ok(())
+}
+
+fn main_loop(
+    connection: lsp_server::Connection,
+    initialize_params: serde_json::Value,
+) -> Result<(), Box<dyn Error + Sync + Send>> {
+    info!("initialize_params: ");
+    info!("{initialize_params}");
+
+    let initialize_params: InitializeParams = serde_json::from_value(initialize_params).unwrap();
+
+    let mut linker = Linker::new();
+    crate::debug::create_dump_on_panic(&mut linker, |linker| {
+        initialize_all_files(linker, &initialize_params);
+
+        info!("starting LSP main loop");
+        let mut should_recompile = ShouldRecompile::Dirty;
+        loop {
+            let msg = match connection.receiver.try_recv() {
+                Ok(msg) => msg,
+                Err(TryRecvError::Empty) => {
+                    // Use a moment of no requests to already recompile, and perhaps speed up future requests
+                    linker.recompile_if_needed(&mut should_recompile);
+                    linker.report_errors_if_needed(&mut should_recompile, &connection)?;
+                    match connection.receiver.recv() {
+                        Ok(msg) => msg,
+                        Err(RecvError) => {
+                            break;
+                        }
+                    }
+                }
+                Err(TryRecvError::Disconnected) => {
+                    break;
+                }
+            };
+
+            match msg {
+                lsp_server::Message::Request(req) => {
+                    if connection.handle_shutdown(&req)? {
+                        info!("Shutdown request");
+                        break;
+                    }
+
+                    let response_value =
+                        handle_request(&req.method, req.params, linker, &mut should_recompile);
+                    let response = match response_value {
+                        Ok(result) => lsp_server::Response {
+                            id: req.id,
+                            result: Some(result),
+                            error: None,
+                        },
+                        Err(message) => lsp_server::Response {
+                            id: req.id,
+                            result: None,
+                            error: Some(ResponseError {
+                                code: ErrorCode::RequestFailed as i32,
+                                message,
+                                data: None,
+                            }),
+                        },
+                    };
+                    connection
+                        .sender
+                        .send(lsp_server::Message::Response(response))?;
+
+                    linker.report_errors_if_needed(&mut should_recompile, &connection)?;
+                }
+                lsp_server::Message::Response(resp) => {
+                    info!("got response: {resp:?}");
+                }
+                lsp_server::Message::Notification(notification) => {
+                    handle_notification(
+                        notification,
+                        linker,
+                        &mut should_recompile,
+                        &initialize_params,
+                    );
+                }
+            }
+
+            info!("All loaded files:");
+            for (_id, file) in &linker.files {
+                info!("File: {}", &file.file_identifier);
+            }
+        }
+        Ok(())
+    })
+}
+
+fn push_all_errors(
+    connection: &lsp_server::Connection,
+    linker: &Linker,
+) -> Result<(), Box<dyn Error + Sync + Send>> {
+    let errs = linker.collect_all_errors();
+
+    for (_file_id, file_data, errs_for_file) in zip_eq(linker.files.iter(), errs.into_iter()) {
+        let diag_vec: Vec<Diagnostic> = errs_for_file
+            .into_iter()
+            .map(|e| convert_diagnostic(e, &file_data.file_text, linker))
+            .collect();
+
+        let params = &PublishDiagnosticsParams {
+            uri: file_data.file_identifier.to_uri(),
+            diagnostics: diag_vec,
+            version: None,
+        };
+        let params_json = serde_json::to_value(params)?;
+
+        connection.sender.send(lsp_server::Message::Notification(
+            lsp_server::Notification {
+                method: PublishDiagnostics::METHOD.to_owned(),
+                params: params_json,
+            },
+        ))?;
+    }
+    Ok(())
+}
+
+/// Requires that token_positions.len() == tokens.len() + 1 to include EOF token
+fn convert_diagnostic(err: CompileError, main_file_text: &FileText, linker: &Linker) -> Diagnostic {
+    assert!(
+        main_file_text.is_span_valid(err.position),
+        "bad error: {}",
+        err.reason
+    );
+    let error_pos = span_to_lsp_range(main_file_text, err.position);
+
+    let severity = match err.level {
+        ErrorLevel::Error => DiagnosticSeverity::ERROR,
+        ErrorLevel::Warning => DiagnosticSeverity::WARNING,
+    };
+    let mut related_info = Vec::new();
+    for info in err.infos {
+        let info_file = &linker.files[info.span.file];
+        let info_span = info.span;
+        assert!(
+            info_file.file_text.is_span_valid(info_span),
+            "bad info in {}:\n{}; in err: {}.\nSpan is {info_span:?}, but file length is {}",
+            info_file.file_identifier,
+            info.info,
+            err.reason,
+            info_file.file_text.len()
+        );
+        let info_pos = span_to_lsp_range(&info_file.file_text, info_span);
+        let location = Location {
+            uri: info_file.file_identifier.to_uri(),
+            range: info_pos,
+        };
+        related_info.push(DiagnosticRelatedInformation {
+            location,
+            message: info.info,
+        });
+    }
+    Diagnostic::new(
+        error_pos,
+        Some(severity),
+        None,
+        None,
+        err.reason,
+        Some(related_info),
+        None,
+    )
+}
 
 fn from_position(pos: lsp_types::Position) -> LineCol {
     LineCol {
@@ -96,22 +309,33 @@ impl UniqueFileID {
     }
 }
 
+enum ShouldRecompile {
+    NoRecompileNeeded,
+    Dirty,
+    ShouldReportErrors,
+}
+
 impl Linker {
-    fn ensure_contains_file(&mut self, identifier: UniqueFileID) -> FileUUID {
+    fn ensure_contains_file(
+        &mut self,
+        identifier: UniqueFileID,
+        should_recompile: &mut ShouldRecompile,
+    ) -> FileUUID {
         if let Some(found) = self.find_file(&identifier) {
             found
         } else {
-            let file_uuid = self.add_or_update_file_from_disk(identifier);
-            self.recompile_all();
-            file_uuid
+            *should_recompile = ShouldRecompile::Dirty;
+            self.add_or_update_file_from_disk(identifier)
         }
     }
     fn location_in_file(
         &mut self,
         text_pos: &lsp_types::TextDocumentPositionParams,
+        should_recompile: &mut ShouldRecompile,
     ) -> Result<(FileUUID, usize), String> {
         let identifier = UniqueFileID::from_uri(&text_pos.text_document.uri)?;
-        let file_id = self.ensure_contains_file(identifier);
+        let file_id = self.ensure_contains_file(identifier, should_recompile);
+
         let file_data = &self.files[file_id];
 
         let position = file_data
@@ -120,81 +344,35 @@ impl Linker {
 
         Ok((file_id, position))
     }
-}
-
-/// Requires that token_positions.len() == tokens.len() + 1 to include EOF token
-fn convert_diagnostic(err: CompileError, main_file_text: &FileText, linker: &Linker) -> Diagnostic {
-    assert!(
-        main_file_text.is_span_valid(err.position),
-        "bad error: {}",
-        err.reason
-    );
-    let error_pos = span_to_lsp_range(main_file_text, err.position);
-
-    let severity = match err.level {
-        ErrorLevel::Error => DiagnosticSeverity::ERROR,
-        ErrorLevel::Warning => DiagnosticSeverity::WARNING,
-    };
-    let mut related_info = Vec::new();
-    for info in err.infos {
-        let info_file = &linker.files[info.span.file];
-        let info_span = info.span;
-        assert!(
-            info_file.file_text.is_span_valid(info_span),
-            "bad info in {}:\n{}; in err: {}.\nSpan is {info_span:?}, but file length is {}",
-            info_file.file_identifier,
-            info.info,
-            err.reason,
-            info_file.file_text.len()
-        );
-        let info_pos = span_to_lsp_range(&info_file.file_text, info_span);
-        let location = Location {
-            uri: info_file.file_identifier.to_uri(),
-            range: info_pos,
-        };
-        related_info.push(DiagnosticRelatedInformation {
-            location,
-            message: info.info,
-        });
+    /// Recompiles and reports errors
+    fn recompile_if_needed(&mut self, should_recompile: &mut ShouldRecompile) {
+        match should_recompile {
+            ShouldRecompile::NoRecompileNeeded => {}
+            ShouldRecompile::ShouldReportErrors => {}
+            ShouldRecompile::Dirty => {
+                self.recompile_all();
+                *should_recompile = ShouldRecompile::ShouldReportErrors;
+            }
+        }
     }
-    Diagnostic::new(
-        error_pos,
-        Some(severity),
-        None,
-        None,
-        err.reason,
-        Some(related_info),
-        None,
-    )
-}
-
-fn push_all_errors(
-    connection: &lsp_server::Connection,
-    linker: &Linker,
-) -> Result<(), Box<dyn Error + Sync + Send>> {
-    let errs = linker.collect_all_errors();
-
-    for (_file_id, file_data, errs_for_file) in zip_eq(linker.files.iter(), errs.into_iter()) {
-        let diag_vec: Vec<Diagnostic> = errs_for_file
-            .into_iter()
-            .map(|e| convert_diagnostic(e, &file_data.file_text, linker))
-            .collect();
-
-        let params = &PublishDiagnosticsParams {
-            uri: file_data.file_identifier.to_uri(),
-            diagnostics: diag_vec,
-            version: None,
-        };
-        let params_json = serde_json::to_value(params)?;
-
-        connection.sender.send(lsp_server::Message::Notification(
-            lsp_server::Notification {
-                method: PublishDiagnostics::METHOD.to_owned(),
-                params: params_json,
-            },
-        ))?;
+    fn report_errors_if_needed(
+        &mut self,
+        should_recompile: &mut ShouldRecompile,
+        connection: &lsp_server::Connection,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        match should_recompile {
+            ShouldRecompile::NoRecompileNeeded => Ok(()),
+            ShouldRecompile::ShouldReportErrors => {
+                *should_recompile = ShouldRecompile::NoRecompileNeeded;
+                push_all_errors(connection, self)
+            }
+            ShouldRecompile::Dirty => {
+                *should_recompile = ShouldRecompile::NoRecompileNeeded;
+                self.recompile_all();
+                push_all_errors(connection, self)
+            }
+        }
     }
-    Ok(())
 }
 
 fn initialize_all_files(linker: &mut Linker, init_params: &InitializeParams) {
@@ -391,6 +569,7 @@ fn handle_request(
     method: &str,
     params: serde_json::Value,
     linker: &mut Linker,
+    should_recompile: &mut ShouldRecompile,
 ) -> Result<serde_json::Value, String> {
     let result = match method {
         request::HoverRequest::METHOD => {
@@ -399,7 +578,8 @@ fn handle_request(
             info!("HoverRequest");
 
             let (file_uuid, pos) =
-                linker.location_in_file(&params.text_document_position_params)?;
+                linker.location_in_file(&params.text_document_position_params, should_recompile)?;
+
             let file_data = &linker.files[file_uuid];
             let mut hover_list: Vec<MarkedString> = Vec::new();
 
@@ -425,7 +605,7 @@ fn handle_request(
             info!("GotoDefinition");
 
             let (file_uuid, pos) =
-                linker.location_in_file(&params.text_document_position_params)?;
+                linker.location_in_file(&params.text_document_position_params, should_recompile)?;
 
             let goto_definition_list = goto_definition(linker, file_uuid, pos);
 
@@ -440,7 +620,8 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
 
             let identifier = UniqueFileID::from_uri(&params.text_document.uri)?;
-            let uuid = linker.ensure_contains_file(identifier);
+            let uuid = linker.ensure_contains_file(identifier, should_recompile);
+            linker.recompile_if_needed(should_recompile);
 
             serde_json::to_value(SemanticTokensResult::Tokens(make_semantic_tokens(
                 uuid, linker,
@@ -451,7 +632,8 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("DocumentHighlight");
 
-            let (file_id, pos) = linker.location_in_file(&params.text_document_position_params)?;
+            let (file_id, pos) =
+                linker.location_in_file(&params.text_document_position_params, should_recompile)?;
             let file_data = &linker.files[file_id];
 
             let ref_locations = gather_all_references_in_one_file(linker, file_id, pos);
@@ -470,7 +652,8 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("FindAllReferences");
 
-            let (file_id, pos) = linker.location_in_file(&params.text_document_position)?;
+            let (file_id, pos) =
+                linker.location_in_file(&params.text_document_position, should_recompile)?;
 
             let ref_locations = gather_all_references_across_all_files(linker, file_id, pos);
 
@@ -481,7 +664,8 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("Rename");
 
-            let (file_id, pos) = linker.location_in_file(&params.text_document_position)?;
+            let (file_id, pos) =
+                linker.location_in_file(&params.text_document_position, should_recompile)?;
 
             let ref_locations_lists = gather_all_references_across_all_files(linker, file_id, pos);
 
@@ -515,7 +699,8 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             info!("Completion");
 
-            let (_file_uuid, position) = linker.location_in_file(&params.text_document_position)?;
+            let (_file_uuid, position) =
+                linker.location_in_file(&params.text_document_position, should_recompile)?;
 
             serde_json::to_value(CompletionResponse::Array(gather_completions(
                 linker, position,
@@ -533,8 +718,9 @@ fn handle_request(
 fn handle_notification(
     notification: lsp_server::Notification,
     linker: &mut Linker,
+    should_recompile: &mut ShouldRecompile,
     _initialize_params: &InitializeParams,
-) -> bool {
+) {
     match notification.method.as_str() {
         notification::DidChangeTextDocument::METHOD => {
             info!("DidChangeTextDocument");
@@ -547,11 +733,11 @@ fn handle_notification(
             assert!(only_change.range.is_none());
 
             let Ok(file_identifier) = UniqueFileID::from_uri(&params.text_document.uri) else {
-                return false;
+                return;
             };
             linker.add_or_update_file_text(file_identifier, only_change.text);
 
-            true
+            *should_recompile = ShouldRecompile::Dirty;
         }
         notification::DidChangeWatchedFiles::METHOD => {
             info!("Workspace Files modified {}", notification.params);
@@ -593,152 +779,10 @@ fn handle_notification(
                 linker.remove_file(f_id);
             }
 
-            true
+            *should_recompile = ShouldRecompile::Dirty;
         }
         other => {
-            info!("got other notification: {other:?}");
-            false
+            info!("got other notification: {other:?}, {}", notification.params);
         }
     }
-}
-
-fn main_loop(
-    connection: lsp_server::Connection,
-    initialize_params: serde_json::Value,
-) -> Result<(), Box<dyn Error + Sync + Send>> {
-    info!("initialize_params: ");
-    info!("{initialize_params}");
-
-    let initialize_params: InitializeParams = serde_json::from_value(initialize_params).unwrap();
-
-    let mut linker = Linker::new();
-    crate::debug::create_dump_on_panic(&mut linker, |linker| {
-        initialize_all_files(linker, &initialize_params);
-
-        info!("starting LSP main loop");
-        let mut require_recompile = true;
-        loop {
-            let msg = match connection.receiver.try_recv() {
-                Ok(msg) => msg,
-                Err(TryRecvError::Empty) => {
-                    if require_recompile {
-                        linker.recompile_all();
-                        push_all_errors(&connection, linker)?;
-                    }
-                    require_recompile = false;
-                    match connection.receiver.recv() {
-                        Ok(msg) => msg,
-                        Err(RecvError) => {
-                            break;
-                        }
-                    }
-                }
-                Err(TryRecvError::Disconnected) => {
-                    break;
-                }
-            };
-
-            match msg {
-                lsp_server::Message::Request(req) => {
-                    if connection.handle_shutdown(&req)? {
-                        info!("Shutdown request");
-                        break;
-                    }
-
-                    if require_recompile {
-                        linker.recompile_all();
-                        push_all_errors(&connection, linker)?;
-                    }
-                    require_recompile = false;
-                    let response_value = handle_request(&req.method, req.params, linker);
-                    let response = match response_value {
-                        Ok(result) => lsp_server::Response {
-                            id: req.id,
-                            result: Some(result),
-                            error: None,
-                        },
-                        Err(message) => lsp_server::Response {
-                            id: req.id,
-                            result: None,
-                            error: Some(ResponseError {
-                                code: ErrorCode::RequestFailed as i32,
-                                message,
-                                data: None,
-                            }),
-                        },
-                    };
-                    connection
-                        .sender
-                        .send(lsp_server::Message::Response(response))?;
-                }
-                lsp_server::Message::Response(resp) => {
-                    info!("got response: {resp:?}");
-                }
-                lsp_server::Message::Notification(notification) => {
-                    require_recompile |=
-                        handle_notification(notification, linker, &initialize_params);
-                }
-            }
-
-            info!("All loaded files:");
-            for (_id, file) in &linker.files {
-                info!("File: {}", &file.file_identifier);
-            }
-        }
-        Ok(())
-    })
-}
-
-pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
-    let cfg = lsp_config();
-
-    info!("starting LSP server");
-
-    // Create the transport.
-    let (connection, io_threads) = match cfg.connection_method {
-        ConnectionMethod::Stdio => {
-            info!("LSP communicating over stdio");
-            lsp_server::Connection::stdio()
-        }
-        ConnectionMethod::Tcp {
-            port,
-            should_listen,
-        } => {
-            let addr = SocketAddr::from(([127, 0, 0, 1], port));
-            let result = if should_listen {
-                info!("LSP Listening on {addr}");
-                lsp_server::Connection::listen(addr)?
-            } else {
-                info!("LSP Attempting to connect on {addr}");
-                lsp_server::Connection::connect(addr)?
-            };
-
-            info!("LSP socket connection established");
-            result
-        }
-    };
-
-    // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
-    let server_capabilities = serde_json::to_value(ServerCapabilities {
-        definition_provider: Some(OneOf::Left(true)),
-        document_highlight_provider: Some(OneOf::Left(true)),
-        references_provider: Some(OneOf::Left(true)),
-        hover_provider: Some(HoverProviderCapability::Simple(true)),
-        rename_provider: Some(OneOf::Left(true)),
-        semantic_tokens_provider: Some(semantic_token_capabilities()),
-        completion_provider: Some(CompletionOptions {
-            resolve_provider: Some(true),
-            ..Default::default()
-        }),
-        text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
-        ..Default::default()
-    })
-    .unwrap();
-    let initialization_params = connection.initialize(server_capabilities)?;
-    main_loop(connection, initialization_params)?;
-    io_threads.join()?;
-
-    // Shut down gracefully.
-    info!("shutting down server");
-    Ok(())
 }
