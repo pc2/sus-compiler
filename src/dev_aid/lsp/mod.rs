@@ -150,12 +150,7 @@ fn main_loop(
                     info!("got response: {resp:?}");
                 }
                 lsp_server::Message::Notification(notification) => {
-                    handle_notification(
-                        notification,
-                        linker,
-                        &mut should_recompile,
-                        &initialize_params,
-                    );
+                    handle_notification(notification, linker, &mut should_recompile);
                 }
             }
 
@@ -719,7 +714,6 @@ fn handle_notification(
     notification: lsp_server::Notification,
     linker: &mut Linker,
     should_recompile: &mut ShouldRecompile,
-    _initialize_params: &InitializeParams,
 ) {
     match notification.method.as_str() {
         notification::DidChangeTextDocument::METHOD => {
@@ -778,6 +772,18 @@ fn handle_notification(
             for f_id in to_delete {
                 linker.remove_file(f_id);
             }
+
+            *should_recompile = ShouldRecompile::Dirty;
+        }
+        notification::DidOpenTextDocument::METHOD => {
+            info!("Workspace Files modified {}", notification.params);
+            let params: DidOpenTextDocumentParams = serde_json::from_value(notification.params)
+                .expect("JSON Encoding Error while parsing params");
+
+            let Ok(unique_file_id) = UniqueFileID::from_uri(&params.text_document.uri) else {
+                return;
+            };
+            linker.add_or_update_file_text(unique_file_id, params.text_document.text);
 
             *should_recompile = ShouldRecompile::Dirty;
         }
