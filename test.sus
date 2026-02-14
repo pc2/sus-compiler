@@ -1839,3 +1839,7 @@ module AssignUnset {
     gen int BEEE
     gen int BOOO = BEEE
 }
+module ReadUnsetArrayElem {
+    gen int[5] array
+    gen int x = array[3]
+}

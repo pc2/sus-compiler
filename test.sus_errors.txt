@@ -178,6 +178,7 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate GenerativeCannotHaveLatencyDeclaration #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate try_conflicting_latencies #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate AssignUnset #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate ReadUnsetArrayElem #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -4239,18 +4240,45 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │             ──┬─  
       │               ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: 'BEEE' is unset!
+Error: 'BEEE' is Unset!
       ╭─[ test.sus:1840:20 ]
       │
  1840 │     gen int BOOO = BEEE
       │                    ──┬─  
-      │                      ╰─── 'BEEE' is unset!
+      │                      ╰─── 'BEEE' is Unset!
       │
       ├─[ test.sus:1840:20 ]
       │
  1839 │     gen int BEEE
       │             ──┬─  
       │               ╰─── 'BEEE' declared here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1843:16 ]
+      │
+ 1843 │     gen int[5] array
+      │                ──┬──  
+      │                  ╰──── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1844:13 ]
+      │
+ 1844 │     gen int x = array[3]
+      │             ┬  
+      │             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: 'array[3]' is Unset!
+      ╭─[ test.sus:1844:17 ]
+      │
+ 1844 │     gen int x = array[3]
+      │                 ────┬───  
+      │                     ╰───── 'array[3]' is Unset!
+      │
+      ├─[ test.sus:1844:17 ]
+      │
+ 1843 │     gen int[5] array
+      │                ──┬──  
+      │                  ╰──── 'array' declared here
 ──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
@@ -4330,3 +4358,4 @@ Error: 'BEEE' is unset!
 [ERROR sus_compiler::codegen] Cannot codegen GenerativeCannotHaveLatencyDeclaration #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen try_conflicting_latencies #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen AssignUnset #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen ReadUnsetArrayElem #() due to errors!

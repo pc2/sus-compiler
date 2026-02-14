@@ -5,10 +5,11 @@
 //! As for typing, it only instantiates written types and leaves the rest for further typechecking.
 
 use std::borrow::Cow;
+use std::fmt::Display;
 use std::ops::{Deref, Index, IndexMut, Range};
 
 use crate::errors::CompileError;
-use crate::to_string::display_join;
+use crate::to_string::{display_join, display_maybe};
 use crate::{
     flattening::*,
     instantiation::*,
@@ -95,6 +96,25 @@ enum GenerativeWireRefPathElem {
         span: Span,
     },
 }
+impl GenerativeWireRefPathElem {
+    pub fn display_path(path: &[GenerativeWireRefPathElem]) -> impl Display {
+        FmtWrapper(move |f| {
+            for p in path {
+                match p {
+                    GenerativeWireRefPathElem::ArrayAccess { idx, span: _ } => {
+                        write!(f, "[{idx}]")?
+                    }
+                    GenerativeWireRefPathElem::Slice { from, to, span: _ } => {
+                        let from = display_maybe(from.as_ref(), |f, from| from.fmt(f));
+                        let to = display_maybe(to.as_ref(), |f, to| to.fmt(f));
+                        write!(f, "[{from}:{to}]")?
+                    }
+                }
+            }
+            Ok(())
+        })
+    }
+}
 
 fn make_array_bounds<'v>(
     from_maybe: Option<IBig>,
@@ -163,6 +183,8 @@ pub type ExecutionResult<T> = Result<T, CompileError>;
 /// Every [crate::flattening::Instruction] has an associated value (See [SubModuleOrWire]).
 /// They are either what this local name is currently referencing (either a wire instance or a submodule instance).
 /// Or in the case of Generative values, the current value in the generative variable.
+/// [Value::Unset] can only be the value for [Declaration] instructions. Any other instruction that *would* be unset,
+/// like a temporary, would not get to execute, as we would have errored out on the declaration that caused the [Value::Unset]
 #[derive(Debug)]
 struct GenerationState<'l> {
     generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
@@ -270,10 +292,8 @@ impl GenerationState<'_> {
     fn read_from_path(
         &self,
         value: &Value,
-        conn_path: &[WireReferencePathElement],
+        executed_path: &[GenerativeWireRefPathElem],
     ) -> ExecutionResult<Value> {
-        let executed_path = self.execute_path(conn_path)?;
-
         let mut flattened_result_tensor: Vec<&Value> = vec![value];
         let mut create_array_layers = Vec::new();
 
@@ -284,10 +304,9 @@ impl GenerationState<'_> {
                     for vp in &mut flattened_result_tensor {
                         let_unwrap!(Value::Array(arr), *vp);
                         let arr_sz = arr.len();
-                        let Some(v) = usize::try_from(&idx).ok().and_then(|idx| arr.get(idx))
-                        else {
+                        let Some(v) = usize::try_from(idx).ok().and_then(|idx| arr.get(idx)) else {
                             return Err(CompileError::error(
-                                span,
+                                *span,
                                 format!("Index {idx} out of bounds for array of size {arr_sz}"),
                             ));
                         };
@@ -295,8 +314,12 @@ impl GenerationState<'_> {
                     }
                 }
                 GenerativeWireRefPathElem::Slice { from, to, span } => {
-                    let slice =
-                        make_array_bounds(from, to, flattened_result_tensor.iter().copied(), span)?;
+                    let slice = make_array_bounds(
+                        from.clone(),
+                        to.clone(),
+                        flattened_result_tensor.iter().copied(),
+                        *span,
+                    )?;
 
                     let mut new_value_parts =
                         Vec::with_capacity(flattened_result_tensor.len() * slice.len());
@@ -342,18 +365,6 @@ impl GenerationState<'_> {
 
         Ok(unwrap_single_element(flattened_result_tensor))
     }
-    fn get_generation_value(&self, v: FlatID) -> ExecutionResult<&Value> {
-        let vv = &self.generation_state[v].unwrap_generation_value();
-
-        if let Value::Unset = vv {
-            Err(CompileError::error(
-                self.span_of(v),
-                "This variable is unset!".to_owned(),
-            ))
-        } else {
-            Ok(vv)
-        }
-    }
     fn get_wire_or_int(&self, v: FlatID) -> ExecutionResult<WireOrInt<'_>> {
         match &self.generation_state[v] {
             SubModuleOrWire::SubModule(_) => unreachable!(),
@@ -374,15 +385,25 @@ impl GenerationState<'_> {
             }
         }
     }
-    fn get_generation_integer(&self, idx: FlatID) -> ExecutionResult<&IBig> {
-        let val = self.get_generation_value(idx)?;
-        Ok(val.unwrap_integer())
+    fn get_generation_value(&self, v: FlatID) -> &Value {
+        let vv = &self.generation_state[v].unwrap_generation_value();
+
+        if let Value::Unset = vv {
+            unreachable!(
+                "Unsets can only come from unset Declarations, but when the declaration was resolved it should have already panicked"
+            )
+        }
+        vv
+    }
+    fn get_generation_integer(&self, idx: FlatID) -> &IBig {
+        let val = self.get_generation_value(idx);
+        val.unwrap_integer()
     }
     fn get_generation_small_int<INT: for<'v> TryFrom<&'v IBig>>(
         &self,
         idx: FlatID,
     ) -> ExecutionResult<INT> {
-        let val = self.get_generation_value(idx)?;
+        let val = self.get_generation_value(idx);
         let val_as_int = val.unwrap_integer();
         INT::try_from(val_as_int).map_err(|_| {
             CompileError::error(
@@ -412,7 +433,7 @@ impl GenerationState<'_> {
                 WireReferencePathElement::ArrayAccess {
                     idx, bracket_span, ..
                 } => {
-                    let idx = self.get_generation_integer(*idx)?.clone();
+                    let idx = self.get_generation_integer(*idx).clone();
                     GenerativeWireRefPathElem::ArrayAccess {
                         idx,
                         span: bracket_span.inner_span(),
@@ -423,23 +444,11 @@ impl GenerationState<'_> {
                     to,
                     bracket_span,
                     ..
-                } => {
-                    let from = if let Some(from) = from {
-                        Some(self.get_generation_integer(*from)?.clone())
-                    } else {
-                        None
-                    };
-                    let to = if let Some(to) = to {
-                        Some(self.get_generation_integer(*to)?.clone())
-                    } else {
-                        None
-                    };
-                    GenerativeWireRefPathElem::Slice {
-                        from,
-                        to,
-                        span: bracket_span.inner_span(),
-                    }
-                }
+                } => GenerativeWireRefPathElem::Slice {
+                    from: from.map(|from| self.get_generation_integer(from).clone()),
+                    to: to.map(|to| self.get_generation_integer(to).clone()),
+                    span: bracket_span.inner_span(),
+                },
                 WireReferencePathElement::ArrayPartSelect {
                     from,
                     width,
@@ -447,8 +456,8 @@ impl GenerationState<'_> {
                     direction,
                     ..
                 } => {
-                    let from = self.get_generation_integer(*from)?;
-                    let width = self.get_generation_integer(*width)?;
+                    let from = self.get_generation_integer(*from);
+                    let width = self.get_generation_integer(*width);
 
                     let (from, to) = match direction {
                         PartSelectDirection::Up => (Some(from.clone()), Some(from + width - 1)),
@@ -515,10 +524,7 @@ impl<'l> ExecutionContext<'l> {
                     }
                     TemplateKind::Value(_) => TemplateKind::Value(
                         if let Some(v) = global_ref.get_value_arg_for(param_id) {
-                            self.generation_state
-                                .get_generation_value(v)?
-                                .clone()
-                                .into()
+                            self.generation_state.get_generation_value(v).clone().into()
                         } else {
                             Value::UNKNOWN
                         },
@@ -576,7 +582,7 @@ impl<'l> ExecutionContext<'l> {
                         let (content, arr_size, _) = arr.deref();
                         let sz = if let Some(arr_size) = arr_size {
                             self.generation_state
-                                .get_generation_value(*arr_size)?
+                                .get_generation_value(*arr_size)
                                 .clone()
                                 .into()
                         } else {
@@ -675,18 +681,14 @@ impl<'l> ExecutionContext<'l> {
                     bracket_span,
                     ..
                 } => {
+                    let from =
+                        from.map(|from| self.generation_state.get_generation_integer(from).clone());
+                    let to = to.map(|to| self.generation_state.get_generation_integer(to).clone());
                     let bounds = match (from, to) {
                         (None, None) => PartialBound::WholeSlice,
-                        (None, Some(to)) => PartialBound::To(
-                            self.generation_state.get_generation_integer(*to)?.clone(),
-                        ),
-                        (Some(from), None) => PartialBound::From(
-                            self.generation_state.get_generation_integer(*from)?.clone(),
-                        ),
-                        (Some(from), Some(to)) => PartialBound::Known(
-                            self.generation_state.get_generation_integer(*from)?.clone(),
-                            self.generation_state.get_generation_integer(*to)?.clone(),
-                        ),
+                        (None, Some(to)) => PartialBound::To(to),
+                        (Some(from), None) => PartialBound::From(from),
+                        (Some(from), Some(to)) => PartialBound::Known(from, to),
                     };
 
                     path.push(RealWirePathElem::Slice {
@@ -701,7 +703,7 @@ impl<'l> ExecutionContext<'l> {
                     direction,
                     ..
                 } => {
-                    let width = self.generation_state.get_generation_integer(*width)?;
+                    let width = self.generation_state.get_generation_integer(*width);
                     let span = *bracket_span;
 
                     match self.generation_state.get_wire_or_int(*from)? {
@@ -1414,7 +1416,7 @@ impl<'l> ExecutionContext<'l> {
                     let decl = self.link_info.instructions[*decl_id].unwrap_declaration();
                     let decl_name = &decl.name;
                     let mut err =
-                        CompileError::error(wire_ref.root_span, format!("'{decl_name}' is unset!"));
+                        CompileError::error(wire_ref.root_span, format!("'{decl_name}' is Unset!"));
                     err.info_obj(decl);
                     return Err(err);
                 } else {
@@ -1429,11 +1431,33 @@ impl<'l> ExecutionContext<'l> {
             | WireReferenceRoot::LocalInterface(_) => {
                 todo!("Don't yet support compile time functions")
             }
-            WireReferenceRoot::Error => caught_by_typecheck!(),
+            WireReferenceRoot::Error => {
+                caught_by_typecheck!("Error wires will not have made it into execute")
+            }
         };
 
-        self.generation_state
-            .read_from_path(&work_on_value, &wire_ref.path)
+        let executed_path = self.generation_state.execute_path(&wire_ref.path)?;
+
+        let v = self
+            .generation_state
+            .read_from_path(&work_on_value, &executed_path)?;
+
+        if let Value::Unset = v {
+            let_unwrap!(WireReferenceRoot::LocalDecl(decl_id), &wire_ref.root);
+            let decl = self.link_info.instructions[*decl_id].unwrap_declaration();
+            let decl_name = &decl.name;
+            let mut err = CompileError::error(
+                wire_ref.get_total_span(),
+                format!(
+                    "'{decl_name}{}' is Unset!",
+                    GenerativeWireRefPathElem::display_path(&executed_path)
+                ),
+            );
+            err.info_obj(decl);
+            Err(err)
+        } else {
+            Ok(v)
+        }
     }
     fn compute_compile_time(&mut self, expr: &Expression) -> ExecutionResult<Value> {
         fn duplicate_for_all_array_ranks<const SZ: usize>(
@@ -1468,7 +1492,7 @@ impl<'l> ExecutionContext<'l> {
                 self.compute_compile_time_wireref(wire_ref)?.clone()
             }
             ExpressionSource::UnaryOp { op, rank, right } => {
-                let right_val = self.generation_state.get_generation_value(*right)?;
+                let right_val = self.generation_state.get_generation_value(*right);
                 duplicate_for_all_array_ranks(&[right_val], rank.count_unwrap(), &mut |[v]| {
                     Ok(compute_unary_op(*op, v))
                 })
@@ -1480,8 +1504,8 @@ impl<'l> ExecutionContext<'l> {
                 left,
                 right,
             } => {
-                let left_val = self.generation_state.get_generation_value(*left)?;
-                let right_val = self.generation_state.get_generation_value(*right)?;
+                let left_val = self.generation_state.get_generation_value(*left);
+                let right_val = self.generation_state.get_generation_value(*right);
 
                 duplicate_for_all_array_ranks(
                     &[left_val, right_val],
@@ -1496,7 +1520,7 @@ impl<'l> ExecutionContext<'l> {
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut result = Vec::with_capacity(arr.len());
                 for v_id in arr {
-                    let val = self.generation_state.get_generation_value(*v_id)?;
+                    let val = self.generation_state.get_generation_value(*v_id);
                     result.push(val.clone());
                 }
                 Value::Array(result)
@@ -1640,9 +1664,8 @@ impl<'l> ExecutionContext<'l> {
                 }
                 Instruction::IfStatement(if_stm) => {
                     if if_stm.is_generative {
-                        let condition_val = self
-                            .generation_state
-                            .get_generation_value(if_stm.condition)?;
+                        let condition_val =
+                            self.generation_state.get_generation_value(if_stm.condition);
                         let run_range = if condition_val.unwrap_bool() {
                             if_stm.then_block
                         } else {
@@ -1786,13 +1809,11 @@ impl<'l> ExecutionContext<'l> {
                     // TODO Non integer for loops?
                     let start_val = self
                         .generation_state
-                        .get_generation_value(stm.start)?
-                        .unwrap_integer()
+                        .get_generation_integer(stm.start)
                         .clone();
                     let end_val = self
                         .generation_state
-                        .get_generation_value(stm.end)?
-                        .unwrap_integer()
+                        .get_generation_integer(stm.end)
                         .clone();
                     if start_val > end_val {
                         let start_flat =
