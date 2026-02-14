@@ -1785,7 +1785,7 @@ module CountBitsWithSplits{
 
 	split int[] sums
 
-	
+
 	sums[0] = BoolToInt(bits[0])
 	for int i in 1..20 {
 		sums[i] = sums[i - 1] + BoolToInt(bits[i])
@@ -1803,7 +1803,7 @@ module ModWithDomains {
 	domain b
 
 	trigger b_trig : bool b_data
-	
+
 	domain a
 
 	action a_act : bool a_data {
@@ -1833,4 +1833,9 @@ module try_conflicting_latencies {
 	reg b = x
 	reg a = y
 	reg reg b = y
+}
+
+module AssignUnset {
+    gen int BEEE
+    gen int BOOO = BEEE
 }

@@ -6,6 +6,7 @@ use std::rc::Rc;
 
 use crate::{
     config::config,
+    errors::ErrorLevel,
     linker::{LinkerFiles, LinkerGlobals},
     to_string::FmtWrapper,
     typing::concrete_type::ConcreteGlobalReference,
@@ -187,8 +188,9 @@ impl Executed {
         name: String,
     ) -> ModuleTypingContext<'l> {
         let errors = ErrorCollector::new_empty(md.link_info.span, linker_files);
-        if let Err((position, reason)) = self.execution_status {
-            errors.error(position, reason);
+        if let Err(err) = self.execution_status {
+            assert!(err.level == ErrorLevel::Error);
+            errors.push_diagnostic(err);
         }
         ModuleTypingContext {
             mangled_name: mangle_name(&name),

@@ -39,6 +39,56 @@ pub struct CompileError {
     pub level: ErrorLevel,
 }
 
+impl CompileError {
+    pub fn error(position: Span, reason: impl Into<String>) -> CompileError {
+        CompileError {
+            position,
+            reason: reason.into(),
+            infos: Vec::new(),
+            level: ErrorLevel::Error,
+        }
+    }
+    pub fn warn(position: Span, reason: impl Into<String>) -> CompileError {
+        CompileError {
+            position,
+            reason: reason.into(),
+            infos: Vec::new(),
+            level: ErrorLevel::Warning,
+        }
+    }
+
+    pub fn info<S: Into<String>>(&mut self, span: Span, reason: S) -> &mut Self {
+        self.infos.push(ErrorInfo {
+            span,
+            info: reason.into(),
+        });
+        self
+    }
+    pub fn info_obj<Obj: ErrorInfoObject>(&mut self, obj: Obj) -> &mut Self {
+        if let Some(info) = obj.make_info() {
+            self.infos.push(info);
+        }
+
+        self
+    }
+    pub fn add_info_list(&mut self, mut info_list: Vec<ErrorInfo>) {
+        self.infos.append(&mut info_list);
+    }
+    pub fn suggest_replace<S: Into<String>>(
+        &mut self,
+        replace_span: Span,
+        replace_with: S,
+    ) -> &mut Self {
+        self.info(
+            replace_span,
+            format!("SUGGEST: Replace this with \"{}\"", replace_with.into()),
+        )
+    }
+    pub fn suggest_remove(&mut self, remove_span: Span) -> &mut Self {
+        self.info(remove_span, "SUGGEST: Remove this")
+    }
+}
+
 /// Stores all errors gathered within a context for reporting to the user.
 ///
 /// Only editable by converting to a ErrorCollector using [ErrorCollector::from_storage]
@@ -158,19 +208,35 @@ impl<'linker> ErrorCollector<'linker> {
         }
     }
 
-    fn push_diagnostic(
-        &self,
-        position: Span,
-        reason: String,
-        level: ErrorLevel,
-    ) -> ErrorReference<'_> {
+    /// Push an existing Diagnostic
+    pub fn push_diagnostic(&self, diagnostic: CompileError) {
+        let position = diagnostic.position;
         assert!(
             self.context_span.contains(position),
             "Base error span must be within the context span. Error: {position:?}, Context: {:?}",
             self.context_span
         );
 
-        ErrorReference {
+        if diagnostic.level == ErrorLevel::Error {
+            self.did_error.set(true);
+        }
+        self.errors.push(diagnostic);
+    }
+
+    /// Creates a [DiagnosticBuilder] that extra infos can still be added to
+    fn build_diagnostic(
+        &self,
+        position: Span,
+        reason: String,
+        level: ErrorLevel,
+    ) -> DiagnosticBuilder<'_> {
+        assert!(
+            self.context_span.contains(position),
+            "Base error span must be within the context span. Error: {position:?}, Context: {:?}",
+            self.context_span
+        );
+
+        DiagnosticBuilder {
             err_collector: self,
             built_error: CompileError {
                 position,
@@ -181,16 +247,16 @@ impl<'linker> ErrorCollector<'linker> {
         }
     }
 
-    pub fn error<S: Into<String>>(&self, position: Span, reason: S) -> ErrorReference<'_> {
-        self.push_diagnostic(position, reason.into(), ErrorLevel::Error)
+    pub fn error(&self, position: Span, reason: impl Into<String>) -> DiagnosticBuilder<'_> {
+        self.build_diagnostic(position, reason.into(), ErrorLevel::Error)
     }
 
-    pub fn warn<S: Into<String>>(&self, position: Span, reason: S) -> ErrorReference<'_> {
-        self.push_diagnostic(position, reason.into(), ErrorLevel::Warning)
+    pub fn warn(&self, position: Span, reason: impl Into<String>) -> DiagnosticBuilder<'_> {
+        self.build_diagnostic(position, reason.into(), ErrorLevel::Warning)
     }
 
-    pub fn todo<S: Into<String>>(&self, position: Span, reason: S) -> ErrorReference<'_> {
-        self.push_diagnostic(
+    pub fn todo(&self, position: Span, reason: impl Into<String>) -> DiagnosticBuilder<'_> {
+        self.build_diagnostic(
             position,
             format!("TODO: {}", reason.into()),
             ErrorLevel::Error,
@@ -203,7 +269,7 @@ impl<'linker> ErrorCollector<'linker> {
         position: Span,
         found: impl Display,
         expected: impl Display,
-    ) -> ErrorReference<'_> {
+    ) -> DiagnosticBuilder<'_> {
         self.error(
             position,
             format!("Typecheck error: In {context}, found {found}, but expected {expected}"),
@@ -215,7 +281,7 @@ impl<'linker> ErrorCollector<'linker> {
         span: Span,
         found: impl Display,
         expected: impl Display,
-    ) -> ErrorReference<'_> {
+    ) -> DiagnosticBuilder<'_> {
         self.error(
             span,
             format!(
@@ -245,13 +311,13 @@ impl Drop for ErrorCollector<'_> {
 /// Use as:
 ///
 ///     errors.warn(span, "Unused Variable").info(span2, "In module").info(blablabla)
-pub struct ErrorReference<'ec> {
+pub struct DiagnosticBuilder<'ec> {
     err_collector: &'ec ErrorCollector<'ec>,
     built_error: CompileError,
 }
 
 // This is the trick, the error is only added to the ErrorCollector when the ErrorReference is dropped.
-impl<'ec> Drop for ErrorReference<'ec> {
+impl<'ec> Drop for DiagnosticBuilder<'ec> {
     fn drop(&mut self) {
         let default_err = CompileError {
             position: Span::PLACEHOLDER,
@@ -260,44 +326,33 @@ impl<'ec> Drop for ErrorReference<'ec> {
             level: ErrorLevel::Error,
         };
         let built_error = std::mem::replace(&mut self.built_error, default_err);
-        self.err_collector
-            .did_error
-            .set(self.err_collector.did_error.get() | (built_error.level == ErrorLevel::Error));
-
-        self.err_collector.errors.push(built_error);
+        self.err_collector.push_diagnostic(built_error);
     }
 }
 
-impl ErrorReference<'_> {
+impl DiagnosticBuilder<'_> {
     pub fn info<S: Into<String>>(&mut self, span: Span, reason: S) -> &mut Self {
-        self.built_error.infos.push(ErrorInfo {
-            span,
-            info: reason.into(),
-        });
+        self.built_error.info(span, reason);
         self
     }
     pub fn info_obj<Obj: ErrorInfoObject>(&mut self, obj: Obj) -> &mut Self {
-        if let Some(info) = obj.make_info() {
-            self.built_error.infos.push(info);
-        }
-
+        self.built_error.info_obj(obj);
         self
     }
     pub fn add_info_list(&mut self, mut info_list: Vec<ErrorInfo>) {
-        self.built_error.infos.append(&mut info_list);
+        self.built_error.add_info_list(info_list);
     }
     pub fn suggest_replace<S: Into<String>>(
         &mut self,
         replace_span: Span,
         replace_with: S,
     ) -> &mut Self {
-        self.info(
-            replace_span,
-            format!("SUGGEST: Replace this with \"{}\"", replace_with.into()),
-        )
+        self.built_error.suggest_replace(replace_span, replace_with);
+        self
     }
     pub fn suggest_remove(&mut self, remove_span: Span) -> &mut Self {
-        self.info(remove_span, "SUGGEST: Remove this")
+        self.built_error.suggest_remove(remove_span);
+        self
     }
 }
 

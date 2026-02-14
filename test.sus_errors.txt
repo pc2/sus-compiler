@@ -177,6 +177,7 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated UseModWithDomains #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate GenerativeCannotHaveLatencyDeclaration #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate try_conflicting_latencies #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate AssignUnset #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -4224,6 +4225,33 @@ Try specifying an explicit latency or rework the module to remove this ambiguity
       │                ┬  
       │                ╰── 'y' declared here
 ──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1839:13 ]
+      │
+ 1839 │     gen int BEEE
+      │             ──┬─  
+      │               ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1840:13 ]
+      │
+ 1840 │     gen int BOOO = BEEE
+      │             ──┬─  
+      │               ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: 'BEEE' is unset!
+      ╭─[ test.sus:1840:20 ]
+      │
+ 1840 │     gen int BOOO = BEEE
+      │                    ──┬─  
+      │                      ╰─── 'BEEE' is unset!
+      │
+      ├─[ test.sus:1840:20 ]
+      │
+ 1839 │     gen int BEEE
+      │             ──┬─  
+      │               ╰─── 'BEEE' declared here
+──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen test_various_assignments #() due to errors!
@@ -4301,3 +4329,4 @@ Try specifying an explicit latency or rework the module to remove this ambiguity
 [ERROR sus_compiler::codegen] Cannot codegen TestNextPow2 #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen GenerativeCannotHaveLatencyDeclaration #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen try_conflicting_latencies #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen AssignUnset #() due to errors!

@@ -1,5 +1,5 @@
-use crate::prelude::*;
 use crate::typing::unifyable_cell::UniCell;
+use crate::{errors::CompileError, prelude::*};
 
 mod builtins;
 mod concrete_typecheck;
@@ -405,7 +405,7 @@ struct Executed {
     wires: FlatAlloc<RealWire, WireIDMarker>,
     submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
     generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
-    execution_status: Result<(), (Span, String)>,
+    execution_status: Result<(), CompileError>,
 }
 
 pub struct ModuleTypingContext<'l> {

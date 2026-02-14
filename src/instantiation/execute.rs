@@ -7,6 +7,7 @@
 use std::borrow::Cow;
 use std::ops::{Deref, Index, IndexMut, Range};
 
+use crate::errors::CompileError;
 use crate::to_string::display_join;
 use crate::{
     flattening::*,
@@ -112,7 +113,10 @@ fn make_array_bounds<'v>(
         let to = to_maybe.unwrap_or_else(|| IBig::from(arr_sz));
 
         if from > to {
-            return Err((span, format!("Slice {from}:{to} has a negative length.")));
+            return Err(CompileError::error(
+                span,
+                format!("Slice {from}:{to} has a negative length."),
+            ));
         }
 
         let (from_valid, to_valid) = match (usize::try_from(&from), usize::try_from(&to)) {
@@ -121,7 +125,7 @@ fn make_array_bounds<'v>(
                 let e = format!(
                     "Slice {from}:{to} is out of bounds. The size of this array is {arr_sz}"
                 );
-                return Err((span, e));
+                return Err(CompileError::error(span, e));
             }
         };
 
@@ -132,14 +136,14 @@ fn make_array_bounds<'v>(
 
             if is_dynamic_range && other_arr_sz != arr_sz {
                 let e = "Using a variable index on a jagged array".to_string();
-                return Err((span, e));
+                return Err(CompileError::error(span, e));
             }
 
             if to_valid > other_arr_sz {
                 let e = format!(
                     "Slice {from}:{to} is out of bounds. The size of this array is {other_arr_sz}"
                 );
-                return Err((span, e));
+                return Err(CompileError::error(span, e));
             }
         }
 
@@ -154,7 +158,7 @@ pub enum WireOrInt<'i> {
     Int(&'i IBig),
 }
 
-pub type ExecutionResult<T> = Result<T, (Span, String)>;
+pub type ExecutionResult<T> = Result<T, CompileError>;
 
 /// Every [crate::flattening::Instruction] has an associated value (See [SubModuleOrWire]).
 /// They are either what this local name is currently referencing (either a wire instance or a submodule instance).
@@ -200,7 +204,7 @@ impl GenerationState<'_> {
                 };
                 (Ok(()), &mut tgt_arr[idx_as_usize.unwrap()])
             } else {
-                let err = Err((
+                let err = Err(CompileError::error(
                     span,
                     format!("Index {idx} out of bounds for array of size {arr_sz}"),
                 ));
@@ -241,7 +245,7 @@ impl GenerationState<'_> {
                         if from_len != slice_len {
                             let from = slice.start;
                             let to = slice.end;
-                            return Err((
+                            return Err(CompileError::error(
                                 span,
                                 format!(
                                     "Attempting to write to this slice {from}:{to} (length {slice_len}) with an array of length {from_len}."
@@ -282,7 +286,7 @@ impl GenerationState<'_> {
                         let arr_sz = arr.len();
                         let Some(v) = usize::try_from(&idx).ok().and_then(|idx| arr.get(idx))
                         else {
-                            return Err((
+                            return Err(CompileError::error(
                                 span,
                                 format!("Index {idx} out of bounds for array of size {arr_sz}"),
                             ));
@@ -342,7 +346,10 @@ impl GenerationState<'_> {
         let vv = &self.generation_state[v].unwrap_generation_value();
 
         if let Value::Unset = vv {
-            Err((self.span_of(v), "This variable is unset!".to_owned()))
+            Err(CompileError::error(
+                self.span_of(v),
+                "This variable is unset!".to_owned(),
+            ))
         } else {
             Ok(vv)
         }
@@ -357,7 +364,7 @@ impl GenerationState<'_> {
             SubModuleOrWire::Wire(wire_id) => Ok(WireOrInt::Wire(*wire_id)),
             SubModuleOrWire::CompileTimeValue(value) => {
                 if let Value::Unset = value {
-                    Err((
+                    Err(CompileError::error(
                         self.span_of(v),
                         "This variable is unset, expected int!".to_owned(),
                     ))
@@ -378,7 +385,7 @@ impl GenerationState<'_> {
         let val = self.get_generation_value(idx)?;
         let val_as_int = val.unwrap_integer();
         INT::try_from(val_as_int).map_err(|_| {
-            (
+            CompileError::error(
                 self.span_of(idx),
                 format!(
                     "Value {val_as_int} does not fit in {}",
@@ -617,14 +624,14 @@ impl<'l> ExecutionContext<'l> {
             )
             .map_err(|e| {
                 let cst_disp = concrete_ref.display(self.globals);
-                (cst_ref.get_total_span(), format!("{cst_disp}: {e}"))
+                CompileError::error(cst_ref.get_total_span(), format!("{cst_disp}: {e}"))
             })?;
 
         if linker_cst.link_info.is_extern == IsExtern::Builtin {
             cst_ref.get_total_span().debug();
             super::builtins::evaluate_builtin_constant(&concrete_ref).map_err(|e| {
                 let cst_disp = concrete_ref.display(self.globals);
-                (cst_ref.get_total_span(), format!("{cst_disp}: {e}"))
+                CompileError::error(cst_ref.get_total_span(), format!("{cst_disp}: {e}"))
             })
         } else {
             todo!("Custom Constants");
@@ -912,7 +919,7 @@ impl<'l> ExecutionContext<'l> {
         const_span: Span,
     ) -> ExecutionResult<WireID> {
         if value.contains_unset() {
-            return Err((
+            return Err(CompileError::error(
                 const_span,
                 format!(
                     "This compile-time value was not fully resolved by the time it needed to be converted to a wire: {value}"
@@ -926,7 +933,7 @@ impl<'l> ExecutionContext<'l> {
         Ok(self.wires.alloc(RealWire {
             typ: value
                 .concretize_type(self.globals, abs_typ, self.working_on_template_args)
-                .map_err(|msg| (const_span, msg))?,
+                .map_err(|msg| CompileError::error(const_span, msg))?,
             source: RealWireDataSource::Constant { value },
             original_instruction,
             clock: domain,
@@ -1398,7 +1405,21 @@ impl<'l> ExecutionContext<'l> {
     fn compute_compile_time_wireref(&mut self, wire_ref: &WireReference) -> ExecutionResult<Value> {
         let work_on_value = match &wire_ref.root {
             WireReferenceRoot::LocalDecl(decl_id) => {
-                Cow::Borrowed(self.generation_state.get_generation_value(*decl_id)?)
+                let_unwrap!(
+                    SubModuleOrWire::CompileTimeValue(value),
+                    &self.generation_state.generation_state[*decl_id]
+                );
+
+                if let Value::Unset = value {
+                    let decl = self.link_info.instructions[*decl_id].unwrap_declaration();
+                    let decl_name = &decl.name;
+                    let mut err =
+                        CompileError::error(wire_ref.root_span, format!("'{decl_name}' is unset!"));
+                    err.info_obj(decl);
+                    return Err(err);
+                } else {
+                    Cow::Borrowed(value)
+                }
             }
             WireReferenceRoot::NamedConstant(cst) => {
                 Cow::Owned(self.get_named_constant_value(cst)?.0)
@@ -1467,7 +1488,7 @@ impl<'l> ExecutionContext<'l> {
                     rank.count_unwrap(),
                     &mut |[l, r]| compute_binary_op(l, *op, r),
                 )
-                .map_err(|reason| (expr.span, reason))?
+                .map_err(|reason| CompileError::error(expr.span, reason))?
             }
             ExpressionSource::FuncCall(_) => {
                 todo!("Func Calls cannot yet be executed at compiletime")
@@ -1777,7 +1798,7 @@ impl<'l> ExecutionContext<'l> {
                         let start_flat =
                             &self.link_info.instructions[stm.start].unwrap_expression();
                         let end_flat = &self.link_info.instructions[stm.end].unwrap_expression();
-                        return Err((
+                        return Err(CompileError::error(
                             Span::new_overarching(start_flat.span, end_flat.span),
                             format!("for loop range end is before begin: {start_val}:{end_val}"),
                         ));

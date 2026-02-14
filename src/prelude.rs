@@ -72,7 +72,7 @@ pub type FileUUID = UUID<FileUUIDMarker>;
 
 pub struct FlatIDMarker;
 impl UUIDMarker for FlatIDMarker {
-    const DISPLAY_NAME: &'static str = "obj_";
+    const DISPLAY_NAME: &'static str = "flat_";
 }
 pub type FlatID = UUID<FlatIDMarker>;
 

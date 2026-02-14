@@ -9,7 +9,7 @@ use std::borrow::Cow;
 use ibig::IBig;
 
 use crate::{
-    errors::ErrorReference,
+    errors::DiagnosticBuilder,
     instantiation::{
         ModuleTypingContext, PartSelectDirection, RealWire, RealWireDataSource, RealWirePathElem,
     },
@@ -56,7 +56,7 @@ impl<'l> ModuleTypingContext<'l> {
         context: &'static str,
         wire: &RealWire,
         expected: &ConcreteType,
-    ) -> Option<ErrorReference<'_>> {
+    ) -> Option<DiagnosticBuilder<'_>> {
         (!wire.typ.is_subtype_of(expected)).then(|| {
             self.errors.subtype_error(
                 context,
