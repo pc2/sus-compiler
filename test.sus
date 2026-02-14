@@ -1822,3 +1822,15 @@ module UseModWithDomains {
 module GenerativeCannotHaveLatencyDeclaration {
 	gen int beep'4
 }
+
+module try_conflicting_latencies {
+	input bool x
+	input bool y
+	output bool a'100
+	output bool b // error should be on 'b'
+
+	reg a = x
+	reg b = x
+	reg a = y
+	reg reg b = y
+}

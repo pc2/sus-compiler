@@ -9,6 +9,7 @@ use std::{cmp::max, iter::zip};
 use crate::alloc::zip_eq;
 use crate::dev_aid::dot_graphs::display_latency_count_graph;
 use crate::errors::ErrorInfoObject;
+use crate::latency::latency_algorithm::IndeterminablePort;
 use crate::prelude::*;
 use crate::to_string::{FmtWrapper, display_join};
 
@@ -547,15 +548,29 @@ impl ModuleTypingContext<'_> {
                 //}
             }
             LatencyCountingError::IndeterminablePortLatency { bad_ports } => {
-                for (port, a, b) in bad_ports {
-                    let port_instr = self.wires[latency_node_meanings[port]].original_instruction;
+                for IndeterminablePort { port_node, options } in bad_ports {
+                    let port_instr =
+                        self.wires[latency_node_meanings[port_node]].original_instruction;
                     let port_name_span = self.md.link_info.instructions[port_instr].get_span();
-                    error(
-                        port_name_span,
-                        format!(
-                            "Cannot determine port latency. Options are {a} and {b}\nTry specifying an explicit latency or rework the module to remove this ambiguity"
-                        ),
-                    );
+                    let mut error_text =
+                        "Cannot determine port latency. Options are:\n".to_string();
+                    let mut error_infos = Vec::with_capacity(options.len());
+                    for opt in options {
+                        let desired = opt.desired_latency;
+                        let from_port_instr = self.md.link_info.instructions
+                            [self.wires[latency_node_meanings[opt.from.node]].original_instruction]
+                            .unwrap_declaration();
+                        error_infos.push(from_port_instr.make_info().unwrap());
+                        let from_port_name = &from_port_instr.name;
+                        let from_port_latency = opt.from.latency;
+                        writeln!(
+                            error_text,
+                            "- '{desired} from {from_port_name}'{from_port_latency}"
+                        )
+                        .unwrap();
+                    }
+                    error_text.push_str("Try specifying an explicit latency or rework the module to remove this ambiguity");
+                    error(port_name_span, error_text).add_info_list(error_infos);
                 }
             }
             LatencyCountingError::PortsNotStronglyConnected { port_partitions } => {

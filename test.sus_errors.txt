@@ -176,6 +176,7 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated ModWithDomains #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated UseModWithDomains #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate GenerativeCannotHaveLatencyDeclaration #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate try_conflicting_latencies #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -308,21 +309,6 @@ Error: No Global 'multiply' was found.
      │                 ────┬───  
      │                     ╰───── No Global 'multiply' was found.
 ─────╯
-Error: This port is not strongly connected to the strongly connected port cluster 'first'.
-An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
-Strongly connected ports are also transitive.
-If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-     ╭─[ test.sus:224:43 ]
-     │
- 224 │     interface first_bit_idx_24 : bool[24] bits -> int first
-     │                                           ──┬─        ──┬──  
-     │                                             ╰──────────────── This port is not strongly connected to the strongly connected port cluster 'first'.
-An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
-Strongly connected ports are also transitive.
-If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-     │                                                         │    
-     │                                                         ╰──── 'first' declared here
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:224:43 ]
      │
@@ -336,6 +322,21 @@ Error: Some parameters of 'first' were still unknown: int #(FROM: ?, TO: ?)
  224 │     interface first_bit_idx_24 : bool[24] bits -> int first
      │                                                       ──┬──  
      │                                                         ╰──── Some parameters of 'first' were still unknown: int #(FROM: ?, TO: ?)
+─────╯
+Error: This port is not strongly connected to the strongly connected port cluster 'bits'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+     ╭─[ test.sus:224:55 ]
+     │
+ 224 │     interface first_bit_idx_24 : bool[24] bits -> int first
+     │                                           ──┬─        ──┬──  
+     │                                             ╰──────────────── 'bits' declared here
+     │                                                         │    
+     │                                                         ╰──── This port is not strongly connected to the strongly connected port cluster 'bits'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:225:9 ]
@@ -485,14 +486,22 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                                                                                           ┬  
      │                                                                                                           ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Cannot determine port latency. Options are 0 and -1
+Error: Cannot determine port latency. Options are:
+- '2 from x'3
+- '1 from y'1
 Try specifying an explicit latency or rework the module to remove this ambiguity
-     ╭─[ test.sus:284:112 ]
+     ╭─[ test.sus:284:96 ]
      │
  284 │     interface undeteriminable_input_latency : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b -> int x, int y
-     │                                                                                                                ┬  
-     │                                                                                                                ╰── Cannot determine port latency. Options are 0 and -1
+     │                                                                                                ┬        ┬      ┬  
+     │                                                                                                ╰────────────────── Cannot determine port latency. Options are:
+- '2 from x'3
+- '1 from y'1
 Try specifying an explicit latency or rework the module to remove this ambiguity
+     │                                                                                                         │      │  
+     │                                                                                                         ╰───────── 'x' declared here
+     │                                                                                                                │  
+     │                                                                                                                ╰── 'y' declared here
 ─────╯
 Error: Conflicting specified latency
 
@@ -3493,22 +3502,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │           ┬  
       │           ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: This port is not strongly connected to the strongly connected port cluster 't'.
-An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
-Strongly connected ports are also transitive.
-If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-      ╭─[ test.sus:1543:13 ]
-      │
- 1543 │     input bool x
-      │                ┬  
-      │                ╰── This port is not strongly connected to the strongly connected port cluster 't'.
-An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
-Strongly connected ports are also transitive.
-If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
- 1544 │     trigger t : bool b
-      │             ┬  
-      │             ╰── 't' declared here
-──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1543:13 ]
       │
@@ -3516,36 +3509,62 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                ┬  
       │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: This port is not strongly connected to the strongly connected port cluster 't'.
+Error: This port is not strongly connected to the strongly connected port cluster 'x'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      ╭─[ test.sus:1544:10 ]
+      │
+ 1544 │     trigger t : bool b
+      │             ┬  
+      │             ╰── This port is not strongly connected to the strongly connected port cluster 'x'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      │
+      ├─[ test.sus:1544:10 ]
+      │
+ 1543 │     input bool x
+      │                ┬  
+      │                ╰── 'x' declared here
+──────╯
+Error: This port is not strongly connected to the strongly connected port cluster 'x'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
       ╭─[ test.sus:1544:19 ]
       │
  1544 │     trigger t : bool b
-      │             ┬        ┬  
-      │             ╰─────────── 't' declared here
-      │                      │  
-      │                      ╰── This port is not strongly connected to the strongly connected port cluster 't'.
+      │                      ┬  
+      │                      ╰── This port is not strongly connected to the strongly connected port cluster 'x'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      │
+      ├─[ test.sus:1544:19 ]
+      │
+ 1543 │     input bool x
+      │                ┬  
+      │                ╰── 'x' declared here
 ──────╯
-Error: This port is not strongly connected to the strongly connected port cluster 'b'.
+Error: This port is not strongly connected to the strongly connected port cluster 'xx'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-      ╭─[ test.sus:1550:13 ]
+      ╭─[ test.sus:1551:14 ]
+      │
+ 1551 │     output bool b
+      │                 ┬  
+      │                 ╰── This port is not strongly connected to the strongly connected port cluster 'xx'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      │
+      ├─[ test.sus:1551:14 ]
       │
  1550 │     input bool xx
       │                ─┬  
-      │                 ╰── This port is not strongly connected to the strongly connected port cluster 'b'.
-An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
-Strongly connected ports are also transitive.
-If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
- 1551 │     output bool b
-      │                 ┬  
-      │                 ╰── 'b' declared here
+      │                 ╰── 'xx' declared here
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1554:18 ]
@@ -4183,6 +4202,28 @@ Error: Generative Declarations may not have a latency specifier
       │                  ┬  
       │                  ╰── Generative Declarations may not have a latency specifier
 ──────╯
+Error: Cannot determine port latency. Options are:
+- '100 from x'99
+- '101 from y'99
+Try specifying an explicit latency or rework the module to remove this ambiguity
+      ╭─[ test.sus:1830:14 ]
+      │
+ 1830 │     output bool b // error should be on 'b'
+      │                 ┬  
+      │                 ╰── Cannot determine port latency. Options are:
+- '100 from x'99
+- '101 from y'99
+Try specifying an explicit latency or rework the module to remove this ambiguity
+      │
+      ├─[ test.sus:1830:14 ]
+      │
+ 1827 │     input bool x
+      │                ┬  
+      │                ╰── 'x' declared here
+ 1828 │     input bool y
+      │                ┬  
+      │                ╰── 'y' declared here
+──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen test_various_assignments #() due to errors!
@@ -4259,3 +4300,4 @@ Error: Generative Declarations may not have a latency specifier
 [ERROR sus_compiler::codegen] Cannot codegen TestUnknownArraySize #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen TestNextPow2 #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen GenerativeCannotHaveLatencyDeclaration #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen try_conflicting_latencies #() due to errors!
