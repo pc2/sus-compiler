@@ -9,7 +9,7 @@ module JoinDomains #(T1, T2, int OFFSET) {
 
 module SlowClockGenerator #(int PERIOD) {
 	interface SlowClockGenerator : -> state int cur_value
-	
+
 	initial cur_value = 0
 
 	when cur_value == PERIOD-1 {
@@ -105,13 +105,13 @@ module PopCount #(int WIDTH) {
 }
 
 
-// Recursive Tree Add module recurses smaller copies of itself. 
+// Recursive Tree Add module recurses smaller copies of itself.
 module TreeAdd #(int WIDTH, int FROM, int TO) {
 	interface TreeAdd : int#(FROM, TO)[WIDTH] values'0 -> int#(FROM: FROM*WIDTH, TO: (TO - 1)*WIDTH + 1) total
 
 	if WIDTH == 0 {
-		// Have to explicitly give zero a latency count. 
-		// Otherwise total's latency can't be determined. 
+		// Have to explicitly give zero a latency count.
+		// Otherwise total's latency can't be determined.
 		int zero'0 = 0
 		total = zero
 	} else if WIDTH == 1 {
@@ -120,8 +120,8 @@ module TreeAdd #(int WIDTH, int FROM, int TO) {
 		// Or instantiate submodules inline
 		int left_total = TreeAdd(values[:WIDTH / 2])
 		int right_total = TreeAdd(values[WIDTH / 2:])
-		
-		// Can add pipelining registers here too. 
+
+		// Can add pipelining registers here too.
 		// Latency Counting will figure it out.
 		reg total = left_total + right_total
 	}
@@ -143,7 +143,7 @@ module BitwiseIntSplit #(int TO, int LOWER_BITS) {
     upper = FromBits#(T: type int#(FROM: 0, TO: UPPER_TO))(v_bits[LOWER_BITS:])
 }
 
-/// Recombines a lower and upper integer parts. 
+/// Recombines a lower and upper integer parts.
 /// See also [BitwiseIntSplit]
 module BitwiseIntConcat #(int UPPER_TO, int LOWER_BITS) {
     interface BitwiseIntConcat :
@@ -204,7 +204,7 @@ module Ternary #(T) {
 }
 
 /// Rotates towards lower indexes by the provided offset. Implemented as a Barrel Shifter
-/// 
+///
 /// Example: `RotateLeft([1, 2, 3, 4], 1) == [2, 3, 4, 1]`
 module RotateLeft#(T, int ARRAY_LEN) {
     interface RotateLeft : T[ARRAY_LEN] data'0, int#(FROM: 0, TO: ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0
@@ -231,7 +231,7 @@ module RotateLeft#(T, int ARRAY_LEN) {
 }
 
 /// Rotates towards higher indexes by the provided offset. Implemented as a Barrel Shifter
-/// 
+///
 /// Example: `RotateRight([1, 2, 3, 4], 1) == [4, 1, 2, 3]`
 module RotateRight#(T, int ARRAY_LEN) {
     interface RotateRight : T[ARRAY_LEN] data'0, int#(FROM: 0, TO: ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0
@@ -255,4 +255,41 @@ module RotateRight#(T, int ARRAY_LEN) {
     }
 
     rotated_data = rotate_stages[NUM_STAGES]
+}
+
+/// Temporary module for creating and deconstructing tuples, until we have structs
+module Tuple2 #(T1, T2) {
+    gen int SIZE1 = sizeof#(T: type T1)
+    gen int SIZE2 = sizeof#(T: type T2)
+    domain clk
+
+    domain pack_dom
+    interface pack : T1 v1_i'0, T2 v2_i'0 -> bool[SIZE1 + SIZE2] packed_o'0
+    packed_o[:SIZE1] = ToBits(v1_i)
+    packed_o[SIZE1:] = ToBits(v2_i)
+
+    domain unpack_dom
+    interface unpack : bool[SIZE1 + SIZE2] packed_i'0 -> T1 v1_o'0, T2 v2_o'0
+    v1_o = FromBits(packed_i[:SIZE1])
+    v2_o = FromBits(packed_i[SIZE1:])
+}
+
+/// Temporary module for creating and deconstructing tuples, until we have structs
+module Tuple3 #(T1, T2, T3) {
+    gen int SIZE1 = sizeof#(T: type T1)
+    gen int SIZE2 = sizeof#(T: type T2)
+    gen int SIZE3 = sizeof#(T: type T3)
+    domain clk
+
+    domain pack_dom
+    interface pack : T1 v1_i'0, T2 v2_i'0, T3 v3_i'0 -> bool[SIZE1 + SIZE2 + SIZE3] packed_o'0
+    packed_o[:SIZE1] = ToBits(v1_i)
+    packed_o[SIZE1:SIZE1+SIZE2] = ToBits(v2_i)
+    packed_o[SIZE1+SIZE2:] = ToBits(v3_i)
+
+    domain unpack_dom
+    interface unpack : bool[SIZE1 + SIZE2 + SIZE3] packed_i'0 -> T1 v1_o'0, T2 v2_o'0, T3 v3_o'0
+    v1_o = FromBits(packed_i[:SIZE1])
+    v2_o = FromBits(packed_i[SIZE1:SIZE1+SIZE2])
+    v3_o = FromBits(packed_i[SIZE1+SIZE2:])
 }
