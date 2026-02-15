@@ -1,4 +1,19 @@
 # Changelog
+## 0.3.8
+- Add Splits (Port splits are thus far not supported yet, only internal splits)
+- Expressly split Latency Domains from Clock Domains (#153)
+- No longer require `CrossDomain` to cross Latency Domains
+- Add lint for latency specifiers on gen decls (#162)
+- Improve the descriptiveness of the Indeterminable Port Latency error (#168)
+- Fix reading Unset value error points to wrong location
+- Reading Unset from an Array now also errors
+- LSP: Fix VSCode doesn't recognise canonized file paths
+- LSP: Keyword colors now encode "is relevant outside the module" vs not. So general control flow is blue, but ports, domains, modules, etc are purple.
+
+### Standard Library
+- Add `FWFT`
+- Add `Tuple2` and `Tuple3`
+
 ## 0.3.7: Bugfix Bonanza
 - No longer report errors when submodule instantiation fails (#146)
 - Make array sizes optional in declarations
@@ -250,4 +265,4 @@ Large portions of the work in this release are thanks to the generous contributi
 - For Abstract Types and Domains, switch to Hindley-Milner type checking
 - All builtin names (bool, int, true, false) are now defined in [stl/core.sus](stl/core.sus). This is so the templating system works for all of them. 
 - Since link_info is now shared between Modules, Types and Constants, we now share all code for templating, typing, etc. 
-- Instructions are now part of LinkInfo. 
+- Instructions are now part of LinkInfo.
