@@ -225,12 +225,12 @@ impl LatencyCountingProblem {
     }
 
     fn make_ports_per_domain(&self, ctx: &ModuleTypingContext) -> Vec<Vec<usize>> {
-        let mut ports_per_domain_flat = ctx.md.clocks.map(|_| Vec::new());
+        let mut ports_per_domain_flat = ctx.md.latency_domains.map(|_| Vec::new());
         for (_id, port) in &ctx.md.ports {
             if let SubModuleOrWire::Wire(port_w) =
                 ctx.generation_state[port.declaration_instruction]
             {
-                ports_per_domain_flat[port.clock].push(self.map_wire_to_latency_node[port_w]);
+                ports_per_domain_flat[port.lat_dom].push(self.map_wire_to_latency_node[port_w]);
             }
         }
         let mut ports_per_domain = ports_per_domain_flat.into_vec();

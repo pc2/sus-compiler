@@ -972,7 +972,19 @@ pub fn solve_latencies(
 
     let mut final_solution = vec![UNSET; fanouts.len()];
 
+    // Tightly bind the known ports together, to ensure that if one port group bleeds into another without the ports being strongly connected, then the second group is still at the correct offsets, even if some internal latencies may not be as expected.
+    let mut bind_port_groups_extra_fanin = Vec::new();
+    for seed in &solution_seeds {
+        add_cycle_to_extra_fanin(seed, &mut bind_port_groups_extra_fanin);
+    }
+    let fanins = fanins.extend_lists_with_new_elements(bind_port_groups_extra_fanin);
+    let fanouts = fanins.faninout_complement();
+
     for seed in solution_seeds {
+        if is_valid(final_solution[seed[0].node]) {
+            continue; // This port group seems to have already been covered when exploring around another port group. Because we bound the latency of the ports together already, it will not have been damaged. Only internal latencies might be a bit shuffled up. 
+        }
+
         let mut solution = mem.make_solution_with_initial_values(&seed);
         solution.explore_all_connected_nodes(&fanins, &fanouts);
 
