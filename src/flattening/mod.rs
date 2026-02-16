@@ -194,6 +194,7 @@ pub struct Port {
     pub name_span: Span,
     pub decl_span: Span,
     pub direction: Direction,
+    pub clock: ClockID,
     pub lat_dom: LatDomID,
     /// Points to a [Declaration]
     pub declaration_instruction: FlatID,

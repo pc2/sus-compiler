@@ -560,6 +560,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             decl_span,
                             direction,
                             lat_dom: self.current_latency_domain,
+                            clock: SINGULAR_CLOCK_DOMAIN,
                             declaration_instruction,
                             latency_specifier,
                         });
@@ -662,6 +663,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         decl_span,
                         direction,
                         lat_dom: self.current_latency_domain,
+                        clock: SINGULAR_CLOCK_DOMAIN,
                         declaration_instruction,
                         latency_specifier,
                     });
@@ -1526,6 +1528,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     decl_span: interface_decl_span,
                     direction: Direction::Input,
                     lat_dom: self.current_latency_domain,
+                    clock: SINGULAR_CLOCK_DOMAIN,
                     declaration_instruction,
                     latency_specifier,
                 });
@@ -1537,6 +1540,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     decl_span: interface_decl_span,
                     direction: Direction::Output,
                     lat_dom: self.current_latency_domain,
+                    clock: SINGULAR_CLOCK_DOMAIN,
                     declaration_instruction,
                     latency_specifier,
                 });

@@ -339,7 +339,7 @@ impl DiagnosticBuilder<'_> {
         self.built_error.info_obj(obj);
         self
     }
-    pub fn add_info_list(&mut self, mut info_list: Vec<ErrorInfo>) {
+    pub fn add_info_list(&mut self, info_list: Vec<ErrorInfo>) {
         self.built_error.add_info_list(info_list);
     }
     pub fn suggest_replace<S: Into<String>>(

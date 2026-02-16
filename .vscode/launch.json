@@ -124,7 +124,8 @@
             },
             "sourceLanguages": ["rust"],
             "args": [
-                "--no-redump"
+                "--no-redump",
+                ".",
                 // By default it'll grab all .sus files in this directory. Doesn't use ./reproduce.sh though...
             ],
             "cwd": "${input:pickDumpFile}",
