@@ -4788,6 +4788,7 @@ module FIFO_T_type_int_FROM_0_TO_6_DEPTH_30_MAY_PUSH_LATENCY_8(
 	output /*mux_wire*/ logic[2:0] pop_data
 );
 
+/*latency*/ logic _pop_D1; always_ff @(posedge clk) begin _pop_D1 <= pop; end
 /*state*/ logic[2:0] mem[29:0];
 /*state*/ logic[4:0] read_addr;
 /*state*/ logic[4:0] write_addr;
@@ -4809,6 +4810,7 @@ assign _16 = (_15 == 30) ? 0 : _15; // == mod 30
 wire _19;
 assign _19 = read_addr != write_addr;
 wire[2:0] _21 = mem[read_addr];
+/*latency*/ logic[2:0] __21_D1; always_ff @(posedge clk) begin __21_D1 <= _21; end
 wire[4:0] _24;
 assign _24 = read_addr + 1'd1;
 wire[4:0] _25;
@@ -4858,7 +4860,7 @@ end
 always_comb begin // combinatorial pop_data
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	pop_data = 3'dx;
-	if(pop) pop_data = _21;
+	if(_pop_D1) pop_data = __21_D1;
 end
 endmodule
 

@@ -1036,7 +1036,7 @@ Error: Excess output targets. Function returns 1 results, but 2 targets were giv
      │
      ├─[ memory.sus:46:12 ]
      │
-  46 │     action pop'0 : -> T pop_data'0 {
+  46 │     action pop'0 : -> T pop_data'1 {
      │            ─┬─  
      │             ╰─── Interface 'pop' defined here
 ─────╯
@@ -1056,7 +1056,7 @@ Error: Excess argument. Function takes 0 args, but 1 were passed.
      │
      ├─[ memory.sus:46:12 ]
      │
-  46 │     action pop'0 : -> T pop_data'0 {
+  46 │     action pop'0 : -> T pop_data'1 {
      │            ─┬─  
      │             ╰─── Interface 'pop' defined here
 ─────╯
@@ -2524,7 +2524,7 @@ Warning: Unused port 'pop'
       │
       ├─[ memory.sus:46:12 ]
       │
-   46 │     action pop'0 : -> T pop_data'0 {
+   46 │     action pop'0 : -> T pop_data'1 {
       │            ─┬─  
       │             ╰─── Port 'pop' declared here
       │
@@ -2543,7 +2543,7 @@ Warning: Unused port 'pop_data'
       │
       ├─[ memory.sus:46:25 ]
       │
-   46 │     action pop'0 : -> T pop_data'0 {
+   46 │     action pop'0 : -> T pop_data'1 {
       │                         ────┬───  
       │                             ╰───── Port 'pop_data' declared here
       │

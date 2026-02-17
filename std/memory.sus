@@ -43,8 +43,8 @@ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
     
     domain pop_dom
     output bool may_pop'0 = read_addr != write_addr
-    action pop'0 : -> T pop_data'0 {
-        pop_data = mem[read_addr]
+    action pop'0 : -> T pop_data'1 {
+        reg pop_data = mem[read_addr]
         read_addr = read_addr + 1 mod DEPTH
     }
 }
