@@ -1843,3 +1843,7 @@ module ReadUnsetArrayElem {
     gen int[5] array
     gen int x = array[3]
 }
+
+module RegressionForBadPort {
+	trigger my_trig'-
+}

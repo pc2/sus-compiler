@@ -1,13 +1,14 @@
 use super::*;
 use crate::{
     prelude::*,
+    to_string::FmtWrapper,
     typing::{
         abstract_type::BOOL_SCALAR_FOR_REF,
         unifyable_cell::{SubstituteRecurse, UnifyRecurse},
     },
 };
 
-use std::ops::Deref;
+use std::{fmt::Display, ops::Deref};
 
 use crate::{
     errors::ErrorInfo,
@@ -1084,7 +1085,12 @@ impl<'l> TypeCheckingContext<'l> {
                 Instruction::Expression(expr) => {
                     match &expr.output {
                         ExpressionOutput::SubExpression(expr_typ) => {
-                            self.finalize_abstract_type(expr_typ, expr.span, report_errors);
+                            self.finalize_abstract_type(
+                                "expression",
+                                expr_typ,
+                                expr.span,
+                                report_errors,
+                            );
                         }
                         ExpressionOutput::MultiWrite(write_tos) => {
                             for wr in write_tos {
@@ -1104,9 +1110,12 @@ impl<'l> TypeCheckingContext<'l> {
                         _ => {}
                     }
                 }
-                Instruction::Declaration(decl) => {
-                    self.finalize_abstract_type(&decl.typ, decl.name_span, report_errors)
-                }
+                Instruction::Declaration(decl) => self.finalize_abstract_type(
+                    &decl.name,
+                    &decl.typ,
+                    decl.name_span,
+                    report_errors,
+                ),
                 // TODO Submodule domains may not be crossed either?
                 Instruction::SubModule(sm) => {
                     self.finalize_global_ref(&sm.module_ref, report_errors);
@@ -1116,28 +1125,36 @@ impl<'l> TypeCheckingContext<'l> {
         }
     }
 
-    fn finalize_abstract_type(&self, typ: &'l AbstractRankedType, span: Span, report_errors: bool) {
+    fn finalize_abstract_type(
+        &self,
+        obj_name: impl Display,
+        typ: &'l AbstractRankedType,
+        span: Span,
+        report_errors: bool,
+    ) {
         if !self.unifier.fully_substitute_recurse(typ) && report_errors {
+            let typ = typ.display(self.globals.globals, self.link_info);
             self.errors.error(
                 span,
-                format!(
-                    "Could not fully figure out the type of this object. {}",
-                    typ.display(self.globals.globals, self.link_info)
-                ),
+                format!("Could not fully figure out the type of {obj_name}. '{typ}'",),
             );
         }
     }
 
-    fn finalize_global_ref<ID: Copy>(
+    fn finalize_global_ref<ID: Copy + Into<GlobalUUID>>(
         &self,
         global_ref: &'l GlobalReference<ID>,
         report_errors: bool,
     ) {
         let global_ref_span = global_ref.get_total_span();
-        for (_template_id, arg) in global_ref.template_arg_types.get().unwrap() {
+        let global_ref_id: GlobalUUID = global_ref.id.into();
+        let global_ref_global = &self.globals.globals[global_ref_id];
+        for (template_id, arg) in global_ref.template_arg_types.get().unwrap() {
             match arg {
                 TemplateKind::Type(arg) => {
-                    self.finalize_abstract_type(arg, global_ref_span, report_errors);
+                    let param = &global_ref_global.parameters[template_id];
+                    let info = FmtWrapper(|f| write!(f, "parameter {}", &param.name));
+                    self.finalize_abstract_type(info, arg, global_ref_span, report_errors);
                 }
                 TemplateKind::Value(()) => {}
             }
@@ -1155,7 +1172,7 @@ impl<'l> TypeCheckingContext<'l> {
             _ => {}
         }
         let total_span = wire_ref.get_total_span();
-        self.finalize_abstract_type(&wire_ref.output_typ, total_span, report_errors);
+        self.finalize_abstract_type("wire ref", &wire_ref.output_typ, total_span, report_errors);
     }
 }
 
