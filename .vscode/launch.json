@@ -147,10 +147,8 @@
                 "description": "Pick a crash dump folder",
                 "fromFolder": {
                     "predefined": [
-                        "${userHome}/.sus/0.3.0/crash_dumps/",
-                        "${userHome}/.sus/0.3.1-devel/crash_dumps/",
-                        "${userHome}/.sus/0.3.2-devel/crash_dumps/",
-                        "${userHome}/.local/share/sus/0.3.3/crash_dumps/",
+                        "${userHome}/.local/share/sus/0.3.8/crash_dumps/",
+                        "${userHome}/.local/share/sus/0.3.9-dev/crash_dumps/",
                         "${workspaceFolder}/crash_dumps/",
                     ]
                 },

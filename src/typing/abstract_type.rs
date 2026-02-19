@@ -131,7 +131,7 @@ impl AbstractRankedType {
         cur
     }
     pub fn is_int_scalar(&self) -> bool {
-        *self.rank.unwrap() == PeanoType::Zero
+        self.rank.get() == Some(&PeanoType::Zero)
             && matches!(
                 &self.inner.unwrap(),
                 AbstractInnerType::Named(AbstractGlobalReference {

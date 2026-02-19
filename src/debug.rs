@@ -92,7 +92,7 @@ pub fn debug_print_span(span: Span, label: String) {
         if let Some(files) = linker_files_ptr.as_ref() {
             pretty_print_span(files, span, label);
         } else {
-            error!("DEBUG: No Linker registered for Span Debugging!");
+            eprintln!("DEBUG: No Linker registered for Span Debugging!");
         }
     }
 }
@@ -226,14 +226,14 @@ fn create_dump(linker_files: &LinkerFiles) {
 
     if let Err(err) = fs::create_dir_all(&dump_dir) {
         let new_dump_dir = PathBuf::from("sus_crash_dumps").join(&dump_name);
-        error!(
+        eprintln!(
             "Could not create {} in the SUS install directory: {err} Trying to save it locally to {}",
             dump_dir.to_string_lossy(),
             new_dump_dir.to_string_lossy()
         );
 
         if let Err(err) = fs::create_dir_all(&new_dump_dir) {
-            error!(
+            eprintln!(
                 "Could not create {} locally either: {err} Giving up on dumping the error",
                 new_dump_dir.to_string_lossy()
             );
@@ -267,7 +267,7 @@ fn create_dump(linker_files: &LinkerFiles) {
             let _ = f.write_all(file_data.file_text.file_text.as_bytes());
         }
     }
-    error!("Internal Compiler Error! All files dumped to {dump_dir:?}");
+    eprintln!("Internal Compiler Error! All files dumped to {dump_dir:?}");
 }
 
 /// Set up the hook to print spans. Uses [std::panic::set_hook] instead of [std::panic::catch_unwind] because this runs before my debugger "on panic" breakpoint.
