@@ -79,6 +79,13 @@ module RippleFIFO#(T, int DEPTH) {
 		pop_data = datas[DEPTH-1]
 		valids[DEPTH-1] = false
 	}
+
+    domain reset
+    action rst {
+        for int I in 0..DEPTH {
+            valids[I] = false
+        }
+    }
 }
 
 module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {

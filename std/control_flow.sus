@@ -57,7 +57,10 @@ module SlowState #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
     assert#(C: OLD_DELAY >= 0)
     gen int UPDATE_TOTAL_DEPTH = max#(A: OLD_DELAY, B: OLD_DELAY + NEW_DELAY)
     domain clk
-    input bool rst
+    bool do_rst = false
+    action rst {
+        do_rst = true
+    }
 
     domain data
     output state T old'-OLD_DELAY
@@ -67,7 +70,7 @@ module SlowState #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
 
     bool update_old'-OLD_DELAY = LatencyOffset#(OFFSET: -UPDATE_TOTAL_DEPTH)(update_s) // Despite their differing absolute latency, they of course need to be set back by the same amount, potentially introducing a pipeline stage
     T new_old'-OLD_DELAY = LatencyOffset#(OFFSET: -UPDATE_TOTAL_DEPTH)(new_s)
-    when rst {
+    when do_rst {
         old = RESET_TO
     } else when update_old {
         old = new_old
@@ -84,7 +87,7 @@ module SlowState #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
     if UPDATE_TOTAL_DEPTH != 0 {
         state bool[UPDATE_TOTAL_DEPTH] cooldown
         may_update = cooldown[0]
-        when update_s | rst { // Importantly, there are no pipeline registers on update for the cooldown. Otherwise it could be called twice rapidly in a row
+        when update_s | do_rst { // Importantly, there are no pipeline registers on update for the cooldown. Otherwise it could be called twice rapidly in a row
             cooldown = Repeat(false)
         } else {
             cooldown[0:UPDATE_TOTAL_DEPTH - 1] = cooldown[1:]
