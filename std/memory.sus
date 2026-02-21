@@ -75,7 +75,7 @@ module RippleFIFO#(T, int DEPTH) {
 
 	domain pop_dom
 	output bool may_pop'0 = valids[DEPTH-1]
-	action try_pop'0 : -> bool did_pop'0, T pop_data'0 {
+	action pop'0 : -> T pop_data'0 {
 		pop_data = datas[DEPTH-1]
 		valids[DEPTH-1] = false
 	}
