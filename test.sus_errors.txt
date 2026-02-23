@@ -179,6 +179,7 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate try_conflicting_latencies #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate AssignUnset #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate ReadUnsetArrayElem #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate RegressionForBadPort #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -1568,12 +1569,12 @@ Warning: Not Instantiating use_test #() due to abstract typing errors
      │        ────┬───  
      │            ╰───── Not Instantiating use_test #() due to abstract typing errors
 ─────╯
-Error: Could not fully figure out the type of this object. ?[...]
+Error: Could not fully figure out the type of parameter T. '?[...]'
      ╭─[ test.sus:779:2 ]
      │
  779 │     test #(MY_INPUT: 3) test_mod
      │     ─────────┬─────────  
-     │              ╰─────────── Could not fully figure out the type of this object. ?[...]
+     │              ╰─────────── Could not fully figure out the type of parameter T. '?[...]'
 ─────╯
 Warning: Unused port 'o'
      ╭─[ test.sus:791:25 ]
@@ -4280,6 +4281,29 @@ Error: 'array[3]' is Unset!
       │                ──┬──  
       │                  ╰──── 'array' declared here
 ──────╯
+Warning: Not Instantiating RegressionForBadPort #() due to abstract typing errors
+      ╭─[ test.sus:1847:8 ]
+      │
+ 1847 │ module RegressionForBadPort {
+      │        ──────────┬─────────  
+      │                  ╰─────────── Not Instantiating RegressionForBadPort #() due to abstract typing errors
+──────╯
+Error: No Global '' was found.
+      ╭─[ test.sus:1848:19 ]
+      │
+ 1848 │     trigger my_trig'-
+      │                      │ 
+      │                      ╰─ No Global '' was found.
+──────╯
+Error: While parsing 'template_global', parser found a missing field in the field 'item' of type 'identifier'
+      ╭─[ test.sus:1848:19 ]
+      │
+ 1848 │     trigger my_trig'-
+      │                      │ 
+      │                      ╰─ While parsing 'template_global', parser found a missing field in the field 'item' of type 'identifier'
+      │                      │ 
+      │                      ╰─ Parent node 'template_global'
+──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen test_various_assignments #() due to errors!
@@ -4359,3 +4383,4 @@ Error: 'array[3]' is Unset!
 [ERROR sus_compiler::codegen] Cannot codegen try_conflicting_latencies #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen AssignUnset #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen ReadUnsetArrayElem #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen RegressionForBadPort #() due to errors!
