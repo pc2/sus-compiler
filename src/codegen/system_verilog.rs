@@ -946,6 +946,16 @@ impl<'g> CodeGenerationContext<'g> {
                     self.in_generate(|slf| {
                         slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| {
                             let output = output_name.with_path(path);
+
+                            let op_sv = match op {
+                                UnaryOperator::And => "&",
+                                UnaryOperator::Or => "|",
+                                UnaryOperator::Xor => "^",
+                                UnaryOperator::Not => "~",// SystemVerilog's '!' operator is like C's. !8b10101110 = 0
+                                UnaryOperator::Sum => "+",
+                                UnaryOperator::Product => "*",
+                                UnaryOperator::Negate => "-",
+                            };
                             match op {
                                 UnaryOperator::And
                                 | UnaryOperator::Or
@@ -953,7 +963,7 @@ impl<'g> CodeGenerationContext<'g> {
                                 | UnaryOperator::Not
                                 | UnaryOperator::Negate => {
                                     let right_with_path = right_name.with_path(path);
-                                    format!("assign {output} = {op}{right_with_path};\n")
+                                    format!("assign {output} = {op_sv}{right_with_path};\n")
                                 }
                                 UnaryOperator::Sum |
                                 UnaryOperator::Product => {
@@ -966,7 +976,7 @@ impl<'g> CodeGenerationContext<'g> {
                                     let for_var = for_var.clone().unwrap();
                                     let for_var_path = [PathElem::Array { idx: for_var.to_string() }];
                                     let right_with_paths = right_name.with_paths([path, &for_var_path]);
-                                    format!("always_comb begin\n\t{output} = {start_at};\n\tfor(int {for_var} = 0; {for_var} < {list_len}; {for_var} += 1) {output} {op}= {right_with_paths};\nend\n")
+                                    format!("always_comb begin\n\t{output} = {start_at};\n\tfor(int {for_var} = 0; {for_var} < {list_len}; {for_var} += 1) {output} {op_sv}= {right_with_paths};\nend\n")
                                 }
                             }
                         })
@@ -1020,7 +1030,13 @@ impl<'g> CodeGenerationContext<'g> {
                                 BinaryOperator::And |
                                 BinaryOperator::Or |
                                 BinaryOperator::Xor => {
-                                    format!("assign {output_with_path} = {left_with_path} {op} {right_with_path};\n")
+                                    let op_sv = match op {
+                                        BinaryOperator::And => "&",
+                                        BinaryOperator::Or => "|",
+                                        BinaryOperator::Xor => "^",
+                                        _ => unreachable!()
+                                    };
+                                    format!("assign {output_with_path} = {left_with_path} {op_sv} {right_with_path};\n")
                                 }
                                 BinaryOperator::Add |
                                 BinaryOperator::Subtract |
@@ -1033,6 +1049,20 @@ impl<'g> CodeGenerationContext<'g> {
                                 BinaryOperator::GreaterEq |
                                 BinaryOperator::Lesser |
                                 BinaryOperator::LesserEq => {
+                                    let op_sv = match op {
+                                        BinaryOperator::Add => "+",
+                                        BinaryOperator::Subtract => "-",
+                                        BinaryOperator::Multiply => "*",
+                                        BinaryOperator::Divide => "/",
+                                        BinaryOperator::Remainder => "%",
+                                        BinaryOperator::Equals => "==",
+                                        BinaryOperator::NotEquals => "!=",
+                                        BinaryOperator::Greater => ">",
+                                        BinaryOperator::GreaterEq => ">=",
+                                        BinaryOperator::Lesser => "<",
+                                        BinaryOperator::LesserEq => "<=",
+                                        _ => unreachable!()
+                                    };
                                     let left_int_range = left_typ.unwrap_int_bounds();
                                     let right_int_range = right_typ.unwrap_int_bounds();
 
@@ -1040,7 +1070,7 @@ impl<'g> CodeGenerationContext<'g> {
                                     let left_arg = wrap_in_signed_if_needed(left_with_path, op_is_signed, left_int_range);
                                     let right_arg = wrap_in_signed_if_needed(right_with_path, op_is_signed, right_int_range);
 
-                                    format!("assign {output_with_path} = {left_arg} {op} {right_arg};\n")
+                                    format!("assign {output_with_path} = {left_arg} {op_sv} {right_arg};\n")
                                 }
                                 BinaryOperator::Modulo => {
                                     let left_int_range =
@@ -1417,7 +1447,6 @@ impl<'g> CodeGenerationContext<'g> {
         writeln!(self.program_text, "endmodule\n").unwrap();
     }
 }
-
 impl RealWireDataSource {
     fn wire_or_reg(&self) -> &'static str {
         match self {

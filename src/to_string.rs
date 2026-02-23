@@ -863,14 +863,18 @@ impl LinkInfo {
                             write!(f, "{func_wire_ref:?}({args})")?;
                         }
                         ExpressionSource::UnaryOp { op, right, rank: _ } => {
-                            write!(f, "{op}{right:?}")?;
+                            let op_text = op.op_text();
+                            write!(f, "{op_text}{right:?}")?;
                         }
                         ExpressionSource::BinaryOp {
                             op,
                             left,
                             right,
                             rank: _,
-                        } => write!(f, "{left:?} {op} {right:?}")?,
+                        } => {
+                            let op_text = op.op_text();
+                            write!(f, "{left:?} {op_text} {right:?}")?
+                        }
                         ExpressionSource::ArrayConstruct(elements) => {
                             let arr_elems =
                                 display_join(", ", elements, |f, elem| write!(f, "{elem:?}"));
@@ -1163,39 +1167,43 @@ impl ModuleTypingContext<'_> {
     fn name(&self, wire_id: WireID) -> impl Display {
         self.wires[wire_id].name.green()
     }
-    fn fmt_path(&self, f: &mut Formatter<'_>, path: &[RealWirePathElem]) -> std::fmt::Result {
-        for p in path {
-            match p {
-                RealWirePathElem::Index { idx_wire, .. } => {
-                    write!(f, "[{}]", self.name(*idx_wire))?;
-                }
-                RealWirePathElem::ConstIndex { idx, .. } => {
-                    write!(f, "[{idx}]")?;
-                }
-                RealWirePathElem::Slice { bounds, .. } => match bounds {
-                    PartialBound::Known(from, to) => write!(f, "[{from}:{to}]")?,
-                    PartialBound::From(from) => write!(f, "[{from}:]")?,
-                    PartialBound::To(to) => write!(f, "[:{to}]")?,
-                    PartialBound::WholeSlice => write!(f, "[:]")?,
-                },
-                RealWirePathElem::PartSelect {
-                    from_wire,
-                    width,
-                    direction,
-                    ..
-                } => {
-                    let from = self.name(*from_wire);
-                    write!(f, "[{from}{direction}{width}]")?;
+    fn display_path(&self, path: &[RealWirePathElem]) -> impl Display {
+        FmtWrapper(move |f| {
+            for p in path {
+                match p {
+                    RealWirePathElem::Index { idx_wire, .. } => {
+                        write!(f, "[{}]", self.name(*idx_wire))?;
+                    }
+                    RealWirePathElem::ConstIndex { idx, .. } => {
+                        write!(f, "[{idx}]")?;
+                    }
+                    RealWirePathElem::Slice { bounds, .. } => match bounds {
+                        PartialBound::Known(from, to) => write!(f, "[{from}:{to}]")?,
+                        PartialBound::From(from) => write!(f, "[{from}:]")?,
+                        PartialBound::To(to) => write!(f, "[:{to}]")?,
+                        PartialBound::WholeSlice => write!(f, "[:]")?,
+                    },
+                    RealWirePathElem::PartSelect {
+                        from_wire,
+                        width,
+                        direction,
+                        ..
+                    } => {
+                        let from = self.name(*from_wire);
+                        write!(f, "[{from}{direction}{width}]")?;
+                    }
                 }
             }
-        }
-        Ok(())
+            Ok(())
+        })
     }
-    fn fmt_rank(&self, f: &mut Formatter<'_>, rank: &[UniCell<Value>]) -> std::fmt::Result {
-        for r in rank {
-            write!(f, "[{r}]")?;
-        }
-        Ok(())
+    fn display_rank(&self, rank: &[UniCell<Value>]) -> impl Display {
+        FmtWrapper(move |f| {
+            for r in rank {
+                write!(f, "[{r}]")?;
+            }
+            Ok(())
+        })
     }
 
     fn fmt_instantiated_module(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -1255,18 +1263,20 @@ impl ModuleTypingContext<'_> {
                             write!(f, "{if_or_and}{invert}{}", self.name(c.condition_wire))?;
                         }
                         if *num_regs != 0 {
-                            write!(f, ": reg({num_regs}) {name}")?;
+                            write!(f, ": reg({num_regs})")?;
                         } else {
-                            write!(f, ": {name}")?;
+                            write!(f, ":")?;
                         }
-                        self.fmt_path(f, to_path)?;
-                        writeln!(f, " = {}", self.name(*from))?;
+                        let to_path = self.display_path(to_path);
+                        let from = self.name(*from);
+                        writeln!(f, " {name}{to_path} = {from}")?;
                     }
                 }
                 RealWireDataSource::UnaryOp { op, rank, right } => {
-                    write!(f, " = {op}")?;
-                    self.fmt_rank(f, rank)?;
-                    writeln!(f, " {}", self.name(*right))?;
+                    let op_text = op.op_text();
+                    let op_rank = self.display_rank(rank);
+                    let right_name = self.name(*right);
+                    write!(f, " = {op_text}{op_rank} {right_name}")?;
                 }
                 RealWireDataSource::BinaryOp {
                     op,
@@ -1274,14 +1284,16 @@ impl ModuleTypingContext<'_> {
                     left,
                     right,
                 } => {
-                    write!(f, " = {} {op}", self.name(*left))?;
-                    self.fmt_rank(f, rank)?;
-                    writeln!(f, " {}", self.name(*right))?;
+                    let op_text = op.op_text();
+                    let op_rank = self.display_rank(rank);
+                    let left_name = self.name(*left);
+                    let right_name = self.name(*right);
+                    write!(f, " = {left_name} {op_text}{op_rank} {right_name}")?;
                 }
                 RealWireDataSource::Select { root, path } => {
-                    write!(f, " = {}", self.name(*root))?;
-                    self.fmt_path(f, path)?;
-                    writeln!(f)?;
+                    let root = self.name(*root);
+                    let path = self.display_path(path);
+                    writeln!(f, " = {root}{path}")?;
                 }
                 RealWireDataSource::ConstructArray { array_wires } => {
                     let s = display_join(", ", array_wires.iter(), |f, item| {

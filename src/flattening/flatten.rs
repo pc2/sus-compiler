@@ -65,11 +65,6 @@ impl UnaryOperator {
         }
     }
 }
-impl core::fmt::Display for UnaryOperator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.op_text())
-    }
-}
 
 impl BinaryOperator {
     pub fn from_kind_id(kind_id: u16) -> Self {
@@ -114,11 +109,6 @@ impl BinaryOperator {
             BinaryOperator::Lesser => "<",
             BinaryOperator::LesserEq => "<=",
         }
-    }
-}
-impl core::fmt::Display for BinaryOperator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.op_text())
     }
 }
 
