@@ -1,6 +1,0 @@
-*.v
-*.sv
-*.vhdl
-*.vh
-# Any build directories created by Verilator or other tools
-**/
