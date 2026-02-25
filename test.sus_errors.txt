@@ -2037,24 +2037,24 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │            ┬  
      │            ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Some parameters of '_cr_in' were still unknown: int #(FROM: ?, TO: ?)[5]
+Error: Some parameters of '_cr_din' were still unknown: int #(FROM: ?, TO: ?)[5]
      ╭─[ test.sus:958:14 ]
      │
  958 │     CrossDomain cr
      │                 ─┬  
-     │                  ╰── Some parameters of '_cr_in' were still unknown: int #(FROM: ?, TO: ?)[5]
+     │                  ╰── Some parameters of '_cr_din' were still unknown: int #(FROM: ?, TO: ?)[5]
 ─────╯
-Error: Some parameters of '_cr_out' were still unknown: int #(FROM: ?, TO: ?)[5]
+Error: Some parameters of '_cr_dout' were still unknown: int #(FROM: ?, TO: ?)[5]
      ╭─[ test.sus:958:14 ]
      │
  958 │     CrossDomain cr
      │                 ─┬  
-     │                  ╰── Some parameters of '_cr_out' were still unknown: int #(FROM: ?, TO: ?)[5]
+     │                  ╰── Some parameters of '_cr_dout' were still unknown: int #(FROM: ?, TO: ?)[5]
 ─────╯
 Error: Some submodule parameters of cr were still unknown: CrossDomain #(T: type int #(FROM: ?, TO: ?)[5])
 T can be inferred from:
-{*} <: T in T in
-{*} = T in T out
+{*} <: T in T din
+{*} = T in T dout
 
      ╭─[ test.sus:958:14 ]
      │
@@ -2062,37 +2062,37 @@ T can be inferred from:
      │                 ─┬  
      │                  ╰── Some submodule parameters of cr were still unknown: CrossDomain #(T: type int #(FROM: ?, TO: ?)[5])
 T can be inferred from:
-{*} <: T in T in
-{*} = T in T out
+{*} <: T in T din
+{*} = T in T dout
 
 ─────╯
 Error: Some parameters of '_1' were still unknown: int #(FROM: ?, TO: ?)[5]
-     ╭─[ test.sus:960:10 ]
+     ╭─[ test.sus:960:11 ]
      │
- 960 │     cr.in = a
-     │             ┬  
-     │             ╰── Some parameters of '_1' were still unknown: int #(FROM: ?, TO: ?)[5]
+ 960 │     cr.din = a
+     │              ┬  
+     │              ╰── Some parameters of '_1' were still unknown: int #(FROM: ?, TO: ?)[5]
 ─────╯
 Error: Some parameters of 'b' were still unknown: int #(FROM: ?, TO: ?)[5]
      ╭─[ test.sus:961:9 ]
      │
- 961 │     int[5] b = cr.out
+ 961 │     int[5] b = cr.dout
      │            ┬  
      │            ╰── Some parameters of 'b' were still unknown: int #(FROM: ?, TO: ?)[5]
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:961:9 ]
      │
- 961 │     int[5] b = cr.out
+ 961 │     int[5] b = cr.dout
      │            ┬  
      │            ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: Some parameters of '_2' were still unknown: int #(FROM: ?, TO: ?)[5]
      ╭─[ test.sus:961:13 ]
      │
- 961 │     int[5] b = cr.out
-     │                ───┬──  
-     │                   ╰──── Some parameters of '_2' were still unknown: int #(FROM: ?, TO: ?)[5]
+ 961 │     int[5] b = cr.dout
+     │                ───┬───  
+     │                   ╰───── Some parameters of '_2' were still unknown: int #(FROM: ?, TO: ?)[5]
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:965:9 ]

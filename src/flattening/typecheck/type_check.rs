@@ -86,6 +86,9 @@ impl<'l> TypeCheckingContext<'l> {
         }
     }
     pub fn init_all_declarations(&self) {
+        for (wr, _) in self.link_info.iter_wire_refs() {
+            self.init_wire_ref(wr);
+        }
         for (_, instr) in self.instructions {
             match instr {
                 Instruction::SubModule(submod_instr) => {
@@ -95,17 +98,8 @@ impl<'l> TypeCheckingContext<'l> {
                     decl.typ
                         .set_initial(self.written_to_abstract_type(&decl.typ_expr));
                 }
-                Instruction::Expression(expr) => {
-                    if let ExpressionSource::WireRef(wr) = &expr.source {
-                        self.init_wire_ref(wr);
-                    }
-                    if let ExpressionOutput::MultiWrite(wrs) = &expr.output {
-                        for wr in wrs {
-                            self.init_wire_ref(&wr.to);
-                        }
-                    }
-                }
-                Instruction::Interface(_)
+                Instruction::Expression(_)
+                | Instruction::Interface(_)
                 | Instruction::IfStatement(_)
                 | Instruction::ForStatement(_) => {}
             }
@@ -1080,6 +1074,9 @@ impl<'l> TypeCheckingContext<'l> {
         // `report_errors` should be false if another error had already occured. This just reduces error overload
         let report_errors = !self.errors.did_error();
         // Post type application. Solidify types and flag any remaining AbstractType::Unknown
+        for (wr, _) in self.link_info.iter_wire_refs() {
+            self.finalize_wire_ref(wr, report_errors);
+        }
         for (_id, inst) in self.instructions {
             match inst {
                 Instruction::Expression(expr) => {
@@ -1092,16 +1089,9 @@ impl<'l> TypeCheckingContext<'l> {
                                 report_errors,
                             );
                         }
-                        ExpressionOutput::MultiWrite(write_tos) => {
-                            for wr in write_tos {
-                                self.finalize_wire_ref(&wr.to, report_errors);
-                            }
-                        }
+                        ExpressionOutput::MultiWrite(_) => {}
                     }
                     match &expr.source {
-                        ExpressionSource::WireRef(wr) => {
-                            self.finalize_wire_ref(wr, report_errors);
-                        }
                         ExpressionSource::UnaryOp { rank, .. }
                         | ExpressionSource::BinaryOp { rank, .. } => {
                             let _ = self.unifier.fully_substitute(rank);

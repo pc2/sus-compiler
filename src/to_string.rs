@@ -962,35 +962,35 @@ impl Module {
             write!(f, "{{{}}} ", self.latency_domains[latency_domain].name)
         })
     }
-    pub fn display_port_info(
+    pub fn display_decl(
         &self,
         decl: &Declaration,
         file_text: &FileText,
         may_print_domain: bool,
     ) -> impl Display {
-        let_unwrap!(
-            DeclarationKind::Port {
+        FmtWrapper(move |f| {
+            if let DeclarationKind::Port {
                 direction,
-                is_state,
                 latency_domain,
                 ..
-            },
-            decl.decl_kind
-        );
+            } = &decl.decl_kind
+            {
+                let latency_domain = self.display_latency_domain(*latency_domain, may_print_domain);
+                write!(f, "{latency_domain}{direction} ")?;
+            }
 
-        let domain = self.display_latency_domain(latency_domain, may_print_domain);
+            if decl.decl_kind.is_generative() {
+                write!(f, "gen ")?;
+            }
+            if decl.decl_kind.is_state() {
+                write!(f, "state ")?;
+            }
 
-        let state_kw = if is_state { "state " } else { "" };
+            let written_typ = &file_text[decl.typ_expr.get_span()];
+            let name = &decl.name;
 
-        let written_typ = &file_text[decl.typ_expr.get_span()];
-        let name = &decl.name;
-
-        let lat_spec = self.display_latency(&decl.latency_specifier, file_text);
-        FmtWrapper(move |f| {
-            write!(
-                f,
-                "{domain}{direction} {state_kw}{written_typ} {name}{lat_spec}"
-            )
+            let lat_spec = self.display_latency(&decl.latency_specifier, file_text);
+            write!(f, "{written_typ} {name}{lat_spec}")
         })
     }
 
@@ -1008,14 +1008,14 @@ impl Module {
             write!(f, "{domain}{interface_kind} {name}{lat_spec}:")?;
             for decl_id in &interface.inputs {
                 let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
-                let port_info = self.display_port_info(port_decl, file_text, false);
+                let port_info = self.display_decl(port_decl, file_text, false);
                 write!(f, "\n\t{port_info}")?;
             }
             if !interface.outputs.is_empty() {
                 write!(f, "\n\t->")?;
                 for decl_id in &interface.outputs {
                     let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
-                    let port_info = self.display_port_info(port_decl, file_text, false);
+                    let port_info = self.display_decl(port_decl, file_text, false);
                     write!(f, "\n\t{port_info}")?;
                 }
             }
@@ -1045,7 +1045,7 @@ impl Module {
                         }
                         Some(InterfaceDeclKind::SinglePort(decl_id)) => {
                             let port = self.link_info.instructions[decl_id].unwrap_declaration();
-                            let info = self.display_port_info(port, file_text, false);
+                            let info = self.display_decl(port, file_text, false);
                             write!(f, "\n{info}")?;
                         }
                         None => {}

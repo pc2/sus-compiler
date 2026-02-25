@@ -1,3 +1,4 @@
+mod completions;
 mod hover_info;
 mod semantic_tokens;
 mod tree_walk;
@@ -5,10 +6,12 @@ mod tree_walk;
 use crate::{
     alloc::zip_eq,
     config::{ConnectionMethod, config, lsp_config},
-    dev_aid::ariadne_interface::{pretty_print_many_spans, pretty_print_span},
+    dev_aid::{
+        ariadne_interface::{pretty_print_many_spans, pretty_print_span},
+        lsp::completions::gather_completions,
+    },
     errors::{CompileError, ErrorLevel},
     file_position::{FileText, LineCol},
-    flattening::Instruction,
     linker::{FileData, GlobalUUID, UniqueFileID},
     prelude::*,
     to_string::FmtWrapper,
@@ -400,46 +403,6 @@ fn initialize_all_files(linker: &mut Linker, init_params: &InitializeParams) {
     }
 }
 
-fn gather_completions(linker: &Linker, position: usize) -> Vec<CompletionItem> {
-    let mut result = Vec::new();
-
-    for (_, m) in &linker.modules {
-        result.push(CompletionItem {
-            label: m.link_info.name.to_string(),
-            kind: Some(CompletionItemKind::FUNCTION),
-            ..Default::default()
-        });
-
-        if m.link_info.span.contains_pos(position) {
-            for (_id, v) in &m.link_info.instructions {
-                if let Instruction::Declaration(d) = v {
-                    result.push(CompletionItem {
-                        label: d.name.to_string(),
-                        kind: Some(CompletionItemKind::VARIABLE),
-                        ..Default::default()
-                    });
-                }
-            }
-        }
-    }
-    for (_, c) in &linker.constants {
-        result.push(CompletionItem {
-            label: c.link_info.name.to_string(),
-            kind: Some(CompletionItemKind::CONSTANT),
-            ..Default::default()
-        });
-    }
-    for (_, t) in &linker.types {
-        result.push(CompletionItem {
-            label: t.link_info.name.to_string(),
-            kind: Some(CompletionItemKind::STRUCT),
-            ..Default::default()
-        });
-    }
-
-    result
-}
-
 fn gather_references_in_file(
     linker: &Linker,
     file_data: &FileData,
@@ -470,11 +433,11 @@ fn for_each_local_reference_in_global(
     ref_locations
 }
 
-fn gather_all_references_in_one_file(linker: &Linker, file_id: FileUUID, pos: usize) -> Vec<Span> {
-    if let Some((_location, hover_info)) = get_selected_object(linker, file_id, pos) {
+fn gather_all_references_in_one_file(linker: &Linker, file: &FileData, pos: usize) -> Vec<Span> {
+    if let Some((_location, hover_info)) = get_selected_object(linker, file, pos) {
         let refers_to = RefersTo::from(hover_info);
         if refers_to.is_global() {
-            gather_references_in_file(linker, &linker.files[file_id], refers_to)
+            gather_references_in_file(linker, file, refers_to)
         } else if let Some(local) = refers_to.local {
             for_each_local_reference_in_global(linker, local.0, local.1)
         } else {
@@ -505,7 +468,7 @@ fn gather_all_references_across_all_files(
 ) -> Vec<(FileUUID, Vec<Span>)> {
     let mut ref_locations = Vec::new();
 
-    if let Some((location, hover_info)) = get_selected_object(linker, file_id, pos) {
+    if let Some((location, hover_info)) = get_selected_object(linker, &linker.files[file_id], pos) {
         let refers_to = RefersTo::from(hover_info);
         if refers_to.is_global() {
             for (other_file_id, other_file) in &linker.files {
@@ -530,10 +493,10 @@ fn gather_all_references_across_all_files(
     ref_locations
 }
 
-fn goto_definition(linker: &mut Linker, file_uuid: FileUUID, pos: usize) -> Vec<Span> {
+fn goto_definition(linker: &mut Linker, file_id: FileUUID, pos: usize) -> Vec<Span> {
     let mut goto_definition_list: Vec<Span> = Vec::new();
 
-    let Some((_location, info)) = get_selected_object(linker, file_uuid, pos) else {
+    let Some((_location, info)) = get_selected_object(linker, &linker.files[file_id], pos) else {
         return Vec::new();
     };
     match info {
@@ -585,7 +548,7 @@ fn handle_request(
             let file_data = &linker.files[file_uuid];
             let mut hover_list: Vec<MarkedString> = Vec::new();
 
-            let range = if let Some((location, info)) = get_selected_object(linker, file_uuid, pos)
+            let range = if let Some((location, info)) = get_selected_object(linker, file_data, pos)
             {
                 if crate::debug::is_enabled("lsp-debug") {
                     hover_list.push(MarkedString::String(format!("{info:?}")))
@@ -647,7 +610,7 @@ fn handle_request(
                 linker.location_in_file(&params.text_document_position_params, should_recompile)?;
             let file_data = &linker.files[file_id];
 
-            let ref_locations = gather_all_references_in_one_file(linker, file_id, pos);
+            let ref_locations = gather_all_references_in_one_file(linker, file_data, pos);
 
             let result: Vec<DocumentHighlight> = ref_locations
                 .into_iter()
@@ -722,11 +685,11 @@ fn handle_request(
                 display_text_position(&params.text_document_position)
             );
 
-            let (_file_uuid, position) =
+            let (file_uuid, position) =
                 linker.location_in_file(&params.text_document_position, should_recompile)?;
 
             serde_json::to_value(CompletionResponse::Array(gather_completions(
-                linker, position,
+                linker, file_uuid, position,
             )))
         }
         req => {

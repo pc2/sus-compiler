@@ -164,30 +164,29 @@ pub fn visit_all_in_module<'linker, Visitor: FnMut(Span, LocationInfo<'linker>)>
 /// IE, the [LocationInfo] in the selection area that has the smallest span.
 pub fn get_selected_object<'linker>(
     linker: &'linker Linker,
-    file: FileUUID,
+    file: &'linker FileData,
     position: usize,
 ) -> Option<(Span, LocationInfo<'linker>)> {
-    let file_data = &linker.files[file];
-
-    let mut best_object: Option<LocationInfo<'linker>> = None;
-    let mut best_span: Span = Span::make_max_possible_span(file);
+    let mut best_object: Option<(Span, LocationInfo<'linker>)> = None;
 
     let mut walker = TreeWalker {
         linker,
         visitor: |span, info| {
-            if span.size() <= best_span.size() {
+            if let Some((best_span, _)) = best_object
+                && best_span.size() > span.size()
+            {
+            } else {
                 //assert!(span.size() < self.best_span.size());
                 // May not be the case. Do prioritize later ones, as they tend to be nested
-                best_span = span;
-                best_object = Some(info);
+                best_object = Some((span, info));
             }
         },
         should_prune: |span| !span.contains_pos(position),
     };
 
-    walker.walk_file(file_data);
+    walker.walk_file(file);
 
-    best_object.map(|v| (best_span, v))
+    best_object
 }
 
 struct TreeWalker<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> bool> {
@@ -387,6 +386,9 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
         if !(self.should_prune)(link_info.span) {
             self.walk_name_and_template_arguments(obj_id, link_info);
 
+            for (wire_ref, _) in link_info.iter_wire_refs() {
+                self.walk_wire_ref(obj_id, link_info, wire_ref);
+            }
             for (id, inst) in &link_info.instructions {
                 match inst {
                     Instruction::SubModule(sm) => {
@@ -416,8 +418,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                         }
                     }
                     Instruction::Expression(expr) => {
-                        if let ExpressionSource::WireRef(wire_ref) = &expr.source {
-                            self.walk_wire_ref(obj_id, link_info, wire_ref)
+                        if let ExpressionSource::WireRef(_) = &expr.source {
                         } else if let Some(single_output_expr) = expr.as_single_output_expr() {
                             self.visit(
                                 expr.span,
@@ -429,15 +430,6 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                                 ),
                             )
                         };
-
-                        match &expr.output {
-                            ExpressionOutput::SubExpression(_full_type) => {}
-                            ExpressionOutput::MultiWrite(write_tos) => {
-                                for output in write_tos {
-                                    self.walk_wire_ref(obj_id, link_info, &output.to);
-                                }
-                            }
-                        }
                     }
                     Instruction::Interface(_) => {}
                     Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}

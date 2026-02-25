@@ -957,8 +957,8 @@ module xyz {
 
 	CrossDomain cr
 
-	cr.in = a
-	int[5] b = cr.out
+	cr.din = a
+	int[5] b = cr.dout
 }
 
 module numbersToAddUp {

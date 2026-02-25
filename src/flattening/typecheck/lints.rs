@@ -656,6 +656,9 @@ impl LintContext<'_> {
         }
     }
     fn splits_are_used_correctly(&self) {
+        for (wr, _) in self.working_on.iter_wire_refs() {
+            self.check_splits_for_wire_ref(wr);
+        }
         for (_, instr) in &self.working_on.instructions {
             match instr {
                 Instruction::Declaration(decl) => {
@@ -666,17 +669,8 @@ impl LintContext<'_> {
                         }
                     }
                 }
-                Instruction::Expression(expression) => {
-                    if let ExpressionSource::WireRef(wr) = &expression.source {
-                        self.check_splits_for_wire_ref(wr);
-                    }
-                    if let ExpressionOutput::MultiWrite(mr) = &expression.output {
-                        for w in mr {
-                            self.check_splits_for_wire_ref(&w.to);
-                        }
-                    }
-                }
-                Instruction::SubModule(_)
+                Instruction::Expression(_)
+                | Instruction::SubModule(_)
                 | Instruction::Interface(_)
                 | Instruction::IfStatement(_)
                 | Instruction::ForStatement(_) => {}

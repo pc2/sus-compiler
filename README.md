@@ -269,7 +269,8 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Highlighting
 - [x] Renaming
 - [x] Basic code completion
-- [ ] Port code completion
+- [x] Port code completion
+- [ ] Parameter name code completion
 - [ ] Struct field code completion
 - [ ] Per-Line Resource Utilization Reporting
 
@@ -279,7 +280,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Can Generate Verilog for Blur2 filter
 - [x] Can Generate Verilog for FIFO
 - [ ] Multi-Clock Modules
-- [ ] Clock Tracking for SubModules
+- [ ] Output Clocks for SubModules
 
 ### Fun projects to do in SUS
 - [x] [Bit-Serial Matrix Multiply](https://github.com/VonTum/BitSerialMatrixMultiply)

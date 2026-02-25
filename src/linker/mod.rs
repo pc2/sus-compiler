@@ -1,5 +1,8 @@
 use crate::{
-    flattening::{ExpressionSource, Instruction, NamedConstant, WireReferenceRoot},
+    flattening::{
+        ExpressionOutput, ExpressionSource, Instruction, NamedConstant, WireReference,
+        WireReferenceRoot,
+    },
     instantiation::Instantiator,
     linker::passes::ResolvedGlobals,
     prelude::*,
@@ -151,6 +154,38 @@ impl LinkInfo {
             Instruction::IfStatement(_) | Instruction::ForStatement(_) => "",
         }
     }
+    pub fn iter_wire_refs(&self) -> impl Iterator<Item = (&WireReference, WireRefDirection)> {
+        self.instructions
+            .iter()
+            .filter_map(|(_, instr)| {
+                if let Instruction::Expression(expr) = instr {
+                    Some(expr)
+                } else {
+                    None
+                }
+            })
+            .flat_map(|expr| {
+                let write_tos = match &expr.output {
+                    ExpressionOutput::SubExpression(_) => &[],
+                    ExpressionOutput::MultiWrite(write_tos) => write_tos.as_slice(),
+                };
+
+                let expr_opt = match &expr.source {
+                    ExpressionSource::WireRef(wr) => Some((wr, WireRefDirection::Read)),
+                    _ => None,
+                };
+
+                write_tos
+                    .iter()
+                    .map(|wr| (&wr.to, WireRefDirection::Write))
+                    .chain(expr_opt)
+            })
+    }
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum WireRefDirection {
+    Read,
+    Write,
 }
 
 pub struct UniqueFileID {

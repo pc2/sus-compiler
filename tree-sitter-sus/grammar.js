@@ -35,7 +35,8 @@ function commaSepSeq($, rule) {
                 $._comma,
                 field('item', rule)
             )),
-            optional($._linebreak)
+            optional($._linebreak),
+            optional($._comma),
         ))
     )
 }
@@ -285,7 +286,7 @@ module.exports = grammar({
         field_access: $ => prec(PREC.postscript_op, seq(
             field('left', $._expression),
             '.',
-            field('name', $.identifier)
+            optional(field('name', $.identifier))
         )),
 
         parenthesis_expression_list: $ => seq(

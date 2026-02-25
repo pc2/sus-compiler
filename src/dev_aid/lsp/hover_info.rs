@@ -93,36 +93,18 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
     };
 
     match info {
-        LocationInfo::InGlobal(obj_id, link_info, decl_id, InGlobal::NamedLocal(decl)) => {
-            let mut details_vec: Vec<String> = Vec::new();
-
-            let domains = if let GlobalUUID::Module(md_id) = obj_id {
-                &linker.modules[md_id].clocks
-            } else {
-                &FlatAlloc::EMPTY_FLAT_ALLOC
-            };
-            details_vec.push(decl.clock_domain.display(domains).to_string());
-
-            match decl.decl_kind {
-                DeclarationKind::Port { direction, .. } => details_vec.push(direction.to_string()),
-                DeclarationKind::TemplateParameter(_) => details_vec.push("param".to_owned()),
-                DeclarationKind::RegularWire { .. }
-                | DeclarationKind::RegularGenerative
-                | DeclarationKind::StructField(_)
-                | DeclarationKind::ConditionalBinding { .. } => {}
-            }
-
-            if decl.decl_kind.is_state() {
-                details_vec.push("state".to_owned());
-            }
-
-            let typ_str = decl.typ.display(linker, link_info).to_string();
-            details_vec.push(typ_str);
-
-            details_vec.push(decl.name.clone());
-
+        LocationInfo::InGlobal(obj_id, _link_info, decl_id, InGlobal::NamedLocal(decl)) => {
             hover.documentation(&decl.documentation);
-            hover.sus_code(details_vec.join(" "));
+
+            hover.sus_code(match obj_id {
+                GlobalObj::Module(md_id) => {
+                    let md = &linker.modules[md_id];
+                    md.display_decl(decl, &file_data.file_text, true)
+                        .to_string()
+                }
+                GlobalObj::Type(_) => todo!("Structs #8"),
+                GlobalObj::Constant(_) => todo!("Custom Compiletime Functions #56"),
+            });
 
             if let DeclarationKind::TemplateParameter(param_id) = &decl.decl_kind
                 && let GlobalObj::Module(md) = &linker.get(obj_id)
@@ -170,15 +152,14 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.gather_submodule_hover_infos(md_id, id);
         }
         LocationInfo::InGlobal(obj_id, link_info, id, InGlobal::Temporary(expr)) => {
-            let mut details_vec: Vec<String> = Vec::new();
             let domains = if let GlobalUUID::Module(md_id) = obj_id {
                 &linker.modules[md_id].clocks
             } else {
                 &FlatAlloc::EMPTY_FLAT_ALLOC
             };
-            details_vec.push(expr.domain.display(domains).to_string());
-            details_vec.push(expr.typ.display(linker, link_info).to_string());
-            hover.sus_code(details_vec.join(" "));
+            let domain = expr.domain.display(domains);
+            let typ = expr.typ.display(linker, link_info);
+            hover.sus_code(format!("{domain} {typ}"));
             hover.gather_hover_infos(obj_id, id, expr.domain.unwrap().is_generative());
         }
         LocationInfo::Type(typ, link_info) => {
@@ -241,7 +222,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     let port_decl = md.link_info.instructions[decl_id].unwrap_declaration();
 
                     hover.sus_code(
-                        md.display_port_info(
+                        md.display_decl(
                             port_decl,
                             &linker.files[md.link_info.span.file].file_text,
                             true,

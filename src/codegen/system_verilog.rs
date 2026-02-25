@@ -1344,18 +1344,30 @@ impl<'g> CodeGenerationContext<'g> {
         use Direction::{Input, Output};
         match self.md.link_info.name.as_str() {
             "LatencyOffset" => {
-                if self.check_ports([(Input, "in"), (Output, "out")]) {
+                if self.check_ports([(Input, "din"), (Output, "dout")]) {
                     return;
                 }
 
-                self.program_text.write_str("\tassign out = in;\n").unwrap();
+                self.program_text
+                    .write_str("\tassign dout = din;\n")
+                    .unwrap();
             }
             "CrossDomain" => {
-                if self.check_ports([(Input, "in"), (Output, "out")]) {
+                if self.check_ports([(Input, "din"), (Output, "dout")]) {
                     return;
                 }
 
-                self.program_text.write_str("\tassign out = in;\n").unwrap();
+                self.program_text
+                    .write_str("\tassign dout = din;\n")
+                    .unwrap();
+            }
+            "IntNarrow" => {
+                let [_from_i, _to_i, _from, _to] = args.cast_to_int_array();
+                if self.check_ports([(Input, "din"), (Output, "dout")]) {
+                    return;
+                }
+
+                writeln!(self.program_text, "\tassign dout = din;").unwrap();
             }
             "IntToBits" => {
                 let [_num_bits] = args.cast_to_int_array();
@@ -1388,14 +1400,6 @@ impl<'g> CodeGenerationContext<'g> {
                 }
 
                 writeln!(self.program_text, "\tassign value = bits;").unwrap();
-            }
-            "IntNarrow" => {
-                let [_from_i, _to_i, _from, _to] = args.cast_to_int_array();
-                if self.check_ports([(Input, "in"), (Output, "out")]) {
-                    return;
-                }
-
-                writeln!(self.program_text, "\tassign out = in;").unwrap();
             }
             "ToBits" => {
                 let [typ] = args.cast_to_array();

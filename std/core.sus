@@ -85,16 +85,16 @@ __builtin__ const T[SIZE_A + SIZE_B] ConcatGen #(T, int SIZE_A, int SIZE_B, T[SI
 /// Unsafe builtin to circumvent the Latency Counting System. Connects `out` to `in` without adding the requisite latency
 /// Or: used for negative latencies, for instance to implement Almost-Full FIFOs, stateful for loops, etc. 
 __builtin__ module LatencyOffset #(T, int OFFSET) {
-    interface LatencyOffset : T in'0 -> T out'OFFSET
+    interface LatencyOffset : T din'0 -> T dout'OFFSET
 }
 
 /// Unsafe builtin to connect wires from different domains. 
 /// Important: Does not perform any kind of Clock Domain Crossing!
 __builtin__ module CrossDomain #(T) {
     domain in_clk
-    input T in'0
+    input T din'0
     domain out_clk
-    output T out'0
+    output T dout'0
 }
 /// Unsafe builtin to connect wires from different domains. 
 /// Important: Does not perform any kind of Clock Domain Crossing!
@@ -102,17 +102,17 @@ module CrossAction #(T) {
     CrossDomain #(T: type bool) cross_valid
     CrossDomain #(T) cross_data
     domain in_clk
-    action in'0 : T data_in'0 {
-        cross_valid.in = true
-        cross_data.in = data_in
+    action din'0 : T data_in'0 {
+        cross_valid.din = true
+        cross_data.din = data_in
     } else {
-        cross_valid.in = false
+        cross_valid.din = false
     }
     domain out_clk
-    trigger out'0 : T data_out'0
+    trigger dout'0 : T data_out'0
 
-    when cross_valid.out {
-        out(cross_data.out)
+    when cross_valid.dout {
+        dout(cross_data.dout)
     }
 }
 /// Unsafe builtin to connect wires from different domains. 
@@ -122,18 +122,18 @@ module CrossAction2 #(T1, T2) {
     CrossDomain #(T: type T1) cross_data1
     CrossDomain #(T: type T2) cross_data2
     domain in_clk
-    action in'0 : T1 data_in1'0, T2 data_in2'0 {
-        cross_valid.in = true
-        cross_data1.in = data_in1
-        cross_data2.in = data_in2
+    action din'0 : T1 data_in1'0, T2 data_in2'0 {
+        cross_valid.din = true
+        cross_data1.din = data_in1
+        cross_data2.din = data_in2
     } else {
-        cross_valid.in = false
+        cross_valid.din = false
     }
     domain out_clk
-    trigger out'0 : T1 data_out1'0, T2 data_out2'0
+    trigger dout'0 : T1 data_out1'0, T2 data_out2'0
 
-    when cross_valid.out {
-        out(cross_data1.out, cross_data2.out)
+    when cross_valid.dout {
+        dout(cross_data1.dout, cross_data2.dout)
     }
 }
 /// Unsafe builtin to connect wires from different domains. 
@@ -144,19 +144,19 @@ module CrossAction3 #(T1, T2, T3) {
     CrossDomain #(T: type T2) cross_data2
     CrossDomain #(T: type T3) cross_data3
     domain in_clk
-    action in'0 : T1 data_in1'0, T2 data_in2'0, T3 data_in3'0 {
-        cross_valid.in = true
-        cross_data1.in = data_in1
-        cross_data2.in = data_in2
-        cross_data3.in = data_in3
+    action din'0 : T1 data_in1'0, T2 data_in2'0, T3 data_in3'0 {
+        cross_valid.din = true
+        cross_data1.din = data_in1
+        cross_data2.din = data_in2
+        cross_data3.din = data_in3
     } else {
-        cross_valid.in = false
+        cross_valid.din = false
     }
     domain out_clk
-    trigger out'0 : T1 data_out1'0, T2 data_out2'0, T3 data_out3'0
+    trigger dout'0 : T1 data_out1'0, T2 data_out2'0, T3 data_out3'0
 
-    when cross_valid.out {
-        out(cross_data1.out, cross_data2.out, cross_data3.out)
+    when cross_valid.dout {
+        dout(cross_data1.dout, cross_data2.dout, cross_data3.dout)
     }
 }
 /// Unsafe builtin to connect wires from different domains. 
@@ -164,49 +164,49 @@ module CrossAction3 #(T1, T2, T3) {
 module CrossActionNoData {
     CrossDomain #(T: type bool) cross_valid
     domain in_clk
-    action in'0 {
-        cross_valid.in = true
+    action din'0 {
+        cross_valid.din = true
     } else {
-        cross_valid.in = false
+        cross_valid.din = false
     }
     domain out_clk
-    trigger out'0
+    trigger dout'0
 
-    when cross_valid.out {
-        out()
+    when cross_valid.dout {
+        dout()
     }
 }
 module LatencyOffsetAction #(T, int OFFSET, int DATA_DELAY) {
     T stored_data
     bool is_valid
     
-    action in'0 : T din'DATA_DELAY {
+    action din'0 : T data_i'DATA_DELAY {
         is_valid = true
-        stored_data = din
+        stored_data = data_i
     } else {
         is_valid = false
     }
 
-    trigger out'OFFSET : T dout'OFFSET+DATA_DELAY
+    trigger dout'OFFSET : T data_o'OFFSET+DATA_DELAY
 
     when LatencyOffset #(OFFSET)(is_valid) {
-        out(LatencyOffset #(OFFSET)(stored_data))
+        dout(LatencyOffset #(OFFSET)(stored_data))
     }
 }
 
 module LatencyOffsetActionNoData #(int OFFSET) {
     bool is_valid
     
-    action in'0 {
+    action din'0 {
         is_valid = true
     } else {
         is_valid = false
     }
 
-    trigger out'OFFSET
+    trigger dout'OFFSET
 
     when LatencyOffset #(OFFSET)(is_valid) {
-        out()
+        dout()
     }
 }
 

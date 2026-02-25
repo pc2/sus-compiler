@@ -1197,10 +1197,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 cursor.field(field!("left"));
                 let mut wire_ref = self.flatten_wire_reference(cursor);
 
-                let (name_span, name) = cursor.field_to_string(field!("name"), kind!("identifier"));
+                // it's only optional to make the parse more robust, so we have an easier time creating completions
+                let (name_span, name) = if let Some(name_span) =
+                    cursor.optional_field_span(field!("name"), kind!("identifier"))
+                {
+                    (name_span, &cursor.file_data.file_text[name_span])
+                } else {
+                    (expr_span.empty_span_at_end(), "")
+                };
 
                 wire_ref.path.push(WireReferencePathElement::FieldAccess {
-                    name,
+                    name: name.to_string(),
                     name_span,
                     refers_to: OnceCell::new(),
                 });

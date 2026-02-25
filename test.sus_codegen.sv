@@ -4801,8 +4801,8 @@ wire[4:0] _8;
 assign _8 = _7 + ((_7 < 0) ? 30 : 0); // == mod 30
 wire _10;
 assign _10 = space_remaining > 4'd8;
-/*mux_wire*/ logic _LatencyOffset_in;
-wire _LatencyOffset_out;
+/*mux_wire*/ logic _LatencyOffset_din;
+wire _LatencyOffset_dout;
 wire[4:0] _15;
 assign _15 = write_addr + 1'd1;
 wire[4:0] _16;
@@ -4817,8 +4817,8 @@ wire[4:0] _25;
 assign _25 = (_24 == 30) ? 0 : _24; // == mod 30
 LatencyOffset_T_type_bool_OFFSET_8 LatencyOffset(
 	.clk(clk),
-	.in(_LatencyOffset_in),
-	.out(_LatencyOffset_out)
+	.din(_LatencyOffset_din),
+	.dout(_LatencyOffset_dout)
 );
 always_ff @(posedge clk) begin // state mem
 	if(push) mem[write_addr] <= push_data;
@@ -4839,16 +4839,16 @@ end
 always_comb begin // combinatorial may_push
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	may_push = 1'bx;
-	may_push = _LatencyOffset_out;
+	may_push = _LatencyOffset_dout;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	may_push = may_push;
 end
-always_comb begin // combinatorial _LatencyOffset_in
+always_comb begin // combinatorial _LatencyOffset_din
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_LatencyOffset_in = 1'bx;
-	_LatencyOffset_in = _10;
+	_LatencyOffset_din = 1'bx;
+	_LatencyOffset_din = _10;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
-	_LatencyOffset_in = _LatencyOffset_in;
+	_LatencyOffset_din = _LatencyOffset_din;
 end
 always_comb begin // combinatorial may_pop
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -4959,52 +4959,52 @@ endmodule
 // CrossActionNoData #()
 module CrossActionNoData(
 	input in_clk,
-	input wire in,
-	output /*mux_wire*/ logic out
+	input wire din,
+	output /*mux_wire*/ logic dout
 );
 
-/*mux_wire*/ logic _cross_valid_in;
-wire _cross_valid_out;
+/*mux_wire*/ logic _cross_valid_din;
+wire _cross_valid_dout;
 CrossDomain_T_type_bool cross_valid(
 	.in_clk(in_clk),
-	.in(_cross_valid_in),
-	.out(_cross_valid_out)
+	.din(_cross_valid_din),
+	.dout(_cross_valid_dout)
 );
-always_comb begin // combinatorial _cross_valid_in
+always_comb begin // combinatorial _cross_valid_din
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_cross_valid_in = 1'bx;
-	if(in) _cross_valid_in = 1'b1;
-	if(!in) _cross_valid_in = 1'b0;
+	_cross_valid_din = 1'bx;
+	if(din) _cross_valid_din = 1'b1;
+	if(!din) _cross_valid_din = 1'b0;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
-	_cross_valid_in = _cross_valid_in;
+	_cross_valid_din = _cross_valid_din;
 end
-always_comb begin // combinatorial out
+always_comb begin // combinatorial dout
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	out = 1'bx;
-	out = 1'b0;
-	if(_cross_valid_out) out = 1'b1;
+	dout = 1'bx;
+	dout = 1'b0;
+	if(_cross_valid_dout) dout = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
-	out = out;
+	dout = dout;
 end
 endmodule
 
 // CrossDomain #(T: type bool #())
 module CrossDomain_T_type_bool(
 	input in_clk,
-	input wire in,
-	output /*mux_wire*/ logic out
+	input wire din,
+	output /*mux_wire*/ logic dout
 );
 
-	assign out = in;
+	assign dout = din;
 endmodule
 
 // LatencyOffset #(T: type bool #(), OFFSET: -8)
 module LatencyOffset_T_type_bool_OFFSET_8(
 	input clk,
-	input wire in,
-	output /*mux_wire*/ logic out
+	input wire din,
+	output /*mux_wire*/ logic dout
 );
 
-	assign out = in;
+	assign dout = din;
 endmodule
 
