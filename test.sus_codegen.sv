@@ -1,3 +1,36 @@
+// IntNarrowToZero #()
+module IntNarrowToZero(
+	input clk
+);
+
+// (zero sized) x
+/*mux_wire*/ logic[2:0] _IntNarrow_din;
+// (zero sized) _IntNarrow_dout
+/*mux_wire*/ logic signed[3:0] y;
+// (zero sized) _IntNarrow_2_din
+wire signed[3:0] _IntNarrow_2_dout;
+IntNarrow_FROM_I_5_TO_I_6_FROM_0_TO_1 IntNarrow(
+	.clk(clk),
+	.din(_IntNarrow_din)
+	// (zero sized port) .dout(_IntNarrow_dout)
+);
+IntNarrow_FROM_I_0_TO_I_1_FROM_3_TO_6 IntNarrow_2(
+	.clk(clk),
+	// (zero sized port) .din(_IntNarrow_2_din)
+	.dout(_IntNarrow_2_dout)
+);
+always_comb begin // combinatorial _IntNarrow_din
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_IntNarrow_din = 3'dx;
+	_IntNarrow_din = 3'd5;
+end
+always_comb begin // combinatorial y
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	y = 4'sdx;
+	y = _IntNarrow_2_dout;
+end
+endmodule
+
 // UseModWithDomains #()
 module UseModWithDomains(
 	input clk
@@ -4862,6 +4895,27 @@ always_comb begin // combinatorial pop_data
 	pop_data = 3'dx;
 	if(_pop_D1) pop_data = __21_D1;
 end
+endmodule
+
+// IntNarrow #(FROM_I: 5, TO_I: 6, FROM: 0, TO: 1)
+module IntNarrow_FROM_I_5_TO_I_6_FROM_0_TO_1(
+	input clk,
+	input wire[2:0] din
+	// (zero sized) output dout
+);
+
+// PATCH XRT 2.16 over-zealous empty module DRC
+initial begin end
+endmodule
+
+// IntNarrow #(FROM_I: 0, TO_I: 1, FROM: -3, TO: 6)
+module IntNarrow_FROM_I_0_TO_I_1_FROM_3_TO_6(
+	input clk,
+	// (zero sized) input din
+	output /*mux_wire*/ logic signed[3:0] dout
+);
+
+	assign dout = 0;
 endmodule
 
 // Transmute #(T1: type int #(FROM: 0, TO: 255)[2], T2: type int #(FROM: 0, TO: 65536))

@@ -1309,15 +1309,15 @@ impl<'g> CodeGenerationContext<'g> {
         }
     }
 
-    /// Check the generated ports of builtin modules against what is expected by the builtin codegen.
-    /// Returns true if all generated ports are of size 0. That means no implementation should be generated.
-    /// Returns false all ports are non-zero. Otherwise this panics, requiring us to implement the more complex combinations of zero/nonzero sized ports.
-    fn check_ports<const N: usize>(&self, ports: [(Direction, &'static str); N]) -> bool {
+    fn get_builtin_ports<const N: usize>(
+        &self,
+        ports: [(Direction, &'static str); N],
+    ) -> [&RealWire; N] {
         let actual_ports: &[Option<InstantiatedPort>; N] =
             self.instance.interface_ports.cast_to_array();
 
         let mut zero_size_count = 0;
-        for i in 0..N {
+        std::array::from_fn(|i| {
             let actual_port = actual_ports[i].as_ref().unwrap();
             let (direction, name) = ports[i];
             let port_wire = &self.instance.wires[actual_port.wire];
@@ -1327,8 +1327,16 @@ impl<'g> CodeGenerationContext<'g> {
             if port_wire.typ.is_zero_sized() {
                 zero_size_count += 1;
             }
-        }
+            port_wire
+        })
+    }
 
+    /// Check the generated ports of builtin modules against what is expected by the builtin codegen.
+    /// Returns true if all generated ports are of size 0. That means no implementation should be generated.
+    /// Returns false all ports are non-zero. Otherwise this panics, requiring us to implement the more complex combinations of zero/nonzero sized ports.
+    fn check_ports_basic<const N: usize>(&self, ports: [(Direction, &'static str); N]) -> bool {
+        let port_wires = self.get_builtin_ports(ports);
+        let zero_size_count = port_wires.iter().filter(|p| p.typ.is_zero_sized()).count();
         if zero_size_count == 0 {
             false
         } else if zero_size_count == N {
@@ -1344,7 +1352,7 @@ impl<'g> CodeGenerationContext<'g> {
         use Direction::{Input, Output};
         match self.md.link_info.name.as_str() {
             "LatencyOffset" => {
-                if self.check_ports([(Input, "din"), (Output, "dout")]) {
+                if self.check_ports_basic([(Input, "din"), (Output, "dout")]) {
                     return;
                 }
 
@@ -1353,7 +1361,7 @@ impl<'g> CodeGenerationContext<'g> {
                     .unwrap();
             }
             "CrossDomain" => {
-                if self.check_ports([(Input, "din"), (Output, "dout")]) {
+                if self.check_ports_basic([(Input, "din"), (Output, "dout")]) {
                     return;
                 }
 
@@ -1363,15 +1371,20 @@ impl<'g> CodeGenerationContext<'g> {
             }
             "IntNarrow" => {
                 let [_from_i, _to_i, _from, _to] = args.cast_to_int_array();
-                if self.check_ports([(Input, "din"), (Output, "dout")]) {
-                    return;
+                let [din, dout] = self.get_builtin_ports([(Input, "din"), (Output, "dout")]);
+                match (din.typ.is_zero_sized(), dout.typ.is_zero_sized()) {
+                    (true, true) | (false, true) => return,
+                    (true, false) => {
+                        writeln!(self.program_text, "\tassign dout = 0;").unwrap();
+                    }
+                    (false, false) => {
+                        writeln!(self.program_text, "\tassign dout = din;").unwrap();
+                    }
                 }
-
-                writeln!(self.program_text, "\tassign dout = din;").unwrap();
             }
             "IntToBits" => {
                 let [_num_bits] = args.cast_to_int_array();
-                if self.check_ports([(Input, "value"), (Output, "bits")]) {
+                if self.check_ports_basic([(Input, "value"), (Output, "bits")]) {
                     return;
                 }
 
@@ -1379,7 +1392,7 @@ impl<'g> CodeGenerationContext<'g> {
             }
             "BitsToInt" => {
                 let [_num_bits] = args.cast_to_int_array();
-                if self.check_ports([(Input, "bits"), (Output, "value")]) {
+                if self.check_ports_basic([(Input, "bits"), (Output, "value")]) {
                     return;
                 }
 
@@ -1387,7 +1400,7 @@ impl<'g> CodeGenerationContext<'g> {
             }
             "UIntToBits" => {
                 let [_num_bits] = args.cast_to_int_array();
-                if self.check_ports([(Input, "value"), (Output, "bits")]) {
+                if self.check_ports_basic([(Input, "value"), (Output, "bits")]) {
                     return;
                 }
 
@@ -1395,7 +1408,7 @@ impl<'g> CodeGenerationContext<'g> {
             }
             "BitsToUInt" => {
                 let [_num_bits] = args.cast_to_int_array();
-                if self.check_ports([(Input, "bits"), (Output, "value")]) {
+                if self.check_ports_basic([(Input, "bits"), (Output, "value")]) {
                     return;
                 }
 
@@ -1405,7 +1418,7 @@ impl<'g> CodeGenerationContext<'g> {
                 let [typ] = args.cast_to_array();
                 let typ = typ.unwrap_type();
 
-                if self.check_ports([(Input, "value"), (Output, "bits")]) {
+                if self.check_ports_basic([(Input, "value"), (Output, "bits")]) {
                     return;
                 }
 
@@ -1425,7 +1438,7 @@ impl<'g> CodeGenerationContext<'g> {
                 let [typ] = args.cast_to_array();
                 let typ = typ.unwrap_type();
 
-                if self.check_ports([(Input, "bits"), (Output, "value")]) {
+                if self.check_ports_basic([(Input, "bits"), (Output, "value")]) {
                     return;
                 }
 

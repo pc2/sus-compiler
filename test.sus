@@ -1847,3 +1847,8 @@ module ReadUnsetArrayElem {
 module RegressionForBadPort {
 	trigger my_trig'-
 }
+
+module IntNarrowToZero {
+	int x = IntNarrow#(FROM: 0, TO: 1)(5)
+	int y = IntNarrow#(FROM: -3, TO: 6)(0)
+}

@@ -297,5 +297,5 @@ module Transmute #(T1, T2) {
 /// The result is not defined if the value lies outside the FROM:TO range.
 /// For folding behavior choose the `mod` operator instead. 
 __builtin__ module IntNarrow #(int FROM_I, int TO_I, int FROM, int TO) {
-    interface IntNarrow : int#(FROM: FROM_I, TO: TO_I) in'0 -> int#(FROM, TO) out'0
+    interface IntNarrow : int#(FROM: FROM_I, TO: TO_I) din'0 -> int#(FROM, TO) dout'0
 }

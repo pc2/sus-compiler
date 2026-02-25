@@ -180,6 +180,9 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate AssignUnset #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate ReadUnsetArrayElem #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate RegressionForBadPort #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated IntNarrow #(FROM_I: 5, TO_I: 6, FROM: 0, TO: 1)
+[INFO  sus_compiler::instantiation::instantiator] Instantiated IntNarrow #(FROM_I: 0, TO_I: 1, FROM: -3, TO: 6)
+[INFO  sus_compiler::instantiation::instantiator] Instantiated IntNarrowToZero #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -4303,6 +4306,20 @@ Error: While parsing 'template_global', parser found a missing field in the fiel
       │                      ╰─ While parsing 'template_global', parser found a missing field in the field 'item' of type 'identifier'
       │                      │ 
       │                      ╰─ Parent node 'template_global'
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1852:6 ]
+      │
+ 1852 │     int x = IntNarrow#(FROM: 0, TO: 1)(5)
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1853:6 ]
+      │
+ 1853 │     int y = IntNarrow#(FROM: -3, TO: 6)(0)
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
