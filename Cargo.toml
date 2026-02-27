@@ -40,7 +40,7 @@ ouroboros = "0.18.5"
 typed-arena = "2.0.2"
 
 # Tree sitter
-tree-sitter = "0.25"
+tree-sitter = "0.26.6"
 tree-sitter-sus = {version = "~0.3.9-dev", path = "./tree-sitter-sus"}
 
 sus-proc-macro = {version = "~0.3.9-dev", path = "./sus-proc-macro"}
