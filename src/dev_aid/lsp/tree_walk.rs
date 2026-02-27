@@ -19,7 +19,7 @@ pub enum InGlobal<'linker> {
 }
 
 /// Information about an object in the source code. Used for hovering, completions, syntax highlighting etc.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub enum LocationInfo<'linker> {
     InGlobal(GlobalUUID, &'linker LinkInfo, FlatID, InGlobal<'linker>),
     Parameter(
@@ -31,6 +31,33 @@ pub enum LocationInfo<'linker> {
     Type(&'linker WrittenType, &'linker LinkInfo),
     Global(GlobalUUID),
     Interface(ModuleUUID, &'linker Module, InterfaceID, &'linker Interface),
+}
+
+impl<'linker> std::fmt::Debug for LocationInfo<'linker> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InGlobal(_arg0, global, arg2, arg3) => f
+                .debug_tuple("InGlobal")
+                .field(&global.name)
+                .field(arg2)
+                .field(arg3)
+                .finish(),
+            Self::Parameter(_arg0, global, arg2, arg3) => f
+                .debug_tuple("Parameter")
+                .field(&global.name)
+                .field(arg2)
+                .field(arg3)
+                .finish(),
+            Self::Type(arg0, arg1) => f.debug_tuple("Type").field(arg0).field(arg1).finish(),
+            Self::Global(arg0) => f.debug_tuple("Global").field(arg0).finish(),
+            Self::Interface(_arg0, md, arg2, arg3) => f
+                .debug_tuple("Interface")
+                .field(&md.link_info.name)
+                .field(arg2)
+                .field(arg3)
+                .finish(),
+        }
+    }
 }
 
 /// Permits really efficient [RefersTo::refers_to_same_as] [LocationInfo] checking
@@ -172,12 +199,12 @@ pub fn get_selected_object<'linker>(
     let mut walker = TreeWalker {
         linker,
         visitor: |span, info| {
+            // Gotta do this condition in inverse, since we only want to set it if it's not already set, or the new span is more specific
             if let Some((best_span, _)) = best_object
-                && best_span.size() > span.size()
+                && best_span.size() < span.size()
             {
             } else {
-                //assert!(span.size() < self.best_span.size());
-                // May not be the case. Do prioritize later ones, as they tend to be nested
+                // Better spans are also spans that come later, even if they are the exact same span. Because more specific tree nodes are nested.
                 best_object = Some((span, info));
             }
         },
@@ -386,9 +413,6 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
         if !(self.should_prune)(link_info.span) {
             self.walk_name_and_template_arguments(obj_id, link_info);
 
-            for (wire_ref, _) in link_info.iter_wire_refs() {
-                self.walk_wire_ref(obj_id, link_info, wire_ref);
-            }
             for (id, inst) in &link_info.instructions {
                 match inst {
                     Instruction::SubModule(sm) => {
@@ -418,8 +442,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                         }
                     }
                     Instruction::Expression(expr) => {
-                        if let ExpressionSource::WireRef(_) = &expr.source {
-                        } else if let Some(single_output_expr) = expr.as_single_output_expr() {
+                        if let Some(single_output_expr) = expr.as_single_output_expr() {
                             self.visit(
                                 expr.span,
                                 LocationInfo::InGlobal(
@@ -429,7 +452,17 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                                     InGlobal::Temporary(single_output_expr),
                                 ),
                             )
-                        };
+                        }
+                        // Don't use [LinkInfo::iter_wire_refs()]
+                        // such that walk_wire_ref is always ordered after the other subexpressions
+                        if let ExpressionSource::WireRef(wire_ref) = &expr.source {
+                            self.walk_wire_ref(obj_id, link_info, wire_ref);
+                        }
+                        if let ExpressionOutput::MultiWrite(writes) = &expr.output {
+                            for wr in writes {
+                                self.walk_wire_ref(obj_id, link_info, &wr.to);
+                            }
+                        }
                     }
                     Instruction::Interface(_) => {}
                     Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
