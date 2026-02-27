@@ -2,6 +2,7 @@ mod completions;
 mod hover_info;
 mod semantic_tokens;
 mod tree_walk;
+mod uri_patch;
 
 use crate::{
     alloc::zip_eq,
@@ -23,11 +24,12 @@ use hover_info::hover;
 use lsp_server::{ErrorCode, ResponseError};
 use lsp_types::{notification::*, request::Request, *};
 use semantic_tokens::{make_semantic_tokens, semantic_token_capabilities};
-use std::{collections::HashMap, error::Error, fmt::Display, net::SocketAddr};
+use std::{collections::HashMap, error::Error, fmt::Display, net::SocketAddr, str::FromStr};
 
 use tree_walk::{InGlobal, LocationInfo, get_selected_object};
 
 use self::tree_walk::RefersTo;
+use uri_patch::{UriExt, uri_from_file_path};
 
 pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let cfg = lsp_config();
@@ -289,15 +291,17 @@ fn cvt_location_list_of_lists(
 }
 
 impl UniqueFileID {
-    fn from_uri(uri: &Url) -> Result<UniqueFileID, String> {
-        if uri.scheme() == "file" {
+    fn from_uri(uri: &Uri) -> Result<UniqueFileID, String> {
+        if let Some(scheme) = uri.scheme()
+            && scheme.as_str() == "file"
+        {
             UniqueFileID::from_path(&uri.to_file_path().unwrap(), uri.to_string())
         } else {
             Ok(UniqueFileID::from_non_path_str(uri.to_string()))
         }
     }
-    fn to_uri(&self) -> Url {
-        Url::parse(&self.name).expect(&self.name)
+    fn to_uri(&self) -> Uri {
+        Uri::from_str(&self.name).expect(&self.name)
     }
 }
 
@@ -384,7 +388,7 @@ fn initialize_all_files(linker: &mut Linker, init_params: &InitializeParams) {
         && let Some(workspace_folder) = &init_params.workspace_folders
     {
         for folder in workspace_folder {
-            if let Ok(path) = folder.uri.to_file_path() {
+            if let Some(path) = folder.uri.to_file_path() {
                 linker.add_file_or_directory(&path);
             }
         }
@@ -397,7 +401,7 @@ fn initialize_all_files(linker: &mut Linker, init_params: &InitializeParams) {
     // Convert all the Path IDs to URIs
     for (_, f) in &mut linker.files {
         f.file_identifier.name =
-            Url::from_file_path(std::fs::canonicalize(&f.file_identifier.name).unwrap())
+            uri_from_file_path(&std::fs::canonicalize(&f.file_identifier.name).unwrap())
                 .expect(&f.file_identifier.name)
                 .to_string();
     }
@@ -587,7 +591,10 @@ fn handle_request(
             let params: SemanticTokensParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
 
-            info!("SemanticTokensFullRequest: {}", &params.text_document.uri);
+            info!(
+                "SemanticTokensFullRequest: {}",
+                params.text_document.uri.as_str()
+            );
 
             let identifier = UniqueFileID::from_uri(&params.text_document.uri)?;
             let uuid = linker.ensure_contains_file(identifier, should_recompile);
@@ -651,6 +658,7 @@ fn handle_request(
 
             let ref_locations_lists = gather_all_references_across_all_files(linker, file_id, pos);
 
+            #[allow(clippy::mutable_key_type)]
             let changes: HashMap<_, _> = ref_locations_lists
                 .into_iter()
                 .map(|(file, spans)| {
@@ -704,7 +712,7 @@ fn display_text_position(
     text_doc_position: &lsp_types::TextDocumentPositionParams,
 ) -> impl Display {
     FmtWrapper(move |f| {
-        let file = &text_doc_position.text_document.uri;
+        let file = text_doc_position.text_document.uri.as_str();
         let line = text_doc_position.position.line;
         let col = text_doc_position.position.character;
         write!(f, "{file}:{line}:{col}")
@@ -722,7 +730,10 @@ fn handle_notification(
             let params: DidChangeTextDocumentParams = serde_json::from_value(notification.params)
                 .expect("JSON Encoding Error while parsing params");
 
-            info!("DidChangeTextDocument: {}", params.text_document.uri);
+            info!(
+                "DidChangeTextDocument: {}",
+                params.text_document.uri.as_str()
+            );
 
             let mut content_change_iter = params.content_changes.into_iter();
             let only_change = content_change_iter.next().unwrap();
@@ -744,11 +755,11 @@ fn handle_notification(
 
             for event in params.changes {
                 if event.typ == FileChangeType::CREATED {
-                    info!("- CREATED {}", event.uri);
+                    info!("- CREATED {}", event.uri.as_str());
                 } else if event.typ == FileChangeType::CHANGED {
-                    info!("- CHANGED {}", event.uri);
+                    info!("- CHANGED {}", event.uri.as_str());
                 } else if event.typ == FileChangeType::DELETED {
-                    info!("- DELETED {}", event.uri);
+                    info!("- DELETED {}", event.uri.as_str());
                 }
                 if event.typ == FileChangeType::CREATED || event.typ == FileChangeType::CHANGED {
                     let Ok(file_identifier) = UniqueFileID::from_uri(&event.uri) else {
@@ -772,7 +783,7 @@ fn handle_notification(
             let mut to_delete: Vec<FileUUID> = Vec::new();
             for (id, f) in &linker.files {
                 if f.file_identifier.inode.is_some() {
-                    match std::fs::exists(f.file_identifier.to_uri().path()) {
+                    match std::fs::exists(f.file_identifier.to_uri().to_file_path().unwrap()) {
                         Ok(true) => {}
                         Ok(false) | Err(_) => to_delete.push(id),
                     }
@@ -790,7 +801,7 @@ fn handle_notification(
             let params: DidOpenTextDocumentParams = serde_json::from_value(notification.params)
                 .expect("JSON Encoding Error while parsing params");
 
-            info!("DidOpenTextDocument: {}", &params.text_document.uri);
+            info!("DidOpenTextDocument: {}", params.text_document.uri.as_str());
 
             let Ok(unique_file_id) = UniqueFileID::from_uri(&params.text_document.uri) else {
                 return;

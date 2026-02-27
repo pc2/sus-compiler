@@ -1373,7 +1373,7 @@ impl<'g> CodeGenerationContext<'g> {
                 let [_from_i, _to_i, _from, _to] = args.cast_to_int_array();
                 let [din, dout] = self.get_builtin_ports([(Input, "din"), (Output, "dout")]);
                 match (din.typ.is_zero_sized(), dout.typ.is_zero_sized()) {
-                    (true, true) | (false, true) => return,
+                    (true, true) | (false, true) => {}
                     (true, false) => {
                         writeln!(self.program_text, "\tassign dout = 0;").unwrap();
                     }

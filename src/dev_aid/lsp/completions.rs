@@ -1,10 +1,9 @@
-use std::{default, fmt::Display, ops::Deref};
+use std::fmt::Display;
 
 use crate::{
-    dev_aid::lsp::tree_walk::get_selected_object,
     flattening::{
-        DeclarationKind, Direction, Interface, InterfaceDeclKind, InterfaceKind, Module,
-        PathElemRefersTo, WireReferencePathElement,
+        Direction, InterfaceDeclKind, InterfaceKind, Module, PathElemRefersTo,
+        WireReferencePathElement,
     },
     linker::{FileData, LinkInfo},
     prelude::*,
