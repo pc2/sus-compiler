@@ -84,14 +84,14 @@ impl UUIDMarker for PortIDMarker {
 }
 pub type PortID = UUID<PortIDMarker>;
 
-pub struct InterfaceIDMarker;
-impl UUIDMarker for InterfaceIDMarker {
+pub struct FieldIDMarker;
+impl UUIDMarker for FieldIDMarker {
     const DISPLAY_NAME: &'static str = "interface_";
 }
-pub type InterfaceID = UUID<InterfaceIDMarker>;
+pub type FieldID = UUID<FieldIDMarker>;
 
-impl InterfaceID {
-    pub const MAIN_INTERFACE: InterfaceID = UUID(0, PhantomData);
+impl FieldID {
+    pub const MAIN_INTERFACE: FieldID = UUID(0, PhantomData);
 }
 
 pub struct ClockIDMarker;
@@ -106,11 +106,11 @@ impl UUIDMarker for LatDomIDMarker {
 }
 pub type LatDomID = UUID<LatDomIDMarker>;
 
-pub struct FieldIDMarker;
-impl UUIDMarker for FieldIDMarker {
+pub struct StructFieldIDMarker;
+impl UUIDMarker for StructFieldIDMarker {
     const DISPLAY_NAME: &'static str = "field_";
 }
-pub type FieldID = UUID<FieldIDMarker>;
+pub type StructFieldID = UUID<StructFieldIDMarker>;
 
 pub struct TemplateIDMarker;
 impl UUIDMarker for TemplateIDMarker {

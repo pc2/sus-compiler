@@ -131,9 +131,9 @@ struct FlatteningContext<'l, 'errs> {
     //current_clock: ClockID // TODO Clocks See [SINGULAR_CLOCK_DOMAIN]
     current_latency_domain: LatDomID,
 
-    fields: FlatAlloc<StructField, FieldIDMarker>,
+    struct_fields: FlatAlloc<StructField, StructFieldIDMarker>,
     ports: FlatAlloc<Port, PortIDMarker>,
-    interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
+    interfaces: FlatAlloc<Field, FieldIDMarker>,
 
     local_variable_context: LocalVariableContext<'l, NamedLocal>,
 
@@ -554,12 +554,12 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             declaration_instruction,
                             latency_specifier,
                         });
-                        let parent_interface = self.interfaces.alloc(Interface {
+                        let parent_interface = self.interfaces.alloc(Field {
                             name_span,
                             name: name.to_owned(),
                             lat_dom: Some(self.current_latency_domain),
                             clock: Some(SINGULAR_CLOCK_DOMAIN),
-                            declaration_instruction: Some(InterfaceDeclKind::SinglePort(
+                            declaration_instruction: Some(FieldDeclKind::SinglePort(
                                 declaration_instruction,
                             )),
                         });
@@ -587,7 +587,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     if gen_kw.is_some() {
                         DeclarationKind::RegularGenerative
                     } else {
-                        DeclarationKind::StructField(self.fields.alloc(StructField {
+                        DeclarationKind::StructField(self.struct_fields.alloc(StructField {
                             name: name.to_owned(),
                             name_span,
                             decl_span,
@@ -1570,16 +1570,16 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         let then_block_starts_at = self.instructions.get_next_alloc_id();
 
-        let new_interface = Interface {
+        let new_interface = Field {
             name_span,
             name: name.to_owned(),
             lat_dom: Some(self.current_latency_domain),
             clock: Some(SINGULAR_CLOCK_DOMAIN),
-            declaration_instruction: Some(InterfaceDeclKind::Interface(declaration_instruction)),
+            declaration_instruction: Some(FieldDeclKind::Interface(declaration_instruction)),
         };
         let interface_id = if name == self.name {
-            self.interfaces[InterfaceID::MAIN_INTERFACE] = new_interface;
-            InterfaceID::MAIN_INTERFACE
+            self.interfaces[FieldID::MAIN_INTERFACE] = new_interface;
+            FieldID::MAIN_INTERFACE
         } else {
             let interface_id = self.interfaces.alloc(new_interface);
             self.alloc_local_name(
@@ -1795,7 +1795,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     fn flatten_interface_ports(
         &mut self,
         left_direction: Direction,
-        parent_interface: InterfaceID,
+        parent_interface: FieldID,
         cursor: &mut Cursor<'c>,
     ) -> (Vec<FlatID>, Vec<FlatID>) {
         if !cursor.optional_field(field!("interface_ports")) {
@@ -1936,7 +1936,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             });
         }
 
-        self.interfaces.alloc(Interface {
+        self.interfaces.alloc(Field {
             name_span,
             name: name.to_owned(),
             lat_dom: None,
@@ -2012,7 +2012,7 @@ fn flatten_global(
         name,
         current_parent_condition: None,
         globals,
-        fields: FlatAlloc::new(),
+        struct_fields: FlatAlloc::new(),
         ports: FlatAlloc::new(),
         interfaces: FlatAlloc::new(),
         clocks: FlatAlloc::new(),
@@ -2031,9 +2031,9 @@ fn flatten_global(
     let parameters = context.parameters;
     let mut clocks = context.clocks;
     let mut latency_domains = context.latency_domains;
-    let interfaces = context.interfaces;
+    let fields = context.interfaces;
     let ports = context.ports;
-    let fields = context.fields;
+    let struct_fields = context.struct_fields;
 
     let mut working_on_mut = pass.get_mut();
     match &mut working_on_mut {
@@ -2053,13 +2053,13 @@ fn flatten_global(
             }
             md.clocks = clocks;
             md.latency_domains = latency_domains;
-            md.interfaces = interfaces;
+            md.fields = fields;
             md.ports = ports;
 
             &mut md.link_info
         }
         GlobalObj::Type(typ) => {
-            typ.fields = fields;
+            typ.fields = struct_fields;
 
             &mut typ.link_info
         }

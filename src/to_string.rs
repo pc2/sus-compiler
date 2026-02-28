@@ -73,12 +73,12 @@ impl UniCell<AbstractInnerType> {
             Some(AbstractInnerType::Named(name)) => {
                 write!(f, "{}", name.display(globals, link_info))
             }
-            Some(AbstractInnerType::Interface(md_id, interface_id)) => {
+            Some(AbstractInnerType::Interface(md_id, interface_field_id)) => {
                 let md = &globals.modules[md_id.id];
                 write!(
                     f,
                     "Interface {} of {}",
-                    md.interfaces[*interface_id].name,
+                    md.fields[*interface_field_id].name,
                     md_id.display(globals, link_info)
                 )
             }
@@ -245,12 +245,12 @@ impl WireReference {
                     } => {
                         write!(f, ".{name}")?;
                         match refers_to.get() {
-                            Some(PathElemRefersTo::Interface(md_id, interface)) => {
+                            Some(PathElemRefersTo::Field(md_id, field_id)) => {
                                 let md = &globals[*md_id];
                                 let md_name = md.link_info.display_full_name();
-                                if let Some(interface) = interface {
-                                    let interf_name = &md.interfaces[*interface].name;
-                                    write!(f, "({md_name}:{interf_name})")?;
+                                if let Some(field_id) = field_id {
+                                    let field_name = &md.fields[*field_id].name;
+                                    write!(f, "({md_name}:{field_name})")?;
                                 } else {
                                     write!(f, "({md_name}:?)")?;
                                 }
@@ -1033,17 +1033,17 @@ impl Module {
                 let name = &domain.name;
                 write!(f, "\ndomain {name}:")?;
 
-                for (_, interface) in &self.interfaces {
-                    if interface.lat_dom != Some(domain_id) {
+                for (_, field) in &self.fields {
+                    if field.lat_dom != Some(domain_id) {
                         continue;
                     }
-                    match interface.declaration_instruction {
-                        Some(InterfaceDeclKind::Interface(decl_id)) => {
+                    match field.declaration_instruction {
+                        Some(FieldDeclKind::Interface(decl_id)) => {
                             let interface = self.link_info.instructions[decl_id].unwrap_interface();
                             let info = self.display_interface_info(interface, file_text, false);
                             write!(f, "\n{info}")?;
                         }
-                        Some(InterfaceDeclKind::SinglePort(decl_id)) => {
+                        Some(FieldDeclKind::SinglePort(decl_id)) => {
                             let port = self.link_info.instructions[decl_id].unwrap_declaration();
                             let info = self.display_decl(port, file_text, false);
                             write!(f, "\n{info}")?;
@@ -1092,9 +1092,9 @@ impl InstantiatedModule {
             let md = &globals.modules[self.global_ref.id];
 
             writeln!(f, "module {}:", self.global_ref.display(globals))?;
-            for (_, interf) in &md.interfaces {
-                match interf.declaration_instruction {
-                    Some(InterfaceDeclKind::Interface(interf_id)) => {
+            for (_, field) in &md.fields {
+                match field.declaration_instruction {
+                    Some(FieldDeclKind::Interface(interf_id)) => {
                         let interf = md.link_info.instructions[interf_id].unwrap_interface();
                         // If an execution error occurred, interface may only be half-finished. Just abort if any port is invalid
                         let interf_is_valid =
@@ -1147,7 +1147,7 @@ impl InstantiatedModule {
                         }
                         writeln!(f)?;
                     }
-                    Some(InterfaceDeclKind::SinglePort(port)) => {
+                    Some(FieldDeclKind::SinglePort(port)) => {
                         if let SubModuleOrWire::Wire(w) = &self.generation_state[port] {
                             let port_w = &self.wires[*w];
                             let_unwrap!(IsPort::Port(_, port_dir), port_w.is_port);
@@ -1313,7 +1313,7 @@ impl ModuleTypingContext<'_> {
                 refers_to,
                 last_infer_values: _,
                 port_map,
-                interface_call_sites: _,
+                field_call_sites: _,
                 name,
             },
         ) in &self.submodules

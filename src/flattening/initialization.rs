@@ -94,7 +94,7 @@ fn initialize_global_object(
                 inference_info: PortLatencyInferenceInfo::default(),
                 clocks: FlatAlloc::new(),
                 latency_domains: FlatAlloc::new(),
-                interfaces: FlatAlloc::new(),
+                fields: FlatAlloc::new(),
             });
         }
         GlobalObjectKind::Struct => {

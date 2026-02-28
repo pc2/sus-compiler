@@ -182,7 +182,7 @@ pub struct SubModule {
     pub refers_to: ConcreteGlobalReference<ModuleUUID>,
     pub last_infer_values: RefCell<TVec<Vec<InferenceResult>>>,
     pub port_map: FlatAlloc<Option<SubModulePort>, PortIDMarker>,
-    pub interface_call_sites: FlatAlloc<Vec<Span>, InterfaceIDMarker>,
+    pub field_call_sites: FlatAlloc<Vec<Span>, FieldIDMarker>,
     pub name: String,
 }
 impl SubModule {

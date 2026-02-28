@@ -293,3 +293,26 @@ module Tuple3 #(T1, T2, T3) {
     v2_o = FromBits(packed_i[SIZE1:SIZE1+SIZE2])
     v3_o = FromBits(packed_i[SIZE1+SIZE2:])
 }
+
+/// Temporary module for creating and deconstructing tuples, until we have structs
+module Tuple4 #(T1, T2, T3, T4) {
+    gen int SIZE1 = sizeof#(T: type T1)
+    gen int SIZE2 = sizeof#(T: type T2)
+    gen int SIZE3 = sizeof#(T: type T3)
+    gen int SIZE4 = sizeof#(T: type T4)
+    domain clk
+
+    domain pack_dom
+    interface pack : T1 v1_i'0, T2 v2_i'0, T3 v3_i'0, T4 v4_i'0 -> bool[SIZE1 + SIZE2 + SIZE3 + SIZE4] packed_o'0
+    packed_o[:SIZE1] = ToBits(v1_i)
+    packed_o[SIZE1:SIZE1+SIZE2] = ToBits(v2_i)
+    packed_o[SIZE1+SIZE2:SIZE1+SIZE2+SIZE3] = ToBits(v3_i)
+    packed_o[SIZE1+SIZE2+SIZE3:] = ToBits(v4_i)
+
+    domain unpack_dom
+    interface unpack : bool[SIZE1 + SIZE2 + SIZE3 + SIZE4] packed_i'0 -> T1 v1_o'0, T2 v2_o'0, T3 v3_o'0, T4 v4_o'0
+    v1_o = FromBits(packed_i[:SIZE1])
+    v2_o = FromBits(packed_i[SIZE1:SIZE1+SIZE2])
+    v3_o = FromBits(packed_i[SIZE1+SIZE2:SIZE1+SIZE2+SIZE3])
+    v4_o = FromBits(packed_i[SIZE1+SIZE2+SIZE3:])
+}

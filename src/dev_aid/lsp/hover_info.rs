@@ -4,7 +4,7 @@ use crate::typing::template::TemplateKind;
 
 use lsp_types::{LanguageString, MarkedString};
 
-use crate::flattening::{DeclarationKind, InterfaceDeclKind};
+use crate::flattening::{DeclarationKind, FieldDeclKind};
 use crate::instantiation::SubModuleOrWire;
 use crate::linker::{Documentation, FileData, GlobalObj, GlobalUUID, LinkInfo};
 
@@ -204,9 +204,9 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 GlobalUUID::Constant(_) => {}
             }
         }
-        LocationInfo::Interface(_md_uuid, md, _, interface) => {
+        LocationInfo::Field(_md_uuid, md, _, interface) => {
             match interface.declaration_instruction.unwrap() {
-                InterfaceDeclKind::Interface(decl_id) => {
+                FieldDeclKind::Interface(decl_id) => {
                     let interface_decl = md.link_info.instructions[decl_id].unwrap_interface();
 
                     hover.sus_code(
@@ -218,7 +218,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                         .to_string(),
                     );
                 }
-                InterfaceDeclKind::SinglePort(decl_id) => {
+                FieldDeclKind::SinglePort(decl_id) => {
                     let port_decl = md.link_info.instructions[decl_id].unwrap_declaration();
 
                     hover.sus_code(

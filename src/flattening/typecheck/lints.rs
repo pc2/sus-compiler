@@ -66,9 +66,9 @@ impl LintContext<'_> {
                     } = p
                     {
                         match refers_to.get() {
-                            Some(PathElemRefersTo::Interface(_, Some(port))) => {
-                                if let Some(InterfaceDeclKind::SinglePort(port_decl)) =
-                                    submod.md.interfaces[*port].declaration_instruction
+                            Some(PathElemRefersTo::Field(_, Some(port))) => {
+                                if let Some(FieldDeclKind::SinglePort(port_decl)) =
+                                    submod.md.fields[*port].declaration_instruction
                                 {
                                     let module_port_decl = submod.get_decl(port_decl);
                                     let_unwrap!(
@@ -90,7 +90,7 @@ impl LintContext<'_> {
                                     }
                                 }
                             }
-                            Some(PathElemRefersTo::Interface(_, None)) | None => {}
+                            Some(PathElemRefersTo::Field(_, None)) | None => {}
                         }
                     }
                 }
@@ -495,21 +495,21 @@ impl LintContext<'_> {
             .ports
             .iter()
             .map(|(_, port)| (&port.name, port.name_span, "port"))
-            .chain(md.interfaces.iter().filter_map(|(_, interf)| {
-                match interf.declaration_instruction? {
-                    InterfaceDeclKind::Interface(interf_id) => {
+            .chain(md.fields.iter().filter_map(|(_, field)| {
+                match field.declaration_instruction? {
+                    FieldDeclKind::Interface(interf_id) => {
                         let_unwrap!(
                             Instruction::Interface(interface_declaration),
                             &md.link_info.instructions[interf_id]
                         );
                         match interface_declaration.interface_kind {
                             InterfaceKind::RegularInterface => {
-                                Some((&interf.name, interf.name_span, "interface"))
+                                Some((&field.name, field.name_span, "interface"))
                             }
                             InterfaceKind::Action(_) | InterfaceKind::Trigger(_) => None, // Covered by ports
                         }
                     }
-                    InterfaceDeclKind::SinglePort(_) => None, // Covered by ports
+                    FieldDeclKind::SinglePort(_) => None, // Covered by ports
                 }
             }))
         {

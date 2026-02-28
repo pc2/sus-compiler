@@ -62,7 +62,7 @@ pub struct Module {
     /// Created in Stage 2: Initialization
     ///
     /// Used for resolving the names. These shouldn't really occur in Instantiation
-    pub interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
+    pub fields: FlatAlloc<Field, FieldIDMarker>,
 }
 
 impl Module {
@@ -72,10 +72,10 @@ impl Module {
     pub fn get_clock_name(&self) -> &str {
         &self.clocks.iter().next().unwrap().1.name
     }
-    pub fn get_fn_interface(&self, interface_id: InterfaceID) -> &InterfaceDeclaration {
-        let interface = &self.interfaces[interface_id];
+    pub fn get_fn_interface(&self, field_id: FieldID) -> &InterfaceDeclaration {
+        let interface = &self.fields[field_id];
         let_unwrap!(
-            Some(InterfaceDeclKind::Interface(i)),
+            Some(FieldDeclKind::Interface(i)),
             interface.declaration_instruction
         );
         self.link_info.instructions[i].unwrap_interface()
@@ -117,7 +117,7 @@ pub struct StructType {
     /// Created in Stage 1: Initialization
     ///
     /// [StructField::declaration_instruction] are set in Stage 2: Flattening
-    fields: FlatAlloc<StructField, FieldIDMarker>,
+    fields: FlatAlloc<StructField, StructFieldIDMarker>,
 }
 
 /// Represents a field in a struct
@@ -232,7 +232,7 @@ impl InterfaceKind {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum InterfaceDeclKind {
+pub enum FieldDeclKind {
     Interface(FlatID),
     SinglePort(FlatID),
 }
@@ -255,17 +255,17 @@ pub enum InterfaceDeclKind {
 /// }
 /// ```
 #[derive(Debug)]
-pub struct Interface {
+pub struct Field {
     pub name_span: Span,
     pub name: String,
     pub lat_dom: Option<LatDomID>,
     pub clock: Option<ClockID>,
-    pub declaration_instruction: Option<InterfaceDeclKind>,
+    pub declaration_instruction: Option<FieldDeclKind>,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum PathElemRefersTo {
-    Interface(ModuleUUID, Option<InterfaceID>),
+    Field(ModuleUUID, Option<FieldID>),
 }
 
 /// An element in a [WireReference] path. Could be array accesses, slice accesses, field accesses, etc
@@ -592,12 +592,12 @@ pub enum DeclarationKind {
         /// Describes how many 'split' keywords have been used for this wire.
         num_splits: usize,
     },
-    StructField(FieldID),
+    StructField(StructFieldID),
     Port {
         direction: Direction,
         is_state: bool,
         port_id: PortID,
-        parent_interface: InterfaceID,
+        parent_interface: FieldID,
         is_standalone_port: bool,
         latency_domain: LatDomID,
     },
@@ -932,7 +932,7 @@ pub struct InterfaceDeclaration {
     pub documentation: Documentation,
     pub latency_specifier: Option<FlatID>,
     pub is_local: bool,
-    pub interface_id: InterfaceID,
+    pub interface_id: FieldID,
     pub interface_kind: InterfaceKind,
     /// These and [Self::outputs] are respective to the function-call syntax!
     ///

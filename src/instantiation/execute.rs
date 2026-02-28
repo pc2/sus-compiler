@@ -425,7 +425,7 @@ impl GenerationState<'_> {
             let new_elem = match p {
                 WireReferencePathElement::FieldAccess { refers_to, .. } => {
                     match refers_to.get().unwrap() {
-                        PathElemRefersTo::Interface(_, _) => {
+                        PathElemRefersTo::Field(_, _) => {
                             unreachable!("Not possible in generative context!")
                         }
                     }
@@ -647,8 +647,8 @@ impl<'l> ExecutionContext<'l> {
     fn execute_wire_ref_path(
         &mut self,
         wire_ref: &'l WireReference,
-    ) -> ExecutionResult<(InterfaceID, Span, Vec<RealWirePathElem>)> {
-        let mut interface_found = (InterfaceID::MAIN_INTERFACE, wire_ref.root_span);
+    ) -> ExecutionResult<(FieldID, Span, Vec<RealWirePathElem>)> {
+        let mut interface_found = (FieldID::MAIN_INTERFACE, wire_ref.root_span);
         let mut path = Vec::new();
         for p in &wire_ref.path {
             match p {
@@ -671,7 +671,7 @@ impl<'l> ExecutionContext<'l> {
                     refers_to,
                     ..
                 } => match refers_to.get().unwrap() {
-                    PathElemRefersTo::Interface(_, interface) => {
+                    PathElemRefersTo::Field(_, interface) => {
                         interface_found = (interface.unwrap(), *name_span);
                     }
                 },
@@ -738,7 +738,7 @@ impl<'l> ExecutionContext<'l> {
         self.link_info.instructions[original_instruction]
             .get_span()
             .debug();
-        let (port_interface, port_span, mut path) = self.execute_wire_ref_path(wire_ref)?;
+        let (port_field, port_span, mut path) = self.execute_wire_ref_path(wire_ref)?;
         let wire_id = match &wire_ref.root {
             &WireReferenceRoot::LocalDecl(decl_id) => {
                 let decl = self.link_info.instructions[decl_id].unwrap_declaration();
@@ -795,9 +795,9 @@ impl<'l> ExecutionContext<'l> {
             WireReferenceRoot::LocalSubmodule(submod_id) => {
                 let submod = self.link_info.instructions[*submod_id].unwrap_submodule();
                 let submod_md = &self.globals.modules[submod.module_ref.id];
-                let submod_interface = &submod_md.interfaces[port_interface];
+                let submod_interface = &submod_md.fields[port_field];
                 let_unwrap!(
-                    Some(InterfaceDeclKind::SinglePort(port_decl)),
+                    Some(FieldDeclKind::SinglePort(port_decl)),
                     submod_interface.declaration_instruction
                 );
                 let port_decl = submod_md.link_info.instructions[port_decl].unwrap_declaration();
@@ -1089,27 +1089,27 @@ impl<'l> ExecutionContext<'l> {
     fn get_submodule_interface(
         &mut self,
         submod_id: SubModuleID,
-        interface_id: InterfaceID,
-        interface_span: Span,
+        field_id: FieldID,
+        field_span: Span,
         domain: ClockID,
     ) -> InterfaceWires {
         add_to_small_set(
-            &mut self.submodules[submod_id].interface_call_sites[interface_id],
-            interface_span,
+            &mut self.submodules[submod_id].field_call_sites[field_id],
+            field_span,
         );
         let md = &self.globals.modules[self.submodules[submod_id].refers_to.id];
-        let interface = &md.interfaces[interface_id];
+        let field = &md.fields[field_id];
         let_unwrap!(
-            Some(InterfaceDeclKind::Interface(interface_id)),
-            interface.declaration_instruction
+            Some(FieldDeclKind::Interface(interface_id)),
+            field.declaration_instruction
         );
 
         let interface = md.link_info.instructions[interface_id].unwrap_interface();
 
         let condition_wire = match interface.interface_kind {
-            InterfaceKind::Action(condition_port) | InterfaceKind::Trigger(condition_port) => Some(
-                self.get_submodule_port(submod_id, condition_port, Some(interface_span), domain),
-            ),
+            InterfaceKind::Action(condition_port) | InterfaceKind::Trigger(condition_port) => {
+                Some(self.get_submodule_port(submod_id, condition_port, Some(field_span), domain))
+            }
             InterfaceKind::RegularInterface => None,
         };
 
@@ -1138,7 +1138,7 @@ impl<'l> ExecutionContext<'l> {
             condition_wire,
             inputs,
             outputs,
-            interface_span,
+            interface_span: field_span,
         }
     }
 
@@ -1167,7 +1167,7 @@ impl<'l> ExecutionContext<'l> {
                 assert!(interface_ref.path.is_empty());
                 Ok(self.get_submodule_interface(
                     submod_id,
-                    InterfaceID::MAIN_INTERFACE,
+                    FieldID::MAIN_INTERFACE,
                     module_ref.get_total_span(),
                     domain,
                 ))
@@ -1538,7 +1538,7 @@ impl<'l> ExecutionContext<'l> {
         let sub_module = &self.globals.modules[module_ref.id];
 
         let port_map = sub_module.ports.map(|_| None);
-        let interface_call_sites = sub_module.interfaces.map(|_| Vec::new());
+        let field_call_sites = sub_module.fields.map(|_| Vec::new());
 
         let refers_to = self.execute_global_ref(module_ref)?;
 
@@ -1561,7 +1561,7 @@ impl<'l> ExecutionContext<'l> {
             ),
             refers_to,
             port_map,
-            interface_call_sites,
+            field_call_sites,
             name: self.unique_name_producer.get_unique_name(name_origin),
         }))
     }

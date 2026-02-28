@@ -29,7 +29,7 @@ use crate::{
 pub enum AbstractInnerType {
     Template(TemplateID),
     Named(AbstractGlobalReference<TypeUUID>),
-    Interface(AbstractGlobalReference<ModuleUUID>, InterfaceID),
+    Interface(AbstractGlobalReference<ModuleUUID>, FieldID),
     LocalInterface(FlatID),
 }
 

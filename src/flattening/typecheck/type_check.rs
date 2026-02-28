@@ -133,7 +133,7 @@ impl<'l> TypeCheckingContext<'l> {
                 self.typecheck_global_ref(md);
                 AbstractInnerType::Interface(
                     self.make_global_ref_types(md),
-                    InterfaceID::MAIN_INTERFACE,
+                    FieldID::MAIN_INTERFACE,
                 )
                 .scalar()
             }
@@ -237,28 +237,25 @@ impl<'l> TypeCheckingContext<'l> {
                     inner.unwrap()
                 );
                 let md = self.globals.get_submodule(md_ref);
-                let interface = md
-                    .md
-                    .interfaces
-                    .find(|_, interface| interface.name == field_name);
+                let field = md.md.fields.find(|_, field| field.name == field_name);
 
                 refers_to
-                    .set(PathElemRefersTo::Interface(md_ref.id, interface))
+                    .set(PathElemRefersTo::Field(md_ref.id, field))
                     .unwrap();
 
-                if let Some(interface) = interface {
-                    if let Some(InterfaceDeclKind::SinglePort(port_decl)) =
-                        md.md.interfaces[interface].declaration_instruction
+                if let Some(field) = field {
+                    if let Some(FieldDeclKind::SinglePort(port_decl)) =
+                        md.md.fields[field].declaration_instruction
                     {
                         md.get_decl(port_decl).get_local_type(self)
                     } else {
-                        AbstractInnerType::Interface(self.unifier.clone_known(md_ref), interface)
+                        AbstractInnerType::Interface(self.unifier.clone_known(md_ref), field)
                             .scalar()
                     }
                 } else {
                     let md = self.globals.get_module(md_ref.id);
                     let md_name = md_ref.display(self.globals.globals, self.link_info);
-                    let field_names = display_join(", ", md.interfaces.iter(), |f, (_, v)| {
+                    let field_names = display_join(", ", md.fields.iter(), |f, (_, v)| {
                         write!(f, "'{}'", v.name)
                     });
                     self.errors
@@ -520,19 +517,19 @@ impl<'l> TypeCheckingContext<'l> {
         match self.unifier.resolve(&wire_ref.output_typ.inner) {
             Ok(AbstractInnerType::Interface(sm_ref, interface)) => {
                 let submod = self.globals.get_submodule(sm_ref);
-                let interface = &submod.md.interfaces[*interface];
-                let Some(interface) = interface.declaration_instruction else {
-                    let name = &interface.name;
+                let field = &submod.md.fields[*interface];
+                let Some(field) = field.declaration_instruction else {
+                    let name = &field.name;
                     let err_text = format!(
                         "{context} expects this to be a callable interface, the interface `{name}` is not callable"
                     );
                     self.errors
                         .error(wire_ref.get_total_span(), err_text)
-                        .info_obj(interface);
+                        .info_obj(field);
                     return None;
                 };
-                let_unwrap!(InterfaceDeclKind::Interface(interface), interface);
-                Some(submod.get_fn(interface))
+                let_unwrap!(FieldDeclKind::Interface(field), field);
+                Some(submod.get_fn(field))
             }
             Ok(AbstractInnerType::LocalInterface(interface_decl)) => {
                 let fn_decl = self.link_info.instructions[*interface_decl].unwrap_interface();
@@ -771,7 +768,7 @@ impl<'l> TypeCheckingContext<'l> {
                 sm.typ.set_initial(
                     AbstractInnerType::Interface(
                         self.make_global_ref_types(&sm.module_ref),
-                        InterfaceID::MAIN_INTERFACE,
+                        FieldID::MAIN_INTERFACE,
                     )
                     .scalar(),
                 );

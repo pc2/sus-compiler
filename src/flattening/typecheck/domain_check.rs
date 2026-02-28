@@ -265,8 +265,8 @@ impl<'l> TypeCheckingContext<'l> {
                 for p in &wire_ref.path {
                     if let WireReferencePathElement::FieldAccess { refers_to, .. } = p {
                         match refers_to.get() {
-                            Some(PathElemRefersTo::Interface(_, Some(interface))) => {
-                                let interf = &submod_ref.md.interfaces[*interface];
+                            Some(PathElemRefersTo::Field(_, Some(field_id))) => {
+                                let interf = &submod_ref.md.fields[*field_id];
                                 if let Some(domain_in_submod) = interf.clock {
                                     return Some(Physical(
                                         self.unifier
@@ -274,7 +274,7 @@ impl<'l> TypeCheckingContext<'l> {
                                     ));
                                 }
                             }
-                            Some(PathElemRefersTo::Interface(_, None)) | None => {}
+                            Some(PathElemRefersTo::Field(_, None)) | None => {}
                         };
                     }
                 }

@@ -8,8 +8,8 @@ use std::fmt::Display;
 use crate::typing::template::Parameter;
 
 use crate::flattening::{
-    ClockInfo, Declaration, Instruction, Interface, InterfaceDeclaration, LatencyDomainInfo,
-    Module, Port, SubModuleInstance,
+    ClockInfo, Declaration, Field, Instruction, InterfaceDeclaration, LatencyDomainInfo, Module,
+    Port, SubModuleInstance,
 };
 use crate::linker::{LinkInfo, checkpoint::ErrorCheckpoint};
 
@@ -444,11 +444,11 @@ impl ErrorInfoObject for &Port {
         })
     }
 }
-impl ErrorInfoObject for &Interface {
+impl ErrorInfoObject for &Field {
     fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
             span: self.name_span,
-            info: format!("Interface '{}' declared here", &self.name),
+            info: format!("Field '{}' declared here", &self.name),
         })
     }
 }
