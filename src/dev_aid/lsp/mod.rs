@@ -522,7 +522,7 @@ fn goto_definition(linker: &mut Linker, file_id: FileUUID, pos: usize) -> Vec<Sp
             let link_info = &linker.globals[id];
             goto_definition_list.push(link_info.name_span);
         }
-        LocationInfo::Interface(_md_uuid, _md, _interface_id, interface) => {
+        LocationInfo::Field(_md_uuid, _md, _interface_id, interface) => {
             goto_definition_list.push(interface.name_span);
         }
     }

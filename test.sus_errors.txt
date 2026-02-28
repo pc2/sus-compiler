@@ -716,7 +716,7 @@ Error: A function call expects this to be a callable interface, the interface `d
      │
  431 │ module doNothing {}
      │        ────┬────  
-     │            ╰────── Interface 'doNothing' declared here
+     │            ╰────── Field 'doNothing' declared here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:462:7 ]
@@ -820,7 +820,7 @@ Error: A function call expects this to be a callable interface, the interface `d
      │
  431 │ module doNothing {}
      │        ────┬────  
-     │            ╰────── Interface 'doNothing' declared here
+     │            ╰────── Field 'doNothing' declared here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:608:22 ]
@@ -1169,7 +1169,7 @@ Error: A function call expects this to be a callable interface, the interface `n
      │
  675 │ module no_port_module {}
      │        ───────┬──────  
-     │               ╰──────── Interface 'no_port_module' declared here
+     │               ╰──────── Field 'no_port_module' declared here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:681:6 ]
@@ -1189,7 +1189,7 @@ Error: A function call expects this to be a callable interface, the interface `n
      │
  675 │ module no_port_module {}
      │        ───────┬──────  
-     │               ╰──────── Interface 'no_port_module' declared here
+     │               ╰──────── Field 'no_port_module' declared here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:686:40 ]
@@ -1860,7 +1860,7 @@ Error: A function call expects this to be a callable interface, the interface `n
      │
  906 │ module no_main_interface {
      │        ────────┬────────  
-     │                ╰────────── Interface 'no_main_interface' declared here
+     │                ╰────────── Field 'no_main_interface' declared here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:914:6 ]
@@ -1880,7 +1880,7 @@ Error: A function call expects this to be a callable interface, the interface `n
      │
  906 │ module no_main_interface {
      │        ────────┬────────  
-     │                ╰────────── Interface 'no_main_interface' declared here
+     │                ╰────────── Field 'no_main_interface' declared here
 ─────╯
 Warning: Not Instantiating moduleWithBadDeclaration #() due to abstract typing errors
      ╭─[ test.sus:917:8 ]

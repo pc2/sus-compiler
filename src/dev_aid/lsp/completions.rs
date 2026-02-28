@@ -2,8 +2,7 @@ use std::fmt::Display;
 
 use crate::{
     flattening::{
-        Direction, InterfaceDeclKind, InterfaceKind, Module, PathElemRefersTo,
-        WireReferencePathElement,
+        Direction, FieldDeclKind, InterfaceKind, Module, PathElemRefersTo, WireReferencePathElement,
     },
     linker::{FileData, LinkInfo},
     prelude::*,
@@ -76,10 +75,9 @@ fn try_find_known_completion_parent<'tree>(
 fn get_module_port_completions(md: &Module, file: &FileData) -> Vec<CompletionItem> {
     let mut completions = Vec::new();
 
-    for (_, interf) in &md.interfaces {
-        let instr = match interf.declaration_instruction {
-            Some(InterfaceDeclKind::Interface(instr))
-            | Some(InterfaceDeclKind::SinglePort(instr)) => instr,
+    for (_, field) in &md.fields {
+        let instr = match field.declaration_instruction {
+            Some(FieldDeclKind::Interface(instr)) | Some(FieldDeclKind::SinglePort(instr)) => instr,
             None => continue,
         };
         match &md.link_info.instructions[instr] {
@@ -190,7 +188,7 @@ fn complete_field_access(
                         continue;
                     };
                     match refers_to {
-                        PathElemRefersTo::Interface(in_module, _interf_opt) => {
+                        PathElemRefersTo::Field(in_module, _interf_opt) => {
                             let md = &linker.modules[*in_module];
 
                             return get_module_port_completions(md, file);

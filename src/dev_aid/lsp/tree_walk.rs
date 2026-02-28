@@ -30,7 +30,7 @@ pub enum LocationInfo<'linker> {
     ),
     Type(&'linker WrittenType, &'linker LinkInfo),
     Global(GlobalUUID),
-    Interface(ModuleUUID, &'linker Module, InterfaceID, &'linker Interface),
+    Field(ModuleUUID, &'linker Module, FieldID, &'linker Field),
 }
 
 impl<'linker> std::fmt::Debug for LocationInfo<'linker> {
@@ -50,7 +50,7 @@ impl<'linker> std::fmt::Debug for LocationInfo<'linker> {
                 .finish(),
             Self::Type(arg0, arg1) => f.debug_tuple("Type").field(arg0).field(arg1).finish(),
             Self::Global(arg0) => f.debug_tuple("Global").field(arg0).finish(),
-            Self::Interface(_arg0, md, arg2, arg3) => f
+            Self::Field(_arg0, md, arg2, arg3) => f
                 .debug_tuple("Interface")
                 .field(&md.link_info.name)
                 .field(arg2)
@@ -65,7 +65,7 @@ impl<'linker> std::fmt::Debug for LocationInfo<'linker> {
 pub struct RefersTo {
     pub local: Option<(GlobalUUID, FlatID)>,
     pub global: Option<GlobalUUID>,
-    pub interface: Option<(ModuleUUID, InterfaceID)>,
+    pub interface: Option<(ModuleUUID, FieldID)>,
     pub parameter: Option<(GlobalUUID, TemplateID)>,
 }
 
@@ -123,13 +123,13 @@ impl From<LocationInfo<'_>> for RefersTo {
             LocationInfo::Global(name_elem) => {
                 result.global = Some(name_elem);
             }
-            LocationInfo::Interface(md_id, _md, i_id, interface) => {
+            LocationInfo::Field(md_id, _md, i_id, interface) => {
                 result.interface = Some((md_id, i_id));
                 match interface.declaration_instruction.unwrap() {
-                    InterfaceDeclKind::SinglePort(port_decl) => {
+                    FieldDeclKind::SinglePort(port_decl) => {
                         result.local = Some((GlobalUUID::Module(md_id), port_decl));
                     }
-                    InterfaceDeclKind::Interface(decl_id) => {
+                    FieldDeclKind::Interface(decl_id) => {
                         result.local = Some((GlobalUUID::Module(md_id), decl_id));
                     }
                 }
@@ -148,7 +148,7 @@ impl RefersTo {
             }
             LocationInfo::Type(_, _) => false,
             LocationInfo::Global(ne) => self.global == Some(ne),
-            LocationInfo::Interface(md_id, _, i_id, _) => self.interface == Some((md_id, i_id)),
+            LocationInfo::Field(md_id, _, i_id, _) => self.interface == Some((md_id, i_id)),
         }
     }
     pub fn is_global(&self) -> bool {
@@ -335,16 +335,16 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                     };
 
                     let target = match refers_to {
-                        PathElemRefersTo::Interface(_, None) => {
+                        PathElemRefersTo::Field(_, None) => {
                             continue;
                         }
-                        PathElemRefersTo::Interface(in_module, Some(interface)) => {
+                        PathElemRefersTo::Field(in_module, Some(field_id)) => {
                             let submodule = &self.linker.modules[*in_module];
-                            LocationInfo::Interface(
+                            LocationInfo::Field(
                                 *in_module,
                                 submodule,
-                                *interface,
-                                &submodule.interfaces[*interface],
+                                *field_id,
+                                &submodule.fields[*field_id],
                             )
                         }
                     };
@@ -476,15 +476,15 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
         match global {
             GlobalUUID::Module(md_id) => {
                 let md = &self.linker.modules[md_id];
-                for (interface_id, interface) in &md.interfaces {
-                    match interface.declaration_instruction {
-                        Some(InterfaceDeclKind::Interface(_)) => {
+                for (field_id, field) in &md.fields {
+                    match field.declaration_instruction {
+                        Some(FieldDeclKind::Interface(_)) => {
                             self.visit(
-                                interface.name_span,
-                                LocationInfo::Interface(md_id, md, interface_id, interface),
+                                field.name_span,
+                                LocationInfo::Field(md_id, md, field_id, field),
                             );
                         }
-                        Some(InterfaceDeclKind::SinglePort(_)) => {} // Ports have been covered by their respective declarations
+                        Some(FieldDeclKind::SinglePort(_)) => {} // Ports have been covered by their respective declarations
                         None => {}
                     }
                 }
