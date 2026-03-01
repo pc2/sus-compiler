@@ -433,14 +433,14 @@ impl core::fmt::Debug for DeclarationKind {
                 direction,
                 is_state,
                 port_id,
-                parent_interface,
+                parent_field,
                 is_standalone_port: _,
                 latency_domain: _,
             } => {
                 if *is_state {
                     f.write_str("state")?;
                 }
-                write!(f, "{direction}({port_id:?}@{parent_interface:?})")
+                write!(f, "{direction}({port_id:?}@{parent_field:?})")
             }
             DeclarationKind::ConditionalBinding {
                 when_id,
@@ -889,7 +889,7 @@ impl LinkInfo {
                     name,
                     latency_specifier,
                     is_local,
-                    interface_id,
+                    field_id,
                     interface_kind,
                     inputs,
                     outputs,
@@ -899,7 +899,7 @@ impl LinkInfo {
                 }) => {
                     let is_local = if *is_local { "local " } else { "" };
                     let name = name.green();
-                    write!(f, "{is_local} {interface_kind:?} {interface_id:?} {name}")?;
+                    write!(f, "{is_local} {interface_kind:?} {field_id:?} {name}")?;
                     if let Some(lat_spec) = latency_specifier {
                         write!(f, "'{lat_spec:?}")?;
                     }
@@ -945,28 +945,30 @@ impl LinkInfo {
     }
 }
 
-impl Module {
+fn display_latency_domain(
+    latency_domains: Option<&FlatAlloc<LatencyDomainInfo, LatDomIDMarker>>,
+    latency_domain: LatDomID,
+) -> impl Display {
+    FmtWrapper(move |f| {
+        if let Some(latency_domains) = latency_domains {
+            write!(f, "{{{}}} ", latency_domains[latency_domain].name)?;
+        }
+        Ok(())
+    })
+}
+impl LinkInfo {
     fn display_latency(&self, lat_spec: &Option<FlatID>, file_text: &FileText) -> impl Display {
         display_maybe(lat_spec.as_ref(), |f, lat_spec| {
-            let lat_spec_expr = self.link_info.instructions[*lat_spec].unwrap_expression();
+            let lat_spec_expr = self.instructions[*lat_spec].unwrap_expression();
             let lat_spec_text = &file_text[lat_spec_expr.span];
             write!(f, "'{lat_spec_text}")
         })
     }
-    fn display_latency_domain(
-        &self,
-        latency_domain: LatDomID,
-        may_print_domain: bool,
-    ) -> impl Display {
-        display_if(may_print_domain, move |f| {
-            write!(f, "{{{}}} ", self.latency_domains[latency_domain].name)
-        })
-    }
     pub fn display_decl(
         &self,
+        latency_domains: Option<&FlatAlloc<LatencyDomainInfo, LatDomIDMarker>>,
         decl: &Declaration,
         file_text: &FileText,
-        may_print_domain: bool,
     ) -> impl Display {
         FmtWrapper(move |f| {
             if let DeclarationKind::Port {
@@ -975,7 +977,7 @@ impl Module {
                 ..
             } = &decl.decl_kind
             {
-                let latency_domain = self.display_latency_domain(*latency_domain, may_print_domain);
+                let latency_domain = display_latency_domain(latency_domains, *latency_domain);
                 write!(f, "{latency_domain}{direction} ")?;
             }
 
@@ -993,29 +995,33 @@ impl Module {
             write!(f, "{written_typ} {name}{lat_spec}")
         })
     }
-
+}
+impl Module {
     pub fn display_interface_info(
         &self,
         interface: &InterfaceDeclaration,
         file_text: &FileText,
         may_print_domain: bool,
     ) -> impl Display {
-        let domain = self.display_latency_domain(interface.latency_domain, may_print_domain);
+        let latency_domains = may_print_domain.then_some(&self.latency_domains);
+        let domain = display_latency_domain(latency_domains, interface.latency_domain);
         let interface_kind = interface.interface_kind;
         let name = &file_text[interface.name_span];
-        let lat_spec = self.display_latency(&interface.latency_specifier, file_text);
+        let lat_spec = self
+            .link_info
+            .display_latency(&interface.latency_specifier, file_text);
         FmtWrapper(move |f| {
             write!(f, "{domain}{interface_kind} {name}{lat_spec}:")?;
             for decl_id in &interface.inputs {
                 let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
-                let port_info = self.display_decl(port_decl, file_text, false);
+                let port_info = self.link_info.display_decl(None, port_decl, file_text);
                 write!(f, "\n\t{port_info}")?;
             }
             if !interface.outputs.is_empty() {
                 write!(f, "\n\t->")?;
                 for decl_id in &interface.outputs {
                     let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
-                    let port_info = self.display_decl(port_decl, file_text, false);
+                    let port_info = self.link_info.display_decl(None, port_decl, file_text);
                     write!(f, "\n\t{port_info}")?;
                 }
             }
@@ -1045,7 +1051,7 @@ impl Module {
                         }
                         Some(FieldDeclKind::SinglePort(decl_id)) => {
                             let port = self.link_info.instructions[decl_id].unwrap_declaration();
-                            let info = self.display_decl(port, file_text, false);
+                            let info = self.link_info.display_decl(None, port, file_text);
                             write!(f, "\n{info}")?;
                         }
                         None => {}

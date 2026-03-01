@@ -133,7 +133,7 @@ struct FlatteningContext<'l, 'errs> {
 
     struct_fields: FlatAlloc<StructField, StructFieldIDMarker>,
     ports: FlatAlloc<Port, PortIDMarker>,
-    interfaces: FlatAlloc<Field, FieldIDMarker>,
+    fields: FlatAlloc<Field, FieldIDMarker>,
 
     local_variable_context: LocalVariableContext<'l, NamedLocal>,
 
@@ -554,7 +554,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             declaration_instruction,
                             latency_specifier,
                         });
-                        let parent_interface = self.interfaces.alloc(Field {
+                        let parent_field = self.fields.alloc(Field {
                             name_span,
                             name: name.to_owned(),
                             lat_dom: Some(self.current_latency_domain),
@@ -567,7 +567,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             direction,
                             is_state,
                             port_id,
-                            parent_interface,
+                            parent_field,
                             is_standalone_port: true,
                             latency_domain: self.current_latency_domain,
                         }
@@ -621,7 +621,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 }
                 DeclarationKind::Port {
                     direction,
-                    parent_interface,
+                    parent_field,
                     ..
                 } => {
                     let port_ctx = match direction {
@@ -661,7 +661,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         direction,
                         is_state,
                         port_id,
-                        parent_interface,
+                        parent_field,
                         is_standalone_port: false,
                         latency_domain: self.current_latency_domain,
                     }
@@ -1553,7 +1553,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 decl_span: interface_decl_span,
                 interface_kw_span,
                 documentation,
-                interface_id: UUID::PLACEHOLDER,
+                field_id: UUID::PLACEHOLDER,
                 interface_kind,
                 latency_specifier,
                 is_local,
@@ -1577,11 +1577,11 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             clock: Some(SINGULAR_CLOCK_DOMAIN),
             declaration_instruction: Some(FieldDeclKind::Interface(declaration_instruction)),
         };
-        let interface_id = if name == self.name {
-            self.interfaces[FieldID::MAIN_INTERFACE] = new_interface;
+        let field_id = if name == self.name {
+            self.fields[FieldID::MAIN_INTERFACE] = new_interface;
             FieldID::MAIN_INTERFACE
         } else {
-            let interface_id = self.interfaces.alloc(new_interface);
+            let interface_id = self.fields.alloc(new_interface);
             self.alloc_local_name(
                 name_span,
                 name,
@@ -1597,7 +1597,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 is_action_or_trigger.then_some(declaration_instruction),
                 |slf| {
                     let (inputs, outputs) =
-                        slf.flatten_interface_ports(left_direction, interface_id, cursor);
+                        slf.flatten_interface_ports(left_direction, field_id, cursor);
 
                     let (then_block, else_block, then_span, else_span) =
                         slf.flatten_then_else_blocks(cursor, is_action_or_trigger);
@@ -1608,7 +1608,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         &mut slf.instructions[declaration_instruction]
                     );
 
-                    interface.interface_id = interface_id;
+                    interface.field_id = field_id;
                     interface.inputs = inputs;
                     interface.outputs = outputs;
                     interface.then_block = then_block;
@@ -1795,7 +1795,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     fn flatten_interface_ports(
         &mut self,
         left_direction: Direction,
-        parent_interface: FieldID,
+        parent_field: FieldID,
         cursor: &mut Cursor<'c>,
     ) -> (Vec<FlatID>, Vec<FlatID>) {
         if !cursor.optional_field(field!("interface_ports")) {
@@ -1807,7 +1807,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 DeclarationKind::Port {
                     direction: left_direction,
                     is_state: false,
-                    parent_interface,
+                    parent_field,
                     port_id: UUID::PLACEHOLDER,
                     is_standalone_port: false,
                     latency_domain: self.current_latency_domain,
@@ -1820,7 +1820,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 DeclarationKind::Port {
                     direction: left_direction.invert(),
                     is_state: false,
-                    parent_interface,
+                    parent_field,
                     port_id: UUID::PLACEHOLDER,
                     is_standalone_port: false,
                     latency_domain: self.current_latency_domain,
@@ -1936,7 +1936,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             });
         }
 
-        self.interfaces.alloc(Field {
+        self.fields.alloc(Field {
             name_span,
             name: name.to_owned(),
             lat_dom: None,
@@ -2014,7 +2014,7 @@ fn flatten_global(
         globals,
         struct_fields: FlatAlloc::new(),
         ports: FlatAlloc::new(),
-        interfaces: FlatAlloc::new(),
+        fields: FlatAlloc::new(),
         clocks: FlatAlloc::new(),
         latency_domains: FlatAlloc::new(),
         default_decl_kind,
@@ -2031,7 +2031,7 @@ fn flatten_global(
     let parameters = context.parameters;
     let mut clocks = context.clocks;
     let mut latency_domains = context.latency_domains;
-    let fields = context.interfaces;
+    let fields = context.fields;
     let ports = context.ports;
     let struct_fields = context.struct_fields;
 

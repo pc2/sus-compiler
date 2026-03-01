@@ -177,7 +177,7 @@ fn complete_field_access(
         for pe in &wr.path {
             match pe {
                 WireReferencePathElement::FieldAccess {
-                    name: _,
+                    name,
                     name_span,
                     refers_to,
                 } => {

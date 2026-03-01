@@ -1,4 +1,9 @@
-use crate::{flattening::FieldDeclKind, prelude::*, typing::template::TemplateKind};
+use crate::{
+    dev_aid::lsp::tree_walk::{self, RefersTo},
+    flattening::FieldDeclKind,
+    prelude::*,
+    typing::template::TemplateKind,
+};
 
 use lsp_types::{
     Position, SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions,
@@ -10,8 +15,6 @@ use crate::{
     dev_aid::lsp::to_position,
     linker::{FileData, GlobalUUID},
 };
-
-use super::tree_walk::{self, InGlobal, LocationInfo};
 
 const NUM_INTERFACE_DISTINGUISHERS: u32 = 5;
 const TOKEN_TYPES: [SemanticTokenType; 8] = [
@@ -132,11 +135,14 @@ impl IDEIdentifierType {
 fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifierType)> {
     let mut result: Vec<(Span, IDEIdentifierType)> = Vec::new();
 
-    tree_walk::visit_all(linker, file, |span, item| {
+    tree_walk::visit_all(linker, file, |location_info| {
+        let Some(refers_to) = location_info.refers_to(linker) else {
+            return;
+        };
         result.push((
-            span,
-            match item {
-                LocationInfo::InGlobal(_md_id, _md, _, InGlobal::NamedLocal(decl)) => {
+            location_info.span,
+            match refers_to {
+                RefersTo::LocalDecl(_, decl, _) => {
                     if decl.decl_kind.is_generative() {
                         IDEIdentifierType::Generative
                     } else {
@@ -146,34 +152,28 @@ fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifier
                         )
                     }
                 }
-                LocationInfo::InGlobal(_md_id, _, _, InGlobal::NamedSubmodule(_)) => {
-                    IDEIdentifierType::Interface
-                }
-                LocationInfo::InGlobal(_md_id, _, _, InGlobal::LocalInterface(_)) => {
-                    IDEIdentifierType::Interface
-                }
-                LocationInfo::InGlobal(_md_id, _, _, InGlobal::Temporary(_)) => return,
-                LocationInfo::Type(_, _) => return,
-                LocationInfo::Parameter(_id, _link_info, _, template_arg) => {
-                    match &template_arg.kind {
-                        TemplateKind::Type(_) => IDEIdentifierType::Type,
-                        TemplateKind::Value(_) => IDEIdentifierType::Generative,
-                    }
-                }
-                LocationInfo::Global(g) => match g {
+                RefersTo::LocalSubModule(..) => IDEIdentifierType::Interface,
+                RefersTo::Global(global_obj) => match global_obj {
                     GlobalUUID::Module(_) => IDEIdentifierType::Interface,
                     GlobalUUID::Type(_) => IDEIdentifierType::Type,
                     GlobalUUID::Constant(_) => IDEIdentifierType::Constant,
                 },
-                LocationInfo::Field(_, md, _, i) => match i.declaration_instruction.unwrap() {
-                    FieldDeclKind::SinglePort(decl_id) => {
-                        let domain = md.link_info.instructions[decl_id]
-                            .unwrap_declaration()
-                            .clock_domain
-                            .unwrap_physical();
-                        IDEIdentifierType::make_local(false, domain)
+                RefersTo::Field(global_obj, field) => {
+                    let md = &linker.modules[global_obj.unwrap_module()];
+                    match field.declaration_instruction.unwrap() {
+                        FieldDeclKind::SinglePort(decl_id) => {
+                            let domain = md.link_info.instructions[decl_id]
+                                .unwrap_declaration()
+                                .clock_domain
+                                .unwrap_physical();
+                            IDEIdentifierType::make_local(false, domain)
+                        }
+                        FieldDeclKind::Interface(_decl_id) => IDEIdentifierType::Interface,
                     }
-                    FieldDeclKind::Interface(_decl_id) => IDEIdentifierType::Interface,
+                }
+                RefersTo::Parameter(_, parameter) => match &parameter.kind {
+                    TemplateKind::Type(_) => IDEIdentifierType::Type,
+                    TemplateKind::Value(_) => IDEIdentifierType::Generative,
                 },
             },
         ));

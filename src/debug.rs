@@ -84,13 +84,13 @@ fn print_most_recent_spans(linker_files: &LinkerFiles, history: &SpanDebuggerSta
 
 /// Used by __debug_span
 #[allow(unused)]
-pub fn debug_print_span(span: Span, label: String) {
+pub fn debug_print_span(span: Span, label: impl Into<String>) {
     let linker_files_ptr = FILES_FOR_DEBUG.get();
     // SAFETY: Well actually this is totally not safe, since this could be called while a &mut Linker is held, and returned.
     // But since this is exclusively for debugging (and therefore should never be part of a release), it doesn't matter.
     unsafe {
         if let Some(files) = linker_files_ptr.as_ref() {
-            pretty_print_span(files, span, label);
+            pretty_print_span(files, span, label.into());
         } else {
             eprintln!("DEBUG: No Linker registered for Span Debugging!");
         }

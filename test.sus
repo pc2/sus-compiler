@@ -1852,3 +1852,14 @@ module IntNarrowToZero {
 	int x = IntNarrow#(FROM: 0, TO: 1)(5)
 	int y = IntNarrow#(FROM: -3, TO: 6)(0)
 }
+
+module CompleteMe {
+	input bool x
+	output bool hello_there
+}
+
+module use_CompleteMe {
+	CompleteMe mm
+
+	mm.he
+}

@@ -597,7 +597,7 @@ pub enum DeclarationKind {
         direction: Direction,
         is_state: bool,
         port_id: PortID,
-        parent_interface: FieldID,
+        parent_field: FieldID,
         is_standalone_port: bool,
         latency_domain: LatDomID,
     },
@@ -932,7 +932,7 @@ pub struct InterfaceDeclaration {
     pub documentation: Documentation,
     pub latency_specifier: Option<FlatID>,
     pub is_local: bool,
-    pub interface_id: FieldID,
+    pub field_id: FieldID,
     pub interface_kind: InterfaceKind,
     /// These and [Self::outputs] are respective to the function-call syntax!
     ///

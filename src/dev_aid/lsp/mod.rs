@@ -7,10 +7,8 @@ mod uri_patch;
 use crate::{
     alloc::zip_eq,
     config::{ConnectionMethod, config, lsp_config},
-    dev_aid::{
-        ariadne_interface::{pretty_print_many_spans, pretty_print_span},
-        lsp::completions::gather_completions,
-    },
+    debug::debug_print_span,
+    dev_aid::ariadne_interface::{pretty_print_many_spans, pretty_print_span},
     errors::{CompileError, ErrorLevel},
     file_position::{FileText, LineCol},
     linker::{FileData, GlobalUUID, UniqueFileID},
@@ -23,10 +21,15 @@ use crossbeam_channel::{RecvError, TryRecvError};
 use hover_info::hover;
 use lsp_server::{ErrorCode, ResponseError};
 use lsp_types::{notification::*, request::Request, *};
-use semantic_tokens::{make_semantic_tokens, semantic_token_capabilities};
-use std::{collections::HashMap, error::Error, fmt::Display, net::SocketAddr, str::FromStr};
+use std::{
+    collections::HashMap,
+    error::Error,
+    fmt::{Debug, Display},
+    net::SocketAddr,
+    str::FromStr,
+};
 
-use tree_walk::{InGlobal, LocationInfo, get_selected_object};
+use tree_walk::get_selected_object;
 
 use self::tree_walk::RefersTo;
 use uri_patch::{UriExt, uri_from_file_path};
@@ -67,7 +70,7 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
         references_provider: Some(OneOf::Left(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         rename_provider: Some(OneOf::Left(true)),
-        semantic_tokens_provider: Some(semantic_token_capabilities()),
+        semantic_tokens_provider: Some(semantic_tokens::semantic_token_capabilities()),
         completion_provider: Some(CompletionOptions {
             resolve_provider: Some(true),
             ..Default::default()
@@ -413,43 +416,80 @@ fn gather_references_in_file(
     refers_to: RefersTo,
 ) -> Vec<Span> {
     let mut ref_locations = Vec::new();
-    tree_walk::visit_all(linker, file_data, |span, info| {
-        if refers_to.refers_to_same_as(info) {
-            ref_locations.push(span);
+    tree_walk::visit_all(linker, file_data, |info| {
+        if let Some(found_ref) = info.refers_to(linker)
+            && refers_to == found_ref
+        {
+            ref_locations.push(info.span);
         }
     });
     ref_locations
 }
 
-fn for_each_local_reference_in_global(
+fn gather_all_references_in_global(
     linker: &Linker,
     obj_id: GlobalUUID,
-    local: FlatID,
+    refers_to: RefersTo,
 ) -> Vec<Span> {
     let mut ref_locations = Vec::new();
-    tree_walk::visit_all_in_module(linker, obj_id, |span, info| {
-        if let LocationInfo::InGlobal(_, _, f_id, _) = info
-            && local == f_id
-        {
-            ref_locations.push(span);
+    tree_walk::visit_all_in_module(linker, obj_id, |info| {
+        if let Some(info_refers_to) = info.refers_to(linker) {
+            if info_refers_to == refers_to {
+                ref_locations.push(info.span);
+            }
         }
     });
     ref_locations
 }
 
 fn gather_all_references_in_one_file(linker: &Linker, file: &FileData, pos: usize) -> Vec<Span> {
-    if let Some((_location, hover_info)) = get_selected_object(linker, file, pos) {
-        let refers_to = RefersTo::from(hover_info);
-        if refers_to.is_global() {
-            gather_references_in_file(linker, file, refers_to)
-        } else if let Some(local) = refers_to.local {
-            for_each_local_reference_in_global(linker, local.0, local.1)
-        } else {
-            Vec::new()
+    let Some(hover_info) = get_selected_object(linker, file, pos) else {
+        return Vec::new();
+    };
+    let Some(refers_to) = hover_info.refers_to(linker) else {
+        return Vec::new();
+    };
+    if let Some(in_global) = refers_to.is_strictly_local() {
+        gather_all_references_in_global(linker, in_global, refers_to)
+    } else {
+        gather_references_in_file(linker, file, refers_to)
+    }
+}
+
+fn gather_all_references_across_all_files(
+    linker: &Linker,
+    file_id: FileUUID,
+    pos: usize,
+) -> Vec<(FileUUID, Vec<Span>)> {
+    let Some(hover_info) = get_selected_object(linker, &linker.files[file_id], pos) else {
+        return Vec::new();
+    };
+    let Some(refers_to) = hover_info.refers_to(linker) else {
+        return Vec::new();
+    };
+    //eprintln!("Refers to {refers_to:?}");
+    let mut ref_locations = Vec::new();
+
+    if let Some(in_global) = refers_to.is_strictly_local() {
+        let found_refs = gather_all_references_in_global(linker, in_global, refers_to);
+        assert_all_refs_of_correct_length(hover_info.span, &found_refs, linker);
+        if !found_refs.is_empty() {
+            ref_locations.push((file_id, found_refs))
         }
     } else {
-        Vec::new()
+        for (other_file_id, other_file) in &linker.files {
+            let found_refs = gather_references_in_file(linker, other_file, refers_to);
+            assert_all_refs_of_correct_length(hover_info.span, &found_refs, linker);
+            if !found_refs.is_empty() {
+                ref_locations.push((other_file_id, found_refs))
+            }
+        }
     }
+    for r in &ref_locations {
+        assert!(!contains_duplicates(&r.1), "List: {:?}", &r.1);
+    }
+
+    ref_locations
 }
 
 fn assert_all_refs_of_correct_length(location: Span, refs: &[Span], linker: &Linker) {
@@ -465,69 +505,22 @@ fn assert_all_refs_of_correct_length(location: Span, refs: &[Span], linker: &Lin
     }
 }
 
-fn gather_all_references_across_all_files(
-    linker: &Linker,
-    file_id: FileUUID,
-    pos: usize,
-) -> Vec<(FileUUID, Vec<Span>)> {
-    let mut ref_locations = Vec::new();
-
-    if let Some((location, hover_info)) = get_selected_object(linker, &linker.files[file_id], pos) {
-        let refers_to = RefersTo::from(hover_info);
-        if refers_to.is_global() {
-            for (other_file_id, other_file) in &linker.files {
-                let found_refs = gather_references_in_file(linker, other_file, refers_to);
-                assert_all_refs_of_correct_length(location, &found_refs, linker);
-                if !found_refs.is_empty() {
-                    ref_locations.push((other_file_id, found_refs))
-                }
-            }
-        } else if let Some(local) = refers_to.local {
-            let found_refs = for_each_local_reference_in_global(linker, local.0, local.1);
-            assert_all_refs_of_correct_length(location, &found_refs, linker);
-            if !found_refs.is_empty() {
-                ref_locations.push((file_id, found_refs))
-            }
-        }
-    }
-    for r in &ref_locations {
-        assert!(!contains_duplicates(&r.1), "List: {:?}", &r.1);
-    }
-
-    ref_locations
-}
-
 fn goto_definition(linker: &mut Linker, file_id: FileUUID, pos: usize) -> Vec<Span> {
-    let mut goto_definition_list: Vec<Span> = Vec::new();
-
-    let Some((_location, info)) = get_selected_object(linker, &linker.files[file_id], pos) else {
+    let Some(info) = get_selected_object(linker, &linker.files[file_id], pos) else {
         return Vec::new();
     };
-    match info {
-        LocationInfo::InGlobal(_obj_id, _link_info, _, InGlobal::NamedLocal(decl)) => {
-            goto_definition_list.push(decl.name_span);
-        }
-        LocationInfo::InGlobal(_obj_id, _link_info, _, InGlobal::NamedSubmodule(submod_decl)) => {
-            goto_definition_list.push(submod_decl.name_span);
-        }
-        LocationInfo::InGlobal(_obj_id, _link_info, _, InGlobal::LocalInterface(interface)) => {
-            goto_definition_list.push(interface.name_span);
-        }
-        LocationInfo::InGlobal(_, _, _, InGlobal::Temporary(_)) => {}
-        LocationInfo::Type(_, _) => {}
-        LocationInfo::Parameter(_, _link_info, _, template_arg) => {
-            goto_definition_list.push(template_arg.name_span);
-        }
-        LocationInfo::Global(id) => {
-            let link_info = &linker.globals[id];
-            goto_definition_list.push(link_info.name_span);
-        }
-        LocationInfo::Field(_md_uuid, _md, _interface_id, interface) => {
-            goto_definition_list.push(interface.name_span);
-        }
-    }
+    let Some(refers_to) = info.refers_to(linker) else {
+        return Vec::new();
+    };
+    let goto_span = match refers_to {
+        RefersTo::LocalDecl(_, declaration, _) => declaration.name_span,
+        RefersTo::LocalSubModule(_, sub_module_instance, _) => sub_module_instance.name_span,
+        RefersTo::Global(global_obj) => linker.globals[global_obj].name_span,
+        RefersTo::Field(_, field) => field.name_span,
+        RefersTo::Parameter(_, parameter) => parameter.name_span,
+    };
 
-    goto_definition_list
+    vec![goto_span]
 }
 
 fn handle_request(
@@ -552,14 +545,13 @@ fn handle_request(
             let file_data = &linker.files[file_uuid];
             let mut hover_list: Vec<MarkedString> = Vec::new();
 
-            let range = if let Some((location, info)) = get_selected_object(linker, file_data, pos)
-            {
+            let range = if let Some(info) = get_selected_object(linker, file_data, pos) {
                 if crate::debug::is_enabled("lsp-debug") {
                     hover_list.push(MarkedString::String(format!("{info:?}")))
                 } else {
                     hover_list = hover(info, linker, file_data);
                 }
-                Some(span_to_lsp_range(&file_data.file_text, location))
+                Some(span_to_lsp_range(&file_data.file_text, info.span))
             } else {
                 None
             };
@@ -600,9 +592,9 @@ fn handle_request(
             let uuid = linker.ensure_contains_file(identifier, should_recompile);
             linker.recompile_if_needed(should_recompile);
 
-            serde_json::to_value(SemanticTokensResult::Tokens(make_semantic_tokens(
-                uuid, linker,
-            )))
+            serde_json::to_value(SemanticTokensResult::Tokens(
+                semantic_tokens::make_semantic_tokens(uuid, linker),
+            ))
         }
         request::DocumentHighlightRequest::METHOD => {
             let params: DocumentHighlightParams =
@@ -640,9 +632,10 @@ fn handle_request(
             let (file_id, pos) =
                 linker.location_in_file(&params.text_document_position, should_recompile)?;
 
-            let ref_locations = gather_all_references_across_all_files(linker, file_id, pos);
+            let ref_locations_per_file =
+                gather_all_references_across_all_files(linker, file_id, pos);
 
-            serde_json::to_value(cvt_location_list_of_lists(ref_locations, linker))
+            serde_json::to_value(cvt_location_list_of_lists(ref_locations_per_file, linker))
         }
         request::Rename::METHOD => {
             let params: RenameParams =
@@ -656,10 +649,11 @@ fn handle_request(
             let (file_id, pos) =
                 linker.location_in_file(&params.text_document_position, should_recompile)?;
 
-            let ref_locations_lists = gather_all_references_across_all_files(linker, file_id, pos);
+            let ref_locations_per_file =
+                gather_all_references_across_all_files(linker, file_id, pos);
 
             #[allow(clippy::mutable_key_type)]
-            let changes: HashMap<_, _> = ref_locations_lists
+            let changes: HashMap<_, _> = ref_locations_per_file
                 .into_iter()
                 .map(|(file, spans)| {
                     let file_data = &linker.files[file];
@@ -696,7 +690,7 @@ fn handle_request(
             let (file_uuid, position) =
                 linker.location_in_file(&params.text_document_position, should_recompile)?;
 
-            serde_json::to_value(CompletionResponse::Array(gather_completions(
+            serde_json::to_value(CompletionResponse::Array(completions::gather_completions(
                 linker, file_uuid, position,
             )))
         }
