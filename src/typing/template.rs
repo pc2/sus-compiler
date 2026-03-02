@@ -105,6 +105,15 @@ pub struct Parameter {
     pub kind: TemplateKind<TypeParameterKind, GenerativeParameterKind>,
 }
 
+impl Parameter {
+    pub fn get_total_span(&self) -> Span {
+        match &self.kind {
+            TemplateKind::Type(_) => self.name_span,
+            TemplateKind::Value(v) => v.decl_span,
+        }
+    }
+}
+
 /// See [Parameter]
 #[derive(Debug)]
 pub struct GenerativeParameterKind {

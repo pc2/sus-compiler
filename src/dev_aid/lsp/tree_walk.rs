@@ -17,17 +17,25 @@ pub enum LocationKind<'linker> {
     LocalInterface(FlatID),
     LocalSubmodule(FlatID),
     Field {
+        #[allow(unused)]
         name: &'linker str,
+        #[allow(unused)]
         name_span: Span,
         refers_to: Option<&'linker PathElemRefersTo>,
+        #[allow(unused)]
         in_wire_ref: &'linker WireReference,
     },
-    Parameter(GlobalUUID, TemplateID, &'linker Parameter),
+    UsedTemplateArg(
+        GlobalUUID,
+        &'linker WrittenTemplateArg,
+        MultiGlobalRef<'linker>,
+    ),
+    TypeTemplateParam(GlobalUUID, TemplateID),
     Global(GlobalUUID),
 }
 
 /// Until we remove the ID template from [GlobalReference], this is the stop-gap
-type MultiGlobalRef<'linker> = GlobalObj<
+pub type MultiGlobalRef<'linker> = GlobalObj<
     &'linker GlobalReference<ModuleUUID>,
     &'linker GlobalReference<TypeUUID>,
     &'linker GlobalReference<ConstantUUID>,
@@ -64,8 +72,6 @@ pub struct LocationInfo<'linker> {
     pub span: Span,
     pub kind: LocationKind<'linker>,
     pub in_global: Option<GlobalUUID>,
-    pub in_global_ref: Option<MultiGlobalRef<'linker>>,
-    pub instr_id: Option<FlatID>,
 }
 
 /// A unique representation of what an object refers to.
@@ -180,8 +186,20 @@ impl<'linker> LocationInfo<'linker> {
                     interface_decl_id,
                 ))
             }
-            LocationKind::Parameter(obj, _, template_arg) => {
-                Some(RefersTo::Parameter(obj, template_arg))
+            LocationKind::UsedTemplateArg(obj, param, _in_global_ref) => {
+                if let Some(param_refers_to) = param.refers_to.get() {
+                    let param_obj = &linker.globals[obj];
+                    Some(RefersTo::Parameter(
+                        obj,
+                        &param_obj.parameters[*param_refers_to],
+                    ))
+                } else {
+                    None
+                }
+            }
+            LocationKind::TypeTemplateParam(obj, param) => {
+                let param_obj = &linker.globals[obj];
+                Some(RefersTo::Parameter(obj, &param_obj.parameters[param]))
             }
             LocationKind::Field { refers_to, .. } => match refers_to {
                 Some(PathElemRefersTo::Field(md_id, Some(field_id))) => {
@@ -298,32 +316,18 @@ impl<'linker, Visitor: FnMut(LocationInfo<'linker>), Pruner: Fn(Span) -> bool>
             span: total_span,
             kind: LocationKind::GlobalReference(global_ref),
             in_global,
-            in_global_ref: None,
-            instr_id: None,
         });
         self.visit(LocationInfo {
             span: name_span,
             kind: LocationKind::Global(target_name_elem),
             in_global,
-            in_global_ref: Some(global_ref),
-            instr_id: None,
         });
-        //global.name_span, LocationInfo::Global(target_name_elem));
-        let target_link_info = &self.linker.globals[target_name_elem];
         for arg in template_args {
-            if let Some(&refers_to) = arg.refers_to.get() {
-                self.visit(LocationInfo {
-                    span: arg.name_span,
-                    kind: LocationKind::Parameter(
-                        target_name_elem,
-                        refers_to,
-                        &target_link_info.parameters[refers_to],
-                    ),
-                    in_global,
-                    in_global_ref: Some(global_ref),
-                    instr_id: None,
-                });
-            }
+            self.visit(LocationInfo {
+                span: arg.name_span,
+                kind: LocationKind::UsedTemplateArg(target_name_elem, arg, global_ref),
+                in_global,
+            });
             match &arg.kind {
                 Some(TemplateKind::Type(wr_typ)) => {
                     self.walk_type(parent, link_info, wr_typ);
@@ -345,8 +349,6 @@ impl<'linker, Visitor: FnMut(LocationInfo<'linker>), Pruner: Fn(Span) -> bool>
             span: wire_ref.root_span,
             kind: LocationKind::WireRefRoot(&wire_ref.root),
             in_global,
-            in_global_ref: None,
-            instr_id: None,
         });
         match &wire_ref.root {
             WireReferenceRoot::NamedConstant(cst) => {
@@ -374,8 +376,6 @@ impl<'linker, Visitor: FnMut(LocationInfo<'linker>), Pruner: Fn(Span) -> bool>
                             in_wire_ref: wire_ref,
                         },
                         in_global,
-                        in_global_ref: None,
-                        instr_id: None,
                     });
                 }
                 WireReferencePathElement::ArrayAccess { .. }
@@ -400,14 +400,8 @@ impl<'linker, Visitor: FnMut(LocationInfo<'linker>), Pruner: Fn(Span) -> bool>
             WrittenType::TemplateVariable(span, template_id) => {
                 self.visit(LocationInfo {
                     span: *span,
-                    kind: LocationKind::Parameter(
-                        parent,
-                        *template_id,
-                        &link_info.parameters[*template_id],
-                    ),
+                    kind: LocationKind::TypeTemplateParam(parent, *template_id),
                     in_global: Some(parent),
-                    in_global_ref: None,
-                    instr_id: None,
                 });
             }
             WrittenType::Named(named_type) => {
@@ -430,18 +424,14 @@ impl<'linker, Visitor: FnMut(LocationInfo<'linker>), Pruner: Fn(Span) -> bool>
             span: link_info.name_span,
             kind: LocationKind::Global(global),
             in_global: Some(global),
-            in_global_ref: None,
-            instr_id: None,
         });
 
         for (param_id, parameter) in &link_info.parameters {
             if let TemplateKind::Type(TypeParameterKind {}) = &parameter.kind {
                 self.visit(LocationInfo {
                     span: parameter.name_span,
-                    kind: LocationKind::Parameter(global, param_id, parameter),
+                    kind: LocationKind::TypeTemplateParam(global, param_id),
                     in_global: Some(global),
-                    in_global_ref: None,
-                    instr_id: None,
                 });
             }
         }
@@ -454,7 +444,6 @@ impl<'linker, Visitor: FnMut(LocationInfo<'linker>), Pruner: Fn(Span) -> bool>
             return;
         }
         for (id, inst) in &link_info.instructions {
-            let instr_id = Some(id);
             match inst {
                 Instruction::SubModule(sm) => {
                     self.walk_global_reference(
@@ -466,8 +455,6 @@ impl<'linker, Visitor: FnMut(LocationInfo<'linker>), Pruner: Fn(Span) -> bool>
                         span: sm.name_span,
                         kind: LocationKind::LocalSubmodule(id),
                         in_global,
-                        in_global_ref: None,
-                        instr_id,
                     });
                 }
                 Instruction::Declaration(decl) => {
@@ -477,8 +464,6 @@ impl<'linker, Visitor: FnMut(LocationInfo<'linker>), Pruner: Fn(Span) -> bool>
                             span: decl.name_span,
                             kind: LocationKind::LocalDecl(id),
                             in_global,
-                            in_global_ref: None,
-                            instr_id,
                         });
                     }
                 }
@@ -487,8 +472,6 @@ impl<'linker, Visitor: FnMut(LocationInfo<'linker>), Pruner: Fn(Span) -> bool>
                         span: interface.name_span,
                         kind: LocationKind::LocalInterface(id),
                         in_global,
-                        in_global_ref: None,
-                        instr_id,
                     });
                 }
                 Instruction::Expression(expr) => {

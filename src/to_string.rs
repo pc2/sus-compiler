@@ -115,13 +115,22 @@ impl LinkInfo {
         &self.name
         // format!("::{}", self.name)
     }
-    pub fn display_full_name_and_args<'s>(&'s self, file_text: &'s FileText) -> impl Display + 's {
-        self.display_with_template_args(&self.parameters, |f, (_, t)| match &t.kind {
-            TemplateKind::Type(TypeParameterKind {}) => f.write_str(&t.name),
+    pub fn display_template_arg<'s>(
+        &'s self,
+        file_text: &'s FileText,
+        param: &'s Parameter,
+    ) -> impl Display + 's {
+        FmtWrapper(|f| match &param.kind {
+            TemplateKind::Type(TypeParameterKind {}) => f.write_str(&param.name),
             TemplateKind::Value(GenerativeParameterKind {
                 decl_span,
                 declaration_instruction: _,
             }) => f.write_str(&file_text[*decl_span]),
+        })
+    }
+    pub fn display_full_name_and_args<'s>(&'s self, file_text: &'s FileText) -> impl Display + 's {
+        self.display_with_template_args(&self.parameters, |f, (_, t)| {
+            self.display_template_arg(file_text, t).fmt(f)
         })
     }
     pub fn display_with_template_args<'s, T: 's, Iter: Iterator<Item = T> + Clone + 's>(

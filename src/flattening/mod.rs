@@ -763,16 +763,24 @@ pub struct GlobalReference<ID> {
     pub id: ID,
     pub template_args: Vec<WrittenTemplateArg>,
     pub template_arg_types: OnceCell<TVec<TemplateKind<AbstractRankedType, ()>>>,
-    pub template_span: Option<BracketSpan>,
+    /// Doesn't use [BracketSpan], because it's "#(...)"
+    pub template_bracket_span: Option<Span>,
 }
 
 impl<ID: Copy> GlobalReference<ID> {
     pub fn get_total_span(&self) -> Span {
         let mut result = self.name_span;
-        if let Some(template_span) = self.template_span {
-            result = Span::new_overarching(result, template_span.outer_span());
+        if let Some(template_bracket_span) = self.template_bracket_span {
+            result = Span::new_overarching(result, template_bracket_span);
         }
         result
+    }
+    pub fn get_inner_bracket_span(&self) -> Option<Span> {
+        self.template_bracket_span.map(|sp| Span {
+            start: sp.start + 1,
+            end: sp.end - 1,
+            file: sp.file,
+        })
     }
 
     pub fn resolve_template_args(&self, errors: &ErrorCollector, target: &LinkInfo) {

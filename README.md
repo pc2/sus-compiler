@@ -270,7 +270,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Renaming
 - [x] Basic code completion
 - [x] Port code completion
-- [ ] Parameter name code completion
+- [x] Parameter name code completion
 - [ ] Struct field code completion
 - [ ] Per-Line Resource Utilization Reporting
 

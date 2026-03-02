@@ -233,7 +233,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
             let (template_args, template_span) = if cursor.optional_field(field!("template_args")) {
                 must_be_global = true;
-                let bracket_span = BracketSpan::from_outer(cursor.span());
+                let bracket_span = cursor.span();
 
                 let args = self.flatten_template_args(cursor);
 
@@ -269,21 +269,21 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         name_span,
                         template_args,
                         template_arg_types: OnceCell::new(),
-                        template_span,
+                        template_bracket_span: template_span,
                     }),
                     GlobalUUID::Type(id) => LocalOrGlobal::Type(GlobalReference {
                         id,
                         name_span,
                         template_args,
                         template_arg_types: OnceCell::new(),
-                        template_span,
+                        template_bracket_span: template_span,
                     }),
                     GlobalUUID::Constant(id) => LocalOrGlobal::Constant(GlobalReference {
                         id,
                         name_span,
                         template_args,
                         template_arg_types: OnceCell::new(),
-                        template_span,
+                        template_bracket_span: template_span,
                     }),
                 }
             } else {

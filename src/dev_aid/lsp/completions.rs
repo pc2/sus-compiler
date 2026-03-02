@@ -1,55 +1,74 @@
 use std::fmt::Display;
 
 use crate::{
-    dev_aid::lsp::tree_walk::{LocationKind, get_selected_object},
-    flattening::{Direction, FieldDeclKind, InterfaceKind, Module, PathElemRefersTo},
-    linker::FileData,
+    dev_aid::lsp::tree_walk::{LocationKind, MultiGlobalRef, get_selected_object},
+    flattening::{
+        Direction, FieldDeclKind, GlobalReference, InterfaceKind, Module, PathElemRefersTo,
+    },
+    linker::{FileData, GlobalObj, GlobalUUID},
     prelude::*,
     to_string::display_join,
+    typing::template::{TemplateKind, TypeParameterKind},
 };
 
 use lsp_types::{CompletionItem, CompletionItemKind, CompletionItemLabelDetails};
 
 use crate::{flattening::Instruction, linker::Linker};
 
-fn completions_fallback(linker: &Linker, position: usize) -> Vec<CompletionItem> {
-    let mut result = Vec::new();
+fn completions_fallback(linker: &Linker, file: &FileData, position: usize) -> Vec<CompletionItem> {
+    let mut completions = Vec::new();
 
+    for g_id in &file.associated_values {
+        let global = &linker.globals[*g_id];
+
+        if !global.span.contains_pos(position) {
+            continue;
+        }
+        for (_id, v) in &global.instructions {
+            if let Instruction::Declaration(d) = v {
+                completions.push(CompletionItem {
+                    label: d.name.to_string(),
+                    kind: Some(CompletionItemKind::VARIABLE),
+                    ..Default::default()
+                });
+            }
+        }
+        for (_, p) in &global.parameters {
+            match &p.kind {
+                TemplateKind::Type(TypeParameterKind {}) => {
+                    completions.push(CompletionItem {
+                        label: p.name.to_string(),
+                        kind: Some(CompletionItemKind::TYPE_PARAMETER),
+                        ..Default::default()
+                    });
+                }
+                TemplateKind::Value(_) => {}
+            }
+        }
+    }
     for (_, m) in &linker.modules {
-        result.push(CompletionItem {
+        completions.push(CompletionItem {
             label: m.link_info.name.to_string(),
             kind: Some(CompletionItemKind::FUNCTION),
             ..Default::default()
         });
-
-        if m.link_info.span.contains_pos(position) {
-            for (_id, v) in &m.link_info.instructions {
-                if let Instruction::Declaration(d) = v {
-                    result.push(CompletionItem {
-                        label: d.name.to_string(),
-                        kind: Some(CompletionItemKind::VARIABLE),
-                        ..Default::default()
-                    });
-                }
-            }
-        }
     }
     for (_, c) in &linker.constants {
-        result.push(CompletionItem {
+        completions.push(CompletionItem {
             label: c.link_info.name.to_string(),
             kind: Some(CompletionItemKind::CONSTANT),
             ..Default::default()
         });
     }
     for (_, t) in &linker.types {
-        result.push(CompletionItem {
+        completions.push(CompletionItem {
             label: t.link_info.name.to_string(),
             kind: Some(CompletionItemKind::STRUCT),
             ..Default::default()
         });
     }
 
-    result
+    completions
 }
 
 fn get_module_port_completions(md: &Module, file: &FileData) -> Vec<CompletionItem> {
@@ -142,6 +161,82 @@ fn suggest_interface_ports(md: &Module, file: &FileData, ports: &[FlatID]) -> im
     })
 }
 
+fn complete_global_ref<ID: Copy>(
+    linker: &Linker,
+    in_global: Option<GlobalUUID>,
+    global_ref: &GlobalReference<ID>,
+    position: usize,
+) -> Option<Vec<CompletionItem>>
+where
+    GlobalUUID: From<ID>,
+{
+    let inside_brackets = global_ref.get_inner_bracket_span()?;
+    if inside_brackets.contains_pos(position) {
+        return None;
+    }
+
+    let arg_of_global = &linker.globals[GlobalUUID::from(global_ref.id)];
+
+    let mut completions = Vec::new();
+    for (param_id, param_decl) in &arg_of_global.parameters {
+        if global_ref.get_arg_for(param_id).is_none() {
+            let detail = Some(match &param_decl.kind {
+                TemplateKind::Type(TypeParameterKind {}) => "type".to_string(),
+                TemplateKind::Value(v) => {
+                    let v_decl =
+                        arg_of_global.instructions[v.declaration_instruction].unwrap_declaration();
+                    v_decl
+                        .typ_expr
+                        .display(&linker.globals, &arg_of_global.parameters)
+                        .to_string()
+                }
+            });
+
+            let insert_text = Some(
+                if let Some(in_global) = in_global
+                    && linker.globals[in_global]
+                        .instructions
+                        .iter()
+                        .any(|(_, instr)| {
+                            if let Instruction::Declaration(decl) = instr
+                                && decl.name == param_decl.name
+                            {
+                                true
+                            } else {
+                                false
+                            }
+                        })
+                {
+                    // If there's a declaration by that name, we don't need the colon, we can simply insert the name and it'll map immediately.
+                    param_decl.name.clone()
+                } else {
+                    format!("{}: ", param_decl.name)
+                },
+            );
+            completions.push(CompletionItem {
+                label: param_decl.name.clone(),
+                insert_text,
+                detail,
+                kind: Some(CompletionItemKind::PROPERTY),
+                ..Default::default()
+            });
+        }
+    }
+    Some(completions)
+}
+fn complete_multi_global_ref(
+    linker: &Linker,
+    in_global: Option<GlobalUUID>,
+    global_ref: &MultiGlobalRef,
+    position: usize,
+) -> Option<Vec<CompletionItem>> {
+    match global_ref {
+        GlobalObj::Module(r) => complete_global_ref(linker, in_global, r, position),
+        GlobalObj::Type(r) => complete_global_ref(linker, in_global, r, position),
+        GlobalObj::Constant(r) => complete_global_ref(linker, in_global, r, position),
+    }
+}
+
 pub fn gather_completions(
     linker: &Linker,
     file_uuid: FileUUID,
@@ -149,30 +244,40 @@ pub fn gather_completions(
 ) -> Vec<CompletionItem> {
     let file = &linker.files[file_uuid];
     let Some(found_location) = get_selected_object(linker, file, position) else {
-        return completions_fallback(linker, position);
+        return completions_fallback(linker, file, position);
     };
 
-    match &found_location.kind {
-        LocationKind::Field { refers_to, .. } => {
-            let Some(refers_to) = refers_to else {
-                return completions_fallback(linker, position);
-            };
+    let special_completion = match &found_location.kind {
+        LocationKind::Field {
+            refers_to: Some(refers_to),
+            ..
+        } => {
             eprintln!("{refers_to:?}");
             match refers_to {
                 PathElemRefersTo::Field(in_module, _interf_opt) => {
                     let md = &linker.modules[*in_module];
 
-                    get_module_port_completions(md, file)
+                    Some(get_module_port_completions(md, file))
                 }
             }
         }
+        LocationKind::GlobalReference(global_ref) => {
+            complete_multi_global_ref(linker, found_location.in_global, global_ref, position)
+        }
+        LocationKind::UsedTemplateArg(_global_obj, _param, global_ref) => {
+            complete_multi_global_ref(linker, found_location.in_global, global_ref, position)
+        }
         /*LocationKind::WireRefRoot(wire_reference_root) => todo!(),
-        LocationKind::GlobalReference(global_obj) => todo!(),
         LocationKind::LocalDecl(uuid) => todo!(),
         LocationKind::LocalInterface(uuid) => todo!(),
         LocationKind::LocalSubmodule(uuid) => todo!(),
-        LocationKind::Parameter(global_obj, uuid, parameter) => todo!(),
         LocationKind::Global(global_obj) => todo!(),*/
-        _ => completions_fallback(linker, position),
+        _ => None,
+    };
+
+    if let Some(special_completion) = special_completion {
+        special_completion
+    } else {
+        completions_fallback(linker, file, position)
     }
 }
