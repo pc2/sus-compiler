@@ -157,6 +157,7 @@ pub fn gather_completions(
             let Some(refers_to) = refers_to else {
                 return completions_fallback(linker, position);
             };
+            eprintln!("{refers_to:?}");
             match refers_to {
                 PathElemRefersTo::Field(in_module, _interf_opt) => {
                     let md = &linker.modules[*in_module];

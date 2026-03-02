@@ -66,6 +66,7 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
         semantic_tokens_provider: Some(semantic_tokens::semantic_token_capabilities()),
         completion_provider: Some(CompletionOptions {
             resolve_provider: Some(true),
+            trigger_characters: Some(vec![".".to_string()]),
             ..Default::default()
         }),
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
@@ -310,14 +311,14 @@ enum ShouldRecompile {
 impl Linker {
     fn ensure_contains_file(
         &mut self,
-        identifier: UniqueFileID,
+        file_identifier: UniqueFileID,
         should_recompile: &mut ShouldRecompile,
     ) -> FileUUID {
-        if let Some(found) = self.find_file(&identifier) {
+        if let Some(found) = self.find_file(&file_identifier) {
             found
         } else {
             *should_recompile = ShouldRecompile::Dirty;
-            self.add_or_update_file_from_disk(identifier)
+            self.add_or_update_file_from_disk(file_identifier)
         }
     }
     fn location_in_file(
@@ -333,6 +334,8 @@ impl Linker {
         let position = file_data
             .file_text
             .linecol_to_byte_clamp(from_position(text_pos.position));
+
+        self.recompile_if_needed(should_recompile);
 
         Ok((file_id, position))
     }
@@ -687,6 +690,14 @@ fn handle_request(
                 linker, file_uuid, position,
             )))
         }
+        /*request::ResolveCompletionItem::METHOD => {
+            info!("ResolveCompletionItem: {params:?}");
+
+            let item: CompletionItem =
+                serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
+
+            serde_json::to_value(item)
+        }*/
         req => {
             info!("Other request: {req:?}");
             Ok(serde_json::Value::Null)
