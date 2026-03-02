@@ -7,7 +7,6 @@ mod uri_patch;
 use crate::{
     alloc::zip_eq,
     config::{ConnectionMethod, config, lsp_config},
-    debug::debug_print_span,
     dev_aid::ariadne_interface::{pretty_print_many_spans, pretty_print_span},
     errors::{CompileError, ErrorLevel},
     file_position::{FileText, LineCol},
@@ -21,13 +20,7 @@ use crossbeam_channel::{RecvError, TryRecvError};
 use hover_info::hover;
 use lsp_server::{ErrorCode, ResponseError};
 use lsp_types::{notification::*, request::Request, *};
-use std::{
-    collections::HashMap,
-    error::Error,
-    fmt::{Debug, Display},
-    net::SocketAddr,
-    str::FromStr,
-};
+use std::{collections::HashMap, error::Error, fmt::Display, net::SocketAddr, str::FromStr};
 
 use tree_walk::get_selected_object;
 

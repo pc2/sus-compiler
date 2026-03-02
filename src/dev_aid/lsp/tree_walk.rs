@@ -13,18 +13,9 @@ use crate::{
 pub enum LocationKind<'linker> {
     WireRefRoot(&'linker WireReferenceRoot),
     GlobalReference(MultiGlobalRef<'linker>),
-    LocalDecl {
-        decl_id: FlatID,
-        decl: &'linker Declaration,
-    },
-    LocalInterface {
-        interface_decl_id: FlatID,
-        interface_decl: &'linker InterfaceDeclaration,
-    },
-    LocalSubmodule {
-        submodule_decl_id: FlatID,
-        submodule_decl: &'linker SubModuleInstance,
-    },
+    LocalDecl(FlatID),
+    LocalInterface(FlatID),
+    LocalSubmodule(FlatID),
     Field {
         name: &'linker str,
         name_span: Span,
@@ -126,12 +117,22 @@ impl<'linker> LocationInfo<'linker> {
             _ => RefersTo::LocalDecl(in_global, decl, decl_id),
         }
     }
+    fn refer_to_submodule(
+        linker: &'linker Linker,
+        in_global: GlobalUUID,
+        submodule_decl_id: FlatID,
+    ) -> RefersTo<'linker> {
+        let link_info = &linker.globals[in_global];
+        let submodule_decl = link_info.instructions[submodule_decl_id].unwrap_submodule();
+        RefersTo::LocalSubModule(in_global, submodule_decl, submodule_decl_id)
+    }
     fn refer_to_interface(
         linker: &'linker Linker,
         in_global: GlobalUUID,
-        interface_decl: &'linker InterfaceDeclaration,
+        interface_decl_id: FlatID,
     ) -> RefersTo<'linker> {
         let md = &linker.modules[in_global.unwrap_module()];
+        let interface_decl = md.link_info.instructions[interface_decl_id].unwrap_interface();
         RefersTo::Field(in_global, &md.fields[interface_decl.field_id])
     }
     pub fn refers_to(&self, linker: &'linker Linker) -> Option<RefersTo<'linker>> {
@@ -150,8 +151,7 @@ impl<'linker> LocationInfo<'linker> {
                         *id,
                     )),
                     WireReferenceRoot::LocalInterface(id) => {
-                        let interface_decl = link_info.instructions[*id].unwrap_interface();
-                        Some(Self::refer_to_interface(linker, in_global, interface_decl))
+                        Some(Self::refer_to_interface(linker, in_global, *id))
                     }
                     WireReferenceRoot::NamedConstant(_) | WireReferenceRoot::NamedModule(_) => {
                         // these will be covered by more specific [LocationKind::GlobalReference]
@@ -160,24 +160,25 @@ impl<'linker> LocationInfo<'linker> {
                     WireReferenceRoot::Error => None,
                 }
             }
-            LocationKind::LocalDecl { decl: _, decl_id } => {
+            LocationKind::LocalDecl(decl_id) => {
                 let in_global = self.in_global.unwrap();
                 Some(Self::refer_to_decl(linker, in_global, decl_id))
             }
-            LocationKind::LocalSubmodule {
-                submodule_decl,
-                submodule_decl_id,
-            } => {
+            LocationKind::LocalSubmodule(submodule_decl_id) => {
                 let in_global = self.in_global.unwrap();
-                Some(RefersTo::LocalSubModule(
+                Some(Self::refer_to_submodule(
+                    linker,
                     in_global,
-                    submodule_decl,
                     submodule_decl_id,
                 ))
             }
-            LocationKind::LocalInterface { interface_decl, .. } => {
+            LocationKind::LocalInterface(interface_decl_id) => {
                 let in_global = self.in_global.unwrap();
-                Some(Self::refer_to_interface(linker, in_global, interface_decl))
+                Some(Self::refer_to_interface(
+                    linker,
+                    in_global,
+                    interface_decl_id,
+                ))
             }
             LocationKind::Parameter(obj, _, template_arg) => {
                 Some(RefersTo::Parameter(obj, template_arg))
@@ -463,10 +464,7 @@ impl<'linker, Visitor: FnMut(LocationInfo<'linker>), Pruner: Fn(Span) -> bool>
                     );
                     self.visit(LocationInfo {
                         span: sm.name_span,
-                        kind: LocationKind::LocalSubmodule {
-                            submodule_decl_id: id,
-                            submodule_decl: sm,
-                        },
+                        kind: LocationKind::LocalSubmodule(id),
                         in_global,
                         in_global_ref: None,
                         instr_id,
@@ -477,7 +475,7 @@ impl<'linker, Visitor: FnMut(LocationInfo<'linker>), Pruner: Fn(Span) -> bool>
                     if decl.declaration_itself_is_not_written_to {
                         self.visit(LocationInfo {
                             span: decl.name_span,
-                            kind: LocationKind::LocalDecl { decl_id: id, decl },
+                            kind: LocationKind::LocalDecl(id),
                             in_global,
                             in_global_ref: None,
                             instr_id,
@@ -487,10 +485,7 @@ impl<'linker, Visitor: FnMut(LocationInfo<'linker>), Pruner: Fn(Span) -> bool>
                 Instruction::Interface(interface) => {
                     self.visit(LocationInfo {
                         span: interface.name_span,
-                        kind: LocationKind::LocalInterface {
-                            interface_decl_id: id,
-                            interface_decl: interface,
-                        },
+                        kind: LocationKind::LocalInterface(id),
                         in_global,
                         in_global_ref: None,
                         instr_id,

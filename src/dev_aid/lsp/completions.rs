@@ -1,17 +1,14 @@
 use std::fmt::Display;
 
 use crate::{
-    flattening::{
-        Direction, FieldDeclKind, InterfaceKind, Module, PathElemRefersTo, WireReferencePathElement,
-    },
-    linker::{FileData, LinkInfo},
+    dev_aid::lsp::tree_walk::{LocationKind, get_selected_object},
+    flattening::{Direction, FieldDeclKind, InterfaceKind, Module, PathElemRefersTo},
+    linker::FileData,
     prelude::*,
     to_string::display_join,
 };
 
 use lsp_types::{CompletionItem, CompletionItemKind, CompletionItemLabelDetails};
-use sus_proc_macro::kind;
-use tree_sitter::Node;
 
 use crate::{flattening::Instruction, linker::Linker};
 
@@ -53,23 +50,6 @@ fn completions_fallback(linker: &Linker, position: usize) -> Vec<CompletionItem>
     }
 
     result
-}
-
-fn try_find_known_completion_parent<'tree>(
-    mut cur_node: Node<'tree>,
-    root_node: Node<'tree>,
-) -> Option<u16> {
-    let mut total_tree = String::new();
-    while cur_node != root_node {
-        use std::fmt::Write;
-        write!(total_tree, " - {}", cur_node.kind()).unwrap();
-        let Some(parent) = cur_node.parent() else {
-            break;
-        };
-        cur_node = parent;
-    }
-    info!("Total tree: {total_tree}");
-    None
 }
 
 fn get_module_port_completions(md: &Module, file: &FileData) -> Vec<CompletionItem> {
@@ -162,127 +142,36 @@ fn suggest_interface_ports(md: &Module, file: &FileData, ports: &[FlatID]) -> im
     })
 }
 
-fn complete_field_access(
-    linker: &Linker,
-    file: &FileData,
-    position: usize,
-    link_info: &LinkInfo,
-    template_args_node: Node,
-) -> Vec<CompletionItem> {
-    assert_eq!(template_args_node.kind(), "field_access");
-    if let Some((wr, _)) = link_info
-        .iter_wire_refs()
-        .find(|(wr, _)| wr.get_total_span().contains_pos(position))
-    {
-        for pe in &wr.path {
-            match pe {
-                WireReferencePathElement::FieldAccess {
-                    name,
-                    name_span,
-                    refers_to,
-                } => {
-                    if !name_span.contains_pos(position) {
-                        continue;
-                    }
-                    let Some(refers_to) = refers_to.get() else {
-                        continue;
-                    };
-                    match refers_to {
-                        PathElemRefersTo::Field(in_module, _interf_opt) => {
-                            let md = &linker.modules[*in_module];
-
-                            return get_module_port_completions(md, file);
-                        }
-                    }
-                }
-                WireReferencePathElement::ArrayAccess { .. }
-                | WireReferencePathElement::ArraySlice { .. }
-                | WireReferencePathElement::ArrayPartSelect { .. } => continue,
-            }
-        }
-    }
-    //if let Some((span, info)) = get_selected_object(linker, file, template_args_node.start_byte());
-    completions_fallback(linker, position)
-}
-
-fn complete_template_args(
-    linker: &Linker,
-    file: &FileData,
-    position: usize,
-    link_info: &LinkInfo,
-    template_args_node: Node,
-) -> Vec<CompletionItem> {
-    assert_eq!(template_args_node.kind(), "template_args");
-
-    completions_fallback(linker, position)
-}
-
-impl FileData {
-    fn find_global_for_position<'l>(
-        &self,
-        linker: &'l Linker,
-        position: usize,
-    ) -> Option<&'l LinkInfo> {
-        self.associated_values.iter().find_map(|assoc_id| {
-            let global = &linker.globals[*assoc_id];
-            global.span.contains_pos(position).then_some(global)
-        })
-    }
-}
-
 pub fn gather_completions(
     linker: &Linker,
     file_uuid: FileUUID,
     position: usize,
 ) -> Vec<CompletionItem> {
     let file = &linker.files[file_uuid];
-    let context_node = file
-        .tree
-        .root_node()
-        .named_descendant_for_byte_range(position - 1, position - 1); // Seemingly tree sitter won't target a node if we're right at the end of it - a common case for completions. That's why we go back by one. 
-
-    let in_global = file.find_global_for_position(linker, position);
-
-    let Some(mut context_node) = context_node else {
-        warn!(
-            "Normally it should be impossible to request a completion outside the tree, but granted LSP weirdness we just do nothing to defend against crashes."
-        );
+    let Some(found_location) = get_selected_object(linker, file, position) else {
         return completions_fallback(linker, position);
     };
 
-    if context_node.kind_id() == kind!("number") {
-        return Vec::new(); // No completions for numbers - DUH
-    }
-    if context_node.kind_id() == kind!("identifier") {
-        context_node = context_node
-            .parent()
-            .expect("Identifier can't not have a parent");
-    }
-    let context_node_kind = context_node.kind();
-    let context_node_span = context_node.byte_range();
-    let completion_prefix = &file.file_text.file_text[context_node_span.start..position];
+    match &found_location.kind {
+        LocationKind::Field { refers_to, .. } => {
+            let Some(refers_to) = refers_to else {
+                return completions_fallback(linker, position);
+            };
+            match refers_to {
+                PathElemRefersTo::Field(in_module, _interf_opt) => {
+                    let md = &linker.modules[*in_module];
 
-    info!("In node {context_node_kind} try completing '{completion_prefix}'");
-
-    try_find_known_completion_parent(context_node, file.tree.root_node());
-
-    match (context_node.kind_id(), in_global) {
-        (kind!("field_access"), Some(in_global)) => {
-            complete_field_access(linker, file, position, in_global, context_node)
+                    get_module_port_completions(md, file)
+                }
+            }
         }
-        (kind!("template_args"), Some(in_global)) => {
-            // TODO: If we're outside of the brackets, then don't.
-            complete_template_args(linker, file, position, in_global, context_node)
-        }
-        (kind!("template_arg"), Some(in_global)) => {
-            context_node = context_node
-                .parent()
-                .expect("template_arg is only in template_args");
-
-            complete_template_args(linker, file, position, in_global, context_node)
-        }
-        //kind!("namespace_list") |
-        _ => completions_fallback(linker, position), // An expression, or a global
+        /*LocationKind::WireRefRoot(wire_reference_root) => todo!(),
+        LocationKind::GlobalReference(global_obj) => todo!(),
+        LocationKind::LocalDecl(uuid) => todo!(),
+        LocationKind::LocalInterface(uuid) => todo!(),
+        LocationKind::LocalSubmodule(uuid) => todo!(),
+        LocationKind::Parameter(global_obj, uuid, parameter) => todo!(),
+        LocationKind::Global(global_obj) => todo!(),*/
+        _ => completions_fallback(linker, position),
     }
-    //completions_fallback(linker, position)
 }

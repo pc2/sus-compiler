@@ -1,17 +1,17 @@
-use crate::dev_aid::lsp::tree_walk::RefersTo;
-use crate::to_string::{display_all_infer_params, display_infer_param_info};
-use crate::typing::template::TemplateKind;
-use crate::{linker, prelude::*};
+use crate::prelude::*;
+
+use crate::{
+    dev_aid::lsp::tree_walk::RefersTo,
+    flattening::FieldDeclKind,
+    instantiation::SubModuleOrWire,
+    linker::{Documentation, FileData, GlobalObj, GlobalUUID, LinkInfo},
+    to_string::display_all_infer_params,
+    typing::template::{GenerativeParameterKind, TemplateKind, TypeParameterKind},
+};
+
+use super::tree_walk::LocationInfo;
 
 use lsp_types::{LanguageString, MarkedString};
-
-use crate::flattening::{DeclarationKind, FieldDeclKind};
-use crate::instantiation::{InstantiatedModule, SubModuleOrWire};
-use crate::linker::{Documentation, FileData, GlobalObj, GlobalUUID, LinkInfo};
-
-use crate::typing::template::{GenerativeParameterKind, TypeParameterKind};
-
-use super::tree_walk::{LocationInfo, LocationKind};
 
 struct HoverCollector<'l> {
     list: Vec<MarkedString>,
