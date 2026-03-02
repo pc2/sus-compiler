@@ -135,7 +135,7 @@ impl IDEIdentifierType {
 fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifierType)> {
     let mut result: Vec<(Span, IDEIdentifierType)> = Vec::new();
 
-    tree_walk::visit_all(linker, file, |location_info| {
+    tree_walk::visit_all(linker, file, &mut |location_info| {
         let Some(refers_to) = location_info.refers_to(linker) else {
             return;
         };

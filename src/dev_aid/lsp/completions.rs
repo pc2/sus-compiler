@@ -251,16 +251,13 @@ pub fn gather_completions(
         LocationKind::Field {
             refers_to: Some(refers_to),
             ..
-        } => {
-            eprintln!("{refers_to:?}");
-            match refers_to {
-                PathElemRefersTo::Field(in_module, _interf_opt) => {
-                    let md = &linker.modules[*in_module];
+        } => match refers_to {
+            PathElemRefersTo::Field(in_module, _interf_opt) => {
+                let md = &linker.modules[*in_module];
 
-                    Some(get_module_port_completions(md, file))
-                }
+                Some(get_module_port_completions(md, file))
             }
-        }
+        },
         LocationKind::GlobalReference(global_ref) => {
             complete_multi_global_ref(linker, found_location.in_global, global_ref, position)
         }

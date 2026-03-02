@@ -1,4 +1,9 @@
-use crate::prelude::*;
+use crate::{
+    dev_aid::ariadne_interface::{pretty_print_many_spans, pretty_print_span},
+    linker::LinkerFiles,
+    prelude::*,
+    util::contains_duplicates,
+};
 
 use std::ops::Deref;
 
@@ -227,33 +232,143 @@ impl<'linker> RefersTo<'linker> {
 }
 
 /// Walks the file, and provides all [LocationInfo]s.
-pub fn visit_all<'linker, Visitor: FnMut(LocationInfo<'linker>)>(
+pub fn visit_all<'linker>(
     linker: &'linker Linker,
     file: &'linker FileData,
-    visitor: Visitor,
+    visitor: &mut dyn FnMut(LocationInfo<'linker>),
 ) {
     let mut walker = TreeWalker {
         linker,
         visitor,
-        should_prune: |_| false,
+        should_prune: &mut |_| false,
     };
 
     walker.walk_file(file);
 }
 
 /// Walks the file, and provides all [LocationInfo]s.
-pub fn visit_all_in_module<'linker, Visitor: FnMut(LocationInfo<'linker>)>(
+pub fn visit_all_in_module<'linker>(
     linker: &'linker Linker,
     obj_id: GlobalUUID,
-    visitor: Visitor,
+    visitor: &mut dyn FnMut(LocationInfo<'linker>),
 ) {
     let mut walker = TreeWalker {
         linker,
         visitor,
-        should_prune: |_| false,
+        should_prune: &mut |_| false,
     };
 
     walker.walk_global(obj_id);
+}
+
+fn check_for_duplicate_spans(linker_files: &LinkerFiles, spans: &[Span]) {
+    if contains_duplicates(spans) {
+        pretty_print_many_spans(
+            linker_files,
+            spans.iter().map(|sp| (*sp, format!("{sp:?}"))),
+        );
+        panic!("Duplicate spans in references found!")
+    }
+}
+
+fn gather_all_references_in_global(
+    linker: &Linker,
+    obj_id: GlobalUUID,
+    refers_to: RefersTo,
+) -> Vec<Span> {
+    let mut ref_locations = Vec::new();
+    visit_all_in_module(linker, obj_id, &mut |info| {
+        if let Some(info_refers_to) = info.refers_to(linker) {
+            if info_refers_to == refers_to {
+                ref_locations.push(info.span);
+            }
+        }
+    });
+    check_for_duplicate_spans(&linker.files, &ref_locations);
+    ref_locations
+}
+
+fn gather_references_in_file(
+    linker: &Linker,
+    file_data: &FileData,
+    refers_to: RefersTo,
+) -> Vec<Span> {
+    let mut ref_locations = Vec::new();
+    visit_all(linker, file_data, &mut |info| {
+        if let Some(found_ref) = info.refers_to(linker)
+            && refers_to == found_ref
+        {
+            ref_locations.push(info.span);
+        }
+    });
+    ref_locations
+}
+
+pub fn gather_all_references_in_one_file(
+    linker: &Linker,
+    file: &FileData,
+    pos: usize,
+) -> Vec<Span> {
+    let Some(hover_info) = get_selected_object(linker, file, pos) else {
+        return Vec::new();
+    };
+    let Some(refers_to) = hover_info.refers_to(linker) else {
+        return Vec::new();
+    };
+    if let Some(in_global) = refers_to.is_strictly_local() {
+        gather_all_references_in_global(linker, in_global, refers_to)
+    } else {
+        gather_references_in_file(linker, file, refers_to)
+    }
+}
+
+pub fn gather_all_references_across_all_files(
+    linker: &Linker,
+    file_id: FileUUID,
+    pos: usize,
+) -> Vec<(FileUUID, Vec<Span>)> {
+    let Some(hover_info) = get_selected_object(linker, &linker.files[file_id], pos) else {
+        return Vec::new();
+    };
+    let Some(refers_to) = hover_info.refers_to(linker) else {
+        return Vec::new();
+    };
+    //eprintln!("Refers to {refers_to:?}");
+    let mut ref_locations = Vec::new();
+
+    if let Some(in_global) = refers_to.is_strictly_local() {
+        let found_refs = gather_all_references_in_global(linker, in_global, refers_to);
+        assert_all_refs_of_correct_length(hover_info.span, &found_refs, linker);
+        if !found_refs.is_empty() {
+            ref_locations.push((file_id, found_refs))
+        }
+    } else {
+        for (other_file_id, other_file) in &linker.files {
+            let found_refs = gather_references_in_file(linker, other_file, refers_to);
+            assert_all_refs_of_correct_length(hover_info.span, &found_refs, linker);
+            if !found_refs.is_empty() {
+                ref_locations.push((other_file_id, found_refs))
+            }
+        }
+    }
+    for r in &ref_locations {
+        check_for_duplicate_spans(&linker.files, &r.1);
+    }
+
+    ref_locations
+}
+
+fn assert_all_refs_of_correct_length(location: Span, refs: &[Span], linker: &Linker) {
+    if refs.iter().any(|r| r.size() != location.size()) {
+        let refs_vec: Vec<_> = refs.iter().map(|r| (*r, String::new())).collect();
+        pretty_print_span(
+            &linker.files,
+            location,
+            "Original location Span".to_string(),
+        );
+        pretty_print_many_spans(&linker.files, refs_vec.into_iter());
+        panic!("One of the spans was not of the same size as the original span!")
+    }
 }
 
 /// Walks the file, and finds the [LocationInfo] that is the most relevant
@@ -268,7 +383,7 @@ pub fn get_selected_object<'linker>(
 
     let mut walker = TreeWalker {
         linker,
-        visitor: |info| {
+        visitor: &mut |info| {
             // Gotta do this condition in inverse, since we only want to set it if it's not already set, or the new span is more specific
             if let Some(best_obj) = best_object
                 && best_obj.span.size() < best_obj.span.size()
@@ -278,7 +393,7 @@ pub fn get_selected_object<'linker>(
                 best_object = Some(info);
             }
         },
-        should_prune: |span| !span.contains_pos(position),
+        should_prune: &mut |span| !span.contains_pos(position),
     };
 
     walker.walk_file(file);
@@ -286,15 +401,13 @@ pub fn get_selected_object<'linker>(
     best_object
 }
 
-struct TreeWalker<'linker, Visitor: FnMut(LocationInfo<'linker>), Pruner: Fn(Span) -> bool> {
+struct TreeWalker<'linker, 'fns> {
     linker: &'linker Linker,
-    visitor: Visitor,
-    should_prune: Pruner,
+    visitor: &'fns mut dyn FnMut(LocationInfo<'linker>),
+    should_prune: &'fns mut dyn Fn(Span) -> bool,
 }
 
-impl<'linker, Visitor: FnMut(LocationInfo<'linker>), Pruner: Fn(Span) -> bool>
-    TreeWalker<'linker, Visitor, Pruner>
-{
+impl<'linker, 'fns> TreeWalker<'linker, 'fns> {
     fn visit(&mut self, info: LocationInfo<'linker>) {
         if !(self.should_prune)(info.span) {
             (self.visitor)(info);

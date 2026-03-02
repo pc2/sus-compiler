@@ -1711,8 +1711,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     }
 
     /// See [Self::flatten_standalone_decls]
-    /// Two cases:
-    /// - Left side of assignment:
+    /// Left side of assignment:
     ///   No modules, Yes write modifiers, Only assignable expressions
     fn flatten_assignment_left_side(&mut self, cursor: &mut Cursor<'c>) -> Vec<WriteTo> {
         cursor.collect_list(kind!("assign_left_side"), |cursor| {
@@ -1725,7 +1724,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     let root = self.flatten_declaration::<false>(
                         self.default_decl_kind,
                         false,
-                        true,
+                        false,
                         cursor,
                     );
                     let flat_root_decl = self.instructions[root].unwrap_declaration();
@@ -1750,7 +1749,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     }
 
     /// See [Self::flatten_assignment_left_side]
-    /// - Standalone declarations:
+    /// Standalone declarations:
     ///   Yes modules, No write modifiers, Yes expressions (-> single expressions)
     fn flatten_standalone_decls(&mut self, cursor: &mut Cursor<'c>) {
         let mut is_first_item = true;
