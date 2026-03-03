@@ -38,7 +38,7 @@ fn completions_fallback(linker: &Linker, file: &FileData, position: usize) -> Ve
                 Instruction::Interface(d) => match &d.interface_kind {
                     InterfaceKind::Action(_) | InterfaceKind::RegularInterface => {}
                     InterfaceKind::Trigger(_) => {
-                        let trigger_params = suggest_interface_ports(global, file, &d.inputs);
+                        let trigger_params = suggest_funccall_ports(global, &d.inputs);
 
                         let label = d.name.to_string();
                         let insert_text = Some(format!("{label}({trigger_params})"));
@@ -138,17 +138,27 @@ fn get_module_port_completions(linker: &Linker, md: &Module) -> Vec<CompletionIt
             Instruction::Interface(interf_decl) => match interf_decl.interface_kind {
                 InterfaceKind::RegularInterface | InterfaceKind::Action(_) => {
                     let label = interf_decl.name.clone();
-                    let action_func_params = display_join(", ", &interf_decl.inputs, |f, input| {
-                        let input = md.link_info.instructions[*input].unwrap_declaration();
-                        write!(f, "{}", input.name)
-                    });
-                    // TODO: Also add "int a, int b = myAct(...)"
-                    let _action_outputs =
-                        suggest_interface_ports(&md.link_info, file, &interf_decl.outputs);
+                    let action_func_params =
+                        suggest_funccall_ports(&md.link_info, &interf_decl.outputs);
+                    let additional_text_edits = if !interf_decl.outputs.is_empty() {
+                        /*let action_outputs = suggest_interface_ports_decls(
+                            &md.link_info,
+                            file,
+                            &interf_decl.outputs,
+                        );*/
+
+                        //let edit : TextEdit = TextEdit { range: , new_text: () }
+                        //Some(vec![])
+                        None // TODO
+                    } else {
+                        None
+                    };
+
                     let insert_text = Some(format!("{label}({action_func_params})"));
                     completions.push(CompletionItem {
                         label,
                         insert_text,
+                        additional_text_edits,
                         detail: Some("action".to_string()),
                         kind: Some(CompletionItemKind::METHOD),
                         ..Default::default()
@@ -157,9 +167,9 @@ fn get_module_port_completions(linker: &Linker, md: &Module) -> Vec<CompletionIt
                 InterfaceKind::Trigger(_) => {
                     let label = interf_decl.name.clone();
                     let trigger_inputs =
-                        suggest_interface_ports(&md.link_info, file, &interf_decl.inputs);
+                        suggest_interface_ports_decls(&md.link_info, file, &interf_decl.inputs);
                     let trigger_outputs =
-                        suggest_interface_ports(&md.link_info, file, &interf_decl.outputs);
+                        suggest_interface_ports_decls(&md.link_info, file, &interf_decl.outputs);
                     let insert_text = Some(
                         match (
                             interf_decl.inputs.is_empty(),
@@ -194,7 +204,14 @@ fn get_module_port_completions(linker: &Linker, md: &Module) -> Vec<CompletionIt
     completions
 }
 
-fn suggest_interface_ports(
+fn suggest_funccall_ports(link_info: &LinkInfo, ports: &[FlatID]) -> impl Display {
+    display_join(", ", ports, |f, port| {
+        let port = link_info.instructions[*port].unwrap_declaration();
+        write!(f, "{}", port.name)
+    })
+}
+
+fn suggest_interface_ports_decls(
     link_info: &LinkInfo,
     file: &FileData,
     ports: &[FlatID],
