@@ -335,7 +335,7 @@ module Tuple5 #(T1, T2, T3, T4, T5) {
     packed_o[TO4:] = ToBits(v5_i)
 
     domain unpack_dom
-    interface unpack : bool[TO4] packed_i'0 -> T1 v1_o'0, T2 v2_o'0, T3 v3_o'0, T4 v4_o'0, T5 v5_o'0
+    interface unpack : bool[TO5] packed_i'0 -> T1 v1_o'0, T2 v2_o'0, T3 v3_o'0, T4 v4_o'0, T5 v5_o'0
     v1_o = FromBits(packed_i[:TO1])
     v2_o = FromBits(packed_i[TO1:TO2])
     v3_o = FromBits(packed_i[TO2:TO3])
