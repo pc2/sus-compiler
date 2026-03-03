@@ -139,7 +139,7 @@ fn get_module_port_completions(linker: &Linker, md: &Module) -> Vec<CompletionIt
                 InterfaceKind::RegularInterface | InterfaceKind::Action(_) => {
                     let label = interf_decl.name.clone();
                     let action_func_params =
-                        suggest_funccall_ports(&md.link_info, &interf_decl.outputs);
+                        suggest_funccall_ports(&md.link_info, &interf_decl.inputs);
                     let additional_text_edits = if !interf_decl.outputs.is_empty() {
                         /*let action_outputs = suggest_interface_ports_decls(
                             &md.link_info,
