@@ -71,8 +71,10 @@ fn completions_fallback(linker: &Linker, file: &FileData, position: usize) -> Ve
     completions
 }
 
-fn get_module_port_completions(md: &Module, file: &FileData) -> Vec<CompletionItem> {
+fn get_module_port_completions(linker: &Linker, md: &Module) -> Vec<CompletionItem> {
     let mut completions = Vec::new();
+
+    let file = &linker.files[md.link_info.span.file];
 
     for (_, field) in &md.fields {
         let instr = match field.declaration_instruction {
@@ -255,7 +257,7 @@ pub fn gather_completions(
             PathElemRefersTo::Field(in_module, _interf_opt) => {
                 let md = &linker.modules[*in_module];
 
-                Some(get_module_port_completions(md, file))
+                Some(get_module_port_completions(linker, md))
             }
         },
         LocationKind::GlobalReference(global_ref) => {
