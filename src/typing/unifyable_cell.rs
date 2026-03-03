@@ -1087,7 +1087,7 @@ mod tests {
 
     use rand::prelude::IndexedRandom;
     use rand::seq::SliceRandom;
-    use rand::{Rng, SeedableRng};
+    use rand::{RngExt, SeedableRng};
 
     /// `amount` must be > 0
     fn add_to(to: UniCell<PeanoType>, amount: usize) -> PeanoType {
