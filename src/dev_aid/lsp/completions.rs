@@ -3,12 +3,13 @@ use std::fmt::Display;
 use crate::{
     dev_aid::lsp::tree_walk::{LocationKind, MultiGlobalRef, get_selected_object},
     flattening::{
-        Direction, FieldDeclKind, GlobalReference, InterfaceKind, Module, PathElemRefersTo,
+        Declaration, Direction, FieldDeclKind, GlobalReference, InterfaceKind, Module,
+        PathElemRefersTo, SubModuleInstance,
     },
-    linker::{FileData, GlobalObj, GlobalUUID},
+    linker::{FileData, GlobalObj, GlobalUUID, LinkInfo, LinkerGlobals},
     prelude::*,
     to_string::display_join,
-    typing::template::{TemplateKind, TypeParameterKind},
+    typing::template::{Parameter, TemplateKind, TypeParameterKind},
 };
 
 use lsp_types::{CompletionItem, CompletionItemKind, CompletionItemLabelDetails};
@@ -18,19 +19,52 @@ use crate::{flattening::Instruction, linker::Linker};
 fn completions_fallback(linker: &Linker, file: &FileData, position: usize) -> Vec<CompletionItem> {
     let mut completions = Vec::new();
 
-    for g_id in &file.associated_values {
+    // Local completions
+    if let Some(global) = file.associated_values.iter().find_map(|g_id| {
         let global = &linker.globals[*g_id];
-
-        if !global.span.contains_pos(position) {
-            continue;
-        }
+        global.span.contains_pos(position).then_some(global)
+    }) {
         for (_id, v) in &global.instructions {
-            if let Instruction::Declaration(d) = v {
-                completions.push(CompletionItem {
-                    label: d.name.to_string(),
-                    kind: Some(CompletionItemKind::VARIABLE),
-                    ..Default::default()
-                });
+            match v {
+                Instruction::Declaration(d) => {
+                    let detail = Some(make_decl_detail(d, &linker.globals, &global.parameters));
+                    completions.push(CompletionItem {
+                        label: d.name.to_string(),
+                        detail,
+                        kind: Some(CompletionItemKind::VARIABLE),
+                        ..Default::default()
+                    });
+                }
+                Instruction::Interface(d) => match &d.interface_kind {
+                    InterfaceKind::Action(_) | InterfaceKind::RegularInterface => {}
+                    InterfaceKind::Trigger(_) => {
+                        let trigger_params = suggest_interface_ports(global, file, &d.inputs);
+
+                        let label = d.name.to_string();
+                        let insert_text = Some(format!("{label}({trigger_params})"));
+                        completions.push(CompletionItem {
+                            label,
+                            insert_text,
+                            detail: Some("trigger".to_string()),
+                            kind: Some(CompletionItemKind::METHOD),
+                            ..Default::default()
+                        });
+                    }
+                },
+                Instruction::SubModule(submod) => {
+                    let detail = Some(make_submod_detail(
+                        submod,
+                        &linker.globals,
+                        &global.parameters,
+                    ));
+                    completions.push(CompletionItem {
+                        label: submod.name.to_string(),
+                        detail,
+                        kind: Some(CompletionItemKind::INTERFACE),
+                        ..Default::default()
+                    });
+                }
+                _ => {}
             }
         }
         for (_, p) in &global.parameters {
@@ -46,6 +80,8 @@ fn completions_fallback(linker: &Linker, file: &FileData, position: usize) -> Ve
             }
         }
     }
+
+    // Suggest other modules, constants, etc
     for (_, m) in &linker.modules {
         completions.push(CompletionItem {
             label: m.link_info.name.to_string(),
@@ -107,7 +143,8 @@ fn get_module_port_completions(linker: &Linker, md: &Module) -> Vec<CompletionIt
                         write!(f, "{}", input.name)
                     });
                     // TODO: Also add "int a, int b = myAct(...)"
-                    let _action_outputs = suggest_interface_ports(md, file, &interf_decl.outputs);
+                    let _action_outputs =
+                        suggest_interface_ports(&md.link_info, file, &interf_decl.outputs);
                     let insert_text = Some(format!("{label}({action_func_params})"));
                     completions.push(CompletionItem {
                         label,
@@ -119,8 +156,10 @@ fn get_module_port_completions(linker: &Linker, md: &Module) -> Vec<CompletionIt
                 }
                 InterfaceKind::Trigger(_) => {
                     let label = interf_decl.name.clone();
-                    let trigger_inputs = suggest_interface_ports(md, file, &interf_decl.inputs);
-                    let trigger_outputs = suggest_interface_ports(md, file, &interf_decl.outputs);
+                    let trigger_inputs =
+                        suggest_interface_ports(&md.link_info, file, &interf_decl.inputs);
+                    let trigger_outputs =
+                        suggest_interface_ports(&md.link_info, file, &interf_decl.outputs);
                     let insert_text = Some(
                         match (
                             interf_decl.inputs.is_empty(),
@@ -155,12 +194,34 @@ fn get_module_port_completions(linker: &Linker, md: &Module) -> Vec<CompletionIt
     completions
 }
 
-fn suggest_interface_ports(md: &Module, file: &FileData, ports: &[FlatID]) -> impl Display {
+fn suggest_interface_ports(
+    link_info: &LinkInfo,
+    file: &FileData,
+    ports: &[FlatID],
+) -> impl Display {
     display_join(", ", ports, |f, port| {
-        let port = md.link_info.instructions[*port].unwrap_declaration();
+        let port = link_info.instructions[*port].unwrap_declaration();
         let typ_expr = &file.file_text[port.typ_expr.get_span()];
         write!(f, "{typ_expr} {}", port.name)
     })
+}
+
+fn make_decl_detail(
+    decl: &Declaration,
+    linker_globals: &LinkerGlobals,
+    params: &FlatAlloc<Parameter, TemplateIDMarker>,
+) -> String {
+    decl.typ_expr.display(linker_globals, params).to_string()
+}
+fn make_submod_detail(
+    submod: &SubModuleInstance,
+    linker_globals: &LinkerGlobals,
+    params: &FlatAlloc<Parameter, TemplateIDMarker>,
+) -> String {
+    submod
+        .module_ref
+        .display(linker_globals, params)
+        .to_string()
 }
 
 fn complete_global_ref<ID: Copy>(
@@ -187,10 +248,8 @@ where
                 TemplateKind::Value(v) => {
                     let v_decl =
                         arg_of_global.instructions[v.declaration_instruction].unwrap_declaration();
-                    v_decl
-                        .typ_expr
-                        .display(&linker.globals, &arg_of_global.parameters)
-                        .to_string()
+
+                    make_decl_detail(v_decl, &linker.globals, &arg_of_global.parameters)
                 }
             });
 

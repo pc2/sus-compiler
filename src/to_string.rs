@@ -151,7 +151,7 @@ impl<ID: Into<GlobalUUID> + Copy> GlobalReference<ID> {
     pub fn display<'a>(
         &'a self,
         globals: &'a LinkerGlobals,
-        link_info: &'a LinkInfo,
+        local_params: &'a FlatAlloc<Parameter, TemplateIDMarker>,
     ) -> impl Display + 'a {
         let target_link_info: &LinkInfo = &globals[self.id.into()];
         target_link_info.display_with_template_args(
@@ -171,7 +171,7 @@ impl<ID: Into<GlobalUUID> + Copy> GlobalReference<ID> {
                 }
                 match kind {
                     Some(TemplateKind::Type(wr_typ)) => {
-                        write!(f, "type {}", wr_typ.display(globals, &link_info.parameters))
+                        write!(f, "type {}", wr_typ.display(globals, local_params))
                     }
                     Some(TemplateKind::Value(v_id)) => write!(f, "{v_id:?}"),
                     None => write!(f, "INVALID"),
@@ -240,10 +240,18 @@ impl WireReference {
                     write!(f, "{decl_name}")?
                 }
                 WireReferenceRoot::NamedConstant(global_reference) => {
-                    write!(f, "{}", global_reference.display(globals, link_info))?;
+                    write!(
+                        f,
+                        "{}",
+                        global_reference.display(globals, &link_info.parameters)
+                    )?;
                 }
                 WireReferenceRoot::NamedModule(global_reference) => {
-                    write!(f, "{}", global_reference.display(globals, link_info))?;
+                    write!(
+                        f,
+                        "{}",
+                        global_reference.display(globals, &link_info.parameters)
+                    )?;
                 }
                 WireReferenceRoot::Error => write!(f, "{{error}}")?,
             }
@@ -799,7 +807,7 @@ impl LinkInfo {
                     typ: _,
                     ..
                 }) => {
-                    let disp_md_ref = module_ref.display(globals, self);
+                    let disp_md_ref = module_ref.display(globals, &self.parameters);
                     let name = name.green();
                     write!(f, "{disp_md_ref} {name}")?;
                     let submod_domains = &globals[module_ref.id].clocks;
