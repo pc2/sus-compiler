@@ -157,6 +157,17 @@ impl<'l> TypeCheckingContext<'l> {
 
                 // Ensure all bindings are in the condition's domain
                 if let Physical(phys_condition) = condition.domain.unwrap() {
+                    if let Some((parent_domain, parent_span)) =
+                        self.get_condition_domain(if_statement.parent_condition)
+                    {
+                        self.unify_physicals(
+                            parent_domain,
+                            parent_span,
+                            phys_condition,
+                            condition.span,
+                            "when statement",
+                        );
+                    }
                     for b in if_statement.iter_all_bindings() {
                         let binding_decl = self.link_info.instructions[b].unwrap_declaration();
                         // If the binding was generative, then that should have been its own error.
