@@ -386,7 +386,7 @@ pub fn get_selected_object<'linker>(
         visitor: &mut |info| {
             // Gotta do this condition in inverse, since we only want to set it if it's not already set, or the new span is more specific
             if let Some(best_obj) = best_object
-                && best_obj.span.size() < best_obj.span.size()
+                && best_obj.span.size() < info.span.size()
             {
             } else {
                 // Better spans are also spans that come later, even if they are the exact same span. Because more specific tree nodes are nested.
@@ -603,7 +603,7 @@ impl<'linker, 'fns> TreeWalker<'linker, 'fns> {
             };
         }
 
-        // The global name for a constant should overrule other references, so we visit it last.
+        // The global name for a constant should overrule the "declaration" of the constant, so we visit it last.
         self.walk_name_and_template_arguments(parent, link_info);
     }
 
