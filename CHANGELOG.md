@@ -1,4 +1,20 @@
 # Changelog
+## 0.3.9: Code Completions Galore!
+- Add one pipeline stage to the `FIFO` to discourage using it as a FWFT
+- Add code completions for module ports & global parameters
+- Codegen: Fix incorrect codegen for boolean array `!`
+- Fix ICE for syntax error on absolute latency of port
+- Make Strongly Connected Ports error stronger still (#172)
+- Fix ICE on codegen IntNarrow for zero sized output (#176)
+- Fix `when` statements not linking properly to their parent's domain
+- Update tree-sitter to 0.26.6
+- Update lsp-types to 0.97
+- Reduced dependencies
+
+### Standard Library
+- Add `Tuple4` and `Tuple5`
+- `RippleFIFO`: Add `rst` and replace `try_pop` with `pop`
+
 ## 0.3.8
 - Add Splits (Port splits are thus far not supported yet, only internal splits)
 - Expressly split Latency Domains from Clock Domains (#153)
