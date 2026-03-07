@@ -415,8 +415,8 @@ fn goto_definition(linker: &mut Linker, file_id: FileUUID, pos: usize) -> Vec<Sp
         RefersTo::LocalDecl(_, declaration, _) => declaration.name_span,
         RefersTo::LocalSubModule(_, sub_module_instance, _) => sub_module_instance.name_span,
         RefersTo::Global(global_obj) => linker.globals[global_obj].name_span,
-        RefersTo::Field(_, field) => field.name_span,
-        RefersTo::Parameter(_, parameter) => parameter.name_span,
+        RefersTo::Field(_, field, _) => field.name_span,
+        RefersTo::Parameter(_, parameter, _) => parameter.name_span,
     };
 
     vec![goto_span]

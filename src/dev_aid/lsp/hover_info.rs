@@ -1,3 +1,5 @@
+use crate::flattening::Declaration;
+use crate::linker::LinkerGlobals;
 use crate::prelude::*;
 
 use crate::{
@@ -87,6 +89,47 @@ impl HoverCollector<'_> {
             }
         }
     }
+
+    fn gather_type_param_hover_infos(
+        &mut self,
+        globals: &LinkerGlobals,
+        global_id: GlobalUUID,
+        type_param: TemplateID,
+    ) {
+        let GlobalObj::Module(md_id) = global_id else {
+            return;
+        };
+        for (_template_args, inst) in self.linker.instantiator.iter_for_module(md_id) {
+            let typ = inst.global_ref.template_args[type_param]
+                .unwrap_type()
+                .display(globals);
+            self.sus_code(format!(" = {typ}"));
+        }
+    }
+
+    fn hover_decl(
+        &mut self,
+        linker: &Linker,
+        file_data: &FileData,
+        in_global: GlobalUUID,
+        decl: &Declaration,
+        decl_id: FlatID,
+    ) {
+        let link_info = &linker.globals[in_global];
+        self.documentation(&decl.documentation);
+
+        let latency_domains = match in_global {
+            GlobalObj::Module(md_id) => Some(&linker.modules[md_id].latency_domains),
+            GlobalObj::Type(_) | GlobalObj::Constant(_) => None,
+        };
+        self.sus_code(
+            link_info
+                .display_decl(latency_domains, decl, &file_data.file_text)
+                .to_string(),
+        );
+
+        self.gather_hover_infos(in_global, decl_id);
+    }
 }
 
 pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<MarkedString> {
@@ -98,20 +141,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
 
     match info.refers_to(linker) {
         Some(RefersTo::LocalDecl(in_global, decl, decl_id)) => {
-            let link_info = &linker.globals[in_global];
-            hover.documentation(&decl.documentation);
-
-            let latency_domains = match in_global {
-                GlobalObj::Module(md_id) => Some(&linker.modules[md_id].latency_domains),
-                GlobalObj::Type(_) | GlobalObj::Constant(_) => None,
-            };
-            hover.sus_code(
-                link_info
-                    .display_decl(latency_domains, decl, &file_data.file_text)
-                    .to_string(),
-            );
-
-            hover.gather_hover_infos(in_global, decl_id);
+            hover.hover_decl(linker, file_data, in_global, decl, decl_id);
         }
         Some(RefersTo::LocalSubModule(in_global, submod, submod_id)) => {
             // Submodules can only exist within Modules
@@ -147,7 +177,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 GlobalUUID::Constant(_) => {}
             }
         }
-        Some(RefersTo::Field(in_global, field)) => {
+        Some(RefersTo::Field(in_global, field, _field_id)) => {
             let md = &linker.modules[in_global.unwrap_module()];
             match field.declaration_instruction.unwrap() {
                 FieldDeclKind::Interface(decl_id) => {
@@ -177,12 +207,13 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 }
             }
         }
-        Some(RefersTo::Parameter(in_global, parameter)) => {
+        Some(RefersTo::Parameter(in_global, parameter, param_id)) => {
             let link_info = &linker.globals[in_global];
             let arg_name = &parameter.name;
             match &parameter.kind {
                 TemplateKind::Type(TypeParameterKind {}) => {
                     hover.monospace(format!("type {arg_name}"));
+                    hover.gather_type_param_hover_infos(&linker.globals, in_global, param_id);
                 }
                 TemplateKind::Value(GenerativeParameterKind {
                     decl_span: _,
@@ -190,8 +221,14 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 }) => {
                     let decl =
                         link_info.instructions[*declaration_instruction].unwrap_declaration();
-                    let typ_displ = decl.typ_expr.display(linker, &link_info.parameters);
-                    hover.sus_code(format!("param {typ_displ} {arg_name}",));
+
+                    hover.hover_decl(
+                        linker,
+                        &linker.files[link_info.span.file],
+                        in_global,
+                        decl,
+                        *declaration_instruction,
+                    );
                 }
             }
         }

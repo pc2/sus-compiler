@@ -998,7 +998,9 @@ impl LinkInfo {
                 write!(f, "{latency_domain}{direction} ")?;
             }
 
-            if decl.decl_kind.is_generative() {
+            if let DeclarationKind::TemplateParameter(_param_id) = &decl.decl_kind {
+                write!(f, "param ")?;
+            } else if decl.decl_kind.is_generative() {
                 write!(f, "gen ")?;
             }
             if decl.decl_kind.is_state() {

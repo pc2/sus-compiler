@@ -85,8 +85,8 @@ pub enum RefersTo<'linker> {
     LocalDecl(GlobalUUID, &'linker Declaration, FlatID),
     LocalSubModule(GlobalUUID, &'linker SubModuleInstance, FlatID),
     Global(GlobalUUID),
-    Field(GlobalUUID, &'linker Field),
-    Parameter(GlobalUUID, &'linker Parameter),
+    Field(GlobalUUID, &'linker Field, FieldID),
+    Parameter(GlobalUUID, &'linker Parameter, TemplateID),
 }
 
 impl<'linker> PartialEq for RefersTo<'linker> {
@@ -97,8 +97,8 @@ impl<'linker> PartialEq for RefersTo<'linker> {
                 std::ptr::eq(*l1, *r1)
             }
             (Self::Global(l0), Self::Global(r0)) => *l0 == *r0,
-            (Self::Field(_, l1), Self::Field(_, r1)) => std::ptr::eq(*l1, *r1),
-            (Self::Parameter(_, l1), Self::Parameter(_, r1)) => std::ptr::eq(*l1, *r1),
+            (Self::Field(_, l1, _), Self::Field(_, r1, _)) => std::ptr::eq(*l1, *r1),
+            (Self::Parameter(_, l1, _), Self::Parameter(_, r1, _)) => std::ptr::eq(*l1, *r1),
             _ => false,
         }
     }
@@ -120,10 +120,12 @@ impl<'linker> LocationInfo<'linker> {
             } => RefersTo::Field(
                 in_global,
                 &linker.globals[in_global.unwrap_module()].fields[parent_field],
+                parent_field,
             ),
             DeclarationKind::TemplateParameter(template_id) => RefersTo::Parameter(
                 in_global,
                 &linker.globals[in_global].parameters[template_id],
+                template_id,
             ),
             _ => RefersTo::LocalDecl(in_global, decl, decl_id),
         }
@@ -144,7 +146,11 @@ impl<'linker> LocationInfo<'linker> {
     ) -> RefersTo<'linker> {
         let md = &linker.modules[in_global.unwrap_module()];
         let interface_decl = md.link_info.instructions[interface_decl_id].unwrap_interface();
-        RefersTo::Field(in_global, &md.fields[interface_decl.field_id])
+        RefersTo::Field(
+            in_global,
+            &md.fields[interface_decl.field_id],
+            interface_decl.field_id,
+        )
     }
     pub fn refers_to(&self, linker: &'linker Linker) -> Option<RefersTo<'linker>> {
         match self.kind {
@@ -197,6 +203,7 @@ impl<'linker> LocationInfo<'linker> {
                     Some(RefersTo::Parameter(
                         obj,
                         &param_obj.parameters[*param_refers_to],
+                        *param_refers_to,
                     ))
                 } else {
                     None
@@ -204,14 +211,18 @@ impl<'linker> LocationInfo<'linker> {
             }
             LocationKind::TypeTemplateParam(obj, param) => {
                 let param_obj = &linker.globals[obj];
-                Some(RefersTo::Parameter(obj, &param_obj.parameters[param]))
+                Some(RefersTo::Parameter(
+                    obj,
+                    &param_obj.parameters[param],
+                    param,
+                ))
             }
             LocationKind::Field { refers_to, .. } => match refers_to {
                 Some(PathElemRefersTo::Field(md_id, Some(field_id))) => {
                     let md = &linker.modules[*md_id];
                     let field = &md.fields[*field_id];
 
-                    Some(RefersTo::Field(GlobalObj::Module(*md_id), field))
+                    Some(RefersTo::Field(GlobalObj::Module(*md_id), field, *field_id))
                 }
                 Some(PathElemRefersTo::Field(_, None)) | None => None,
             },

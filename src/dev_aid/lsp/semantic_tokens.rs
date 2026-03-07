@@ -158,7 +158,7 @@ fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifier
                     GlobalUUID::Type(_) => IDEIdentifierType::Type,
                     GlobalUUID::Constant(_) => IDEIdentifierType::Constant,
                 },
-                RefersTo::Field(global_obj, field) => {
+                RefersTo::Field(global_obj, field, _) => {
                     let md = &linker.modules[global_obj.unwrap_module()];
                     match field.declaration_instruction.unwrap() {
                         FieldDeclKind::SinglePort(decl_id) => {
@@ -171,7 +171,7 @@ fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifier
                         FieldDeclKind::Interface(_decl_id) => IDEIdentifierType::Interface,
                     }
                 }
-                RefersTo::Parameter(_, parameter) => match &parameter.kind {
+                RefersTo::Parameter(_, parameter, _) => match &parameter.kind {
                     TemplateKind::Type(_) => IDEIdentifierType::Type,
                     TemplateKind::Value(_) => IDEIdentifierType::Generative,
                 },
