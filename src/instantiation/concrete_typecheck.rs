@@ -297,8 +297,11 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     (array_content_supertyp, &w.typ)
                 }));
 
-                // The output's size cannot have already been unified, this is the first time we see it
-                unifier.set_hard(arr_sz, IBig::from(array_wires.len()));
+                // Is checked in final_checks
+                let _ = unifier.set(
+                    arr_sz,
+                    &mut UniCell::from_known(Value::Integer(IBig::from(array_wires.len()))),
+                );
             }
             // type is already set when the wire was created
             RealWireDataSource::Constant { value: _ } => {}
