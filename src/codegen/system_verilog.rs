@@ -438,7 +438,10 @@ fn display_constant(typ: &ConcreteType, cst: &Value) -> impl Display {
                                 let unsigned_equivalent = IBig::from(higher_pow2) + v;
                                 let unsigned_equivalent: UBig =
                                     UBig::try_from(unsigned_equivalent).unwrap();
-                                assert!(unsigned_equivalent.bit((bitwidth - 1) as usize), "Sign bit must be \"true\", of course, because it's negative.");
+                                assert!(
+                                    unsigned_equivalent.bit((bitwidth - 1) as usize),
+                                    "Sign bit must be \"true\", of course, because it's negative."
+                                );
                                 write!(f, "{bitwidth}'sh{unsigned_equivalent:x} /* {v} */")
                             } else {
                                 write!(f, "{bitwidth}'sd{v}")
