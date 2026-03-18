@@ -1,3 +1,129 @@
+// NegativeIntLiterals #()
+module NegativeIntLiterals(
+	input clk
+);
+
+/*mux_wire*/ logic signed[4:0] j;
+/*mux_wire*/ logic signed[4:0] j_2;
+/*mux_wire*/ logic signed[3:0] j_3;
+/*mux_wire*/ logic signed[3:0] j_4;
+/*mux_wire*/ logic signed[3:0] j_5;
+/*mux_wire*/ logic signed[3:0] j_6;
+/*mux_wire*/ logic signed[2:0] j_7;
+/*mux_wire*/ logic signed[2:0] j_8;
+/*mux_wire*/ logic signed[1:0] j_9;
+/*mux_wire*/ logic signed[0:0] j_10;
+// (zero sized) j_11
+/*mux_wire*/ logic[0:0] j_12;
+/*mux_wire*/ logic[1:0] j_13;
+/*mux_wire*/ logic[1:0] j_14;
+/*mux_wire*/ logic[2:0] j_15;
+/*mux_wire*/ logic[2:0] j_16;
+/*mux_wire*/ logic[2:0] j_17;
+/*mux_wire*/ logic[2:0] j_18;
+/*mux_wire*/ logic[3:0] j_19;
+/*mux_wire*/ logic[3:0] j_20;
+always_comb begin // combinatorial j
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j = 5'sdx;
+	j = 5'sh16 /* -10 */;
+end
+always_comb begin // combinatorial j_2
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_2 = 5'sdx;
+	j_2 = 5'sh17 /* -9 */;
+end
+always_comb begin // combinatorial j_3
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_3 = 4'sdx;
+	j_3 = 4'sh8 /* -8 */;
+end
+always_comb begin // combinatorial j_4
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_4 = 4'sdx;
+	j_4 = 4'sh9 /* -7 */;
+end
+always_comb begin // combinatorial j_5
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_5 = 4'sdx;
+	j_5 = 4'sha /* -6 */;
+end
+always_comb begin // combinatorial j_6
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_6 = 4'sdx;
+	j_6 = 4'shb /* -5 */;
+end
+always_comb begin // combinatorial j_7
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_7 = 3'sdx;
+	j_7 = 3'sh4 /* -4 */;
+end
+always_comb begin // combinatorial j_8
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_8 = 3'sdx;
+	j_8 = 3'sh5 /* -3 */;
+end
+always_comb begin // combinatorial j_9
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_9 = 2'sdx;
+	j_9 = 2'sh2 /* -2 */;
+end
+always_comb begin // combinatorial j_10
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_10 = 1'sdx;
+	j_10 = 1'sh1 /* -1 */;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	j_10 = j_10;
+end
+always_comb begin // combinatorial j_12
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_12 = 1'dx;
+	j_12 = 1'd1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	j_12 = j_12;
+end
+always_comb begin // combinatorial j_13
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_13 = 2'dx;
+	j_13 = 2'd2;
+end
+always_comb begin // combinatorial j_14
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_14 = 2'dx;
+	j_14 = 2'd3;
+end
+always_comb begin // combinatorial j_15
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_15 = 3'dx;
+	j_15 = 3'd4;
+end
+always_comb begin // combinatorial j_16
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_16 = 3'dx;
+	j_16 = 3'd5;
+end
+always_comb begin // combinatorial j_17
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_17 = 3'dx;
+	j_17 = 3'd6;
+end
+always_comb begin // combinatorial j_18
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_18 = 3'dx;
+	j_18 = 3'd7;
+end
+always_comb begin // combinatorial j_19
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_19 = 4'dx;
+	j_19 = 4'd8;
+end
+always_comb begin // combinatorial j_20
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	j_20 = 4'dx;
+	j_20 = 4'd9;
+end
+endmodule
+
 // IntNarrowToZero #()
 module IntNarrowToZero(
 	input clk

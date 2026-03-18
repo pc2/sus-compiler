@@ -183,6 +183,7 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated IntNarrow #(FROM_I: 5, TO_I: 6, FROM: 0, TO: 1)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated IntNarrow #(FROM_I: 0, TO_I: 1, FROM: -3, TO: 6)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated IntNarrowToZero #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated NegativeIntLiterals #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ test.sus:26:6 ]
     │
@@ -4320,6 +4321,20 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1853 │     int y = IntNarrow#(FROM: -3, TO: 6)(0)
       │         ┬  
       │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1857:10 ]
+      │
+ 1857 │     for int I in -10..10 {
+      │             ┬  
+      │             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │            ┬  
+      │            ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!

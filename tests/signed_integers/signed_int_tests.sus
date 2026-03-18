@@ -181,6 +181,24 @@ module TestSpecificModulos {
     assert_eq#(ID: "Modulo specific case")(l_wide, r_wide, found_wide, 5 mod 6)
 }
 
+module TestNegate#(int FROM, int TO) {
+    for int V in FROM..TO {
+        int v = V
+        int found = -v
+        gen int EXPECTED = -V
+
+        assert_eq#(ID: "- narrow")(v, v, found, EXPECTED)
+
+        int found_from_zero = 0-v
+        assert_eq#(ID: "0-narrow")(v, v, found_from_zero, EXPECTED)
+
+        int#(FROM, TO) v_wide = v
+
+        int found_wide = -v_wide
+        assert_eq#(ID: "- wide  ")(v_wide, v_wide, found_wide, EXPECTED)
+    }
+}
+
 module AllTests {
     TestAdd#(FROM_L: -8, TO_L: 7, FROM_R: -8, TO_R: 7) add_both_signed
     TestAdd#(FROM_L: -8, TO_L: 7, FROM_R: 0, TO_R: 7)  add_l_signed
@@ -215,6 +233,17 @@ module AllTests {
 
     TestShr#(FROM_L: -8, TO_L: 7, FROM_R: 0, TO_R: 7)  shr_l_signed
     TestShr#(FROM_L: 0, TO_L: 7, FROM_R: 0, TO_R: 7)   shr_unsigned
+
+    TestNegate#(FROM:  0, TO: 6)   neg_unsigned6
+    TestNegate#(FROM:  0, TO: 7)   neg_unsigned7
+    TestNegate#(FROM:  0, TO: 8)   neg_unsigned8
+    TestNegate#(FROM:  0, TO: 9)   neg_unsigned9
+    TestNegate#(FROM: -8, TO: 7)   neg_signed
+
+    int vvv1 = -1
+    int vvv2 = -2
+    int vvv3 = -3
+    int vvv4 = -4
 
     TestSpecificModulos test_specific_modulos
 }

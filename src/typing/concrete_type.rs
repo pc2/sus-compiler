@@ -337,14 +337,13 @@ impl IntBounds<&'_ IBig> {
     pub fn bitwidth(self) -> u64 {
         assert!(!self.is_empty(), "{self}");
         let min = self.from;
-        let max = self.to - IBig::from(1);
         if min < &IBig::from(0) {
             let min_abs: UBig = UBig::try_from(-min).unwrap() - 1;
 
             let bits_for_min = min_abs.bit_len();
 
-            let bits_for_max = if max > IBig::from(0) {
-                let max = UBig::try_from(max).unwrap();
+            let bits_for_max = if *self.to > IBig::from(0) {
+                let max: UBig = UBig::try_from(self.to).unwrap() - 1;
 
                 max.bit_len()
             } else {
@@ -353,7 +352,7 @@ impl IntBounds<&'_ IBig> {
 
             (usize::max(bits_for_min, bits_for_max) + 1) as u64
         } else {
-            let max = UBig::try_from(max).unwrap();
+            let max: UBig = UBig::try_from(self.to).unwrap() - 1;
 
             max.bit_len() as u64
         }
@@ -429,16 +428,41 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn test_bound_to_bits() {
+        for unsigned_bitwidth in 0..5 {
+            let to = IBig::from(2_i64.pow(unsigned_bitwidth));
+            assert_eq!(IntBounds{from: &IBig::from(0), to: &to}.bitwidth(), unsigned_bitwidth as u64);
+            assert_eq!(IntBounds{from: &IBig::from(0), to: &(&to+1)}.bitwidth(), (unsigned_bitwidth+1) as u64);
+        }
+        for signed_bitwidth in 1..5 {
+            let from = -IBig::from(2_i64.pow(signed_bitwidth - 1));
+            let to = IBig::from(2_i64.pow(signed_bitwidth - 1));
+            assert_eq!(IntBounds{from: &from, to: &to}.bitwidth(), signed_bitwidth as u64);
+            assert_eq!(IntBounds{from: &(&from-1), to: &to}.bitwidth(), (signed_bitwidth+1) as u64);
+            assert_eq!(IntBounds{from: &from, to: &(&to+1)}.bitwidth(), (signed_bitwidth+1) as u64);
+        }
+        // Try one-sided negative numbers
+        assert_eq!(IntBounds{from: &IBig::from(-1), to: &IBig::from(0)}.bitwidth(), 1);
+        assert_eq!(IntBounds{from: &IBig::from(-2), to: &IBig::from(0)}.bitwidth(), 2);
+        assert_eq!(IntBounds{from: &IBig::from(-3), to: &IBig::from(0)}.bitwidth(), 3);
+        assert_eq!(IntBounds{from: &IBig::from(-4), to: &IBig::from(0)}.bitwidth(), 3);
+        assert_eq!(IntBounds{from: &IBig::from(-5), to: &IBig::from(0)}.bitwidth(), 4);
+        assert_eq!(IntBounds{from: &IBig::from(-6), to: &IBig::from(0)}.bitwidth(), 4);
+        assert_eq!(IntBounds{from: &IBig::from(-7), to: &IBig::from(0)}.bitwidth(), 4);
+        assert_eq!(IntBounds{from: &IBig::from(-8), to: &IBig::from(0)}.bitwidth(), 4);
+
+        assert_eq!(IntBounds{from: &IBig::from(0), to: &IBig::from(1)}.bitwidth(), 0); // Zero sized wires are now possible
+        assert_eq!(IntBounds{from: &IBig::from(0), to: &IBig::from(256)}.bitwidth(), 8);
+        assert_eq!(IntBounds{from: &IBig::from(20), to: &IBig::from(257)}.bitwidth(), 9);
+        assert_eq!(IntBounds{from: &IBig::from(-256), to: &IBig::from(256)}.bitwidth(), 9);
         assert_eq!(IntBounds{from: &IBig::from(-1), to: &IBig::from(1)}.bitwidth(), 1);
         assert_eq!(IntBounds{from: &IBig::from(-2), to: &IBig::from(1)}.bitwidth(), 2);
+        assert_eq!(IntBounds{from: &IBig::from(-2), to: &IBig::from(2)}.bitwidth(), 2);
+        assert_eq!(IntBounds{from: &IBig::from(-3), to: &IBig::from(2)}.bitwidth(), 3);
+        assert_eq!(IntBounds{from: &IBig::from(-2), to: &IBig::from(3)}.bitwidth(), 3);
         assert_eq!(IntBounds{from: &IBig::from(-1), to: &IBig::from(2)}.bitwidth(), 2);
         assert_eq!(IntBounds{from: &IBig::from(-2), to: &IBig::from(3)}.bitwidth(), 3);
         assert_eq!(IntBounds{from: &IBig::from(2), to: &IBig::from(9)}.bitwidth(), 4);
         assert_eq!(IntBounds{from: &IBig::from(-1000), to: &IBig::from(1)}.bitwidth(), 11);
         assert_eq!(IntBounds{from: &IBig::from(-2000), to: &IBig::from(-999)}.bitwidth(), 12);
-        assert_eq!(IntBounds{from: &IBig::from(-256), to: &IBig::from(256)}.bitwidth(), 9);
-        assert_eq!(IntBounds{from: &IBig::from(0), to: &IBig::from(256)}.bitwidth(), 8);
-        assert_eq!(IntBounds{from: &IBig::from(20), to: &IBig::from(257)}.bitwidth(), 9);
-        assert_eq!(IntBounds{from: &IBig::from(0), to: &IBig::from(1)}.bitwidth(), 0); // Zero sized wires are now possible
     }
 }
