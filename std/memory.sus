@@ -32,10 +32,11 @@ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
         read_addr = 0
     }
 
-	int space_remaining = read_addr - (write_addr + 1) mod DEPTH
+	int space_remaining = read_addr - write_addr - 1 mod DEPTH
 
     domain push_dom
-    output bool may_push'-MAY_PUSH_LATENCY = LatencyOffset #(OFFSET: -MAY_PUSH_LATENCY)(space_remaining > MAY_PUSH_LATENCY)
+    // Add in-built pipeline stage for may_push, since its computation is fairly complex, and it's in a latency tolerant path
+    reg output bool may_push'-MAY_PUSH_LATENCY = LatencyOffset #(OFFSET: -MAY_PUSH_LATENCY-1)(space_remaining > MAY_PUSH_LATENCY+1)
     action push'0 : T push_data'0 {
         mem[write_addr] = push_data
         write_addr = write_addr + 1 mod DEPTH
@@ -127,10 +128,11 @@ module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {
         }
     }
 
-	int space_remaining = read_addr - (write_addr + 1) mod DEPTH
+	int space_remaining = read_addr - write_addr - 1 mod DEPTH
 
     domain write
-    output bool may_push'-MAY_PUSH_LATENCY = LatencyOffset #(OFFSET: -MAY_PUSH_LATENCY)(space_remaining > MAY_PUSH_LATENCY)
+    // Add in-built pipeline stage for may_push, since its computation is fairly complex, and it's in a latency tolerant path
+    reg output bool may_push'-MAY_PUSH_LATENCY = LatencyOffset #(OFFSET: -MAY_PUSH_LATENCY-1)(space_remaining > MAY_PUSH_LATENCY+1)
     action push'0 : T push_data'0 {
         mem[write_addr] = push_data
         write_addr = write_addr + 1 mod DEPTH

@@ -4952,29 +4952,30 @@ module FIFO_T_type_int_FROM_0_TO_6_DEPTH_30_MAY_PUSH_LATENCY_8(
 /*state*/ logic[4:0] read_addr;
 /*state*/ logic[4:0] write_addr;
 /*mux_wire*/ logic[4:0] space_remaining;
-wire[4:0] _6;
-assign _6 = write_addr + 1'd1;
+wire signed[5:0] _5;
+assign _5 = read_addr - write_addr;
 wire signed[5:0] _7;
-assign _7 = read_addr - _6;
+assign _7 = _5 - $signed({1'b0, 1'd1});
 wire[4:0] _8;
 assign _8 = _7 + ((_7 < 0) ? 30 : 0); // == mod 30
-wire _10;
-assign _10 = space_remaining > 4'd8;
+wire _11;
+assign _11 = space_remaining > 4'd9;
 /*mux_wire*/ logic _LatencyOffset_din;
 wire _LatencyOffset_dout;
-wire[4:0] _15;
-assign _15 = write_addr + 1'd1;
+/*latency*/ logic __LatencyOffset_dout_N8; always_ff @(posedge clk) begin __LatencyOffset_dout_N8 <= _LatencyOffset_dout; end
 wire[4:0] _16;
-assign _16 = (_15 == 30) ? 0 : _15; // == mod 30
-wire _19;
-assign _19 = read_addr != write_addr;
-wire[2:0] _21 = mem[read_addr];
-/*latency*/ logic[2:0] __21_D1; always_ff @(posedge clk) begin __21_D1 <= _21; end
-wire[4:0] _24;
-assign _24 = read_addr + 1'd1;
+assign _16 = write_addr + 1'd1;
+wire[4:0] _17;
+assign _17 = (_16 == 30) ? 0 : _16; // == mod 30
+wire _20;
+assign _20 = read_addr != write_addr;
+wire[2:0] _22 = mem[read_addr];
+/*latency*/ logic[2:0] __22_D1; always_ff @(posedge clk) begin __22_D1 <= _22; end
 wire[4:0] _25;
-assign _25 = (_24 == 30) ? 0 : _24; // == mod 30
-LatencyOffset_T_type_bool_OFFSET_8 LatencyOffset(
+assign _25 = read_addr + 1'd1;
+wire[4:0] _26;
+assign _26 = (_25 == 30) ? 0 : _25; // == mod 30
+LatencyOffset_T_type_bool_OFFSET_9 LatencyOffset(
 	.clk(clk),
 	.din(_LatencyOffset_din),
 	.dout(_LatencyOffset_dout)
@@ -4984,11 +4985,11 @@ always_ff @(posedge clk) begin // state mem
 end
 always_ff @(posedge clk) begin // state read_addr
 	if(rst) read_addr <= 1'd0;
-	if(pop) read_addr <= _25;
+	if(pop) read_addr <= _26;
 end
 always_ff @(posedge clk) begin // state write_addr
 	if(rst) write_addr <= 1'd0;
-	if(push) write_addr <= _16;
+	if(push) write_addr <= _17;
 end
 always_comb begin // combinatorial space_remaining
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -4998,28 +4999,28 @@ end
 always_comb begin // combinatorial may_push
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	may_push = 1'bx;
-	may_push = _LatencyOffset_dout;
+	may_push = __LatencyOffset_dout_N8;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	may_push = may_push;
 end
 always_comb begin // combinatorial _LatencyOffset_din
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	_LatencyOffset_din = 1'bx;
-	_LatencyOffset_din = _10;
+	_LatencyOffset_din = _11;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_LatencyOffset_din = _LatencyOffset_din;
 end
 always_comb begin // combinatorial may_pop
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	may_pop = 1'bx;
-	may_pop = _19;
+	may_pop = _20;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	may_pop = may_pop;
 end
 always_comb begin // combinatorial pop_data
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	pop_data = 3'dx;
-	if(_pop_D1) pop_data = __21_D1;
+	if(_pop_D1) pop_data = __22_D1;
 end
 endmodule
 
@@ -5178,8 +5179,8 @@ module CrossDomain_T_type_bool(
 	assign dout = din;
 endmodule
 
-// LatencyOffset #(T: type bool #(), OFFSET: -8)
-module LatencyOffset_T_type_bool_OFFSET_8(
+// LatencyOffset #(T: type bool #(), OFFSET: -9)
+module LatencyOffset_T_type_bool_OFFSET_9(
 	input clk,
 	input wire din,
 	output /*mux_wire*/ logic dout
