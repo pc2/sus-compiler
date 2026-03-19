@@ -4963,29 +4963,44 @@ assign _11 = space_remaining > 4'd9;
 /*mux_wire*/ logic _LatencyOffset_din;
 wire _LatencyOffset_dout;
 /*latency*/ logic __LatencyOffset_dout_N8; always_ff @(posedge clk) begin __LatencyOffset_dout_N8 <= _LatencyOffset_dout; end
+/*mux_wire*/ logic[2:0] _ToBits_value;
+wire[2:0] _ToBits_bits;
 wire[4:0] _16;
 assign _16 = write_addr + 1'd1;
 wire[4:0] _17;
 assign _17 = (_16 == 30) ? 0 : _16; // == mod 30
 wire _20;
 assign _20 = read_addr != write_addr;
+/*mux_wire*/ logic[2:0] pop_out_reg;
 wire[2:0] _22 = mem[read_addr];
 /*latency*/ logic[2:0] __22_D1; always_ff @(posedge clk) begin __22_D1 <= _22; end
-wire[4:0] _25;
-assign _25 = read_addr + 1'd1;
+/*mux_wire*/ logic[2:0] _FromBits_bits;
+wire[2:0] _FromBits_value;
 wire[4:0] _26;
-assign _26 = (_25 == 30) ? 0 : _25; // == mod 30
+assign _26 = read_addr + 1'd1;
+wire[4:0] _27;
+assign _27 = (_26 == 30) ? 0 : _26; // == mod 30
 LatencyOffset_T_type_bool_OFFSET_9 LatencyOffset(
 	.clk(clk),
 	.din(_LatencyOffset_din),
 	.dout(_LatencyOffset_dout)
 );
+ToBits_T_type_int_FROM_0_TO_6 ToBits(
+	.clk(clk),
+	.value(_ToBits_value),
+	.bits(_ToBits_bits)
+);
+FromBits_T_type_int_FROM_0_TO_6 FromBits(
+	.clk(clk),
+	.bits(_FromBits_bits),
+	.value(_FromBits_value)
+);
 always_ff @(posedge clk) begin // state mem
-	if(push) mem[write_addr] <= push_data;
+	if(push) mem[write_addr] <= _ToBits_bits;
 end
 always_ff @(posedge clk) begin // state read_addr
 	if(rst) read_addr <= 1'd0;
-	if(pop) read_addr <= _26;
+	if(pop) read_addr <= _27;
 end
 always_ff @(posedge clk) begin // state write_addr
 	if(rst) write_addr <= 1'd0;
@@ -5010,6 +5025,11 @@ always_comb begin // combinatorial _LatencyOffset_din
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_LatencyOffset_din = _LatencyOffset_din;
 end
+always_comb begin // combinatorial _ToBits_value
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_ToBits_value = 3'dx;
+	if(push) _ToBits_value = push_data;
+end
 always_comb begin // combinatorial may_pop
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	may_pop = 1'bx;
@@ -5020,7 +5040,17 @@ end
 always_comb begin // combinatorial pop_data
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	pop_data = 3'dx;
-	if(_pop_D1) pop_data = __22_D1;
+	if(_pop_D1) pop_data = _FromBits_value;
+end
+always_comb begin // combinatorial pop_out_reg
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	pop_out_reg = 3'bxxx;
+	if(_pop_D1) pop_out_reg = __22_D1;
+end
+always_comb begin // combinatorial _FromBits_bits
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_FromBits_bits = 3'bxxx;
+	if(_pop_D1) _FromBits_bits = pop_out_reg;
 end
 endmodule
 
@@ -5101,6 +5131,16 @@ module FromBits_T_type_int_FROM_0_TO_65536(
 assign value = bits;
 endmodule
 
+// FromBits #(T: type int #(FROM: 0, TO: 6))
+module FromBits_T_type_int_FROM_0_TO_6(
+	input clk,
+	input wire[2:0] bits,
+	output /*mux_wire*/ logic[2:0] value
+);
+
+assign value = bits;
+endmodule
+
 // ToBits #(T: type int #(FROM: 0, TO: 255)[2])
 module ToBits_T_type_int_FROM_0_TO_255_2(
 	input clk,
@@ -5121,6 +5161,16 @@ module ToBits_T_type_bool_60(
 	input clk,
 	input wire[59:0] value,
 	output /*mux_wire*/ logic[59:0] bits
+);
+
+assign bits = value;
+endmodule
+
+// ToBits #(T: type int #(FROM: 0, TO: 6))
+module ToBits_T_type_int_FROM_0_TO_6(
+	input clk,
+	input wire[2:0] value,
+	output /*mux_wire*/ logic[2:0] bits
 );
 
 assign bits = value;
