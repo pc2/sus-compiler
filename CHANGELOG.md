@@ -1,4 +1,13 @@
 # Changelog
+## 0.3.10: Fond Memories
+- Fix ICE on partial arrays assigns (#184)
+- Fix incorrect negative integer literals (#186)
+- Fix Memory blocks & FIFOs not synthesizing to BRAMs for non-bitstrings (such as `RAM#(T: type float[3])`) (#187)
+- Fix hover info on Parameters not displaying their values. 
+
+### Standard Library
+- Add pipeline stage on `FIFO.may_push` & `FWFT.may_push`
+
 ## 0.3.9: Code Completions Galore!
 - Add one pipeline stage to the `FIFO` to discourage using it as a FWFT
 - Add code completions for module ports & global parameters
