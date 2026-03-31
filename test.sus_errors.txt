@@ -194,9 +194,9 @@ Warning: Unused Variable: This variable does not affect the output ports of this
     │                ╰───── Unused Variable: This variable does not affect the output ports of this module
 ────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-    ╭─[ memory.sus:99:13 ]
+    ╭─[ memory.sus:59:13 ]
     │
- 99 │     gen int T_WIDTH = sizeof#(T)
+ 59 │     gen int T_WIDTH = sizeof#(T)
     │             ───┬───  
     │                ╰───── Unused Variable: This variable does not affect the output ports of this module
 ────╯
