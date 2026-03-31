@@ -1,7 +1,7 @@
 
 module ROM #(T, int DEPTH, T[DEPTH] DATA) {
-    action read : int #(FROM: 0, TO: DEPTH) index'0 -> T output_data'0 {
-        output_data = DATA[index]
+    action read : int #(FROM: 0, TO: DEPTH) index'0 -> T output_data'1 {
+        reg output_data = DATA[index]
     }
 }
 
@@ -18,8 +18,8 @@ module RAM #(T, int DEPTH) {
 	}
 
     domain r_dom
-	action read'0: int#(FROM: 0, TO: DEPTH) read_addr'0 -> T read_data'0 {
-		read_data = FromBits(mem[read_addr])
+	action read'0: int#(FROM: 0, TO: DEPTH) read_addr'0 -> T read_data'1 {
+		reg read_data = FromBits(mem[read_addr])
 	}
 }
 
