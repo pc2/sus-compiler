@@ -6,7 +6,7 @@ use crate::{
     dev_aid::lsp::tree_walk::RefersTo,
     flattening::FieldDeclKind,
     instantiation::SubModuleOrWire,
-    linker::{Documentation, FileData, GlobalObj, GlobalUUID, LinkInfo},
+    linker::{Documentation, FileData, GlobalObj, GlobalUUID},
     to_string::display_all_infer_params,
     typing::template::{GenerativeParameterKind, TemplateKind, TypeParameterKind},
 };
@@ -18,20 +18,12 @@ use lsp_types::{LanguageString, MarkedString};
 struct HoverCollector<'l> {
     list: Vec<MarkedString>,
     linker: &'l Linker,
-    file_data: &'l FileData,
 }
 
 impl HoverCollector<'_> {
-    fn documentation(&mut self, d: &Documentation) {
+    fn documentation(&mut self, d: &Documentation, file_data: &FileData) {
         self.list
-            .push(MarkedString::String(d.to_string(&self.file_data.file_text)))
-    }
-    fn documentation_link_info(&mut self, link_info: &LinkInfo) {
-        self.list.push(MarkedString::String(
-            link_info
-                .documentation
-                .to_string(&self.linker.files[link_info.span.file].file_text),
-        ))
+            .push(MarkedString::String(d.to_string(&file_data.file_text)))
     }
     fn sus_code<Str: ToOwned<Owned = String>>(&mut self, text: Str) {
         self.list.push(MarkedString::LanguageString(LanguageString {
@@ -110,13 +102,13 @@ impl HoverCollector<'_> {
     fn hover_decl(
         &mut self,
         linker: &Linker,
-        file_data: &FileData,
         in_global: GlobalUUID,
         decl: &Declaration,
         decl_id: FlatID,
     ) {
         let link_info = &linker.globals[in_global];
-        self.documentation(&decl.documentation);
+        let link_info_file_data = &linker.files[link_info.span.file];
+        self.documentation(&decl.documentation, link_info_file_data);
 
         let latency_domains = match in_global {
             GlobalObj::Module(md_id) => Some(&linker.modules[md_id].latency_domains),
@@ -124,7 +116,7 @@ impl HoverCollector<'_> {
         };
         self.sus_code(
             link_info
-                .display_decl(latency_domains, decl, &file_data.file_text)
+                .display_decl(latency_domains, decl, &link_info_file_data.file_text)
                 .to_string(),
         );
 
@@ -132,16 +124,15 @@ impl HoverCollector<'_> {
     }
 }
 
-pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<MarkedString> {
+pub fn hover(info: LocationInfo, linker: &Linker) -> Vec<MarkedString> {
     let mut hover = HoverCollector {
         list: Vec::new(),
         linker,
-        file_data,
     };
 
     match info.refers_to(linker) {
         Some(RefersTo::LocalDecl(in_global, decl, decl_id)) => {
-            hover.hover_decl(linker, file_data, in_global, decl, decl_id);
+            hover.hover_decl(linker, in_global, decl, decl_id);
         }
         Some(RefersTo::LocalSubModule(in_global, submod, submod_id)) => {
             // Submodules can only exist within Modules
@@ -158,8 +149,8 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
         }
         Some(RefersTo::Global(global)) => {
             let link_info = &linker.globals[global];
-            hover.documentation_link_info(link_info);
             let file = &linker.files[link_info.span.file];
+            hover.documentation(&link_info.documentation, file);
             hover.sus_code(
                 link_info
                     .display_full_name_and_args(&file.file_text)
@@ -222,13 +213,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     let decl =
                         link_info.instructions[*declaration_instruction].unwrap_declaration();
 
-                    hover.hover_decl(
-                        linker,
-                        &linker.files[link_info.span.file],
-                        in_global,
-                        decl,
-                        *declaration_instruction,
-                    );
+                    hover.hover_decl(linker, in_global, decl, *declaration_instruction);
                 }
             }
         }

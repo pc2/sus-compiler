@@ -1,7 +1,7 @@
 [package]
 name = "sus_compiler"
 description = "Compiler for the SUS Hardware Design Language"
-version = "0.3.10"
+version = "0.3.11-dev"
 authors = ["Lennart Van Hirtum <lennart.vanhirtum@gmail.com>"]
 license = "GPL-3.0-or-later"
 repository = "https://github.com/pc2/sus-compiler"
@@ -41,9 +41,9 @@ same-file = "1.0.6"
 
 # Tree sitter
 tree-sitter = "0.26.6"
-tree-sitter-sus = {version = "~0.3.10", path = "./tree-sitter-sus"}
+tree-sitter-sus = {version = "~0.3.11-dev", path = "./tree-sitter-sus"}
 
-sus-proc-macro = {version = "~0.3.10", path = "./sus-proc-macro"}
+sus-proc-macro = {version = "~0.3.11-dev", path = "./sus-proc-macro"}
 
 # calyx-ir = {version = "0.6.1", optional = true}
 # calyx-opt = {version = "0.6.1", optional = true}

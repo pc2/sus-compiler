@@ -448,7 +448,7 @@ fn handle_request(
                 if crate::debug::is_enabled("lsp-debug") {
                     hover_list.push(MarkedString::String(format!("{info:?}")))
                 } else {
-                    hover_list = hover(info, linker, file_data);
+                    hover_list = hover(info, linker);
                 }
                 Some(span_to_lsp_range(&file_data.file_text, info.span))
             } else {
