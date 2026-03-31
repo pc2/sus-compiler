@@ -23,13 +23,31 @@ pub fn get_std_dir() -> PathBuf {
     config().sus_home.join("std")
 }
 
+const STL_FILES: &[&str] = &["core.sus", "control_flow.sus", "util.sus", "memory.sus"];
+const STL_FILES_FEATURE_XPM: &[&str] = &[
+    "core.sus",
+    "control_flow.sus",
+    "util.sus",
+    "feature/xpm/xpm.sus",
+    "feature/xpm/memory.sus",
+];
+
 impl Linker {
     pub fn add_standard_library(&mut self) {
         assert!(self.modules.is_empty());
         assert!(self.types.is_empty());
         assert!(self.constants.is_empty());
         let std_lib_path = get_std_dir();
-        self.add_all_files_in_directory_recurse(&std_lib_path);
+
+        let fileset = if config().features.xpm {
+            STL_FILES_FEATURE_XPM
+        } else {
+            STL_FILES
+        };
+
+        for f in fileset {
+            self.add_file(&std_lib_path.join(f));
+        }
         for (_, f) in &mut self.files {
             f.is_std = true; // Mark standard library files
         }
@@ -65,16 +83,21 @@ impl Linker {
         }
     }
 
+    pub fn add_file(&mut self, path: &Path) {
+        assert!(path.is_file());
+        match UniqueFileID::from_path(path, path.to_string_lossy().to_string()) {
+            Ok(file_identifier) => {
+                self.add_or_update_file_from_disk(file_identifier);
+            }
+            Err(err) => fatal_exit!("{err}"),
+        }
+    }
+
     pub fn add_file_or_directory(&mut self, path: &Path) {
         if path.is_dir() {
             self.add_all_files_in_directory_recurse(path);
         } else {
-            match UniqueFileID::from_path(path, path.to_string_lossy().to_string()) {
-                Ok(file_identifier) => {
-                    self.add_or_update_file_from_disk(file_identifier);
-                }
-                Err(err) => fatal_exit!("{err}"),
-            }
+            self.add_file(path);
         }
     }
 

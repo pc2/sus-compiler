@@ -1,0 +1,241 @@
+
+module ROM #(T, int DEPTH, T[DEPTH] DATA) {
+    action read : int #(FROM: 0, TO: DEPTH) index'0 -> T output_data'0 {
+        output_data = DATA[index]
+    }
+}
+
+module RAM #(T, int DEPTH) {
+	domain clk
+
+    gen int T_WIDTH = sizeof#(T)
+
+    gen int READ_LATENCY = 1
+
+    xpm_memory_sdpram #(
+        // Common module strings
+        MEMORY_SIZE: DEPTH * T_WIDTH,
+        MEMORY_PRIMITIVE: "auto",
+        CLOCKING_MODE: "common_clock",
+        ECC_MODE: "no_ecc",
+        ECC_TYPE: "NONE",
+        ECC_BIT_RANGE: "[7:0]",
+        MEMORY_INIT_FILE: "none",
+        MEMORY_INIT_PARAM: "",
+        USE_MEM_INIT: 1,
+        USE_MEM_INIT_MMI: 0,
+        WAKEUP_TIME: "disable_sleep",
+        AUTO_SLEEP_TIME: 0,
+        MESSAGE_CONTROL: 0,
+        USE_EMBEDDED_CONSTRAINT: 0,
+        MEMORY_OPTIMIZATION: "true",
+        CASCADE_HEIGHT: 0,
+        RAM_DECOMP: "auto",
+        SIM_ASSERT_CHK: 0,
+        WRITE_PROTECT: 1,
+        IGNORE_INIT_SYNTH: 0,
+
+        // Port A module strings
+        WRITE_DATA_WIDTH_A: T_WIDTH,
+        BYTE_WRITE_WIDTH_A: T_WIDTH,
+        ADDR_WIDTH_A: clog2#(V: DEPTH),
+        RST_MODE_A: "SYNC",
+
+        // Port B module strings
+        READ_DATA_WIDTH_B: T_WIDTH,
+        ADDR_WIDTH_B: clog2#(V: DEPTH),
+        READ_RESET_VALUE_B: "0",
+        READ_LATENCY_B: READ_LATENCY,
+        WRITE_MODE_B: "no_change",
+        RST_MODE_B: "SYNC"
+    ) mem
+
+    // Common module ports
+    mem.sleep = false
+
+    // Port A module ports
+    mem.ena = false
+    mem.wea = [true]
+    mem.injectsbiterra = false
+    mem.injectdbiterra = false
+
+    // Port B module ports
+    mem.rstb = false
+    mem.enb = false
+    mem.regceb = true
+    bool _sbiterrb = mem.sbiterrb
+    bool _dbiterrb = mem.dbiterrb
+
+    domain w_dom
+	action write'0 : int#(FROM: 0, TO: DEPTH) addr'0, T data'0 {
+        mem.ena = true
+        mem.addra = addr
+        mem.dina = ToBits(data)
+	}
+
+    bool[T_WIDTH] offset_data = LatencyOffset#(OFFSET: READ_LATENCY)(mem.doutb)
+    domain r_dom
+	action read'0: int#(FROM: 0, TO: DEPTH) read_addr'0 -> T read_data'READ_LATENCY {
+        mem.enb = true
+        mem.addrb = read_addr
+		read_data = FromBits(offset_data)
+	}
+}
+
+module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+    domain clk
+    gen int T_WIDTH = sizeof#(T)
+
+    gen int FIFO_READ_LATENCY = 1
+
+    xpm_fifo_sync #(
+        // Common module strings
+        FIFO_MEMORY_TYPE: "auto",
+        ECC_MODE: "no_ecc",
+        SIM_ASSERT_CHK: 0,
+        CASCADE_HEIGHT: 0,
+
+        FIFO_WRITE_DEPTH: DEPTH,
+        WRITE_DATA_WIDTH: T_WIDTH,
+        WR_DATA_COUNT_WIDTH: 1,
+        PROG_FULL_THRESH: DEPTH - MAY_PUSH_LATENCY,
+        FULL_RESET_VALUE: 0,
+        USE_ADV_FEATURES: "0002",
+
+        READ_MODE: "std",
+        FIFO_READ_LATENCY,
+        READ_DATA_WIDTH: T_WIDTH,
+        RD_DATA_COUNT_WIDTH: 1,
+        PROG_EMPTY_THRESH: 3, // have to use a valid value, despite not using it. 
+        DOUT_RESET_VALUE: "0",
+
+        WAKEUP_TIME: 0
+    ) fifo
+
+    // Common module ports
+    fifo.sleep = false
+
+    // Write Domain ports
+    fifo.wr_en = false
+    bool _full = fifo.full
+    int _wr_data_count = fifo.wr_data_count
+    bool _overflow = fifo.overflow
+    bool _wr_rst_busy = fifo.wr_rst_busy
+    bool _almost_full = fifo.almost_full
+    bool _wr_ack = fifo.wr_ack
+
+    // Read Domain ports
+    fifo.rd_en = false
+    bool _empty = fifo.empty
+    bool _prog_empty = fifo.prog_empty
+    int _rd_data_count = fifo.rd_data_count
+    bool _underflow = fifo.underflow
+    bool _rd_rst_busy = fifo.rd_rst_busy
+    bool _almost_empty = fifo.almost_empty
+    bool _data_valid = fifo.data_valid
+
+    // ECC Related ports
+    fifo.injectsbiterr = false
+    fifo.injectdbiterr = false
+    bool _sbiterr = fifo.sbiterr
+    bool _dbiterr = fifo.dbiterr
+    
+    fifo.rst = false
+    action rst {
+        fifo.rst = true
+    }
+
+    domain push_dom
+    output bool may_push'-MAY_PUSH_LATENCY = !LatencyOffset#(OFFSET: -MAY_PUSH_LATENCY)(fifo.prog_full)
+    action push'0 : T push_data'0 {
+        fifo.wr_en = true
+        fifo.din = ToBits(push_data)
+    }
+    
+    domain pop_dom
+    output bool may_pop'0 = !fifo.empty
+    bool[] fifo_pop_data = LatencyOffset#(OFFSET: FIFO_READ_LATENCY)(fifo.dout)
+    action pop'0 : -> T pop_data'FIFO_READ_LATENCY {
+        fifo.rd_en = true
+        pop_data = FromBits(fifo_pop_data)
+    }
+}
+
+module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+    domain clk
+    gen int T_WIDTH = sizeof#(T)
+
+    xpm_fifo_sync #(
+        // Common module strings
+        FIFO_MEMORY_TYPE: "auto",
+        ECC_MODE: "no_ecc",
+        SIM_ASSERT_CHK: 0,
+        CASCADE_HEIGHT: 0,
+
+        FIFO_WRITE_DEPTH: DEPTH,
+        WRITE_DATA_WIDTH: T_WIDTH,
+        WR_DATA_COUNT_WIDTH: 1,
+        PROG_FULL_THRESH: DEPTH - MAY_PUSH_LATENCY,
+        FULL_RESET_VALUE: 0,
+        USE_ADV_FEATURES: "0002",
+
+        READ_MODE: "fwft",
+        FIFO_READ_LATENCY: 0,
+        READ_DATA_WIDTH: T_WIDTH,
+        RD_DATA_COUNT_WIDTH: 1,
+        PROG_EMPTY_THRESH: 3, // have to use a valid value, despite not using it. 
+        DOUT_RESET_VALUE: "0",
+
+        WAKEUP_TIME: 0
+    ) fifo
+
+    // Common module ports
+    fifo.sleep = false
+
+    // Write Domain ports
+    fifo.wr_en = false
+    bool _full = fifo.full
+    int _wr_data_count = fifo.wr_data_count
+    bool _overflow = fifo.overflow
+    bool _wr_rst_busy = fifo.wr_rst_busy
+    bool _almost_full = fifo.almost_full
+    bool _wr_ack = fifo.wr_ack
+
+    // Read Domain ports
+    fifo.rd_en = false
+    bool _prog_empty = fifo.prog_empty
+    int _rd_data_count = fifo.rd_data_count
+    bool _underflow = fifo.underflow
+    bool _rd_rst_busy = fifo.rd_rst_busy
+    bool _almost_empty = fifo.almost_empty
+    bool _data_valid = fifo.data_valid
+
+    // ECC Related ports
+    fifo.injectsbiterr = false
+    fifo.injectdbiterr = false
+    bool _sbiterr = fifo.sbiterr
+    bool _dbiterr = fifo.dbiterr
+    
+    fifo.rst = false
+    action rst {
+        fifo.rst = true
+    }
+
+    domain write
+    output bool may_push'-MAY_PUSH_LATENCY = !LatencyOffset#(OFFSET: -MAY_PUSH_LATENCY)(fifo.prog_full)
+    action push'0 : T push_data'0 {
+        fifo.wr_en = true
+        fifo.din = ToBits(push_data)
+    }
+    
+    domain read
+    fifo.rd_en = false
+    trigger pop_available'0 : T pop_data'0 {
+        action pop'0 {
+            fifo.rd_en = true
+        }
+    }
+    when !fifo.empty {
+        pop_available(FromBits(fifo.dout))
+    }
+}

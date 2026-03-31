@@ -51,6 +51,12 @@ pub enum ConnectionMethod {
     Tcp { port: u16, should_listen: bool },
 }
 
+const KNOWN_FEATURES: [&str; 1] = ["xpm"];
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Features {
+    pub xpm: bool,
+}
+
 /// All command-line flags are converted to this struct, of which the singleton instance can be acquired using [crate::config::config]
 #[derive(Debug)]
 pub struct ConfigStruct {
@@ -62,9 +68,9 @@ pub struct ConfigStruct {
     /// When no top modules specified, then codegen all
     pub top_modules: Vec<String>,
     pub use_color: bool,
-    pub ci: bool,
     pub target_language: TargetLanguage,
     pub files: Vec<PathBuf>,
+    pub features: Features,
 
     /// Enable debugging printouts and figures
     ///
@@ -73,6 +79,7 @@ pub struct ConfigStruct {
     /// If the list is empty, debug everything
     ///
     /// See also [Self::enabled_debug_paths]
+    pub ci: bool,
     pub debug_whitelist: Vec<String>,
     pub enabled_debug_paths: HashSet<String>,
     pub early_exit: EarlyExitUpTo,
@@ -153,11 +160,11 @@ fn command_builder() -> Command {
             .long("nocolor")
             .help("Disables color printing in the errors of the sus_compiler output")
             .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("ci")
-            .long("ci")
-            .hide(true)
-            .help("Makes the compiler output as environment agnostic as possible")
-            .action(clap::ArgAction::SetTrue))
+        .arg(Arg::new("feature")
+            .long("feature")
+            .help("Enables compiler optimizations")
+            .value_parser(KNOWN_FEATURES)
+            .action(clap::ArgAction::Append))
         .arg(Arg::new("files")
             .action(clap::ArgAction::Append)
             .help(".sus Files")
@@ -192,6 +199,11 @@ fn command_builder() -> Command {
             })
         )
         // Debug stuff
+        .arg(Arg::new("ci")
+            .long("ci")
+            .hide(true)
+            .help("Makes the compiler output as environment agnostic as possible")
+            .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("debug")
             .long("debug")
             .hide(true)
@@ -309,6 +321,14 @@ pub fn parse_args() {
         }
     };
 
+    let mut features = Features::default();
+    for feature in matches.get_many::<String>("feature").unwrap_or_default() {
+        match feature.as_str() {
+            "xpm" => features.xpm = true,
+            _ => unreachable!("Unknown feature '{feature}'"),
+        }
+    }
+
     let ci = matches.get_flag("ci");
 
     if !ci {
@@ -354,6 +374,7 @@ pub fn parse_args() {
         codegen_separate_folder,
         top_modules,
         target_language,
+        features,
         use_color,
         ci,
         debug_whitelist,
@@ -378,6 +399,7 @@ pub fn init_cfg_for_test() {
         top_modules: Vec::new(),
         target_language: TargetLanguage::SystemVerilog,
         use_color: true,
+        features: Features::default(),
         ci: false,
         debug_whitelist: Vec::new(),
         enabled_debug_paths: HashSet::new(),

@@ -342,3 +342,43 @@ module Tuple5 #(T1, T2, T3, T4, T5) {
     v4_o = FromBits(packed_i[TO3:TO4])
     v5_o = FromBits(packed_i[TO4:])
 }
+
+/// A FIFO implemented as a sequence of registers with a accompanying valid bit. 
+///
+/// Bandwidth limited to 1 element every 2 cycles.  
+///
+/// Use for very small FIFOs, in bandwidth-limited circumstances. 
+module RippleFIFO#(T, int DEPTH) {
+    domain clk
+	state T[DEPTH] datas
+	state bool[DEPTH] valids
+
+	for int I in 0..DEPTH - 1 {
+		when !valids[I+1] & valids[I] {
+			datas[I+1] = datas[I]
+			valids[I+1] = true
+			valids[I] = false
+		}
+	}
+
+	domain push_dom
+	output bool may_push'0 = !valids[0]
+	action push'0: T push_data'0 {
+		datas[0] = push_data
+		valids[0] = true
+	}
+
+	domain pop_dom
+	output bool may_pop'0 = valids[DEPTH-1]
+	action pop'0 : -> T pop_data'0 {
+		pop_data = datas[DEPTH-1]
+		valids[DEPTH-1] = false
+	}
+
+    domain reset
+    action rst {
+        for int I in 0..DEPTH {
+            valids[I] = false
+        }
+    }
+}

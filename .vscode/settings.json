@@ -6,6 +6,7 @@
     "--sus-home", ".",
     // Tracking down slow compilations
     "--kill-timeout", "2.0",
+    "--feature", "xpm",
     "test.sus"
     //, "--upto", "typecheck"
   ],
