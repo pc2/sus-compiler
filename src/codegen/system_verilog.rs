@@ -10,7 +10,9 @@ use crate::latency::AbsLat;
 use crate::linker::{IsExtern, LinkInfo};
 use crate::prelude::*;
 
-use crate::flattening::{BinaryOperator, Direction, Module, PartSelectDirection, UnaryOperator};
+use crate::flattening::{
+    BinaryOperator, ClockVisibility, Direction, Module, PartSelectDirection, UnaryOperator,
+};
 use crate::instantiation::{
     InstantiatedModule, InstantiatedPort, IsPort, MultiplexerSource, RealWire, RealWireDataSource,
     RealWirePathElem,
@@ -584,7 +586,7 @@ impl<'g> CodeGenerationContext<'g> {
 
             let to_decl = to.make_declaration();
 
-            let clk_name = self.md.get_clock_name();
+            let clk_name = &self.instance.clocks[w.clock].name;
             writeln!(
                 self.program_text,
                 "/*latency*/ logic{to_decl}; always_ff @(posedge {clk_name}) begin {to} <= {from}; end"
@@ -653,10 +655,17 @@ impl<'g> CodeGenerationContext<'g> {
 
     fn write_module_signature(&mut self) {
         // First output the interface of the module
-        let clk_name = self.md.get_clock_name();
         let module_name = &self.instance.mangled_name;
         let mut port_list = CommaSeparatedList::new("// (zero sized) ");
-        port_list.line(format!("input {clk_name}"));
+        for (_, clk) in &self.instance.clocks {
+            let clk_name = &clk.name;
+            let direction = match clk.visibility {
+                ClockVisibility::Input => "input",
+                ClockVisibility::Output => "output",
+                ClockVisibility::Local => continue, // Declare outside of ports
+            };
+            port_list.line(format!("/* clock */ {direction} {clk_name}"));
+        }
         for (_id, port_wire) in &self.instance.wires {
             let IsPort::Port(_, direction) = port_wire.is_port else {
                 continue;
@@ -684,6 +693,13 @@ impl<'g> CodeGenerationContext<'g> {
             }
         }
         writeln!(self.program_text, "module {module_name}({port_list});\n").unwrap();
+
+        for (_, clk) in &self.instance.clocks {
+            let clk_name = &clk.name;
+            if clk.visibility == ClockVisibility::Local {
+                port_list.line(format!("/* local clock */ wire {clk_name}"));
+            }
+        }
 
         // Add latency registers for the interface declarations
         // Should not appear in the program text for extern modules
@@ -1162,7 +1178,6 @@ impl<'g> CodeGenerationContext<'g> {
     }
 
     fn write_submodules(&mut self) {
-        let parent_clk_name = self.md.get_clock_name();
         for (_id, sm) in &self.instance.submodules {
             let sm_md = &self.linker.modules[sm.refers_to.id];
 
@@ -1176,8 +1191,12 @@ impl<'g> CodeGenerationContext<'g> {
             let sm_name = &sm.name;
 
             let mut port_list = CommaSeparatedList::new("// (zero sized port) ");
-            let submod_clk = sm_md.get_clock_name();
-            port_list.line(format!(".{submod_clk}({parent_clk_name})"));
+
+            for (sm_clock_id, maps_to_parent) in &sm.clock_map {
+                let submod_clk = &sm_inst.clocks[sm_clock_id].name;
+                let parent_clk = &self.instance.clocks[*maps_to_parent].name;
+                port_list.line(format!(".{submod_clk}({parent_clk})"));
+            }
 
             for (port_id, iport) in sm_inst.interface_ports.iter_valids() {
                 let sm_port = &sm_inst.wires[iport.wire];
@@ -1273,7 +1292,7 @@ impl<'g> CodeGenerationContext<'g> {
                 RealWireDataSource::Multiplexer { is_state, sources } => {
                     let output_name = self.output_wire_name(w);
                     let arrow_str = if is_state.is_some() {
-                        let clk_name = self.md.get_clock_name();
+                        let clk_name = &self.instance.clocks[w.clock].name;
                         writeln!(
                             self.program_text,
                             "always_ff @(posedge {clk_name}) begin // state {output_name}"

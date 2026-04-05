@@ -1,4 +1,4 @@
-mod domain_check;
+mod clock_check;
 mod lints;
 mod type_check;
 
@@ -8,7 +8,6 @@ pub use lints::perform_lints;
 use typed_arena::Arena;
 
 use crate::{
-    alloc::UUIDAllocator,
     errors::ErrorInfo,
     linker::{
         GlobalObj,
@@ -108,17 +107,19 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
     let (working_on, globals) = pass.get_with_context();
     let link_info = working_on.get_link_info();
     let typ_alloc = Arena::new();
-    let domains = if let GlobalObj::Module(md) = working_on {
+    let clocks = if let GlobalObj::Module(md) = working_on {
         &md.clocks
     } else {
         &FlatAlloc::EMPTY_FLAT_ALLOC
     };
+    let mut interior_clocks = clocks.clone();
+
     let context = TypeCheckingContext {
         globals,
         errors,
         instructions: &link_info.instructions,
         link_info,
-        domains,
+        domains: clocks,
         typ_alloc: &typ_alloc,
         unifier: AbstractUnifier::new(),
     };
@@ -133,7 +134,7 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
     // This order is important, such that unknown domains get IDd here,
     // but the errors for incomplete types are reported *after* reporting the unification errors,
     // so we can choose not to report incomplete type errors.
-    context.finalize_domains();
+    context.finalize_domains(&mut interior_clocks);
     context.unifier.report_delayed_errors();
     context.finalize_types();
     std::mem::drop(context);
@@ -145,5 +146,6 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
             &md.link_info.instructions,
             &md.link_info.parameters,
         );
+        md.interior_clocks = interior_clocks;
     }
 }

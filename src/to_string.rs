@@ -775,13 +775,13 @@ impl LinkInfo {
     pub fn fmt_instructions(
         &self,
         f: &mut Formatter<'_>,
-        domains: &FlatAlloc<ClockInfo, ClockIDMarker>,
+        parent_clocks: &FlatAlloc<ClockInfo, ClockIDMarker>,
         linker_files: &LinkerFiles,
         globals: &LinkerGlobals,
     ) -> std::fmt::Result {
         let mut spans_print = Vec::new();
         for (id, instr) in &self.instructions {
-            let domain = self.display_domain_of(id, domains);
+            let domain = self.display_domain_of(id, parent_clocks);
             let span = self.get_instruction_span(id);
             spans_print.push((span, format!("{id:?} {domain}")));
 
@@ -810,16 +810,16 @@ impl LinkInfo {
                     let disp_md_ref = module_ref.display(globals, &self.parameters);
                     let name = name.green();
                     write!(f, "{disp_md_ref} {name}")?;
-                    let submod_domains = &globals[module_ref.id].clocks;
+                    let submod_clocks = &globals[module_ref.id].clocks;
                     if let Some(local_domain_map) = local_domain_map.get() {
                         let domain_map = display_join(
                             ", ",
                             local_domain_map,
                             |f, (submod_domain, domain_here)| {
-                                let submod_domain = submod_domain.display(submod_domains);
-                                let domain_here = *domain_here.unwrap();
-                                let domain_here = domain_here.display(domains);
-                                write!(f, ".{submod_domain} = {domain_here}")
+                                let submod_clock = submod_domain.display(submod_clocks);
+                                let parent_clock = *domain_here.unwrap();
+                                let parent_clock = parent_clock.display(parent_clocks);
+                                write!(f, ".{submod_clock} = {parent_clock}")
                             },
                         );
                         write!(f, "[{domain_map}]")?;
@@ -858,7 +858,7 @@ impl LinkInfo {
                                      target_domain,
                                      ..
                                  }| {
-                                    let target_domain = target_domain.display(domains);
+                                    let target_domain = target_domain.display(parent_clocks);
                                     let typ_disp = to.output_typ.display(globals, self);
                                     let to = to.display(globals, self);
                                     write!(f, "{target_domain} ({typ_disp}) {write_modifiers} {to}")
@@ -1092,7 +1092,7 @@ impl Module {
             )?;
             writeln!(f, "Instructions:")?;
             self.link_info
-                .fmt_instructions(f, &self.clocks, linker_files, globals)
+                .fmt_instructions(f, &self.interior_clocks, linker_files, globals)
         });
 
         eprintln!("{disp}");
@@ -1253,11 +1253,11 @@ impl ModuleTypingContext<'_> {
                 "".purple()
             };
             let typ_str = typ.display(self.globals).to_string().red();
-            let domain_name = domain.display(&self.md.clocks);
+            let clock_name = domain.display(&self.md.interior_clocks);
             let name = name.green();
             write!(
                 f,
-                "{name}: {is_port_str}{typ_str}'{absolute_latency} {domain_name} [{original_instruction:?}]"
+                "{name}: {is_port_str}{typ_str}'{absolute_latency} {clock_name} [{original_instruction:?}]"
             )?;
             match source {
                 RealWireDataSource::ReadOnly => writeln!(f, " = ReadOnly")?,
@@ -1337,13 +1337,14 @@ impl ModuleTypingContext<'_> {
                 instance,
                 refers_to,
                 last_infer_values: _,
+                clock_map,
                 port_map,
                 field_call_sites: _,
                 name,
             },
         ) in &self.submodules
         {
-            let instance_md = &self.globals[refers_to.id];
+            let submod_md = &self.globals[refers_to.id];
             let refers_to = refers_to.display(self.globals);
             let instantiate_success = if instance.get().is_some() {
                 "Instantiation Successful!".yellow()
@@ -1354,7 +1355,12 @@ impl ModuleTypingContext<'_> {
                 f,
                 "{name}: {refers_to}[{original_instruction:?}]: {instantiate_success}"
             )?;
-            for (port_id, port, usage) in zip_eq(&instance_md.ports, port_map) {
+            for (_clock_id, submod_clk, parent_clock) in zip_eq(&submod_md.clocks, clock_map) {
+                let submod_clk_name = &submod_clk.name;
+                let parent_clk_name = &self.clocks[*parent_clock].name;
+                writeln!(f, "    clock .{submod_clk_name}({parent_clk_name})")?;
+            }
+            for (port_id, port, usage) in zip_eq(&submod_md.ports, port_map) {
                 let local_name = if let Some(p) = usage {
                     self.name(p.maps_to_wire).to_string()
                 } else {
@@ -1444,6 +1450,7 @@ pub fn display_maybe<T>(
     FmtWrapper(move |f| if let Some(v) = v { func(f, v) } else { Ok(()) })
 }
 
+#[allow(unused)]
 pub fn display_if(b: bool, func: impl Fn(&mut Formatter<'_>) -> std::fmt::Result) -> impl Display {
     FmtWrapper(move |f| if b { func(f) } else { Ok(()) })
 }

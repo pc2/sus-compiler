@@ -33,6 +33,7 @@ pub fn execute(
     link_info: &LinkInfo,
     globals: &LinkerGlobals,
     working_on_template_args: &TVec<ConcreteTemplateArg>,
+    interior_clocks: &FlatAlloc<ClockInfo, ClockIDMarker>,
 ) -> Executed {
     let mut context = ExecutionContext {
         generation_state: GenerationState {
@@ -50,10 +51,19 @@ pub fn execute(
         link_info,
         globals,
     };
+    let clocks = interior_clocks.map(|(_, cl)| {
+        let name = context.unique_name_producer.get_unique_name(&cl.name);
+        InstantiatedClock {
+            name,
+            visibility: cl.visibility,
+            driver: None,
+        }
+    });
 
     let execution_status = context.instantiate_code_block(link_info.instructions.id_range());
 
     Executed {
+        clocks,
         wires: context.wires,
         submodules: context.submodules,
         generation_state: context.generation_state.generation_state,
@@ -1146,7 +1156,7 @@ impl<'l> ExecutionContext<'l> {
         &mut self,
         interface_ref: &'l WireReference,
         original_instruction: FlatID,
-        domain: ClockID,
+        parent_clock: ClockID,
     ) -> ExecutionResult<InterfaceWires> {
         match &interface_ref.root {
             WireReferenceRoot::LocalSubmodule(submod_decl_id) => {
@@ -1154,14 +1164,17 @@ impl<'l> ExecutionContext<'l> {
 
                 let (interface, name_span, path) = self.execute_wire_ref_path(interface_ref)?;
 
-                Ok(self.get_submodule_interface(submod_id, interface, name_span, domain))
+                Ok(self.get_submodule_interface(submod_id, interface, name_span, parent_clock))
             }
             WireReferenceRoot::NamedModule(module_ref) => {
                 let md = &self.globals.modules[module_ref.id];
+                // It's a single clock, since it's an inline module.
+                let clock_map = FlatAlloc::from_vec(vec![parent_clock]);
                 let submod_id = self.instantiate_submodule(
                     module_ref,
                     &md.link_info.name,
                     original_instruction,
+                    clock_map,
                 )?;
 
                 assert!(interface_ref.path.is_empty());
@@ -1169,7 +1182,7 @@ impl<'l> ExecutionContext<'l> {
                     submod_id,
                     FieldID::MAIN_INTERFACE,
                     module_ref.get_total_span(),
-                    domain,
+                    parent_clock,
                 ))
             }
             WireReferenceRoot::LocalInterface(interface_decl) => {
@@ -1534,6 +1547,7 @@ impl<'l> ExecutionContext<'l> {
         module_ref: &GlobalReference<ModuleUUID>,
         name_origin: &str,
         original_instruction: FlatID,
+        clock_map: FlatAlloc<ClockID, ClockIDMarker>,
     ) -> ExecutionResult<SubModuleID> {
         let sub_module = &self.globals.modules[module_ref.id];
 
@@ -1560,6 +1574,7 @@ impl<'l> ExecutionContext<'l> {
                     }),
             ),
             refers_to,
+            clock_map,
             port_map,
             field_call_sites,
             name: self.unique_name_producer.get_unique_name(name_origin),
@@ -1650,10 +1665,16 @@ impl<'l> ExecutionContext<'l> {
                 .debug();
             let instance_to_add: SubModuleOrWire = match instr {
                 Instruction::SubModule(submodule) => {
+                    let clock_map = submodule
+                        .submodule_clock_map
+                        .get()
+                        .unwrap()
+                        .map(|(_, cl)| *cl.unwrap());
                     SubModuleOrWire::SubModule(self.instantiate_submodule(
                         &submodule.module_ref,
                         &submodule.name,
                         original_instruction,
+                        clock_map,
                     )?)
                 }
                 Instruction::Declaration(wire_decl) => {

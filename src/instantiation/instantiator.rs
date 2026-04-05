@@ -196,6 +196,7 @@ impl Executed {
             mangled_name: mangle_name(&name),
             name,
             global_ref,
+            clocks: self.clocks,
             wires: self.wires,
             submodules: self.submodules,
             generation_state: self.generation_state,
@@ -248,6 +249,7 @@ fn start_instantiation<'l>(
             mangled_name: mangle_name(&name),
             name,
             errors: errors.into_storage(),
+            clocks: Default::default(),
             interface_ports: Default::default(),
             wires: Default::default(),
             submodules: Default::default(),
@@ -287,6 +289,7 @@ fn start_instantiation<'l>(
             mangled_name: mangle_name(&name),
             name,
             errors: errors.into_storage(),
+            clocks: Default::default(),
             interface_ports: Default::default(),
             wires: Default::default(),
             submodules: Default::default(),
@@ -298,7 +301,12 @@ fn start_instantiation<'l>(
     }
 
     debug!("Executing {name}");
-    let exec = execute::execute(&md.link_info, linker_globals, &global_ref.template_args);
+    let exec = execute::execute(
+        &md.link_info,
+        linker_globals,
+        &global_ref.template_args,
+        &md.interior_clocks,
+    );
 
     let typed = exec.into_module_typing_context(linker_globals, linker_files, md, global_ref, name);
     let name = &typed.name;

@@ -186,6 +186,7 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated IntNarrow #(FROM_I: 0, TO_I: 1, FROM: -3, TO: 6)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated IntNarrowToZero #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated NegativeIntLiterals #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated WeirdlyNamedClock #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
     ╭─[ memory.sus:11:13 ]
     │

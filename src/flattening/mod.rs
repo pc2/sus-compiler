@@ -54,8 +54,11 @@ pub struct Module {
     /// Created in Stage 2: Flattening
     pub inference_info: PortLatencyInferenceInfo,
 
-    /// Created in Stage 2: Initialization
+    /// Created in Stage 2: Flattening
+    /// These are the clocks visible on the module's interface.
     pub clocks: FlatAlloc<ClockInfo, ClockIDMarker>,
+    /// Created at Typecheck Finalization. The first elements are identical to `self.clocks`. Afterwards, local undriven (or driven by a submodule) clocks follow.
+    pub interior_clocks: FlatAlloc<ClockInfo, ClockIDMarker>,
 
     pub latency_domains: FlatAlloc<LatencyDomainInfo, LatDomIDMarker>,
 
@@ -66,12 +69,6 @@ pub struct Module {
 }
 
 impl Module {
-    /// Temporary upgrade such that we can name the singular clock of the module, such that weirdly-named external module clocks can be used
-    ///
-    /// See #7
-    pub fn get_clock_name(&self) -> &str {
-        &self.clocks.iter().next().unwrap().1.name
-    }
     pub fn get_fn_interface(&self, field_id: FieldID) -> &InterfaceDeclaration {
         let interface = &self.fields[field_id];
         let_unwrap!(
@@ -146,6 +143,13 @@ pub struct NamedConstant {
     pub output_decl: FlatID,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClockVisibility {
+    Input,
+    Output,
+    Local,
+}
+
 /// Information about a clock domain.
 ///
 /// Right now this only contains the clock name, but when actual clock domains are implemented (#7),
@@ -153,6 +157,9 @@ pub struct NamedConstant {
 #[derive(Debug, Clone)]
 pub struct ClockInfo {
     pub name: String,
+    pub visibility: ClockVisibility,
+    /// If this clock is driven by a submodule.
+    pub submodule_driver: Option<(FlatID, ClockID)>,
     /// May be [None] for the default `clk` domain
     pub name_span: Option<Span>,
 }

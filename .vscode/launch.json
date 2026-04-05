@@ -70,6 +70,7 @@
             },
             "sourceLanguages": ["rust"],
             "args": [
+                "test.sus",
                 "-o", "/dev/null",
                 "--no-redump",
             ],

@@ -1858,3 +1858,7 @@ module NegativeIntLiterals {
 		int j = I
 	}
 }
+
+module WeirdlyNamedClock {
+	domain default
+}

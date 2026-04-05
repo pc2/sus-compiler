@@ -1,3 +1,4 @@
+use crate::flattening::ClockVisibility;
 use crate::typing::unifyable_cell::UniCell;
 use crate::{errors::CompileError, prelude::*};
 
@@ -181,6 +182,8 @@ pub struct SubModule {
     pub instance: OnceCell<Rc<InstantiatedModule>>,
     pub refers_to: ConcreteGlobalReference<ModuleUUID>,
     pub last_infer_values: RefCell<TVec<Vec<InferenceResult>>>,
+    /// How each of this submodule's clocks map to the clock in the parent module (`clock_map[submod_clock] = parent_clock`)
+    pub clock_map: FlatAlloc<ClockID, ClockIDMarker>,
     pub port_map: FlatAlloc<Option<SubModulePort>, PortIDMarker>,
     pub field_call_sites: FlatAlloc<Vec<Span>, FieldIDMarker>,
     pub name: String,
@@ -229,6 +232,13 @@ pub struct InstantiatedPort {
     pub latency_domain: LatDomID,
 }
 
+#[derive(Debug)]
+pub struct InstantiatedClock {
+    pub name: String,
+    pub visibility: ClockVisibility,
+    pub driver: Option<(SubModuleID, ClockID)>,
+}
+
 /// [InstantiatedModule] are the final product we're trying to produce with the compiler.
 /// They amount to little more than a collection of wires, multiplexers and submodules.
 ///
@@ -243,6 +253,7 @@ pub struct InstantiatedModule {
     /// Used in code generation. Only contains characters allowed in SV and VHDL
     pub mangled_name: String,
     pub errors: ErrorStore,
+    pub clocks: FlatAlloc<InstantiatedClock, ClockIDMarker>,
     /// This matches the ports in [Module::ports]. Ports are not `None` when they are not part of this instantiation.
     pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
@@ -402,6 +413,7 @@ pub enum InferenceResult {
 }
 
 struct Executed {
+    clocks: FlatAlloc<InstantiatedClock, ClockIDMarker>,
     wires: FlatAlloc<RealWire, WireIDMarker>,
     submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
     generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
@@ -412,6 +424,7 @@ pub struct ModuleTypingContext<'l> {
     pub name: String,
     pub mangled_name: String,
     pub global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
+    pub clocks: FlatAlloc<InstantiatedClock, ClockIDMarker>,
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
     pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
     pub generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
@@ -460,6 +473,7 @@ impl<'l> ModuleTypingContext<'l> {
             name: self.name,
             mangled_name: self.mangled_name,
             errors: self.errors.into_storage(),
+            clocks: self.clocks,
             interface_ports,
             wires: self.wires,
             submodules: self.submodules,

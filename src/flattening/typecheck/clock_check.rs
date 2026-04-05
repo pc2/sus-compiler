@@ -377,22 +377,29 @@ impl<'l> TypeCheckingContext<'l> {
     fn finalize_physical(
         &self,
         domain: &'l UniCell<ClockID>,
-        id_alloc: &mut UUIDAllocator<ClockIDMarker>,
+        clocks: &mut FlatAlloc<ClockInfo, ClockIDMarker>,
     ) {
         if self.unifier.resolve(domain).is_err() {
-            self.unifier.set_hard(domain, id_alloc.alloc());
+            let new_clock_idx = clocks.len();
+            let new_clock = ClockInfo {
+                name: format!("Unconnected_clock_{new_clock_idx}"),
+                name_span: None,
+                visibility: ClockVisibility::Local,
+                submodule_driver: None,
+            };
+            self.unifier.set_hard(domain, clocks.alloc(new_clock));
         }
         assert!(self.unifier.fully_substitute(domain));
     }
     fn finalize_domain(
         &self,
         domain: &'l UniCell<ClockDomain>,
-        id_alloc: &mut UUIDAllocator<ClockIDMarker>,
+        clocks: &mut FlatAlloc<ClockInfo, ClockIDMarker>,
     ) {
         match self.unifier.resolve(domain) {
             Ok(Generative) => {}
             Ok(Physical(phys)) => {
-                self.finalize_physical(phys, id_alloc);
+                self.finalize_physical(phys, clocks);
             }
             Err(_) => {
                 self.unifier.set_hard(domain, Generative);
@@ -400,26 +407,24 @@ impl<'l> TypeCheckingContext<'l> {
         }
         assert!(self.unifier.fully_substitute(domain));
     }
-    pub fn finalize_domains(&self) {
-        let mut unknown_domain_alloc =
-            UUIDAllocator::new_start_from(self.domains.get_next_alloc_id());
+    pub fn finalize_domains(&self, clocks: &mut FlatAlloc<ClockInfo, ClockIDMarker>) {
         for (_, instr) in self.instructions {
             match instr {
                 Instruction::SubModule(sm) => {
                     for (_, d) in sm.submodule_clock_map.get().unwrap() {
-                        self.finalize_physical(d, &mut unknown_domain_alloc);
+                        self.finalize_physical(d, clocks);
                     }
                 }
                 Instruction::Declaration(declaration) => match &declaration.clock_domain {
                     Generative => {}
-                    Physical(phys) => self.finalize_physical(phys, &mut unknown_domain_alloc),
+                    Physical(phys) => self.finalize_physical(phys, clocks),
                 },
                 Instruction::Expression(expr) => {
-                    self.finalize_domain(&expr.clock_domain, &mut unknown_domain_alloc);
+                    self.finalize_domain(&expr.clock_domain, clocks);
 
                     if let ExpressionOutput::MultiWrite(writes) = &expr.output {
                         for w in writes {
-                            self.finalize_domain(&w.target_domain, &mut unknown_domain_alloc);
+                            self.finalize_domain(&w.target_domain, clocks);
                         }
                     }
                 }

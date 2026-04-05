@@ -1653,6 +1653,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             }
             self.clocks.alloc(ClockInfo {
                 name: domain_name.to_owned(),
+                visibility: ClockVisibility::Input,
+                submodule_driver: None,
                 name_span: Some(domain_name_span),
             });
         }
@@ -2040,6 +2042,8 @@ fn flatten_global(
             if clocks.is_empty() {
                 clocks.alloc(ClockInfo {
                     name: "clk".to_string(),
+                    visibility: ClockVisibility::Input,
+                    submodule_driver: None,
                     name_span: None,
                 });
             }

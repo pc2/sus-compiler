@@ -1,6 +1,15 @@
+// WeirdlyNamedClock #()
+module WeirdlyNamedClock(
+	/* clock */ input default_1
+);
+
+// PATCH XRT 2.16 over-zealous empty module DRC
+initial begin end
+endmodule
+
 // NegativeIntLiterals #()
 module NegativeIntLiterals(
-	input clk
+	/* clock */ input clk
 );
 
 /*mux_wire*/ logic signed[4:0] j;
@@ -126,7 +135,7 @@ endmodule
 
 // IntNarrowToZero #()
 module IntNarrowToZero(
-	input clk
+	/* clock */ input clk
 );
 
 // (zero sized) x
@@ -136,12 +145,12 @@ module IntNarrowToZero(
 // (zero sized) _IntNarrow_2_din
 wire signed[3:0] _IntNarrow_2_dout;
 IntNarrow_FROM_I_5_TO_I_6_FROM_0_TO_1 IntNarrow(
-	.clk(clk),
+	.clk(Unconnected_clock_1),
 	.din(_IntNarrow_din)
 	// (zero sized port) .dout(_IntNarrow_dout)
 );
 IntNarrow_FROM_I_0_TO_I_1_FROM_3_TO_6 IntNarrow_2(
-	.clk(clk),
+	.clk(Unconnected_clock_2),
 	// (zero sized port) .din(_IntNarrow_2_din)
 	.dout(_IntNarrow_2_dout)
 );
@@ -159,7 +168,7 @@ endmodule
 
 // UseModWithDomains #()
 module UseModWithDomains(
-	input clk
+	/* clock */ input clk
 );
 
 wire _mwd_b_trig;
@@ -168,7 +177,7 @@ wire _mwd_b_data;
 /*mux_wire*/ logic _mwd_a_act;
 /*mux_wire*/ logic _mwd_a_data;
 ModWithDomains mwd(
-	.b(clk),
+	.b(Unconnected_clock_1),
 	.b_trig(_mwd_b_trig),
 	.b_data(_mwd_b_data),
 	.a_act(_mwd_a_act),
@@ -200,7 +209,7 @@ endmodule
 
 // ModWithDomains #()
 module ModWithDomains(
-	input b,
+	/* clock */ input b,
 	output /*mux_wire*/ logic b_trig,
 	output /*mux_wire*/ logic b_data,
 	input wire a_act,
@@ -226,7 +235,7 @@ endmodule
 
 // CountBitsWithSplits #()
 module CountBitsWithSplits(
-	input clk,
+	/* clock */ input clk,
 	input wire[19:0] bits,
 	output /*mux_wire*/ logic[4:0] total
 );
@@ -700,7 +709,7 @@ endmodule
 
 // TestSplits #()
 module TestSplits(
-	input clk,
+	/* clock */ input clk,
 	input wire y
 );
 
@@ -836,7 +845,7 @@ endmodule
 
 // TestZerosArrays #()
 module TestZerosArrays(
-	input clk
+	/* clock */ input clk
 );
 
 genvar _g0;
@@ -871,7 +880,7 @@ assign _12[_g0] = _10[_g0] + 1'd0;
 end
 endgenerate
 ReceiveZerosArray ReceiveZerosArray(
-	.clk(clk)
+	.clk(Unconnected_clock_3)
 	// (zero sized port) .values(_ReceiveZerosArray_values)
 );
 always_comb begin // combinatorial vs
@@ -899,7 +908,7 @@ endmodule
 
 // ReceiveZerosArray #()
 module ReceiveZerosArray(
-	input clk
+	/* clock */ input clk
 	// (zero sized) input values
 );
 
@@ -909,7 +918,7 @@ endmodule
 
 // TestGenArrayOps #()
 module TestGenArrayOps(
-	input clk
+	/* clock */ input clk
 );
 
 // PATCH XRT 2.16 over-zealous empty module DRC
@@ -918,13 +927,13 @@ endmodule
 
 // ModuleWithInitialStates #()
 module ModuleWithInitialStates(
-	input clk,
+	/* clock */ input clk,
 	output /*state*/ logic[4:0] O = 5'bx10xx,
 	output /*state*/ logic[1:0] X[1:0] = '{2'd1, 2'd2}
 );
 
 /*state*/ logic[4:0] A = 5'bx1xxx;
-always_ff @(posedge clk) begin // state A
+always_ff @(posedge Unconnected_clock_1) begin // state A
 end
 always_ff @(posedge clk) begin // state O
 end
@@ -934,7 +943,7 @@ endmodule
 
 // testRemainder #()
 module testRemainder(
-	input clk
+	/* clock */ input clk
 );
 
 /*mux_wire*/ logic[3:0] a;
@@ -969,7 +978,7 @@ endmodule
 
 // testShifts #()
 module testShifts(
-	input clk
+	/* clock */ input clk
 );
 
 // PATCH XRT 2.16 over-zealous empty module DRC
@@ -978,7 +987,7 @@ endmodule
 
 // test_all_modulos #()
 module test_all_modulos(
-	input clk
+	/* clock */ input clk
 );
 
 /*mux_wire*/ logic[3:0] unsigned_val;
@@ -1050,7 +1059,7 @@ endmodule
 
 // zero_sized_stuffs #()
 module zero_sized_stuffs(
-	input clk
+	/* clock */ input clk
 );
 
 // (zero sized) x
@@ -1068,7 +1077,7 @@ module zero_sized_stuffs(
 // (zero sized) b
 // (zero sized) _8
 UIntToBits_NUM_BITS_0 UIntToBits(
-	.clk(clk)
+	.clk(Unconnected_clock_1)
 	// (zero sized port) .value(_UIntToBits_value)
 	// (zero sized port) .bits(_UIntToBits_bits)
 );
@@ -1081,7 +1090,7 @@ endmodule
 
 // floats_and_doubles #()
 module floats_and_doubles(
-	input clk
+	/* clock */ input clk
 );
 
 /*mux_wire*/ logic[31:0] x;
@@ -1112,7 +1121,7 @@ endmodule
 
 // boolean_array_literals #()
 module boolean_array_literals(
-	input clk
+	/* clock */ input clk
 );
 
 /*mux_wire*/ logic[49:0] b;
@@ -1133,7 +1142,7 @@ endmodule
 
 // test_vivado_bug #()
 module test_vivado_bug(
-	input clk,
+	/* clock */ input clk,
 	input wire b
 );
 
@@ -1253,7 +1262,7 @@ endmodule
 
 // check_non_inlineds #()
 module check_non_inlineds(
-	input clk
+	/* clock */ input clk
 );
 
 /*mux_wire*/ logic[31:0] fs[4:0];
@@ -1283,7 +1292,7 @@ endmodule
 
 // float_literal #()
 module float_literal(
-	input clk
+	/* clock */ input clk
 );
 
 /*mux_wire*/ logic[31:0] ff;
@@ -1311,7 +1320,7 @@ endmodule
 
 // multi_slice_reverse #()
 module multi_slice_reverse(
-	input clk,
+	/* clock */ input clk,
 	input wire[4:0] a,
 	input wire[4:0] b,
 	input wire[19:0] slice[8:0],
@@ -1349,7 +1358,7 @@ endmodule
 
 // multi_slice #()
 module multi_slice(
-	input clk,
+	/* clock */ input clk,
 	input wire[19:0] matrix[29:0],
 	input wire[4:0] a,
 	input wire[4:0] b,
@@ -1425,7 +1434,7 @@ endmodule
 
 // use_use_trigger #()
 module use_use_trigger(
-	input clk,
+	/* clock */ input clk,
 	output /*mux_wire*/ logic pass_it_up
 );
 
@@ -1477,7 +1486,7 @@ endmodule
 
 // use_trigger #()
 module use_trigger(
-	input clk,
+	/* clock */ input clk,
 	output /*mux_wire*/ logic beep,
 	output /*mux_wire*/ logic[2:0] boop,
 	input wire maybe_use_trigger
@@ -1502,7 +1511,7 @@ endmodule
 
 // testInts #()
 module testInts(
-	input clk
+	/* clock */ input clk
 );
 
 /*mux_wire*/ logic[2:0] vs[4:0];
@@ -1518,7 +1527,7 @@ endmodule
 
 // use_infer_me_with_negative_delta #()
 module use_infer_me_with_negative_delta(
-	input clk,
+	/* clock */ input clk,
 	input wire x,
 	output /*mux_wire*/ logic y
 );
@@ -1590,7 +1599,7 @@ endmodule
 
 // infer_me_with_negative_delta #(V: 31)
 module infer_me_with_negative_delta_V_31(
-	input clk,
+	/* clock */ input clk,
 	input wire x,
 	output /*mux_wire*/ logic y,
 	input wire p,
@@ -1613,7 +1622,7 @@ endmodule
 
 // use_infer_me_with_delta #()
 module use_infer_me_with_delta(
-	input clk,
+	/* clock */ input clk,
 	input wire x,
 	output /*mux_wire*/ logic y
 );
@@ -1685,7 +1694,7 @@ endmodule
 
 // infer_me_with_delta #(V: -31)
 module infer_me_with_delta_V_31(
-	input clk,
+	/* clock */ input clk,
 	input wire x,
 	output /*mux_wire*/ logic y,
 	input wire p,
@@ -1708,7 +1717,7 @@ endmodule
 
 // testArrayWrite #()
 module testArrayWrite(
-	input clk,
+	/* clock */ input clk,
 	input wire signed[3:0] in_arr[1:0][5:0][9:0],
 	output /*mux_wire*/ logic signed[3:0] out_arr[5:0][9:0]
 );
@@ -1858,7 +1867,7 @@ endmodule
 
 // specified_latencies_not_ports_edge_case #()
 module specified_latencies_not_ports_edge_case(
-	input clk,
+	/* clock */ input clk,
 	input wire in_port,
 	output /*mux_wire*/ logic out_port
 );
@@ -1897,7 +1906,7 @@ endmodule
 
 // instantiate_fifo #()
 module instantiate_fifo(
-	input clk,
+	/* clock */ input clk,
 	output /*mux_wire*/ logic request_data,
 	input wire[2:0] data_received
 );
@@ -1959,7 +1968,7 @@ endmodule
 
 // infer_from_local_context #()
 module infer_from_local_context(
-	input clk,
+	/* clock */ input clk,
 	input wire in_val,
 	output /*mux_wire*/ logic out_val
 );
@@ -2004,7 +2013,7 @@ endmodule
 
 // infer_me #(A: 5)
 module infer_me_A_5(
-	input clk,
+	/* clock */ input clk,
 	input wire x,
 	output /*mux_wire*/ logic y
 );
@@ -2025,7 +2034,7 @@ endmodule
 
 // infer_me #(A: 2)
 module infer_me_A_2(
-	input clk,
+	/* clock */ input clk,
 	input wire x,
 	output /*mux_wire*/ logic y
 );
@@ -2043,7 +2052,7 @@ endmodule
 
 // use_sized_int_add #()
 module use_sized_int_add(
-	input clk,
+	/* clock */ input clk,
 	input wire[3:0] a,
 	input wire[2:0] b,
 	output /*mux_wire*/ logic[4:0] c
@@ -2078,14 +2087,14 @@ endmodule
 // sized_int_add #(LEFT_SIZE: 4, RIGHT_SIZE: 3, OUTPUT_SIZE: 5)
 // Provided externally
 // module sized_int_add_LEFT_SIZE_4_RIGHT_SIZE_3_OUTPUT_SIZE_5(
-// 	input clk,
+// 	/* clock */ input clk,
 // 	input wire[3:0] a,
 // 	input wire[2:0] b,
 // 	output /*mux_wire*/ logic[4:0] c
 // );
 // numbersToAddUp #()
 module numbersToAddUp(
-	input clk
+	/* clock */ input clk
 );
 
 /*mux_wire*/ logic[1:0] arr[4:0];
@@ -2093,7 +2102,7 @@ module numbersToAddUp(
 /*mux_wire*/ logic[1:0] _adder_values[4:0];
 wire[3:0] _adder_total;
 TreeAdd_WIDTH_5_FROM_3_TO_4 adder(
-	.clk(clk),
+	.clk(Unconnected_clock_1),
 	.values(_adder_values),
 	.total(_adder_total)
 );
@@ -2122,7 +2131,7 @@ endmodule
 
 // no_main_interface #()
 module no_main_interface(
-	input clk
+	/* clock */ input clk
 );
 
 // PATCH XRT 2.16 over-zealous empty module DRC
@@ -2131,7 +2140,7 @@ endmodule
 
 // instruction_decoder #()
 module instruction_decoder(
-	input clk,
+	/* clock */ input clk,
 	input wire[31:0] instr
 );
 
@@ -2141,7 +2150,7 @@ endmodule
 
 // use_permute #()
 module use_permute(
-	input clk
+	/* clock */ input clk
 );
 
 /*mux_wire*/ logic[19:0] inArr[1:0];
@@ -2150,7 +2159,7 @@ module use_permute(
 wire[2:0] _permut_d_out[7:0];
 localparam[2:0] SOURCES[7:0] = '{3'd3, 3'd2, 3'd4, 3'd5, 3'd1, 3'd2, 3'd7, 3'd6};
 permute_t_T_type_int_FROM_1_TO_8_SIZE_8_SOURCES_3_2_4_5_1_2_7_6 permut(
-	.clk(clk),
+	.clk(Unconnected_clock_2),
 	.d_in(_permut_d_in),
 	.d_out(_permut_d_out)
 );
@@ -2178,7 +2187,7 @@ endmodule
 
 // permute_t #(T: type int #(FROM: 1, TO: 8), SIZE: 8, SOURCES: [3, 2, 4, 5, 1, 2, 7, 6])
 module permute_t_T_type_int_FROM_1_TO_8_SIZE_8_SOURCES_3_2_4_5_1_2_7_6(
-	input clk,
+	/* clock */ input clk,
 	input wire[2:0] d_in[7:0],
 	output /*mux_wire*/ logic[2:0] d_out[7:0]
 );
@@ -2207,7 +2216,7 @@ endmodule
 
 // replicate #(T: type int #(FROM: 3, TO: 4), NUM_REPLS: 30)
 module replicate_T_type_int_FROM_3_TO_4_NUM_REPLS_30(
-	input clk,
+	/* clock */ input clk,
 	input wire[1:0] data,
 	output /*mux_wire*/ logic[1:0] result[29:0]
 );
@@ -2250,26 +2259,26 @@ endmodule
 
 // testTinyTestMod #()
 module testTinyTestMod(
-	input clk
+	/* clock */ input clk
 );
 
 tinyTestMod_beep_3 a(
-	.clk(clk),
+	.clk(Unconnected_clock_1),
 	.o()
 );
 tinyTestMod_beep_4 b(
-	.clk(clk),
+	.clk(Unconnected_clock_2),
 	.o()
 );
 tinyTestMod_beep_3 c(
-	.clk(clk),
+	.clk(Unconnected_clock_3),
 	.o()
 );
 endmodule
 
 // tinyTestMod #(beep: 4)
 module tinyTestMod_beep_4(
-	input clk,
+	/* clock */ input clk,
 	output /*mux_wire*/ logic[2:0] o
 );
 
@@ -2282,7 +2291,7 @@ endmodule
 
 // tinyTestMod #(beep: 3)
 module tinyTestMod_beep_3(
-	input clk,
+	/* clock */ input clk,
 	output /*mux_wire*/ logic[1:0] o
 );
 
@@ -2295,7 +2304,7 @@ endmodule
 
 // mod_with_unused_interface #()
 module mod_with_unused_interface(
-	input clk
+	/* clock */ input clk
 );
 
 // PATCH XRT 2.16 over-zealous empty module DRC
@@ -2304,7 +2313,7 @@ endmodule
 
 // no_port_module #()
 module no_port_module(
-	input clk
+	/* clock */ input clk
 );
 
 // PATCH XRT 2.16 over-zealous empty module DRC
@@ -2313,7 +2322,7 @@ endmodule
 
 // offset_backwards #()
 module offset_backwards(
-	input clk,
+	/* clock */ input clk,
 	input wire i,
 	output /*mux_wire*/ logic o
 );
@@ -2329,7 +2338,7 @@ endmodule
 
 // cross_memory #()
 module cross_memory(
-	input clk,
+	/* clock */ input clk,
 	input wire[19:0] i[511:0],
 	output /*mux_wire*/ logic[19:0] o[511:0]
 );
@@ -2343,7 +2352,7 @@ endmodule
 
 // cross_int #()
 module cross_int(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] i,
 	output /*mux_wire*/ logic[0:0] o
 );
@@ -2359,7 +2368,7 @@ endmodule
 
 // cross_bool #()
 module cross_bool(
-	input clk,
+	/* clock */ input clk,
 	input wire i,
 	output /*mux_wire*/ logic o
 );
@@ -2375,7 +2384,7 @@ endmodule
 
 // submodule_named_ports #()
 module submodule_named_ports(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] port_a,
 	input wire[6:0] port_b,
 	output /*mux_wire*/ logic[7:0] port_c
@@ -2392,7 +2401,7 @@ endmodule
 
 // use_my_mod #()
 module use_my_mod(
-	input clk,
+	/* clock */ input clk,
 	output /*mux_wire*/ logic either
 );
 
@@ -2439,7 +2448,7 @@ endmodule
 
 // my_mod #()
 module my_mod(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] i,
 	output /*mux_wire*/ logic a,
 	output /*mux_wire*/ logic b
@@ -2467,7 +2476,7 @@ endmodule
 
 // monotonize_down #()
 module monotonize_down(
-	input clk,
+	/* clock */ input clk,
 	input wire[15:0] mbf,
 	output /*mux_wire*/ logic[15:0] mtDown
 );
@@ -2719,7 +2728,7 @@ endmodule
 
 // mbf_dual #()
 module mbf_dual(
-	input clk,
+	/* clock */ input clk,
 	input wire[127:0] mbf,
 	output /*mux_wire*/ logic[127:0] dual
 );
@@ -3244,7 +3253,7 @@ endmodule
 
 // fizz_buzz #()
 module fizz_buzz(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] v,
 	output /*mux_wire*/ logic[19:0] fb
 );
@@ -3287,7 +3296,7 @@ endmodule
 
 // use_xor #()
 module use_xor(
-	input clk
+	/* clock */ input clk
 );
 
 /*mux_wire*/ logic b;
@@ -3295,7 +3304,7 @@ module use_xor(
 /*mux_wire*/ logic _xor_1_x2;
 wire _xor_1_y;
 xor xor_1(
-	.clk(clk),
+	.clk(Unconnected_clock_1),
 	.x1(_xor_1_x1),
 	.x2(_xor_1_x2),
 	.y(_xor_1_y)
@@ -3325,7 +3334,7 @@ endmodule
 
 // xor #()
 module xor(
-	input clk,
+	/* clock */ input clk,
 	input wire x1,
 	input wire x2,
 	output /*mux_wire*/ logic y
@@ -3384,7 +3393,7 @@ endmodule
 
 // doNothing #()
 module doNothing(
-	input clk
+	/* clock */ input clk
 );
 
 // PATCH XRT 2.16 over-zealous empty module DRC
@@ -3393,7 +3402,7 @@ endmodule
 
 // submodule #()
 module submodule(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] a,
 	input wire[6:0] b,
 	output /*mux_wire*/ logic[13:0] r
@@ -3410,7 +3419,7 @@ endmodule
 
 // multiple_outputs_only #()
 module multiple_outputs_only(
-	input clk,
+	/* clock */ input clk,
 	output /*mux_wire*/ logic o,
 	output /*mux_wire*/ logic o2
 );
@@ -3441,7 +3450,7 @@ endmodule
 
 // output_only #()
 module output_only(
-	input clk,
+	/* clock */ input clk,
 	output /*mux_wire*/ logic o
 );
 
@@ -3463,7 +3472,7 @@ endmodule
 
 // multiple_inputs_only #()
 module multiple_inputs_only(
-	input clk,
+	/* clock */ input clk,
 	input wire i,
 	input wire i2
 );
@@ -3480,7 +3489,7 @@ endmodule
 
 // input_only #()
 module input_only(
-	input clk,
+	/* clock */ input clk,
 	input wire i
 );
 
@@ -3494,7 +3503,7 @@ endmodule
 
 // good_cycle #()
 module good_cycle(
-	input clk,
+	/* clock */ input clk,
 	input wire a,
 	output /*mux_wire*/ logic r
 );
@@ -3524,7 +3533,7 @@ endmodule
 
 // module_taking_a_lot_of_time #()
 module module_taking_a_lot_of_time(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] data_in,
 	output /*mux_wire*/ logic[6:0] data_out
 );
@@ -3738,7 +3747,7 @@ endmodule
 
 // matrix_vector_mul #()
 module matrix_vector_mul(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] mat[3:0][5:0],
 	input wire[6:0] vec[3:0],
 	output /*mux_wire*/ logic[15:0] result[5:0]
@@ -3938,7 +3947,7 @@ endmodule
 
 // module_taking_time #()
 module module_taking_time(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] i,
 	output /*mux_wire*/ logic[6:0] o
 );
@@ -3957,7 +3966,7 @@ endmodule
 
 // determinable_because_no_input_output_ports #()
 module determinable_because_no_input_output_ports(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] a,
 	output /*mux_wire*/ logic[7:0] x
 );
@@ -4002,7 +4011,7 @@ endmodule
 
 // determinable_input_latency #()
 module determinable_input_latency(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] a,
 	input wire[6:0] b,
 	output /*mux_wire*/ logic[8:0] x,
@@ -4054,7 +4063,7 @@ endmodule
 
 // specified_input_latency #()
 module specified_input_latency(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] a,
 	input wire[6:0] b,
 	output /*mux_wire*/ logic[8:0] x,
@@ -4108,7 +4117,7 @@ endmodule
 
 // test_single_wire #()
 module test_single_wire(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] a,
 	output /*mux_wire*/ logic[6:0] o
 );
@@ -4122,7 +4131,7 @@ endmodule
 
 // first_bit_idx_6 #()
 module first_bit_idx_6(
-	input clk,
+	/* clock */ input clk,
 	input wire[5:0] bits,
 	output /*mux_wire*/ logic[2:0] first,
 	output /*mux_wire*/ logic all_zeros
@@ -4161,7 +4170,7 @@ endmodule
 
 // add_indices_to_array #()
 module add_indices_to_array(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] values[9:0],
 	output /*mux_wire*/ logic[6:0] added_values[9:0]
 );
@@ -4274,7 +4283,7 @@ endmodule
 
 // Unpack4 #()
 module Unpack4(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] packed_1[3:0],
 	output /*mux_wire*/ logic[6:0] out_stream
 );
@@ -4319,7 +4328,7 @@ endmodule
 
 // blur #()
 module blur(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] a,
 	input wire done,
 	output /*mux_wire*/ logic[7:0] result
@@ -4352,7 +4361,7 @@ endmodule
 
 // Accumulator #()
 module Accumulator(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] term,
 	input wire done,
 	output /*mux_wire*/ logic[6:0] total
@@ -4384,7 +4393,7 @@ endmodule
 
 // Tree_Multiply #()
 module Tree_Multiply(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] values[3:0],
 	output /*mux_wire*/ logic[26:0] total
 );
@@ -4423,7 +4432,7 @@ endmodule
 
 // blur2 #()
 module blur2(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] data,
 	input wire first,
 	output /*mux_wire*/ logic[6:0] blurred
@@ -4448,7 +4457,7 @@ endmodule
 
 // fibonnaci #()
 module fibonnaci(
-	input clk,
+	/* clock */ input clk,
 	output /*mux_wire*/ logic[6:0] num
 );
 
@@ -4475,14 +4484,14 @@ endmodule
 
 // test_pow17 #()
 module test_pow17(
-	input clk
+	/* clock */ input clk
 );
 
 /*mux_wire*/ logic[112:0] a;
 /*mux_wire*/ logic[6:0] _pow17_i;
 wire[112:0] _pow17_o;
 pow17 pow17(
-	.clk(clk),
+	.clk(Unconnected_clock_1),
 	.i(_pow17_i),
 	.o(_pow17_o)
 );
@@ -4500,7 +4509,7 @@ endmodule
 
 // pow17 #()
 module pow17(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] i,
 	output /*mux_wire*/ logic[112:0] o
 );
@@ -4552,7 +4561,7 @@ endmodule
 
 // multiply_add #()
 module multiply_add(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] a,
 	input wire[6:0] b,
 	input wire[6:0] c,
@@ -4579,7 +4588,7 @@ endmodule
 
 // example_md #()
 module example_md(
-	input clk,
+	/* clock */ input clk,
 	input wire[6:0] factors[3:0],
 	input wire[6:0] add_to,
 	output /*mux_wire*/ logic[26:0] product,
@@ -4628,7 +4637,7 @@ endmodule
 
 // FIFO #(T: type int #(FROM: 0, TO: 6), DEPTH: 30, MAY_PUSH_LATENCY: 8)
 module FIFO_T_type_int_FROM_0_TO_6_DEPTH_30_MAY_PUSH_LATENCY_8(
-	input clk,
+	/* clock */ input clk,
 	input wire rst,
 	output /*mux_wire*/ logic may_push,
 	input wire push,
@@ -4747,7 +4756,7 @@ endmodule
 
 // BoolToInt #()
 module BoolToInt(
-	input clk,
+	/* clock */ input clk,
 	input wire i,
 	output /*mux_wire*/ logic[0:0] o
 );
@@ -4764,7 +4773,7 @@ endmodule
 
 // IntToBool #()
 module IntToBool(
-	input clk,
+	/* clock */ input clk,
 	input wire[0:0] i,
 	output /*mux_wire*/ logic o
 );
@@ -4782,7 +4791,7 @@ endmodule
 
 // TreeAdd #(WIDTH: 5, FROM: 3, TO: 4)
 module TreeAdd_WIDTH_5_FROM_3_TO_4(
-	input clk,
+	/* clock */ input clk,
 	input wire[1:0] values[4:0],
 	output /*mux_wire*/ logic[3:0] total
 );
@@ -4853,7 +4862,7 @@ endmodule
 
 // TreeAdd #(WIDTH: 3, FROM: 3, TO: 4)
 module TreeAdd_WIDTH_3_FROM_3_TO_4(
-	input clk,
+	/* clock */ input clk,
 	input wire[1:0] values[2:0],
 	output /*mux_wire*/ logic[3:0] total
 );
@@ -4924,7 +4933,7 @@ endmodule
 
 // TreeAdd #(WIDTH: 2, FROM: 3, TO: 4)
 module TreeAdd_WIDTH_2_FROM_3_TO_4(
-	input clk,
+	/* clock */ input clk,
 	input wire[1:0] values[1:0],
 	output /*mux_wire*/ logic[2:0] total
 );
@@ -4994,7 +5003,7 @@ endmodule
 
 // TreeAdd #(WIDTH: 1, FROM: 3, TO: 4)
 module TreeAdd_WIDTH_1_FROM_3_TO_4(
-	input clk,
+	/* clock */ input clk,
 	input wire[1:0] values[0:0],
 	output /*mux_wire*/ logic[1:0] total
 );
@@ -5009,7 +5018,7 @@ endmodule
 
 // Repeat #(T: type bool #(), SIZE: 3)
 module Repeat_T_type_bool_SIZE_3(
-	input clk,
+	/* clock */ input clk,
 	input wire v,
 	output /*mux_wire*/ logic[2:0] result
 );
@@ -5025,7 +5034,7 @@ endmodule
 
 // Repeat #(T: type bool #(), SIZE: 2)
 module Repeat_T_type_bool_SIZE_2(
-	input clk,
+	/* clock */ input clk,
 	input wire v,
 	output /*mux_wire*/ logic[1:0] result
 );
@@ -5040,7 +5049,7 @@ endmodule
 
 // Repeat #(T: type bool #(), SIZE: 1)
 module Repeat_T_type_bool_SIZE_1(
-	input clk,
+	/* clock */ input clk,
 	input wire v,
 	output /*mux_wire*/ logic[0:0] result
 );
@@ -5056,7 +5065,7 @@ endmodule
 
 // IntNarrow #(FROM_I: 5, TO_I: 6, FROM: 0, TO: 1)
 module IntNarrow_FROM_I_5_TO_I_6_FROM_0_TO_1(
-	input clk,
+	/* clock */ input clk,
 	input wire[2:0] din
 	// (zero sized) output dout
 );
@@ -5067,7 +5076,7 @@ endmodule
 
 // IntNarrow #(FROM_I: 0, TO_I: 1, FROM: -3, TO: 6)
 module IntNarrow_FROM_I_0_TO_I_1_FROM_3_TO_6(
-	input clk,
+	/* clock */ input clk,
 	// (zero sized) input din
 	output /*mux_wire*/ logic signed[3:0] dout
 );
@@ -5077,7 +5086,7 @@ endmodule
 
 // Transmute #(T1: type int #(FROM: 0, TO: 255)[2], T2: type int #(FROM: 0, TO: 65536))
 module Transmute_T1_type_int_FROM_0_TO_255_2_T2_type_int_FROM_0_TO_65536(
-	input clk,
+	/* clock */ input clk,
 	input wire[7:0] a[1:0],
 	output /*mux_wire*/ logic[15:0] b
 );
@@ -5123,7 +5132,7 @@ endmodule
 
 // FromBits #(T: type int #(FROM: 0, TO: 65536))
 module FromBits_T_type_int_FROM_0_TO_65536(
-	input clk,
+	/* clock */ input clk,
 	input wire[15:0] bits,
 	output /*mux_wire*/ logic[15:0] value
 );
@@ -5133,7 +5142,7 @@ endmodule
 
 // FromBits #(T: type int #(FROM: 0, TO: 6))
 module FromBits_T_type_int_FROM_0_TO_6(
-	input clk,
+	/* clock */ input clk,
 	input wire[2:0] bits,
 	output /*mux_wire*/ logic[2:0] value
 );
@@ -5143,7 +5152,7 @@ endmodule
 
 // ToBits #(T: type int #(FROM: 0, TO: 255)[2])
 module ToBits_T_type_int_FROM_0_TO_255_2(
-	input clk,
+	/* clock */ input clk,
 	input wire[7:0] value[1:0],
 	output /*mux_wire*/ logic[15:0] bits
 );
@@ -5158,7 +5167,7 @@ endmodule
 
 // ToBits #(T: type bool #()[60])
 module ToBits_T_type_bool_60(
-	input clk,
+	/* clock */ input clk,
 	input wire[59:0] value,
 	output /*mux_wire*/ logic[59:0] bits
 );
@@ -5168,7 +5177,7 @@ endmodule
 
 // ToBits #(T: type int #(FROM: 0, TO: 6))
 module ToBits_T_type_int_FROM_0_TO_6(
-	input clk,
+	/* clock */ input clk,
 	input wire[2:0] value,
 	output /*mux_wire*/ logic[2:0] bits
 );
@@ -5178,7 +5187,7 @@ endmodule
 
 // UIntToBits #(NUM_BITS: 0)
 module UIntToBits_NUM_BITS_0(
-	input clk
+	/* clock */ input clk
 	// (zero sized) input value
 	// (zero sized) output bits
 );
@@ -5189,7 +5198,7 @@ endmodule
 
 // CrossActionNoData #()
 module CrossActionNoData(
-	input in_clk,
+	/* clock */ input in_clk,
 	input wire din,
 	output /*mux_wire*/ logic dout
 );
@@ -5221,7 +5230,7 @@ endmodule
 
 // CrossDomain #(T: type bool #())
 module CrossDomain_T_type_bool(
-	input in_clk,
+	/* clock */ input in_clk,
 	input wire din,
 	output /*mux_wire*/ logic dout
 );
@@ -5231,7 +5240,7 @@ endmodule
 
 // LatencyOffset #(T: type bool #(), OFFSET: -9)
 module LatencyOffset_T_type_bool_OFFSET_9(
-	input clk,
+	/* clock */ input clk,
 	input wire din,
 	output /*mux_wire*/ logic dout
 );
