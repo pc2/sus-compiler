@@ -159,8 +159,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     fn flatten_template_args(&mut self, cursor: &mut Cursor<'c>) -> Vec<WrittenTemplateArg> {
         cursor.collect_list(kind!("template_args"), |cursor| {
             cursor.go_down(kind!("template_arg"), |cursor| {
-                let (name_span, name) =
-                    cursor.field_span(field!("name"), kind!("identifier"));
+                let (name_span, name) = cursor.field_span(field!("name"), kind!("identifier"));
 
                 let (kind, value_span) = if cursor.optional_field(field!("val_arg")) {
                     let value_span = cursor.span();
@@ -171,51 +170,53 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     let typ = self.flatten_type(cursor);
                     (Some(TemplateKind::Type(typ)), value_span)
                 } else {
-                    (match self.local_variable_context.get_declaration_for(name) {
-                        Some(NamedLocal::TemplateType(t)) => Some(TemplateKind::Type(WrittenType::TemplateVariable(name_span, t))),
-                        Some(NamedLocal::Declaration(decl_id)) => {
-                            let wire_read_id = self.instructions.alloc(Instruction::Expression(Expression {
-                                parent_condition: self.current_parent_condition,
-                                output: ExpressionOutput::SubExpression(AbstractRankedType::UNKNOWN),
-                                span: name_span,
-                                clock_domain: ClockDomain::UNKNOWN,
-                                source: ExpressionSource::WireRef(WireReference {
-                                    root: WireReferenceRoot::LocalDecl(decl_id),
-                                    root_span: name_span,
-                                    output_typ: AbstractRankedType::UNKNOWN,
-                                    path: Vec::new(),
-                                })
-                            }));
-                            Some(TemplateKind::Value(wire_read_id))
-                        }
-                        Some(NamedLocal::SubModule(sm)) => {
-                            self.errors.error(name_span, format!("{name} does not name a Type or a Value. Local submodules are not allowed!"))
-                                .info_obj(self.instructions[sm].unwrap_submodule());
-                            None
-                        }
-                        Some(NamedLocal::LatDomainDecl(dom)) => {
-                            self.errors.error(name_span, format!("{name} does not name a Type or a Value. Domains are not allowed!"))
-                                .info_obj(&self.latency_domains[dom]);
-                            None
-                        }
-                        Some(NamedLocal::ClockDecl(clock_id)) => {
-                            self.errors.error(name_span, format!("{name} does not name a Type or a Value. Clocks are not allowed!"))
-                                .info_obj(&self.clocks[clock_id]);
-                            None
-                        }
-                        Some(NamedLocal::LocalInterface(interf)) => {
-                            self.errors.error(name_span, format!("{name} does not name a Type or a Value. Local Interfaces are not allowed!"))
-                                .info_obj(self.instructions[interf].unwrap_interface());
-                            None
-                        }
-                        None => {
-                            self.errors.error(name_span, format!("{name} does not name a Type or a Value."));
-                            None
+                    (
+                        match self.local_variable_context.get_declaration_for(name) {
+                            Some(NamedLocal::TemplateType(t)) => Some(TemplateKind::Type(
+                                WrittenType::TemplateVariable(name_span, t),
+                            )),
+                            Some(NamedLocal::Declaration(decl_id)) => {
+                                let wire_read_id =
+                                    self.instructions.alloc(Instruction::Expression(Expression {
+                                        parent_condition: self.current_parent_condition,
+                                        output: ExpressionOutput::SubExpression(
+                                            AbstractRankedType::UNKNOWN,
+                                        ),
+                                        span: name_span,
+                                        clock_domain: ClockDomain::UNKNOWN,
+                                        source: ExpressionSource::WireRef(WireReference {
+                                            root: WireReferenceRoot::LocalDecl(decl_id),
+                                            root_span: name_span,
+                                            output_typ: AbstractRankedType::UNKNOWN,
+                                            path: Vec::new(),
+                                        }),
+                                    }));
+                                Some(TemplateKind::Value(wire_read_id))
+                            }
+                            Some(other) => {
+                                let error_text = format!("{name} does not name a Type or a Value");
+                                self.report_conflict(name_span, &error_text, other);
+                                None
+                            }
+                            None => {
+                                self.errors.error(
+                                    name_span,
+                                    format!("{name} does not name a Type or a Value."),
+                                );
+                                None
+                            }
                         },
-                    }, name_span)
+                        name_span,
+                    )
                 };
 
-                WrittenTemplateArg{ name: name.to_owned(), name_span, value_span, kind, refers_to: OnceCell::new() }
+                WrittenTemplateArg {
+                    name: name.to_owned(),
+                    name_span,
+                    value_span,
+                    kind,
+                    refers_to: OnceCell::new(),
+                }
             })
         })
     }
@@ -333,45 +334,16 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         match kind {
             kind!("template_global") => {
                 match self.flatten_local_or_template_global(cursor) {
-                    LocalOrGlobal::Local(span, NamedLocal::Declaration(instr))
-                    | LocalOrGlobal::Local(span, NamedLocal::SubModule(instr))
-                    | LocalOrGlobal::Local(span, NamedLocal::LocalInterface(instr)) => {
-                        self.errors
-                            .error(
-                                span,
-                                format!(
-                                    "This is not a {accepted_text}, it is a local variable instead!"
-                                ),
-                            )
-                            .info_obj(&self.instructions[instr]);
-
-                        ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
-                    }
-                    LocalOrGlobal::Local(span, NamedLocal::LatDomainDecl(domain_id)) => {
-                        self.errors
-                            .error(
-                                span,
-                                format!("This is not a {accepted_text}, it is a domain instead!"),
-                            )
-                            .info_obj(&self.latency_domains[domain_id]);
-
-                        ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
-                    }
-                    LocalOrGlobal::Local(span, NamedLocal::ClockDecl(clock_id)) => {
-                        self.errors
-                            .error(
-                                span,
-                                format!("This is not a {accepted_text}, it is a clock instead!"),
-                            )
-                            .info_obj(&self.clocks[clock_id]);
-
-                        ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
-                    }
                     LocalOrGlobal::Local(span, NamedLocal::TemplateType(template_id)) => {
                         ModuleOrWrittenType::WrittenType(WrittenType::TemplateVariable(
                             span,
                             template_id,
                         ))
+                    }
+                    LocalOrGlobal::Local(span, other) => {
+                        let error_text = format!("This is not a {accepted_text}");
+                        self.report_conflict(span, &error_text, other);
+                        ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
                     }
                     LocalOrGlobal::Type(type_ref) => {
                         ModuleOrWrittenType::WrittenType(WrittenType::Named(type_ref))
@@ -407,36 +379,57 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         }
     }
 
+    fn report_conflict(&self, error_span: Span, error_text: &str, conflict: NamedLocal) {
+        match conflict {
+            NamedLocal::Declaration(decl_id) => {
+                let decl = self.instructions[decl_id].unwrap_declaration();
+                let name = &decl.name;
+                let err_str = format!("{error_text}, found declaration '{name}'");
+                self.errors.error(error_span, err_str).info_obj(decl);
+            }
+            NamedLocal::SubModule(submod_id) => {
+                let submod = self.instructions[submod_id].unwrap_submodule();
+                let name = &submod.name;
+                let err_str = format!("{error_text}, found submodule '{name}'");
+                self.errors.error(error_span, err_str).info_obj(submod);
+            }
+            NamedLocal::LocalInterface(interf_id) => {
+                let interface = self.instructions[interf_id].unwrap_interface();
+                let name = &interface.name;
+                let err_str = format!("{error_text}, found interface '{name}'");
+                self.errors.error(error_span, err_str).info_obj(interface);
+            }
+            NamedLocal::TemplateType(template_id) => {
+                let param = &self.parameters[template_id];
+                let name = &param.name;
+                let err_str = format!("{error_text}, found type parameter '{name}'");
+                self.errors.error(error_span, err_str).info_obj(param);
+            }
+            NamedLocal::LatDomainDecl(domain_id) => {
+                let domain = &self.latency_domains[domain_id];
+                let name = &domain.name;
+                let err_str = format!("{error_text}, found domain '{name}'");
+                self.errors.error(error_span, err_str).info_obj(domain);
+            }
+            NamedLocal::ClockDecl(clock_id) => {
+                let clock = &self.clocks[clock_id];
+                let name = &clock.name;
+                let err_str = format!("{error_text}, found clock '{name}'");
+                self.errors.error(error_span, err_str).info_obj(clock);
+            }
+        }
+    }
+
     fn alloc_local_name(&mut self, name_span: Span, name: &'c str, named_local: NamedLocal) {
         if let Err(conflict) = self
             .local_variable_context
             .add_declaration(name, named_local)
         {
-            let mut err_ref = self.errors.error(
+            self.report_conflict(
                 name_span,
                 "This declaration conflicts with a previous declaration in the same scope",
+                conflict,
             );
-
-            match conflict {
-                NamedLocal::Declaration(decl_id) => {
-                    err_ref.info_obj(self.instructions[decl_id].unwrap_declaration());
-                }
-                NamedLocal::SubModule(submod_id) => {
-                    err_ref.info_obj(self.instructions[submod_id].unwrap_submodule());
-                }
-                NamedLocal::LocalInterface(interf_id) => {
-                    err_ref.info_obj(self.instructions[interf_id].unwrap_interface());
-                }
-                NamedLocal::TemplateType(template_id) => {
-                    err_ref.info_obj(&self.parameters[template_id]);
-                }
-                NamedLocal::LatDomainDecl(domain_id) => {
-                    err_ref.info_obj(&self.latency_domains[domain_id]);
-                }
-                NamedLocal::ClockDecl(clock_id) => {
-                    err_ref.info_obj(&self.clocks[clock_id]);
-                }
-            }
         }
     }
 
@@ -1143,42 +1136,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 path: Vec::new(),
                             }
                         }
-                        NamedLocal::TemplateType(template_id) => {
-                            self.errors
-                                .error(
-                                    span,
-                                    format!(
-                                        "Expected a value, but instead found template type '{}'",
-                                        self.parameters[template_id].name
-                                    ),
-                                )
-                                .info_obj(&self.parameters[template_id]);
-                            self.new_error(expr_span)
-                        }
-                        NamedLocal::LatDomainDecl(domain_id) => {
-                            let domain = &self.latency_domains[domain_id];
-                            self.errors
-                                .error(
-                                    span,
-                                    format!(
-                                        "Expected a value, but instead found domain '{}'",
-                                        domain.name
-                                    ),
-                                )
-                                .info_obj(domain);
-                            self.new_error(expr_span)
-                        }
-                        NamedLocal::ClockDecl(clock_id) => {
-                            let domain = &self.clocks[clock_id];
-                            self.errors
-                                .error(
-                                    span,
-                                    format!(
-                                        "Expected a value, but instead found clock '{}'",
-                                        domain.name
-                                    ),
-                                )
-                                .info_obj(domain);
+                        conflict => {
+                            self.report_conflict(span, "Expected a value", conflict);
                             self.new_error(expr_span)
                         }
                     },

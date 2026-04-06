@@ -22,5 +22,6 @@
     "editor.formatOnSave": true
   },
   "rust-analyzer.check.command": "clippy",
+  "rust-analyzer.cargo.features": "all",
   "terminal.integrated.cwd": "${workspaceFolder}",
 }

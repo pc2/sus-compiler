@@ -884,14 +884,14 @@ Error: Duplicate interface 'write' declaration
      │                              │    
      │                              ╰──── port 'write' declared here
 ─────╯
-Error: This declaration conflicts with a previous declaration in the same scope
+Error: This declaration conflicts with a previous declaration in the same scope, found interface 'write'
      ╭─[ test.sus:632:25 ]
      │
  632 │     interface write : bool write, bool[20] wr_data, int#(FROM:0, TO: 511) wr_addr
      │               ──┬──        ──┬──  
      │                 ╰───────────────── 'write' declared here
      │                              │    
-     │                              ╰──── This declaration conflicts with a previous declaration in the same scope
+     │                              ╰──── This declaration conflicts with a previous declaration in the same scope, found interface 'write'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:632:25 ]
@@ -909,14 +909,14 @@ Error: Duplicate interface 'read' declaration
      │                             │   
      │                             ╰─── port 'read' declared here
 ─────╯
-Error: This declaration conflicts with a previous declaration in the same scope
+Error: This declaration conflicts with a previous declaration in the same scope, found interface 'read'
      ╭─[ test.sus:634:24 ]
      │
  634 │     interface read : bool read, int#(FROM:0, TO: 511) rd_addr -> bool[20] rd_data
      │               ──┬─        ──┬─  
      │                 ╰─────────────── 'read' declared here
      │                             │   
-     │                             ╰─── This declaration conflicts with a previous declaration in the same scope
+     │                             ╰─── This declaration conflicts with a previous declaration in the same scope, found interface 'read'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:634:24 ]
@@ -1294,14 +1294,14 @@ Error: Duplicate interface 'start' declaration
      │                              │    
      │                              ╰──── port 'start' declared here
 ─────╯
-Error: This declaration conflicts with a previous declaration in the same scope
+Error: This declaration conflicts with a previous declaration in the same scope, found interface 'start'
      ╭─[ test.sus:723:25 ]
      │
  723 │     interface start : bool start'0, int#(FROM: 0, TO: 100) upTo'0
      │               ──┬──        ──┬──  
      │                 ╰───────────────── 'start' declared here
      │                              │    
-     │                              ╰──── This declaration conflicts with a previous declaration in the same scope
+     │                              ╰──── This declaration conflicts with a previous declaration in the same scope, found interface 'start'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:723:25 ]
@@ -2163,12 +2163,12 @@ Warning: Not Instantiating conflicting_domain_with_port_name #() due to abstract
       │        ────────────────┬────────────────  
       │                        ╰────────────────── Not Instantiating conflicting_domain_with_port_name #() due to abstract typing errors
 ──────╯
-Error: This declaration conflicts with a previous declaration in the same scope
+Error: This declaration conflicts with a previous declaration in the same scope, found domain 'my_domain'
       ╭─[ test.sus:1015:12 ]
       │
  1015 │     input int my_domain
       │               ────┬────  
-      │                   ╰────── This declaration conflicts with a previous declaration in the same scope
+      │                   ╰────── This declaration conflicts with a previous declaration in the same scope, found domain 'my_domain'
       │
       ├─[ test.sus:1015:12 ]
       │
@@ -2183,12 +2183,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │               ────┬────  
       │                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: This declaration conflicts with a previous declaration in the same scope
+Error: This declaration conflicts with a previous declaration in the same scope, found domain 'my_domain'
       ╭─[ test.sus:1017:9 ]
       │
  1017 │     domain my_domain
       │            ────┬────  
-      │                ╰────── This declaration conflicts with a previous declaration in the same scope
+      │                ╰────── This declaration conflicts with a previous declaration in the same scope, found domain 'my_domain'
       │
       ├─[ test.sus:1017:9 ]
       │
@@ -3092,12 +3092,12 @@ Error: Cannot write to compiletime variable through runtime 'when' blocks
       │     ──┬─  
       │       ╰─── Assignment passes through this 'when'
 ──────╯
-Error: This declaration conflicts with a previous declaration in the same scope
+Error: This declaration conflicts with a previous declaration in the same scope, found type parameter 'NUM_INPUTS'
       ╭─[ test.sus:1384:13 ]
       │
  1384 │     gen int NUM_INPUTS = 500
       │             ─────┬────  
-      │                  ╰────── This declaration conflicts with a previous declaration in the same scope
+      │                  ╰────── This declaration conflicts with a previous declaration in the same scope, found type parameter 'NUM_INPUTS'
       │
       ├─[ test.sus:1384:13 ]
       │
@@ -3414,14 +3414,14 @@ Error: Duplicate interface 'port_interf' declaration
       │                                      │       
       │                                      ╰─────── port 'port_interf' declared here
 ──────╯
-Error: This declaration conflicts with a previous declaration in the same scope
+Error: This declaration conflicts with a previous declaration in the same scope, found interface 'port_interf'
       ╭─[ test.sus:1514:30 ]
       │
  1514 │     interface port_interf: bool port_interf
       │               ─────┬─────       ─────┬─────  
       │                    ╰───────────────────────── 'port_interf' declared here
       │                                      │       
-      │                                      ╰─────── This declaration conflicts with a previous declaration in the same scope
+      │                                      ╰─────── This declaration conflicts with a previous declaration in the same scope, found interface 'port_interf'
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1514:30 ]
