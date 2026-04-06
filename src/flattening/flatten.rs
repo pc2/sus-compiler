@@ -1675,7 +1675,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let clock_id = self.clocks.alloc(ClockInfo {
             name: clock_name.to_owned(),
             visibility,
-            submodule_driver: None,
             name_span: Some(clock_name_span),
         });
         self.current_clock = clock_id;
@@ -2057,7 +2056,6 @@ fn flatten_global(
                 clocks.alloc(ClockInfo {
                     name: "clk".to_string(),
                     visibility: ClockVisibility::Input,
-                    submodule_driver: None,
                     name_span: None,
                 });
             }

@@ -25,7 +25,7 @@ struct TypeCheckingContext<'l> {
     errors: &'l ErrorCollector<'l>,
     link_info: &'l LinkInfo,
     instructions: &'l FlatAlloc<Instruction, FlatIDMarker>,
-    domains: &'l FlatAlloc<ClockInfo, ClockIDMarker>,
+    clocks: &'l FlatAlloc<ClockInfo, ClockIDMarker>,
     typ_alloc: &'l Arena<UniCell<AbstractInnerType>>,
     unifier: AbstractUnifier<'l>,
 }
@@ -119,7 +119,7 @@ pub fn typecheck(pass: &mut LinkerPass, errors: &ErrorCollector) {
         errors,
         instructions: &link_info.instructions,
         link_info,
-        domains: clocks,
+        clocks,
         typ_alloc: &typ_alloc,
         unifier: AbstractUnifier::new(),
     };

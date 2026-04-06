@@ -344,8 +344,8 @@ impl<'l> TypeCheckingContext<'l> {
         assert!(self.unifier.fully_substitute(a_dom));
         assert!(self.unifier.fully_substitute(b_dom));
 
-        let expected_name = a_dom.display(self.domains);
-        let found_name = b_dom.display(self.domains);
+        let expected_name = a_dom.display(self.clocks);
+        let found_name = b_dom.display(self.clocks);
         self.errors
             .error(b_span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"))
             .info(a_span, "Conflicting with");
@@ -385,7 +385,6 @@ impl<'l> TypeCheckingContext<'l> {
                 name: format!("Unconnected_clock_{new_clock_idx}"),
                 name_span: None,
                 visibility: ClockVisibility::Local,
-                submodule_driver: None,
             };
             self.unifier.set_hard(domain, clocks.alloc(new_clock));
         }
@@ -411,8 +410,24 @@ impl<'l> TypeCheckingContext<'l> {
         for (_, instr) in self.instructions {
             match instr {
                 Instruction::SubModule(sm) => {
-                    for (_, d) in sm.submodule_clock_map.get().unwrap() {
+                    for (submod_clock_id, d) in sm.submodule_clock_map.get().unwrap() {
                         self.finalize_physical(d, clocks);
+
+                        // Connect output clocks upwards
+                        let sm_md = &self.globals.get_module(sm.module_ref.id);
+                        let clk_info = &sm_md.clocks[submod_clock_id];
+                        if clk_info.visibility != ClockVisibility::Output {
+                            continue;
+                        }
+                        let parent_clk = d.unwrap();
+                        let parent_clk_info = &clocks[*parent_clk];
+                        if parent_clk_info.visibility == ClockVisibility::Input {
+                            let err_text = format!(
+                                "The output clock '{}' of submodule '{}' cannot override clock '{}' because it's an input clock",
+                                clk_info.name, sm.name, parent_clk_info.name
+                            );
+                            self.errors.error(sm.name_span, err_text);
+                        }
                     }
                 }
                 Instruction::Declaration(declaration) => match &declaration.clock_domain {

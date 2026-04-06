@@ -158,8 +158,6 @@ pub enum ClockVisibility {
 pub struct ClockInfo {
     pub name: String,
     pub visibility: ClockVisibility,
-    /// If this clock is driven by a submodule.
-    pub submodule_driver: Option<(FlatID, ClockID)>,
     /// May be [None] for the default `clk` domain
     pub name_span: Option<Span>,
 }
