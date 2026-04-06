@@ -1860,5 +1860,15 @@ module NegativeIntLiterals {
 }
 
 module WeirdlyNamedClock {
-	domain default
+	clock default
+	input bool x_i
+	reg output bool x_o = x_i
+	state output bool x_st
+	x_st = x_i
+
+	output clock this_clock_out
+	input bool y_i
+	reg output bool y_o = y_i
+	state output bool y_st
+	y_st = y_i
 }

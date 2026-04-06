@@ -2143,19 +2143,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │               ────┬───  
       │                   ╰───── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: When using explicit clocks, no port is allowed to be declared on the implicit 'clk' clock.
-      ╭─[ test.sus:1008:9 ]
-      │
- 1008 │     domain bad_domain
-      │            ─────┬────  
-      │                 ╰────── When using explicit clocks, no port is allowed to be declared on the implicit 'clk' clock.
-      │
-      ├─[ test.sus:1008:9 ]
-      │
- 1006 │     input int bad_port
-      │     ─────────┬────────  
-      │              ╰────────── A domain should be explicitly defined before this port
-──────╯
 Error: When using explicit latency domains, no port is allowed to be declared on the implicit 'default' latency domain.
       ╭─[ test.sus:1008:9 ]
       │

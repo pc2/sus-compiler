@@ -109,7 +109,8 @@ module.exports = grammar({
                 $.assign_left_side,
                 $.if_statement,
                 $.for_statement,
-                $.domain_statement,
+                $.domain_declaration,
+                $.clock_declaration,
                 $.interface_statement
             )),
             '}'
@@ -166,8 +167,14 @@ module.exports = grammar({
 
         // Interfaces
 
-        domain_statement: $ => seq(
+        domain_declaration: $ => seq(
             'domain',
+            field('name', $.identifier),
+        ),
+
+        clock_declaration: $ => seq(
+            optional(field('output_clk', 'output')),
+            'clock',
             field('name', $.identifier),
         ),
 

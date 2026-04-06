@@ -584,11 +584,15 @@
             "named": true
           },
           {
+            "type": "clock_declaration",
+            "named": true
+          },
+          {
             "type": "decl_assign_statement",
             "named": true
           },
           {
-            "type": "domain_statement",
+            "type": "domain_declaration",
             "named": true
           },
           {
@@ -602,6 +606,32 @@
           {
             "type": "interface_statement",
             "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "clock_declaration",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "output_clk": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "output",
+            "named": false
           }
         ]
       }
@@ -796,7 +826,7 @@
     }
   },
   {
-    "type": "domain_statement",
+    "type": "domain_declaration",
     "named": true,
     "fields": {
       "name": {
@@ -2167,6 +2197,10 @@
   {
     "type": "bool_array_literal",
     "named": true
+  },
+  {
+    "type": "clock",
+    "named": false
   },
   {
     "type": "const",

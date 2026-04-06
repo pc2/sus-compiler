@@ -355,7 +355,11 @@
                           },
                           {
                             "type": "SYMBOL",
-                            "name": "domain_statement"
+                            "name": "domain_declaration"
+                          },
+                          {
+                            "type": "SYMBOL",
+                            "name": "clock_declaration"
                           },
                           {
                             "type": "SYMBOL",
@@ -401,7 +405,11 @@
                                 },
                                 {
                                   "type": "SYMBOL",
-                                  "name": "domain_statement"
+                                  "name": "domain_declaration"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "clock_declaration"
                                 },
                                 {
                                   "type": "SYMBOL",
@@ -718,12 +726,45 @@
         }
       ]
     },
-    "domain_statement": {
+    "domain_declaration": {
       "type": "SEQ",
       "members": [
         {
           "type": "STRING",
           "value": "domain"
+        },
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        }
+      ]
+    },
+    "clock_declaration": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "output_clk",
+              "content": {
+                "type": "STRING",
+                "value": "output"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": "clock"
         },
         {
           "type": "FIELD",

@@ -1,10 +1,37 @@
 // WeirdlyNamedClock #()
 module WeirdlyNamedClock(
-	/* clock */ input default_1
+	/* clock */ input default_1,
+	/* clock */ output this_clock_out,
+	input wire x_i,
+	output /*mux_wire*/ logic x_o,
+	output /*state*/ logic x_st,
+	input wire y_i,
+	output /*mux_wire*/ logic y_o,
+	output /*state*/ logic y_st
 );
 
-// PATCH XRT 2.16 over-zealous empty module DRC
-initial begin end
+/*latency*/ logic _x_i_D1; always_ff @(posedge default_1) begin _x_i_D1 <= x_i; end
+/*latency*/ logic _y_i_D1001; always_ff @(posedge this_clock_out) begin _y_i_D1001 <= y_i; end
+always_comb begin // combinatorial x_o
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x_o = 1'bx;
+	x_o = _x_i_D1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x_o = x_o;
+end
+always_ff @(posedge default_1) begin // state x_st
+	x_st <= x_i;
+end
+always_comb begin // combinatorial y_o
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	y_o = 1'bx;
+	y_o = _y_i_D1001;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	y_o = y_o;
+end
+always_ff @(posedge this_clock_out) begin // state y_st
+	y_st <= y_i;
+end
 endmodule
 
 // NegativeIntLiterals #()
@@ -177,7 +204,7 @@ wire _mwd_b_data;
 /*mux_wire*/ logic _mwd_a_act;
 /*mux_wire*/ logic _mwd_a_data;
 ModWithDomains mwd(
-	.b(Unconnected_clock_1),
+	.clk(Unconnected_clock_1),
 	.b_trig(_mwd_b_trig),
 	.b_data(_mwd_b_data),
 	.a_act(_mwd_a_act),
@@ -209,7 +236,7 @@ endmodule
 
 // ModWithDomains #()
 module ModWithDomains(
-	/* clock */ input b,
+	/* clock */ input clk,
 	output /*mux_wire*/ logic b_trig,
 	output /*mux_wire*/ logic b_data,
 	input wire a_act,
@@ -5198,7 +5225,7 @@ endmodule
 
 // CrossActionNoData #()
 module CrossActionNoData(
-	/* clock */ input in_clk,
+	/* clock */ input clk,
 	input wire din,
 	output /*mux_wire*/ logic dout
 );
@@ -5206,7 +5233,7 @@ module CrossActionNoData(
 /*mux_wire*/ logic _cross_valid_din;
 wire _cross_valid_dout;
 CrossDomain_T_type_bool cross_valid(
-	.in_clk(in_clk),
+	.clk(clk),
 	.din(_cross_valid_din),
 	.dout(_cross_valid_dout)
 );
@@ -5230,7 +5257,7 @@ endmodule
 
 // CrossDomain #(T: type bool #())
 module CrossDomain_T_type_bool(
-	/* clock */ input in_clk,
+	/* clock */ input clk,
 	input wire din,
 	output /*mux_wire*/ logic dout
 );
