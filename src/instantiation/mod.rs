@@ -189,7 +189,7 @@ pub struct SubModule {
     pub name: String,
 }
 impl SubModule {
-    fn get_span(&self, link_info: &LinkInfo) -> Span {
+    pub fn get_span(&self, link_info: &LinkInfo) -> Span {
         match &link_info.instructions[self.original_instruction] {
             Instruction::SubModule(sub_module_instance) => sub_module_instance.name_span,
             Instruction::Expression(Expression {
@@ -235,7 +235,9 @@ pub struct InstantiatedPort {
 #[derive(Debug)]
 pub struct InstantiatedClock {
     pub name: String,
+    pub best_span: Span,
     pub visibility: ClockVisibility,
+    pub used: bool,
     pub driver: Option<(SubModuleID, ClockID)>,
 }
 

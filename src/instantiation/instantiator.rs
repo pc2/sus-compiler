@@ -324,7 +324,7 @@ fn start_instantiation<'l>(
     Ok(ModuleTypingSuperContext::start_typechecking(typed))
 }
 fn finish_instantiation(context: ModuleTypingSuperContext) -> InstantiatedModule {
-    let typed = context.finish();
+    let mut typed = context.finish();
     let name = &typed.name;
 
     if crate::debug::is_enabled("print-concrete") {
@@ -336,7 +336,8 @@ fn finish_instantiation(context: ModuleTypingSuperContext) -> InstantiatedModule
         return typed.into_instantiated_module();
     }
 
-    debug!("Checking array accesses {name}");
+    debug!("Performing final checks for {name}");
+    typed.check_clocks_have_one_driver();
     typed.check_subtypes();
 
     typed.into_instantiated_module()

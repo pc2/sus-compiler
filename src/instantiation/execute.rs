@@ -53,9 +53,16 @@ pub fn execute(
     };
     let clocks = interior_clocks.map(|(_, cl)| {
         let name = context.unique_name_producer.get_unique_name(&cl.name);
+        let best_span = if let Some(span) = cl.name_span {
+            span
+        } else {
+            context.link_info.name_span
+        };
         InstantiatedClock {
             name,
+            best_span,
             visibility: cl.visibility,
+            used: false,
             driver: None,
         }
     });

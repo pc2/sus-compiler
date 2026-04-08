@@ -1,39 +1,3 @@
-// WeirdlyNamedClock #()
-module WeirdlyNamedClock(
-	/* clock */ input default_1,
-	/* clock */ output this_clock_out,
-	input wire x_i,
-	output /*mux_wire*/ logic x_o,
-	output /*state*/ logic x_st,
-	input wire y_i,
-	output /*mux_wire*/ logic y_o,
-	output /*state*/ logic y_st
-);
-
-/*latency*/ logic _x_i_D1; always_ff @(posedge default_1) begin _x_i_D1 <= x_i; end
-/*latency*/ logic _y_i_D1001; always_ff @(posedge this_clock_out) begin _y_i_D1001 <= y_i; end
-always_comb begin // combinatorial x_o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x_o = 1'bx;
-	x_o = _x_i_D1;
-	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
-	x_o = x_o;
-end
-always_ff @(posedge default_1) begin // state x_st
-	x_st <= x_i;
-end
-always_comb begin // combinatorial y_o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y_o = 1'bx;
-	y_o = _y_i_D1001;
-	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
-	y_o = y_o;
-end
-always_ff @(posedge this_clock_out) begin // state y_st
-	y_st <= y_i;
-end
-endmodule
-
 // NegativeIntLiterals #()
 module NegativeIntLiterals(
 	/* clock */ input clk
@@ -172,12 +136,12 @@ module IntNarrowToZero(
 // (zero sized) _IntNarrow_2_din
 wire signed[3:0] _IntNarrow_2_dout;
 IntNarrow_FROM_I_5_TO_I_6_FROM_0_TO_1 IntNarrow(
-	.clk(Unconnected_clock_1),
+	.clk(clk),
 	.din(_IntNarrow_din)
 	// (zero sized port) .dout(_IntNarrow_dout)
 );
 IntNarrow_FROM_I_0_TO_I_1_FROM_3_TO_6 IntNarrow_2(
-	.clk(Unconnected_clock_2),
+	.clk(clk),
 	// (zero sized port) .din(_IntNarrow_2_din)
 	.dout(_IntNarrow_2_dout)
 );
@@ -204,7 +168,7 @@ wire _mwd_b_data;
 /*mux_wire*/ logic _mwd_a_act;
 /*mux_wire*/ logic _mwd_a_data;
 ModWithDomains mwd(
-	.clk(Unconnected_clock_1),
+	.clk(clk),
 	.b_trig(_mwd_b_trig),
 	.b_data(_mwd_b_data),
 	.a_act(_mwd_a_act),
@@ -907,7 +871,7 @@ assign _12[_g0] = _10[_g0] + 1'd0;
 end
 endgenerate
 ReceiveZerosArray ReceiveZerosArray(
-	.clk(Unconnected_clock_3)
+	.clk(clk)
 	// (zero sized port) .values(_ReceiveZerosArray_values)
 );
 always_comb begin // combinatorial vs
@@ -960,7 +924,7 @@ module ModuleWithInitialStates(
 );
 
 /*state*/ logic[4:0] A = 5'bx1xxx;
-always_ff @(posedge Unconnected_clock_1) begin // state A
+always_ff @(posedge clk) begin // state A
 end
 always_ff @(posedge clk) begin // state O
 end
@@ -1104,7 +1068,7 @@ module zero_sized_stuffs(
 // (zero sized) b
 // (zero sized) _8
 UIntToBits_NUM_BITS_0 UIntToBits(
-	.clk(Unconnected_clock_1)
+	.clk(clk)
 	// (zero sized port) .value(_UIntToBits_value)
 	// (zero sized port) .bits(_UIntToBits_bits)
 );
@@ -2129,7 +2093,7 @@ module numbersToAddUp(
 /*mux_wire*/ logic[1:0] _adder_values[4:0];
 wire[3:0] _adder_total;
 TreeAdd_WIDTH_5_FROM_3_TO_4 adder(
-	.clk(Unconnected_clock_1),
+	.clk(clk),
 	.values(_adder_values),
 	.total(_adder_total)
 );
@@ -2186,7 +2150,7 @@ module use_permute(
 wire[2:0] _permut_d_out[7:0];
 localparam[2:0] SOURCES[7:0] = '{3'd3, 3'd2, 3'd4, 3'd5, 3'd1, 3'd2, 3'd7, 3'd6};
 permute_t_T_type_int_FROM_1_TO_8_SIZE_8_SOURCES_3_2_4_5_1_2_7_6 permut(
-	.clk(Unconnected_clock_2),
+	.clk(clk),
 	.d_in(_permut_d_in),
 	.d_out(_permut_d_out)
 );
@@ -2290,15 +2254,15 @@ module testTinyTestMod(
 );
 
 tinyTestMod_beep_3 a(
-	.clk(Unconnected_clock_1),
+	.clk(clk),
 	.o()
 );
 tinyTestMod_beep_4 b(
-	.clk(Unconnected_clock_2),
+	.clk(clk),
 	.o()
 );
 tinyTestMod_beep_3 c(
-	.clk(Unconnected_clock_3),
+	.clk(clk),
 	.o()
 );
 endmodule
@@ -3331,7 +3295,7 @@ module use_xor(
 /*mux_wire*/ logic _xor_1_x2;
 wire _xor_1_y;
 xor xor_1(
-	.clk(Unconnected_clock_1),
+	.clk(clk),
 	.x1(_xor_1_x1),
 	.x2(_xor_1_x2),
 	.y(_xor_1_y)
@@ -4518,7 +4482,7 @@ module test_pow17(
 /*mux_wire*/ logic[6:0] _pow17_i;
 wire[112:0] _pow17_o;
 pow17 pow17(
-	.clk(Unconnected_clock_1),
+	.clk(clk),
 	.i(_pow17_i),
 	.o(_pow17_o)
 );

@@ -1,4 +1,5 @@
 use crate::append_only_vec::AppendOnlyVec;
+use crate::instantiation::SubModule;
 use crate::linker::LinkerFiles;
 use crate::prelude::*;
 
@@ -458,6 +459,15 @@ impl ErrorInfoObject for &LinkInfo {
         Some(ErrorInfo {
             span: self.name_span,
             info: format!("'{}' defined here", &self.name),
+        })
+    }
+}
+
+impl ErrorInfoObject for (&SubModule, &LinkInfo) {
+    fn make_info(self) -> Option<ErrorInfo> {
+        Some(ErrorInfo {
+            span: self.0.get_span(self.1),
+            info: format!("'{}' instantiated here", &self.0.name),
         })
     }
 }
