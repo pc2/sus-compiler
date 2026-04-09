@@ -7,6 +7,7 @@ use std::rc::Rc;
 use crate::{
     config::config,
     errors::ErrorLevel,
+    instantiation::clocks::process_clocks,
     linker::{LinkerFiles, LinkerGlobals},
     to_string::FmtWrapper,
     typing::concrete_type::ConcreteGlobalReference,
@@ -180,7 +181,7 @@ impl Instantiator {
 
 impl Executed {
     pub fn into_module_typing_context<'l>(
-        self,
+        mut self,
         globals: &'l LinkerGlobals,
         linker_files: &'l LinkerFiles,
         md: &'l Module,
@@ -192,11 +193,18 @@ impl Executed {
             assert!(err.level == ErrorLevel::Error);
             errors.push_diagnostic(err);
         }
+        let clocks = process_clocks(
+            &mut self.wires,
+            &mut self.submodules,
+            &mut self.unique_name_producer,
+            md,
+            &errors,
+        );
         ModuleTypingContext {
             mangled_name: mangle_name(&name),
             name,
             global_ref,
-            clocks: self.clocks,
+            clocks,
             wires: self.wires,
             submodules: self.submodules,
             generation_state: self.generation_state,
@@ -301,12 +309,7 @@ fn start_instantiation<'l>(
     }
 
     debug!("Executing {name}");
-    let exec = execute::execute(
-        &md.link_info,
-        linker_globals,
-        &global_ref.template_args,
-        &md.interior_clocks,
-    );
+    let exec = execute::execute(&md.link_info, linker_globals, &global_ref.template_args);
 
     let typed = exec.into_module_typing_context(linker_globals, linker_files, md, global_ref, name);
     let name = &typed.name;
@@ -324,7 +327,7 @@ fn start_instantiation<'l>(
     Ok(ModuleTypingSuperContext::start_typechecking(typed))
 }
 fn finish_instantiation(context: ModuleTypingSuperContext) -> InstantiatedModule {
-    let mut typed = context.finish();
+    let typed = context.finish();
     let name = &typed.name;
 
     if crate::debug::is_enabled("print-concrete") {
@@ -337,7 +340,6 @@ fn finish_instantiation(context: ModuleTypingSuperContext) -> InstantiatedModule
     }
 
     debug!("Performing final checks for {name}");
-    typed.check_clocks_have_one_driver();
     typed.check_subtypes();
 
     typed.into_instantiated_module()

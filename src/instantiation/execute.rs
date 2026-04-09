@@ -33,7 +33,6 @@ pub fn execute(
     link_info: &LinkInfo,
     globals: &LinkerGlobals,
     working_on_template_args: &TVec<ConcreteTemplateArg>,
-    interior_clocks: &FlatAlloc<ClockInfo, ClockIDMarker>,
 ) -> Executed {
     let mut context = ExecutionContext {
         generation_state: GenerationState {
@@ -51,30 +50,15 @@ pub fn execute(
         link_info,
         globals,
     };
-    let clocks = interior_clocks.map(|(_, cl)| {
-        let name = context.unique_name_producer.get_unique_name(&cl.name);
-        let best_span = if let Some(span) = cl.name_span {
-            span
-        } else {
-            context.link_info.name_span
-        };
-        InstantiatedClock {
-            name,
-            best_span,
-            visibility: cl.visibility,
-            used: false,
-            driver: None,
-        }
-    });
 
     let execution_status = context.instantiate_code_block(link_info.instructions.id_range());
 
     Executed {
-        clocks,
         wires: context.wires,
         submodules: context.submodules,
         generation_state: context.generation_state.generation_state,
         execution_status,
+        unique_name_producer: context.unique_name_producer,
     }
 }
 

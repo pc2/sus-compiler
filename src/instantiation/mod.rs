@@ -3,6 +3,7 @@ use crate::typing::unifyable_cell::UniCell;
 use crate::{errors::CompileError, prelude::*};
 
 mod builtins;
+mod clocks;
 mod concrete_typecheck;
 mod execute;
 mod final_checks;
@@ -396,7 +397,9 @@ impl ForEachContainedWire for RealWireDataSource {
 pub enum InferenceResult {
     /// Means the inference candidate can be discarded
     PortNotUsed,
-    /// Means the port is valid, but the target couldn't be computed. Invalidates [ValueInferStrategy::Min] and [ValueInferStrategy::Max]
+    /// Means the port is valid, but the target couldn't be computed.
+    /// Invalidates [crate::latency::port_latency_inference::ValueInferStrategy::Min]
+    /// and [crate::latency::port_latency_inference::ValueInferStrategy::Max]
     NotFound,
     /// See [InferenceFailure::BadProblem]
     LatencyBadProblem,
@@ -415,11 +418,11 @@ pub enum InferenceResult {
 }
 
 struct Executed {
-    clocks: FlatAlloc<InstantiatedClock, ClockIDMarker>,
     wires: FlatAlloc<RealWire, WireIDMarker>,
     submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
     generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
     execution_status: Result<(), CompileError>,
+    unique_name_producer: UniqueNames,
 }
 
 pub struct ModuleTypingContext<'l> {
