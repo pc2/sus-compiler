@@ -35,84 +35,85 @@ extern module xpm_memory_sdpram #(
     string              WRITE_MODE_B,//       = "no_change",
     string              RST_MODE_B,//         = "SYNC",
 ) {
-    domain clka
-    // Common module ports
-    input bool sleep'0
+	clock clka
+	// Common module ports
+	input bool sleep'0
 
-    // Port A module ports
-    //input  wire                                               clka,
-    input bool                                        ena'0
-    input bool[WRITE_DATA_WIDTH_A/BYTE_WRITE_WIDTH_A] wea'0
-    input int#(FROM: 0, TO: pow2#(E: ADDR_WIDTH_A))   addra'0
-    input bool[WRITE_DATA_WIDTH_A]                    dina'0
-    input bool                                        injectsbiterra'0
-    input bool                                        injectdbiterra'0
+	// Port A module ports
+	//input  wire                                               clka,
+	input bool                                        ena'0
+	input bool[WRITE_DATA_WIDTH_A/BYTE_WRITE_WIDTH_A] wea'0
+	input int#(FROM: 0, TO: pow2#(E: ADDR_WIDTH_A))   addra'0
+	input bool[WRITE_DATA_WIDTH_A]                    dina'0
+	input bool                                        injectsbiterra'0
+	input bool                                        injectdbiterra'0
 
-    // Port B module ports
-    //input  bool                                       clkb'0
-    input  bool                                       rstb'0
-    input  bool                                       enb'0
-    input  bool                                       regceb'0
-    input  int#(FROM: 0, TO: pow2#(E: ADDR_WIDTH_B))  addrb'0
-    output bool[READ_DATA_WIDTH_B]                    doutb'0
-    output bool                                       sbiterrb'0
-    output bool                                       dbiterrb'0
+	// Port B module ports
+	clock clkb
+	input  bool                                       rstb'0
+	input  bool                                       enb'0
+	input  bool                                       regceb'0
+	input  int#(FROM: 0, TO: pow2#(E: ADDR_WIDTH_B))  addrb'0
+	output bool[READ_DATA_WIDTH_B]                    doutb'0
+	output bool                                       sbiterrb'0
+	output bool                                       dbiterrb'0
 }
 
 extern module xpm_fifo_sync #(
-  // Common module strings
-  string FIFO_MEMORY_TYPE, // "auto",
-  string ECC_MODE, // "no_ecc",
-  int    SIM_ASSERT_CHK, // 0,
-  int    CASCADE_HEIGHT, // 0,
+	// Common module strings
+	string FIFO_MEMORY_TYPE, // "auto",
+	string ECC_MODE, // "no_ecc",
+	int    SIM_ASSERT_CHK, // 0,
+	int    CASCADE_HEIGHT, // 0,
 
-  int    FIFO_WRITE_DEPTH, // 2048,
-  int    WRITE_DATA_WIDTH, // 32,
-  int    WR_DATA_COUNT_WIDTH, // 1,
-  int    PROG_FULL_THRESH, // 10,
-  int    FULL_RESET_VALUE, // 0,
-  string USE_ADV_FEATURES, // "0707",
+	int    FIFO_WRITE_DEPTH, // 2048,
+	int    WRITE_DATA_WIDTH, // 32,
+	int    WR_DATA_COUNT_WIDTH, // 1,
+	int    PROG_FULL_THRESH, // 10,
+	int    FULL_RESET_VALUE, // 0,
+	string USE_ADV_FEATURES, // "0707",
 
-  string READ_MODE, // "std",
-  int    FIFO_READ_LATENCY, // 1,
-  int    READ_DATA_WIDTH, // WRITE_DATA_WIDTH,
-  int    RD_DATA_COUNT_WIDTH, // 1,
-  int    PROG_EMPTY_THRESH, // 10,
-  string DOUT_RESET_VALUE, // "0",
+	string READ_MODE, // "std",
+	int    FIFO_READ_LATENCY, // 1,
+	int    READ_DATA_WIDTH, // WRITE_DATA_WIDTH,
+	int    RD_DATA_COUNT_WIDTH, // 1,
+	int    PROG_EMPTY_THRESH, // 10,
+	string DOUT_RESET_VALUE, // "0",
 
-  int WAKEUP_TIME          // should be string, but is 0
+	int WAKEUP_TIME          // should be string, but is 0
 ) {
-  domain wr_clk
+	clock wr_clk
 
-  // Common module ports
-  input  bool sleep'0
-  input  bool rst'0
+	// Common module ports
+	input  bool sleep'0
+	input  bool rst'0
 
-  // Write Domain ports
-  input  bool                        wr_en'0
-  input  bool[WRITE_DATA_WIDTH]      din'0
-  output bool                        full'0
-  output bool                        prog_full'0
-  output int#(FROM: 0, TO: pow2#(E: WR_DATA_COUNT_WIDTH))   wr_data_count'0
-  output bool                        overflow'0
-  output bool                        wr_rst_busy'0
-  output bool                        almost_full'0
-  output bool                        wr_ack'0
+	// Write Domain ports
+	input  bool                        wr_en'0
+	input  bool[WRITE_DATA_WIDTH]      din'0
+	output bool                        full'0
+	output bool                        prog_full'0
+	output int#(FROM: 0, TO: pow2#(E: WR_DATA_COUNT_WIDTH))   wr_data_count'0
+	output bool                        overflow'0
+	output bool                        wr_rst_busy'0
+	output bool                        almost_full'0
+	output bool                        wr_ack'0
 
-  // Read Domain ports
-  input  bool                        rd_en'0
-  output bool[READ_DATA_WIDTH]       dout'0
-  output bool                        empty'0
-  output bool                        prog_empty'0
-  output int#(FROM: 0, TO: pow2#(E: RD_DATA_COUNT_WIDTH))   rd_data_count'0
-  output bool                        underflow'0
-  output bool                        rd_rst_busy'0
-  output bool                        almost_empty'0
-  output bool                        data_valid'0
+	// Read Domain ports
+	clock rd_clk
+	input  bool                        rd_en'0
+	output bool[READ_DATA_WIDTH]       dout'0
+	output bool                        empty'0
+	output bool                        prog_empty'0
+	output int#(FROM: 0, TO: pow2#(E: RD_DATA_COUNT_WIDTH))   rd_data_count'0
+	output bool                        underflow'0
+	output bool                        rd_rst_busy'0
+	output bool                        almost_empty'0
+	output bool                        data_valid'0
 
-  // ECC Related ports
-  input  bool injectsbiterr'0
-  input  bool injectdbiterr'0
-  output bool sbiterr'0
-  output bool dbiterr'0
+	// ECC Related ports
+	input  bool injectsbiterr'0
+	input  bool injectdbiterr'0
+	output bool sbiterr'0
+	output bool dbiterr'0
 }

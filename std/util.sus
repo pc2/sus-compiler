@@ -261,7 +261,7 @@ module RotateRight#(T, int ARRAY_LEN) {
 module Tuple2 #(T1, T2) {
     gen int TO1 = sizeof#(T: type T1)
     gen int TO2 = TO1 + sizeof#(T: type T2)
-    domain clk
+    clock clk
 
     domain pack_dom
     interface pack : T1 v1_i'0, T2 v2_i'0 -> bool[TO2] packed_o'0
@@ -279,7 +279,7 @@ module Tuple3 #(T1, T2, T3) {
     gen int TO1 = sizeof#(T: type T1)
     gen int TO2 = TO1 + sizeof#(T: type T2)
     gen int TO3 = TO2 + sizeof#(T: type T3)
-    domain clk
+    clock clk
 
     domain pack_dom
     interface pack : T1 v1_i'0, T2 v2_i'0, T3 v3_i'0 -> bool[TO3] packed_o'0
@@ -300,7 +300,7 @@ module Tuple4 #(T1, T2, T3, T4) {
     gen int TO2 = TO1 + sizeof#(T: type T2)
     gen int TO3 = TO2 + sizeof#(T: type T3)
     gen int TO4 = TO3 + sizeof#(T: type T4)
-    domain clk
+    clock clk
 
     domain pack_dom
     interface pack : T1 v1_i'0, T2 v2_i'0, T3 v3_i'0, T4 v4_i'0 -> bool[TO4] packed_o'0
@@ -324,7 +324,7 @@ module Tuple5 #(T1, T2, T3, T4, T5) {
     gen int TO3 = TO2 + sizeof#(T: type T3)
     gen int TO4 = TO3 + sizeof#(T: type T4)
     gen int TO5 = TO4 + sizeof#(T: type T5)
-    domain clk
+    clock clk
 
     domain pack_dom
     interface pack : T1 v1_i'0, T2 v2_i'0, T3 v3_i'0, T4 v4_i'0, T5 v5_i'0 -> bool[TO5] packed_o'0
@@ -349,7 +349,7 @@ module Tuple5 #(T1, T2, T3, T4, T5) {
 ///
 /// Use for very small FIFOs, in bandwidth-limited circumstances. 
 module RippleFIFO#(T, int DEPTH) {
-    domain clk
+    clock clk
 	state T[DEPTH] datas
 	state bool[DEPTH] valids
 

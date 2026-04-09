@@ -6,7 +6,7 @@ module ROM #(T, int DEPTH, T[DEPTH] DATA) {
 }
 
 module RAM #(T, int DEPTH) {
-	domain clk
+	clock clk
 
     gen int T_WIDTH = sizeof#(T)
 
@@ -83,7 +83,7 @@ module RAM #(T, int DEPTH) {
 }
 
 module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
-    domain clk
+    clock clk
     gen int T_WIDTH = sizeof#(T)
 
     gen int FIFO_READ_LATENCY = 1
@@ -162,7 +162,7 @@ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
 }
 
 module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {
-    domain clk
+    clock clk
     gen int T_WIDTH = sizeof#(T)
 
     xpm_fifo_sync #(

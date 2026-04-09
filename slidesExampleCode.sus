@@ -215,7 +215,7 @@ module BRAMShiftReg #(T, int LATENCY) {
 module FIFO_ #(T, int MAY_PUSH_LATENCY) {
     assert #(C: MAY_PUSH_LATENCY >= 0)
 
-    domain clk
+    clock clk
     action rst'0 {}
 
     domain write

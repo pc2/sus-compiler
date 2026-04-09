@@ -5187,48 +5187,6 @@ module UIntToBits_NUM_BITS_0(
 initial begin end
 endmodule
 
-// CrossActionNoData #()
-module CrossActionNoData(
-	/* clock */ input clk,
-	input wire din,
-	output /*mux_wire*/ logic dout
-);
-
-/*mux_wire*/ logic _cross_valid_din;
-wire _cross_valid_dout;
-CrossDomain_T_type_bool cross_valid(
-	.clk(clk),
-	.din(_cross_valid_din),
-	.dout(_cross_valid_dout)
-);
-always_comb begin // combinatorial _cross_valid_din
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_cross_valid_din = 1'bx;
-	if(din) _cross_valid_din = 1'b1;
-	if(!din) _cross_valid_din = 1'b0;
-	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
-	_cross_valid_din = _cross_valid_din;
-end
-always_comb begin // combinatorial dout
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	dout = 1'bx;
-	dout = 1'b0;
-	if(_cross_valid_dout) dout = 1'b1;
-	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
-	dout = dout;
-end
-endmodule
-
-// CrossDomain #(T: type bool #())
-module CrossDomain_T_type_bool(
-	/* clock */ input clk,
-	input wire din,
-	output /*mux_wire*/ logic dout
-);
-
-	assign dout = din;
-endmodule
-
 // LatencyOffset #(T: type bool #(), OFFSET: -9)
 module LatencyOffset_T_type_bool_OFFSET_9(
 	/* clock */ input clk,

@@ -6,7 +6,7 @@ module ROM #(T, int DEPTH, T[DEPTH] DATA) {
 }
 
 module RAM #(T, int DEPTH) {
-	domain clk
+	clock clk
 
     gen int T_WIDTH = sizeof#(T)
 
@@ -24,7 +24,7 @@ module RAM #(T, int DEPTH) {
 }
 
 module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
-    domain clk
+    clock clk
     gen int T_WIDTH = sizeof#(T)
 
 	state bool[T_WIDTH][DEPTH] mem
@@ -87,7 +87,7 @@ module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {
         }
     }
 
-    domain clk
+    clock clk
     action rst {
         write_addr = 0
         read_addr = 0

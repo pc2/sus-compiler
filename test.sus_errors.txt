@@ -1,6 +1,4 @@
 [INFO  sus_compiler::compiler_top] Selecting all parameter-less modules as --top
-[INFO  sus_compiler::instantiation::instantiator] Instantiated CrossDomain #(T: type bool #())
-[INFO  sus_compiler::instantiation::instantiator] Instantiated CrossActionNoData #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated IntToBool #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated BoolToInt #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
@@ -2171,6 +2169,13 @@ Error: Some parameters of '_1' were still unknown: int #(FROM: ?, TO: ?)[5]
      │              ┬  
      │              ╰── Some parameters of '_1' were still unknown: int #(FROM: ?, TO: ?)[5]
 ─────╯
+Warning: Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+     ╭─[ test.sus:961:9 ]
+     │
+ 961 │     int[5] b = cr.dout
+     │            ┬  
+     │            ╰── Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+─────╯
 Error: Some parameters of 'b' were still unknown: int #(FROM: ?, TO: ?)[5]
      ╭─[ test.sus:961:9 ]
      │
@@ -3265,9 +3270,9 @@ Warning: Unused port 'bits'
       │                               ┬  
       │                               ╰── Unused port 'bits'
       │
-      ├─[ core.sus:275:55 ]
+      ├─[ core.sus:197:55 ]
       │
-  275 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
+  197 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                                       ──┬─  
       │                                                         ╰─── Port 'bits' declared here
       │
@@ -3284,9 +3289,9 @@ Warning: Unused port 'value'
       │                               ┬  
       │                               ╰── Unused port 'value'
       │
-      ├─[ core.sus:275:26 ]
+      ├─[ core.sus:197:26 ]
       │
-  275 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
+  197 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
       │                          ──┬──  
       │                            ╰──── Port 'value' declared here
       │

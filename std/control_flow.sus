@@ -56,7 +56,7 @@ module FixedSizeIterator #(int TO) {
 module SlowState #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
     assert#(C: OLD_DELAY >= 0)
     gen int UPDATE_TOTAL_DEPTH = max#(A: OLD_DELAY, B: OLD_DELAY + NEW_DELAY)
-    domain clk
+    clock clk
     bool do_rst = false
     action rst {
         do_rst = true
@@ -134,6 +134,7 @@ module SlowState #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
 ///
 /// The order in which results arrive is not the same as the order of inputs, due to some taking more cycles to execute.
 module ParallelWhile #(int COMPUTATION_LATENCY, int REQUEST_DATA_LATENCY) {
+    clock clk
     domain iter_domain
     gen int TOTAL_CYCLES = COMPUTATION_LATENCY + REQUEST_DATA_LATENCY
     state int#(FROM: 0, TO: TOTAL_CYCLES) cur_iter_st
@@ -167,7 +168,7 @@ module ParallelWhile #(int COMPUTATION_LATENCY, int REQUEST_DATA_LATENCY) {
         may_start()
     }
 
-    domain clk
+    domain reset
     // Reset, overwrite valid_slots completely
     action rst {
         should_continue = false
