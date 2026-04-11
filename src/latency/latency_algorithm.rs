@@ -533,28 +533,16 @@ fn find_positive_latency_cycle(
 
 #[derive(Default, Clone, Debug)]
 pub struct LatencyCountingPorts {
-    /// All inputs come first, then all outputs
-    port_nodes: Vec<usize>,
-    outputs_start_at: usize,
+    pub inputs: Vec<usize>,
+    pub outputs: Vec<usize>,
 }
 
 impl LatencyCountingPorts {
     pub fn push(&mut self, node: usize, direction: Direction) {
         match direction {
-            Direction::Input => {
-                self.port_nodes.insert(self.outputs_start_at, node);
-                self.outputs_start_at += 1;
-            }
-            Direction::Output => {
-                self.port_nodes.push(node);
-            }
+            Direction::Input => self.inputs.push(node),
+            Direction::Output => self.outputs.push(node),
         }
-    }
-    pub fn inputs(&self) -> &[usize] {
-        &self.port_nodes[..self.outputs_start_at]
-    }
-    pub fn outputs(&self) -> &[usize] {
-        &self.port_nodes[self.outputs_start_at..]
     }
 }
 
@@ -596,8 +584,8 @@ fn print_latency_test_case(
                 f,
                 "    let fanins = ListOfLists::from_slice_slice(&fanins);"
             )?;
-            writeln!(f, "    let inputs = {:?};", ports.inputs())?;
-            writeln!(f, "    let outputs = {:?};", ports.outputs())?;
+            writeln!(f, "    let inputs = {:?};", ports.inputs)?;
+            writeln!(f, "    let outputs = {:?};", ports.outputs)?;
             writeln!(f, "    let specified_latencies = {specified_latencies:?};")?;
             writeln!(
                 f,
@@ -617,8 +605,8 @@ fn solve_port_latencies(
     solution_memory: &mut SolutionMemory,
     specified_latencies: &[SpecifiedLatency],
 ) -> Result<(Vec<Vec<SpecifiedLatency>>, i64), LatencyCountingError> {
-    let inputs = ports.inputs();
-    let outputs = ports.outputs();
+    let inputs = &ports.inputs;
+    let outputs = &ports.outputs;
     // Index as port_connection_matrix[input_idx * outputs.len() + output_idx]
     // Describes the latency difference from the input to the output port. ('out - 'in)
     // Input/Output port pairs that are UNSET have no connection
@@ -644,8 +632,9 @@ fn solve_port_latencies(
     }
 
     let mut all_latencies: Vec<_> = ports
-        .port_nodes
+        .inputs
         .iter()
+        .chain(ports.outputs.iter())
         .map(|p| SpecifiedLatency {
             node: *p,
             latency: UNSET,
@@ -1102,8 +1091,8 @@ mod tests {
     impl LatencyCountingPorts {
         pub fn from_inputs_outputs(inputs: &[usize], outputs: &[usize]) -> Self {
             Self {
-                port_nodes: inputs.iter().chain(outputs.iter()).cloned().collect(),
-                outputs_start_at: inputs.len(),
+                inputs: inputs.to_vec(),
+                outputs: outputs.to_vec(),
             }
         }
     }
@@ -1119,11 +1108,17 @@ mod tests {
         let fanins =
             fanins.add_extra_fanin_and_specified_latencies(Vec::new(), specified_latencies);
 
+        let all_ports: Vec<usize> = ports
+            .inputs
+            .iter()
+            .chain(ports.outputs.iter())
+            .cloned()
+            .collect();
         solve_latencies(
             fanins,
             &ports,
             specified_latencies,
-            std::slice::from_ref(&ports.port_nodes),
+            std::slice::from_ref(&all_ports),
         )
     }
 

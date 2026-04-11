@@ -178,10 +178,10 @@ pub fn display_latency_count_graph(
 ) {
     // true for input
     let mut extra_node_info = vec![(None, None); lc_problem.map_latency_node_to_wire.len()];
-    for port in lc_problem.ports.inputs() {
+    for port in &lc_problem.ports.inputs {
         extra_node_info[*port].0 = Some(Direction::Input);
     }
-    for port in lc_problem.ports.outputs() {
+    for port in &lc_problem.ports.outputs {
         extra_node_info[*port].0 = Some(Direction::Output);
     }
 
