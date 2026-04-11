@@ -347,8 +347,8 @@ impl GenerationState<'_> {
         let mut flattened_result_tensor: Vec<Value> =
             flattened_result_tensor.into_iter().cloned().collect();
         for dimension_len in create_array_layers.into_iter().rev() {
-            let num_sub_tensors = flattened_result_tensor.len() / dimension_len;
             assert_eq!(flattened_result_tensor.len() % dimension_len, 0);
+            let num_sub_tensors = flattened_result_tensor.len() / dimension_len;
 
             let mut result_iter = flattened_result_tensor.into_iter();
             flattened_result_tensor = (0..num_sub_tensors)

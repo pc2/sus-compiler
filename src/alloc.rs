@@ -142,7 +142,7 @@ impl<IndexMarker> UUIDRange<IndexMarker> {
         self.len() == 0
     }
     pub fn contains(&self, id: UUID<IndexMarker>) -> bool {
-        self.0.0 >= id.0 && self.1.0 < id.0
+        self.0.0 <= id.0 && id.0 < self.1.0
     }
     pub fn iter(&self) -> UUIDRangeIter<IndexMarker> {
         self.into_iter()

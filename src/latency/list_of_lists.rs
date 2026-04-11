@@ -53,8 +53,6 @@ impl<T> ListOfLists<T> {
     ///
     /// The input vector is consumed. Each tuple (group, element) indicates that
     /// `element` is to be appended to the group at index `group`.
-    ///
-    /// new_values_iter MUST return elements in ascending group order.
     pub fn extend_lists_with_new_elements(self, mut new_edges: Vec<(usize, T)>) -> Self {
         assert!(*self.start_ends.first().unwrap() == 0);
         assert!(*self.start_ends.last().unwrap() == self.buf.len());
@@ -175,16 +173,14 @@ impl<T> ListOfLists<T> {
             *found_idx += 1;
         }
 
-        /*
-            SAFETY:
-            Unless the user passes a ridiculous Iterator, where it's Clone-d version behaves differently,
-            both passes should yield the exact same sequence of elements. In that case, we've properly
-            reserved space in the buf vector for all of the elements, and thus every element got written to once.
-            Vec<MaybeUninit<T>> is also compatible to transmute to Vec<T>
-            (Caveat, nothing on DuckDuckGo I could find said anything about this)
-        */
-        let buf =
-            unsafe { std::mem::transmute::<Vec<MaybeUninit<T>>, Vec<T>>(partially_initialize_buf) };
+        // SAFETY: Both iterator passes yield the same sequence (Clone contract), so every slot in
+        // `partially_initialize_buf` was written exactly once above. All elements are initialized.
+        // MaybeUninit<T> is guaranteed to have the same size, alignment, and ABI as T, so
+        // reinterpreting the raw pointer as *mut T is valid.
+        let buf = unsafe {
+            let mut md = std::mem::ManuallyDrop::new(partially_initialize_buf);
+            Vec::from_raw_parts(md.as_mut_ptr() as *mut T, md.len(), md.capacity())
+        };
 
         Self { buf, start_ends }
     }

@@ -171,9 +171,10 @@ macro_rules! let_unwrap {
                 __val
             );
         };
-        // Now match by value (may move)
+        // Now match by value (may move). The first match already verified the pattern,
+        // so this branch is truly unreachable.
         let $pat = __val else {
-            unreachable!("let_unwrap! internal error: pattern matched by ref, but failed by value")
+            unreachable!("let_unwrap! internal error: pattern {} matched by reference but not by value", stringify!($pat))
         };
     };
 }
