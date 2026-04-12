@@ -98,6 +98,103 @@ module SlowState #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
     }
 }
 
+/// This module lets you wait until all values within a pipeline have stabilized, and use the results as if the pipeline completed instantaneously. 
+///
+/// As opposed to [SlowPipelineBegin], this module is meant to go at the end of your pipeline
+///
+/// Usage:
+/// ```sus
+/// state float cur_sum'0
+/// SlowPipelineEnd manage_adder
+///
+/// float next_sum'11 = fp32_add(cur_sum, 1.0) // Takes 11 cycles
+/// manage_adder.din = next_sum
+/// when manage_adder.pipeline_stable : float new_sum {
+///     cur_sum = new_sum
+///     manage_adder.input_changed()
+/// } 
+/// ```
+module SlowPipelineEnd#(T, int PIPELINE_DEPTH) {
+    domain main
+    state bool[PIPELINE_DEPTH] cooldown
+
+    input T din'PIPELINE_DEPTH
+    action input_changed'0 {
+        cooldown = RepeatGen#(T: type bool, V: false, SIZE: PIPELINE_DEPTH)
+    } else {
+        if PIPELINE_DEPTH >= 1 {
+            for int I in 1..PIPELINE_DEPTH {
+                cooldown[I - 1] = cooldown[I]
+            }
+            cooldown[PIPELINE_DEPTH - 1] = true
+        }
+    }
+    trigger pipeline_stable'0 : T dout'0
+    if PIPELINE_DEPTH == 0 {
+        pipeline_stable(din)
+    } else {
+        T pipe_out = LatencyOffset#(OFFSET: -PIPELINE_DEPTH)(din)
+        when cooldown[0] {
+            pipeline_stable(pipe_out)
+        }
+    }
+
+    domain reset
+    action rst {
+        cooldown = RepeatGen#(T: type bool, V: false, SIZE: PIPELINE_DEPTH)
+    }
+}
+
+/// This module lets you wait until all values within a pipeline have stabilized, and use the results as if the pipeline completed instantaneously.
+/// 
+/// As opposed to [SlowPipelineEnd], this module is meant to go at the beginning of your pipeline
+///
+/// Usage:
+/// ```sus
+/// state float cur_sum'0
+/// SlowPipeline manage_adder
+/// manage_adder.din = cur_sum
+///
+/// float next_sum'11 = fp32_add(manage_adder.dout, 1.0) // Takes 11 cycles
+/// when manage_adder.pipeline_stable {
+///     cur_sum = next_sum
+///     manage_adder.input_changed()
+/// } 
+/// ```
+module SlowPipelineBegin#(T, int PIPELINE_DEPTH) {
+    domain main
+    state bool[PIPELINE_DEPTH] cooldown
+
+    input T din'0
+    action input_changed'0 {
+        cooldown = RepeatGen#(T: type bool, V: false, SIZE: PIPELINE_DEPTH)
+    } else {
+        if PIPELINE_DEPTH >= 1 {
+            for int I in 1..PIPELINE_DEPTH {
+                cooldown[I - 1] = cooldown[I]
+            }
+            cooldown[PIPELINE_DEPTH - 1] = true
+        }
+    }
+    output T dout'-PIPELINE_DEPTH
+    trigger pipeline_stable'0
+    if PIPELINE_DEPTH == 0 {
+        dout = din
+        pipeline_stable()
+    } else {
+        dout = LatencyOffset#(OFFSET: -PIPELINE_DEPTH)(din)
+        when cooldown[0] {
+            pipeline_stable()
+        }
+    }
+
+    domain reset
+    action rst {
+        cooldown = RepeatGen#(T: type bool, V: false, SIZE: PIPELINE_DEPTH)
+    }
+}
+
+
 /// This module lets you create pipelined feedback loops of variable latency. 
 ///
 /// Use as follows:
