@@ -72,6 +72,34 @@ module RAM_Unbalanced #(ElemT, int DEPTH, int WRITE_SIZE, int READ_SIZE) {
 	}
 }
 
+/// This shift register is implemented as a memory block with a rotating index.
+///
+/// It is meant to bridge a long latency difference. 
+/// 
+/// We keep one latency register on the inflow, and one on the outflow, as they tend to slot into the primitives we synthesize to. 
+module ShiftReg#(T, int LATENCY) {
+    interface ShiftReg : T din'0 -> T dout'LATENCY
+    assert#(C: LATENCY >= 0)
+    
+    if LATENCY <= 3 {
+        // Not worth it to use the memory block. A few registers back to back will do. 
+        dout = din
+    } else {
+        gen int T_WIDTH = sizeof#(T)
+
+        reg bool[T_WIDTH] bits_in = ToBits(din)
+        
+        state bool[T_WIDTH][LATENCY-2] mem
+        state int#(FROM: 0, TO: LATENCY-2) cur_idx
+        initial cur_idx = 0
+        cur_idx = cur_idx + 1 mod LATENCY-2
+
+        reg bool[T_WIDTH] bits_out = mem[cur_idx]
+        mem[cur_idx] = bits_in
+        dout = FromBits(LatencyOffset#(OFFSET: LATENCY - 2)(bits_out))
+    }
+}
+
 module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
     clock clk
     gen int T_WIDTH = sizeof#(T)

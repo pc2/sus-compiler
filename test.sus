@@ -1227,8 +1227,8 @@ module instantiate_infer_me_with_poison_output {
 module __add__ #(int A, int B) {
 	interface __add__ : int#(TO: A) a'0, int #(TO:B) b'0 -> int #(TO: A+B) o'clog2 #(V: 5)
 }
-module ShiftReg #(int DEPTH) {
-	interface ShiftReg : bool i'0 -> bool o'DEPTH
+module ShiftRegTest #(int DEPTH) {
+	interface ShiftRegTest : bool i'0 -> bool o'DEPTH
 	if DEPTH > 3 {
 		// Impl as BRAM
 	} else {
@@ -1871,4 +1871,9 @@ module WeirdlyNamedClock {
 	reg output bool y_o = y_i
 	state output bool y_st
 	y_st = y_i
+}
+
+module inst_STL {
+    FIFO#(T: type int#(FROM: 3, TO: 10)[3], DEPTH: 1024, ALMOST_FULL_LATENCY: ) s
+    ShiftReg#(T: type int#(FROM: 3, TO: 10)[3], LATENCY: 2) s
 }
