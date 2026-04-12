@@ -6,20 +6,69 @@ module ROM #(T, int DEPTH, T[DEPTH] DATA) {
 }
 
 module RAM #(T, int DEPTH) {
-	clock clk
-
     gen int T_WIDTH = sizeof#(T)
 
     state bool[T_WIDTH][DEPTH] mem
 
     domain w_dom
-	action write'0 : int#(FROM: 0, TO: DEPTH) addr'0, T data'0 {
-		mem[addr] = ToBits(data)
+	action write'0 : int#(FROM: 0, TO: DEPTH) write_addr'0, T write_data'0 {
+		mem[write_addr] = ToBits(write_data)
 	}
 
     domain r_dom
 	action read'0: int#(FROM: 0, TO: DEPTH) read_addr'0 -> T read_data'1 {
-		reg read_data = FromBits(mem[read_addr])
+        reg bool[T_WIDTH] mem_read = mem[read_addr]
+        read_data = FromBits(mem_read)
+	}
+}
+
+module RAM_Unbalanced #(ElemT, int DEPTH, int WRITE_SIZE, int READ_SIZE) {
+    assert#(C: DEPTH mod WRITE_SIZE == 0)
+    assert#(C: DEPTH mod READ_SIZE == 0)
+    if READ_SIZE < WRITE_SIZE {
+        assert#(C: WRITE_SIZE mod READ_SIZE == 0)
+    } else {
+        assert#(C: READ_SIZE mod WRITE_SIZE == 0)
+    }
+
+    gen int ELEM_WIDTH = sizeof#(T: type ElemT)
+    gen int WRITE_WIDTH = WRITE_SIZE * ELEM_WIDTH
+    gen int READ_WIDTH = READ_SIZE * ELEM_WIDTH
+    gen int MEMORY_WIDTH = max#(A: WRITE_WIDTH, B: READ_WIDTH)
+    gen int NUM_WRITE_SEGMENTS = MEMORY_WIDTH / WRITE_SIZE
+    gen int NUM_READ_SEGMENTS = MEMORY_WIDTH / READ_SIZE
+    
+    gen int MEMORY_DEPTH = DEPTH / (MEMORY_WIDTH / ELEM_WIDTH)
+    
+    state bool[MEMORY_WIDTH][MEMORY_DEPTH] mem
+
+    bool[NUM_WRITE_SEGMENTS] should_write_segment = RepeatGen#(T: type bool, SIZE: NUM_WRITE_SEGMENTS, V: false)
+    bool[WRITE_WIDTH] wr_data
+    int#(FROM: 0, TO: MEMORY_DEPTH) write_row
+    for int WR_SEGMENT in 0..NUM_WRITE_SEGMENTS {
+        when should_write_segment[WR_SEGMENT] {
+            mem[write_row][WR_SEGMENT * WRITE_WIDTH +: WRITE_WIDTH] = wr_data
+        }
+    }
+
+    domain w_dom
+	action write'0 : int#(FROM: 0, TO: DEPTH / WRITE_SIZE) write_addr'0, ElemT[WRITE_SIZE] write_data'0 {
+		wr_data = ToBits(write_data)
+        int selected_write_segment = write_addr mod NUM_WRITE_SEGMENTS
+        write_row = write_addr / NUM_WRITE_SEGMENTS
+        should_write_segment[selected_write_segment] = true
+	}
+
+    domain r_dom
+	action read'0: int#(FROM: 0, TO: DEPTH / READ_SIZE) read_addr'0 -> ElemT[READ_SIZE] read_data'1 {
+        int selected_read_segment = read_addr mod NUM_READ_SEGMENTS
+        int#(FROM: 0, TO: MEMORY_DEPTH) read_row = read_addr / NUM_READ_SEGMENTS
+        reg bool[MEMORY_WIDTH] rd_data = mem[read_row]
+        bool[READ_WIDTH][NUM_READ_SEGMENTS] segments
+        for int RD_SEGMENT in 0..NUM_READ_SEGMENTS {
+            segments[RD_SEGMENT] = rd_data[RD_SEGMENT * WRITE_WIDTH +: WRITE_WIDTH]
+        }
+        read_data = FromBits(segments[selected_read_segment])
 	}
 }
 

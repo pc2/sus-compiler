@@ -67,15 +67,101 @@ module RAM #(T, int DEPTH) {
     bool _dbiterrb = mem.dbiterrb
 
     domain w_dom
-	action write'0 : int#(FROM: 0, TO: DEPTH) addr'0, T data'0 {
+	action write'0 : int#(FROM: 0, TO: DEPTH) write_addr'0, T write_data'0 {
         mem.ena = true
-        mem.addra = addr
-        mem.dina = ToBits(data)
+        mem.addra = write_addr
+        mem.dina = ToBits(write_data)
 	}
 
     bool[T_WIDTH] offset_data = LatencyOffset#(OFFSET: READ_LATENCY)(mem.doutb)
     domain r_dom
 	action read'0: int#(FROM: 0, TO: DEPTH) read_addr'0 -> T read_data'READ_LATENCY {
+        mem.enb = true
+        mem.addrb = read_addr
+		read_data = FromBits(offset_data)
+	}
+}
+
+module RAM_Unbalanced #(ElemT, int DEPTH, int WRITE_SIZE, int READ_SIZE) {
+    assert#(C: DEPTH mod WRITE_SIZE == 0)
+    assert#(C: DEPTH mod READ_SIZE == 0)
+    if READ_SIZE < WRITE_SIZE {
+        assert#(C: WRITE_SIZE mod READ_SIZE == 0)
+    } else {
+        assert#(C: READ_SIZE mod WRITE_SIZE == 0)
+    }
+
+    gen int ELEM_WIDTH = sizeof#(T: type ElemT)
+    gen int WRITE_WIDTH = WRITE_SIZE * ELEM_WIDTH
+    gen int READ_WIDTH = READ_SIZE * ELEM_WIDTH
+
+    gen int READ_LATENCY = 1
+
+    xpm_memory_sdpram #(
+        // Common module strings
+        MEMORY_SIZE: DEPTH * ELEM_WIDTH,
+        MEMORY_PRIMITIVE: "auto",
+        CLOCKING_MODE: "common_clock",
+        ECC_MODE: "no_ecc",
+        ECC_TYPE: "NONE",
+        ECC_BIT_RANGE: "[7:0]",
+        MEMORY_INIT_FILE: "none",
+        MEMORY_INIT_PARAM: "",
+        USE_MEM_INIT: 1,
+        USE_MEM_INIT_MMI: 0,
+        WAKEUP_TIME: "disable_sleep",
+        AUTO_SLEEP_TIME: 0,
+        MESSAGE_CONTROL: 0,
+        USE_EMBEDDED_CONSTRAINT: 0,
+        MEMORY_OPTIMIZATION: "true",
+        CASCADE_HEIGHT: 0,
+        RAM_DECOMP: "auto",
+        SIM_ASSERT_CHK: 0,
+        WRITE_PROTECT: 1,
+        IGNORE_INIT_SYNTH: 0,
+
+        // Port A module strings
+        WRITE_DATA_WIDTH_A: WRITE_WIDTH,
+        BYTE_WRITE_WIDTH_A: WRITE_WIDTH,
+        ADDR_WIDTH_A: clog2#(V: DEPTH / WRITE_SIZE),
+        RST_MODE_A: "SYNC",
+
+        // Port B module strings
+        READ_DATA_WIDTH_B: READ_WIDTH,
+        ADDR_WIDTH_B: clog2#(V: DEPTH / READ_SIZE),
+        READ_RESET_VALUE_B: "0",
+        READ_LATENCY_B: READ_LATENCY,
+        WRITE_MODE_B: "no_change",
+        RST_MODE_B: "SYNC"
+    ) mem
+
+    // Common module ports
+    mem.sleep = false
+
+    // Port A module ports
+    mem.ena = false
+    mem.wea = [true]
+    mem.injectsbiterra = false
+    mem.injectdbiterra = false
+
+    // Port B module ports
+    mem.rstb = false
+    mem.enb = false
+    mem.regceb = true
+    bool _sbiterrb = mem.sbiterrb
+    bool _dbiterrb = mem.dbiterrb
+
+
+    domain w_dom
+	action write'0 : int#(FROM: 0, TO: DEPTH / WRITE_SIZE) write_addr'0, ElemT[WRITE_SIZE] write_data'0 {
+        mem.ena = true
+        mem.addra = write_addr
+        mem.dina = ToBits(write_data)
+	}
+
+    bool[READ_WIDTH] offset_data = LatencyOffset#(OFFSET: READ_LATENCY)(mem.doutb)
+    domain r_dom
+	action read'0: int#(FROM: 0, TO: DEPTH / READ_SIZE) read_addr'0 -> ElemT[READ_SIZE] read_data'READ_LATENCY {
         mem.enb = true
         mem.addrb = read_addr
 		read_data = FromBits(offset_data)
