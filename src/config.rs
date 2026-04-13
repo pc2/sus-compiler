@@ -65,6 +65,7 @@ pub struct ConfigStruct {
     pub sus_home: PathBuf,
     pub codegen_file: Option<PathBuf>,
     pub codegen_separate_folder: Option<PathBuf>,
+    pub gen_tb: bool,
     /// When no top modules specified, then codegen all
     pub top_modules: Vec<String>,
     pub use_color: bool,
@@ -147,6 +148,10 @@ fn command_builder() -> Command {
             .help("Sets the target HDL")
             .requires("codegen-enabled")
             .value_parser(clap::builder::EnumValueParser::<TargetLanguage>::new()))
+        .arg(Arg::new("gen-tb")
+            .long("gen-tb")
+            .help("Generate testbench stubs for all --top modules to stdout")
+            .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("top")
             .long("top")
             .help("List of top module names to limit compilation/codegen to")
@@ -361,6 +366,8 @@ pub fn parse_args() {
         );
     }
 
+    let gen_tb = matches.get_flag("gen-tb");
+
     let mut recursion_limit = *matches.get_one::<usize>("recursion-limit").unwrap();
     if recursion_limit == 0 {
         recursion_limit = usize::MAX; // 0 means "disable recursion limit", this is pretty effective at that
@@ -372,6 +379,7 @@ pub fn parse_args() {
         files,
         codegen_file,
         codegen_separate_folder,
+        gen_tb,
         top_modules,
         target_language,
         features,
@@ -396,6 +404,7 @@ pub fn init_cfg_for_test() {
         files: Vec::new(),
         codegen_file: None,
         codegen_separate_folder: None,
+        gen_tb: false,
         top_modules: Vec::new(),
         target_language: TargetLanguage::SystemVerilog,
         use_color: true,

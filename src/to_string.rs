@@ -1100,13 +1100,16 @@ impl Module {
 }
 
 impl RealWire {
+    /// Displays this wire as a SUS declaration.
+    ///
+    /// Something like: "int#(FROM: -2, TO: 17) beep'12"
     pub fn display_decl(&self, globals: &LinkerGlobals) -> impl Display {
         FmtWrapper(|f| {
-            let port_typ = self.typ.display(globals);
-            let port_name = &self.name;
-            let port_abs_lat = &self.absolute_latency;
+            let typ = self.typ.display(globals);
+            let name = &self.name;
+            let abs_lat = &self.absolute_latency;
 
-            write!(f, "{port_typ} {port_name}'{port_abs_lat}")
+            write!(f, "{typ} {name}'{abs_lat}")
         })
     }
 }

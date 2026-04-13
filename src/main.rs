@@ -60,6 +60,10 @@ fn main() -> ExitCode {
         compile_all(linker, file_paths);
         print_all_errors(&*linker);
 
-        crate::codegen::codegen(&*linker)
+        let exit_code = crate::codegen::codegen(&*linker);
+
+        crate::codegen::maybe_gen_tb(linker);
+
+        exit_code
     })
 }

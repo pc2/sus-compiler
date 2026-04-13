@@ -1,7 +1,11 @@
 mod patches;
-pub mod system_verilog;
+mod sv_utils;
+mod system_verilog;
 
-use crate::codegen::system_verilog::gen_verilog_code;
+use log::logger;
+
+use crate::codegen::system_verilog::generate_systemverilog;
+use crate::codegen::system_verilog::generate_testbench_stub;
 use crate::prelude::*;
 
 use crate::{InstantiatedModule, Linker};
@@ -9,6 +13,7 @@ use crate::{InstantiatedModule, Linker};
 use crate::config::{TargetLanguage, VERSION_INFO, config};
 
 use std::collections::HashSet;
+use std::io::stdout;
 use std::path::Path;
 use std::process::ExitCode;
 use std::{fs::File, io::Write};
@@ -66,28 +71,13 @@ pub fn codegen(linker: &Linker) -> ExitCode {
     let mut all_instances = HashSet::new();
     let mut dependency_stack = Vec::new();
     let mut any_error = false;
-    if config.top_modules.is_empty() {
-        for (id, _) in &linker.modules {
-            for (_, md) in linker.instantiator.iter_for_module(id) {
-                if !md.errors.did_error {
-                    order_dependencies(&mut all_instances, &mut dependency_stack, md);
-                } else {
-                    any_error = true;
-                    error!("Cannot codegen {} due to errors!", md.name);
-                }
-            }
-        }
-    } else {
-        for top in &config.top_modules {
-            let md_id = linker.get_by_name(top).unwrap().unwrap_module();
-            for (_, md) in linker.instantiator.iter_for_module(md_id) {
-                if !md.errors.did_error {
-                    order_dependencies(&mut all_instances, &mut dependency_stack, md);
-                } else {
-                    any_error = true;
-                    error!("Cannot codegen {} due to errors!", md.name);
-                }
-            }
+    for top in &linker.instantiator.tops {
+        let inst = linker.instantiator.get(top);
+        if !inst.errors.did_error {
+            order_dependencies(&mut all_instances, &mut dependency_stack, inst);
+        } else {
+            any_error = true;
+            error!("Cannot codegen {} due to errors!", inst.name);
         }
     }
     if let Some(path) = &config.codegen_file {
@@ -101,7 +91,7 @@ pub fn codegen(linker: &Linker) -> ExitCode {
         }
 
         for md in dependency_stack.iter().rev() {
-            let code = gen_verilog_code(md, linker);
+            let code = generate_systemverilog(md, linker);
             if let Err(e) = out_file.write(code.as_bytes()) {
                 fatal_exit!("Error while writing to {}: {e}", path.to_string_lossy());
             }
@@ -126,7 +116,7 @@ pub fn codegen(linker: &Linker) -> ExitCode {
             let path = output_folder.join(filename);
             let mut out_file = make_output_file(&path);
             for (_global_ref, inst) in linker.instantiator.iter_for_module(id) {
-                let code = gen_verilog_code(inst, linker);
+                let code = generate_systemverilog(inst, linker);
                 if let Err(e) = write!(out_file, "{code}") {
                     fatal_exit!("Error while writing to {}: {e}", path.to_string_lossy());
                 }
@@ -138,6 +128,29 @@ pub fn codegen(linker: &Linker) -> ExitCode {
     } else {
         ExitCode::SUCCESS
     }
+}
+
+pub fn maybe_gen_tb(linker: &Linker) {
+    if !config().gen_tb {
+        return;
+    }
+    info!("===== Printing Testbench Stubs to STDOUT =====");
+    // Flush since we want to print to STDOUT so the testbench stubs can be redirected to a file
+    // don't want the streams to get de-synced with STDERR
+    logger().flush();
+    for top in &linker.instantiator.tops {
+        let inst = linker.instantiator.get(top);
+        if inst.errors.did_error {
+            error!("Cannot give testbench for {} due to errors!", inst.name);
+            continue;
+        }
+        let testbench_stub = generate_testbench_stub(inst, linker);
+        // Explicitly print to STDOUT.
+        println!("{testbench_stub}");
+    }
+    // And flush again, such that we're in sync again for the STDERR print afterwards
+    let _ = stdout().flush();
+    info!("===== Done Printing Testbench Stubs to STDOUT =====");
 }
 
 // Limit total folder/file name byte size to 255, which is the maximum on just about every platform

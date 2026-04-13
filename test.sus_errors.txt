@@ -4747,14 +4747,6 @@ Error: Output clock 'this_clock_out' has no driver. output clocks require exactl
 [ERROR sus_compiler::codegen] Cannot codegen sequenceDownFrom #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen sumUpTo #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen use_test #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 1) due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 3) due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 7) due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 15) due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 31) due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 63) due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 127) due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen tree_add #(WIDTH: 255) due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen make_tree_add #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen use_replicate #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen run_instruction #() due to errors!

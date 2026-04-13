@@ -1872,8 +1872,3 @@ module WeirdlyNamedClock {
 	state output bool y_st
 	y_st = y_i
 }
-
-module inst_STL {
-    FIFO#(T: type int#(FROM: 3, TO: 10)[3], DEPTH: 1024, ALMOST_FULL_LATENCY: ) s
-    ShiftReg#(T: type int#(FROM: 3, TO: 10)[3], LATENCY: 2) s
-}

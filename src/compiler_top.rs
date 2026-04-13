@@ -267,6 +267,8 @@ impl Linker {
             return;
         }
 
+        let mut tops = Vec::with_capacity(config.top_modules.len());
+
         if config.top_modules.is_empty() {
             info!("Selecting all parameter-less modules as --top");
 
@@ -276,14 +278,10 @@ impl Linker {
                 // Already instantiate any modules without parameters
                 // Can immediately instantiate modules that have no template args
                 if md.link_info.parameters.is_empty() {
-                    let _inst = self.instantiator.instantiate(
-                        &self.globals,
-                        &self.files,
-                        ConcreteGlobalReference {
-                            id,
-                            template_args: FlatAlloc::new(),
-                        },
-                    );
+                    tops.push(ConcreteGlobalReference {
+                        id,
+                        template_args: FlatAlloc::new(),
+                    });
                 }
             }
         } else {
@@ -292,14 +290,10 @@ impl Linker {
                     Ok(GlobalObj::Module(id)) => {
                         let md = &self.modules[id];
                         if md.link_info.parameters.is_empty() {
-                            let _inst = self.instantiator.instantiate(
-                                &self.globals,
-                                &self.files,
-                                ConcreteGlobalReference {
-                                    id,
-                                    template_args: FlatAlloc::new(),
-                                },
-                            );
+                            tops.push(ConcreteGlobalReference {
+                                id,
+                                template_args: FlatAlloc::new(),
+                            });
                         } else {
                             let md_with_args = md.link_info.display_full_name_and_args(
                                 &self.files[md.link_info.span.file].file_text,
@@ -317,5 +311,7 @@ impl Linker {
                 }
             }
         }
+        self.instantiator
+            .instantiate_tops(&self.globals, &self.files, tops);
     }
 }

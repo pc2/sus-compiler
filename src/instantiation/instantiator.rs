@@ -22,6 +22,7 @@ use crate::{
 pub struct Instantiator {
     cache: BTreeMap<Rc<ConcreteGlobalReference<ModuleUUID>>, InstantiatorCacheElem>,
     stack: Vec<Rc<ConcreteGlobalReference<ModuleUUID>>>,
+    pub tops: Vec<ConcreteGlobalReference<ModuleUUID>>,
 }
 
 #[derive(Debug)]
@@ -46,6 +47,7 @@ impl Instantiator {
         Self {
             cache: BTreeMap::new(),
             stack: Vec::new(),
+            tops: Vec::new(),
         }
     }
 
@@ -63,7 +65,7 @@ impl Instantiator {
         })
     }
 
-    pub fn instantiate(
+    fn instantiate(
         &mut self,
         globals: &LinkerGlobals,
         linker_files: &LinkerFiles,
@@ -147,6 +149,17 @@ impl Instantiator {
             Err(InstantiateError::ErrorInModule)
         }
     }
+    pub fn instantiate_tops(
+        &mut self,
+        globals: &LinkerGlobals,
+        linker_files: &LinkerFiles,
+        tops: Vec<ConcreteGlobalReference<ModuleUUID>>,
+    ) {
+        for t in &tops {
+            let _ = self.instantiate(globals, linker_files, t.clone());
+        }
+        self.tops = tops;
+    }
 
     // Also passes over invalid instances. Instance validity should not be assumed!
     // Only used for things like syntax highlighting
@@ -176,6 +189,14 @@ impl Instantiator {
             .iter()
             .filter(move |kv| kv.0.id == md_id)
             .map(|v| (v.0, v.1.unwrap()))
+    }
+
+    pub fn get(&self, global_ref: &ConcreteGlobalReference<ModuleUUID>) -> &Rc<InstantiatedModule> {
+        match self.cache.get(global_ref) {
+            Some(InstantiatorCacheElem::Done(inst)) => inst,
+            Some(InstantiatorCacheElem::InProgress) => panic!("Instantiation still in progress?"),
+            None => panic!("Global ref was never attempted to be instantiated?"),
+        }
     }
 }
 

@@ -59,10 +59,7 @@ impl HoverCollector<'_> {
                         if wire.original_instruction != id {
                             continue;
                         }
-                        let typ_str = wire.typ.display(self.linker);
-                        let name = &wire.name;
-                        let absolute_latency = &wire.absolute_latency;
-                        self.sus_code(format!("{typ_str} {name}'{absolute_latency}"));
+                        self.sus_code(wire.display_decl(&self.linker.globals).to_string());
                     }
                 }
             }
