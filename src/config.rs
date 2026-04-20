@@ -66,6 +66,7 @@ pub struct ConfigStruct {
     pub codegen_file: Option<PathBuf>,
     pub codegen_separate_folder: Option<PathBuf>,
     pub gen_tb: bool,
+    pub gen_docs: bool,
     /// When no top modules specified, then codegen all
     pub top_modules: Vec<String>,
     pub use_color: bool,
@@ -151,6 +152,10 @@ fn command_builder() -> Command {
         .arg(Arg::new("gen-tb")
             .long("gen-tb")
             .help("Generate testbench stubs for all --top modules to stdout")
+            .action(clap::ArgAction::SetTrue))
+        .arg(Arg::new("gen-docs")
+            .long("gen-docs")
+            .help("Generate HTML documentation for all loaded .sus files into docs/")
             .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("top")
             .long("top")
@@ -367,6 +372,7 @@ pub fn parse_args() {
     }
 
     let gen_tb = matches.get_flag("gen-tb");
+    let gen_docs = matches.get_flag("gen-docs");
 
     let mut recursion_limit = *matches.get_one::<usize>("recursion-limit").unwrap();
     if recursion_limit == 0 {
@@ -380,6 +386,7 @@ pub fn parse_args() {
         codegen_file,
         codegen_separate_folder,
         gen_tb,
+        gen_docs,
         top_modules,
         target_language,
         features,
@@ -405,6 +412,7 @@ pub fn init_cfg_for_test() {
         codegen_file: None,
         codegen_separate_folder: None,
         gen_tb: false,
+        gen_docs: false,
         top_modules: Vec::new(),
         target_language: TargetLanguage::SystemVerilog,
         use_color: true,

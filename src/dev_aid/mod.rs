@@ -1,4 +1,5 @@
 pub mod ariadne_interface;
+pub mod gen_docs;
 
 pub mod dot_graphs;
 
