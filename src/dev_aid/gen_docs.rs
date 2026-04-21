@@ -10,7 +10,7 @@ use std::path::Path;
 /// Maps module name → file stem for cross-page link resolution.
 type ModuleIndex = HashMap<String, String>;
 
-pub fn gen_docs(linker: &Linker) {
+pub fn gen_docs(linker: &Linker, host: &str) {
     let docs_dir = Path::new("docs");
     if let Err(e) = std::fs::create_dir_all(docs_dir) {
         fatal_exit!("Could not create docs/ directory: {e}");
@@ -59,7 +59,7 @@ pub fn gen_docs(linker: &Linker) {
             continue;
         }
 
-        let html = generate_file_html(&stem, &modules, file_text, &index, &all_stems);
+        let html = generate_file_html(&stem, &modules, file_text, &index, &all_stems, host);
         let out_path = docs_dir.join(format!("{stem}.html"));
         match std::fs::write(&out_path, &html) {
             Ok(()) => info!("Generated {}", out_path.display()),
@@ -325,53 +325,13 @@ fn render_module_section(
     s
 }
 
-const EMBEDDED_CSS: &str = r"
-:root {
-  --brand: #412173;
-  --brand-light: #ede8f5;
-  --bg: #ffffff;
-  --bg-subtle: #f7f6fb;
-  --bg-code: #f3f1f9;
-  --text: #1a1227;
-  --text-muted: #5a5370;
-  --text-faint: #9b96aa;
-  --border: #e0dcea;
-  --link: #412173;
-}
-*,*::before,*::after{box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;margin:0}
-.doc-layout{display:flex;max-width:1300px;margin:0 auto}
-.doc-sidebar{width:210px;flex-shrink:0;padding:1.75rem 1rem 1.75rem 1.25rem;border-right:1px solid var(--border);position:sticky;top:0;align-self:flex-start;max-height:100vh;overflow-y:auto;background:var(--bg-subtle)}
-.sidebar-title{font-size:.68rem;text-transform:uppercase;letter-spacing:.13em;color:var(--text-faint);margin:0 0 .6rem}
-.doc-sidebar ul{list-style:none;padding:0;margin:0}
-.doc-sidebar a{font-family:'Fira Code',monospace;font-size:.83rem;color:var(--text-muted);text-decoration:none;display:block;padding:3px 7px;border-radius:4px}
-.doc-sidebar a:hover,.doc-sidebar a.sidebar-current{color:var(--brand);background:var(--brand-light)}
-.doc-main{flex:1;padding:1.75rem 2.5rem 3rem;min-width:0}
-.page-title{font-family:'Fira Code',monospace;font-size:1.55rem;color:var(--text);margin:0 0 2rem}
-.module{scroll-margin-top:1rem}
-.module+.module{border-top:1px solid var(--border);padding-top:2.5rem;margin-top:2.5rem}
-.module-heading h2{font-family:'Fira Code',monospace;font-size:1.2rem;color:var(--text);margin:0 0 .8rem}
-.doc-prose{font-size:.95rem;color:var(--text-muted);line-height:1.75;max-width:680px;margin:0 0 1.1rem}
-.doc-prose p{margin:0}.doc-prose p+p{margin-top:.6em}
-.doc-prose code{font-family:'Fira Code',monospace;font-size:.875em;background:var(--bg-code);color:var(--brand);padding:1px 5px;border-radius:3px}
-.doc-prose a{color:var(--link);text-decoration:none}
-.doc-prose a:hover{text-decoration:underline}
-.interface-block{background:var(--bg-subtle);border-left:3px solid var(--brand);border-radius:0 6px 6px 0;overflow-x:auto;margin-bottom:1.1rem}
-.interface-block pre{margin:0;padding:1rem 1.25rem;line-height:1.65}
-.interface-block code{font-family:'Fira Code',monospace!important;font-size:.875rem!important;background:transparent!important;color:var(--text)!important}
-.block-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.13em;color:var(--text-faint);margin:0 0 .35rem}
-.example-section{margin-bottom:1.1rem}
-.example-block{background:#1e1e2e;border-radius:6px;overflow-x:auto}
-.example-block pre{margin:0;padding:1rem 1.25rem;line-height:1.65}
-.example-block code{font-family:'Fira Code',monospace!important;font-size:.875rem!important;background:transparent!important;color:#cdd6f4!important}
-";
-
 fn generate_file_html(
     file_stem: &str,
     modules: &[&Module],
     ft: &FileText,
     index: &ModuleIndex,
     all_stems: &[String],
+    host: &str,
 ) -> String {
     let mut html = String::new();
 
@@ -381,9 +341,9 @@ fn generate_file_html(
         "  <title>{} — SUS Documentation</title>\n",
         html_escape(file_stem)
     ));
-    html.push_str("  <style>\n");
-    html.push_str(EMBEDDED_CSS);
-    html.push_str("  </style>\n</head>\n<body>\n<main>\n<div class=\"doc-layout\">\n");
+    html.push_str(&format!("  <link rel=\"stylesheet\" href=\"{host}/docs/highlight.css\"/>\n"));
+    html.push_str(&format!("  <link rel=\"stylesheet\" href=\"{host}/susdoc.css\"/>\n"));
+    html.push_str("</head>\n<body>\n<main>\n<div class=\"doc-layout\">\n");
 
     html.push_str("<aside class=\"doc-sidebar\">\n");
     if all_stems.len() > 1 {
@@ -416,7 +376,10 @@ fn generate_file_html(
     for md in modules {
         html.push_str(&render_module_section(md, ft, file_stem, index));
     }
-    html.push_str("</div>\n</div>\n</main>\n</body>\n</html>\n");
+    html.push_str("</div>\n</div>\n</main>\n");
+    html.push_str(&format!("<script src=\"{host}/docs/highlight.js\"></script>\n"));
+    html.push_str(&format!("<script src=\"{host}/susdoc.js\"></script>\n"));
+    html.push_str("</body>\n</html>\n");
 
     html
 }

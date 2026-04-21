@@ -67,6 +67,7 @@ pub struct ConfigStruct {
     pub codegen_separate_folder: Option<PathBuf>,
     pub gen_tb: bool,
     pub gen_docs: bool,
+    pub gen_docs_host: String,
     /// When no top modules specified, then codegen all
     pub top_modules: Vec<String>,
     pub use_color: bool,
@@ -157,6 +158,11 @@ fn command_builder() -> Command {
             .long("gen-docs")
             .help("Generate HTML documentation for all loaded .sus files into docs/")
             .action(clap::ArgAction::SetTrue))
+        .arg(Arg::new("gen-docs-host")
+            .long("gen-docs-host")
+            .hide(true)
+            .help("Base URL for susdoc.css / susdoc.js assets (default: https://sus-lang.org)")
+            .default_value("https://sus-lang.org"))
         .arg(Arg::new("top")
             .long("top")
             .help("List of top module names to limit compilation/codegen to")
@@ -373,6 +379,7 @@ pub fn parse_args() {
 
     let gen_tb = matches.get_flag("gen-tb");
     let gen_docs = matches.get_flag("gen-docs");
+    let gen_docs_host = matches.get_one::<String>("gen-docs-host").cloned().unwrap_or_else(|| "https://sus-lang.org".to_owned());
 
     let mut recursion_limit = *matches.get_one::<usize>("recursion-limit").unwrap();
     if recursion_limit == 0 {
@@ -387,6 +394,7 @@ pub fn parse_args() {
         codegen_separate_folder,
         gen_tb,
         gen_docs,
+        gen_docs_host,
         top_modules,
         target_language,
         features,
@@ -413,6 +421,7 @@ pub fn init_cfg_for_test() {
         codegen_separate_folder: None,
         gen_tb: false,
         gen_docs: false,
+        gen_docs_host: "https://sus-lang.org".to_owned(),
         top_modules: Vec::new(),
         target_language: TargetLanguage::SystemVerilog,
         use_color: true,

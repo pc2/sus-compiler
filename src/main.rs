@@ -61,7 +61,7 @@ fn main() -> ExitCode {
         print_all_errors(&*linker);
 
         if config.gen_docs {
-            dev_aid::gen_docs::gen_docs(&*linker);
+            dev_aid::gen_docs::gen_docs(&*linker, &config.gen_docs_host);
         }
 
         let exit_code = crate::codegen::codegen(&*linker);
