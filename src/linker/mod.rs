@@ -53,6 +53,7 @@ impl Documentation {
                 result.push_str("  \n");
             } else {
                 result.push_str(text);
+                result.push('\n');
             }
         }
         result
