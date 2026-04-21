@@ -72,9 +72,8 @@ pub enum LatencyCountingError {
         conflict_path: Vec<SpecifiedLatency>,
         net_roundtrip_latency: i64,
     },
-    IndeterminablePortLatency {
-        bad_ports: Vec<IndeterminablePort>,
-    },
+    /// One or more ports' latencies cannot be decided upon, where pushing back an input that still has give pushes another output out of place.
+    NotUniquePortLatency { bad_ports: Vec<IndeterminablePort> },
     /// Result is a partitioning of all ports in this domain.
     /// The ports before the partition are all strongly connected,
     /// and the ports after it are not strongly connected to this first cluster.
@@ -733,7 +732,7 @@ fn solve_port_latencies(
     if bad_ports.is_empty() {
         Ok((port_groups, next_latency_group_offset))
     } else {
-        Err(LatencyCountingError::IndeterminablePortLatency { bad_ports })
+        Err(LatencyCountingError::NotUniquePortLatency { bad_ports })
     }
 }
 
@@ -1359,7 +1358,7 @@ mod tests {
 
         assert!(matches!(
             should_be_err,
-            Err(LatencyCountingError::IndeterminablePortLatency { bad_ports: _ })
+            Err(LatencyCountingError::NotUniquePortLatency { bad_ports: _ })
         ))
     }
 
@@ -1478,7 +1477,7 @@ mod tests {
                 }],
             );
 
-            let Err(LatencyCountingError::IndeterminablePortLatency { bad_ports }) = should_be_err
+            let Err(LatencyCountingError::NotUniquePortLatency { bad_ports }) = should_be_err
             else {
                 panic!("{should_be_err:?}")
             };

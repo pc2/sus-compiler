@@ -547,13 +547,13 @@ impl ModuleTypingContext<'_> {
                 }
                 //}
             }
-            LatencyCountingError::IndeterminablePortLatency { bad_ports } => {
+            LatencyCountingError::NotUniquePortLatency { bad_ports } => {
                 for IndeterminablePort { port_node, options } in bad_ports {
                     let port_instr =
                         self.wires[latency_node_meanings[port_node]].original_instruction;
                     let port_name_span = self.md.link_info.instructions[port_instr].get_span();
                     let mut error_text =
-                        "Cannot determine port latency. Options are:\n".to_string();
+                        "No Unique assignment for Port Latency. Options are:\n".to_string();
                     let mut error_infos = Vec::with_capacity(options.len());
                     for opt in options {
                         let desired = opt.desired_latency;
