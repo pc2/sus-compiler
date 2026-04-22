@@ -1,3 +1,4 @@
+use crate::config::GenDocs;
 use crate::dev_aid::port_diagram;
 use crate::file_position::FileText;
 use crate::flattening::{
@@ -7,14 +8,15 @@ use crate::latency::port_latency_inference::InferenceTarget;
 use crate::linker::{GlobalObj, LinkInfo};
 use crate::prelude::*;
 use crate::typing::template::TemplateKind;
+use pulldown_cmark::{Options, Parser, html::push_html as md_push_html};
 use std::collections::HashMap;
 use std::path::Path;
 
 /// Maps module name → file stem for cross-page link resolution.
 type ModuleIndex = HashMap<String, String>;
 
-pub fn gen_docs(linker: &Linker, host: &str) {
-    let docs_dir = Path::new("docs");
+pub fn gen_docs(linker: &Linker, settings: &GenDocs) {
+    let docs_dir = &settings.dir;
     if let Err(e) = std::fs::create_dir_all(docs_dir) {
         fatal_exit!("Could not create docs/ directory: {e}");
     }
@@ -62,7 +64,14 @@ pub fn gen_docs(linker: &Linker, host: &str) {
             continue;
         }
 
-        let html = generate_file_html(&stem, &modules, file_text, &index, &all_stems, host);
+        let html = generate_file_html(
+            &stem,
+            &modules,
+            file_text,
+            &index,
+            &all_stems,
+            &settings.host,
+        );
         let out_path = docs_dir.join(format!("{stem}.html"));
         match std::fs::write(&out_path, &html) {
             Ok(()) => info!("Generated {}", out_path.display()),
@@ -202,87 +211,43 @@ fn resolve_ref_href(name: &str, current_stem: &str, index: &ModuleIndex) -> Stri
     }
 }
 
-fn render_inline(text: &str, current_stem: &str, index: &ModuleIndex) -> String {
+/// Convert `[Name]` wiki-style references to proper Markdown links before parsing.
+fn preprocess_refs(raw: &str, current_stem: &str, index: &ModuleIndex) -> String {
     let mut result = String::new();
-    let mut chars = text.chars().peekable();
-    while let Some(c) = chars.next() {
-        match c {
-            '`' => {
-                let mut code = String::new();
-                for ch in chars.by_ref() {
-                    if ch == '`' {
-                        break;
-                    }
-                    code.push(ch);
-                }
-                result.push_str("<code>");
-                result.push_str(&html_escape(&code));
-                result.push_str("</code>");
+    let mut rest = raw;
+    while let Some(open) = rest.find('[') {
+        result.push_str(&rest[..open]);
+        rest = &rest[open + 1..];
+        if let Some(close) = rest.find(']') {
+            let name = &rest[..close];
+            rest = &rest[close + 1..];
+            if rest.starts_with('(') {
+                // Already a proper Markdown link — keep as-is.
+                result.push('[');
+                result.push_str(name);
+                result.push(']');
+            } else {
+                let href = resolve_ref_href(name, current_stem, index);
+                result.push_str(&format!("[{name}]({href})"));
             }
-            '[' => {
-                let mut name = String::new();
-                let mut closed = false;
-                for ch in chars.by_ref() {
-                    if ch == ']' {
-                        closed = true;
-                        break;
-                    }
-                    name.push(ch);
-                }
-                if closed && !name.is_empty() {
-                    let href = resolve_ref_href(&name, current_stem, index);
-                    result.push_str(&format!("<a href=\"{href}\">{}</a>", html_escape(&name)));
-                } else {
-                    result.push('[');
-                    result.push_str(&name);
-                }
-            }
-            '<' => result.push_str("&lt;"),
-            '>' => result.push_str("&gt;"),
-            '&' => result.push_str("&amp;"),
-            _ => result.push(c),
+        } else {
+            result.push('[');
+            result.push_str(rest);
+            rest = "";
         }
     }
+    result.push_str(rest);
     result
 }
 
 fn render_prose(raw: &str, current_stem: &str, index: &ModuleIndex) -> String {
+    let md = preprocess_refs(raw, current_stem, index);
+    let opts =
+        Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TABLES | Options::ENABLE_SMART_PUNCTUATION;
+    let parser = Parser::new_ext(&md, opts);
     let mut html = String::new();
-    let mut para = String::new();
-    for line in raw.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            if !para.is_empty() {
-                html.push_str("<p>");
-                html.push_str(&render_inline(&para, current_stem, index));
-                html.push_str("</p>\n");
-                para.clear();
-            }
-        } else {
-            if !para.is_empty() {
-                para.push(' ');
-            }
-            para.push_str(trimmed);
-        }
-    }
-    if !para.is_empty() {
-        html.push_str("<p>");
-        html.push_str(&render_inline(&para, current_stem, index));
-        html.push_str("</p>\n");
-    }
+    md_push_html(&mut html, parser);
     html
-}
-
-fn split_example(raw: &str) -> (Option<String>, String) {
-    if let Some(start) = raw.find("```sus") {
-        let after_open = &raw[start + 6..];
-        if let Some(end) = after_open.find("```") {
-            let example = after_open[..end].trim().to_string();
-            let remainder = format!("{}{}", &raw[..start], &after_open[end + 3..]);
-            return (Some(example), remainder);
-        }
-    }
-    (None, raw.to_string())
 }
 
 fn has_port_latency_inference(md: &Module) -> bool {
@@ -309,7 +274,6 @@ fn render_module_section(
     let li = &md.link_info;
     let name = &li.name;
     let raw_doc = li.documentation.to_string(ft);
-    let (example, doc_text) = split_example(&raw_doc);
 
     let heading = if li.parameters.is_empty() {
         html_escape(name)
@@ -322,19 +286,6 @@ fn render_module_section(
         "<div class=\"module-heading\"><h2>{heading}</h2></div>\n"
     ));
 
-    if !doc_text.trim().is_empty() {
-        s.push_str("<div class=\"doc-prose\">\n");
-        s.push_str(&render_prose(&doc_text, current_stem, index));
-        s.push_str("</div>\n");
-    }
-
-    if let Some(code) = example {
-        s.push_str("<div class=\"example-section\">\n<p class=\"block-label\">Example</p>\n");
-        s.push_str("<div class=\"example-block\"><pre><code class=\"language-sus\">");
-        s.push_str(&html_escape(&code));
-        s.push_str("</code></pre></div>\n</div>\n");
-    }
-
     let interface = build_interface_block(md, ft);
     s.push_str("<div class=\"interface-block\"><pre><code class=\"language-sus\">");
     s.push_str(&html_escape(&interface));
@@ -342,6 +293,12 @@ fn render_module_section(
 
     let show_poison = has_port_latency_inference(md);
     s.push_str(&port_diagram::render_port_diagram(md, show_poison));
+
+    if !raw_doc.trim().is_empty() {
+        s.push_str("<div class=\"doc-prose\">\n");
+        s.push_str(&render_prose(&raw_doc, current_stem, index));
+        s.push_str("</div>\n");
+    }
 
     s.push_str("</section>\n");
     s
@@ -363,8 +320,12 @@ fn generate_file_html(
         "  <title>{} — SUS Documentation</title>\n",
         html_escape(file_stem)
     ));
-    html.push_str(&format!("  <link rel=\"stylesheet\" href=\"{host}/docs/highlight.css\"/>\n"));
-    html.push_str(&format!("  <link rel=\"stylesheet\" href=\"{host}/susdoc.css\"/>\n"));
+    html.push_str(&format!(
+        "  <link rel=\"stylesheet\" href=\"{host}/docs/highlight.css\"/>\n"
+    ));
+    html.push_str(&format!(
+        "  <link rel=\"stylesheet\" href=\"{host}/susdoc.css\"/>\n"
+    ));
     html.push_str("</head>\n<body>\n<main>\n<div class=\"doc-layout\">\n");
 
     html.push_str("<aside class=\"doc-sidebar\">\n");
@@ -376,9 +337,7 @@ fn generate_file_html(
                     "<li><a href=\"{stem}.html\" class=\"sidebar-current\">{stem}</a></li>\n"
                 ));
             } else {
-                html.push_str(&format!(
-                    "<li><a href=\"{stem}.html\">{stem}</a></li>\n"
-                ));
+                html.push_str(&format!("<li><a href=\"{stem}.html\">{stem}</a></li>\n"));
             }
         }
         html.push_str("</ul>\n");
@@ -399,7 +358,9 @@ fn generate_file_html(
         html.push_str(&render_module_section(md, ft, file_stem, index));
     }
     html.push_str("</div>\n</div>\n</main>\n");
-    html.push_str(&format!("<script src=\"{host}/docs/highlight.js\"></script>\n"));
+    html.push_str(&format!(
+        "<script src=\"{host}/docs/highlight.js\"></script>\n"
+    ));
     html.push_str(&format!("<script src=\"{host}/susdoc.js\"></script>\n"));
     html.push_str("</body>\n</html>\n");
 

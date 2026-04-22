@@ -38,6 +38,7 @@ unescape = "0.1"
 ouroboros = "0.18.5"
 typed-arena = "2.0.2"
 same-file = "1.0.6"
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 
 # Tree sitter
 tree-sitter = "0.26.6"

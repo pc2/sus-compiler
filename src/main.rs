@@ -60,8 +60,8 @@ fn main() -> ExitCode {
         compile_all(linker, file_paths);
         print_all_errors(&*linker);
 
-        if config.gen_docs {
-            dev_aid::gen_docs::gen_docs(&*linker, &config.gen_docs_host);
+        if let Some(gen_docs) = &config.gen_docs {
+            dev_aid::gen_docs::gen_docs(&*linker, gen_docs);
         }
 
         let exit_code = crate::codegen::codegen(&*linker);
