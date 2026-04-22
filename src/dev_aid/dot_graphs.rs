@@ -399,19 +399,7 @@ fn custom_render_latency_count_graph(
                             let to_idx = lc_problem.map_wire_to_latency_node[to.maps_to_wire];
                             let from_id = &node_ids[from_idx].id;
                             let to_id = &node_ids[to_idx].id;
-                            let param = &param.name;
-                            let mul = i64::try_from(&c.mul_by).unwrap();
-                            let add = i64::try_from(&c.offset).unwrap();
-                            let label = match (mul, add) {
-                                (1, 0) => param.to_string(),
-                                (-1, 0) => format!("-{param}"),
-                                (1, add) if add < 0 => format!("{param} - {}", -add),
-                                (1, add) => format!("{param} + {add}"),
-                                (-1, add) if add < 0 => format!("-{param} - {}", -add),
-                                (-1, add) => format!("-{param} + {add}"),
-                                (mul, add) if add < 0 => format!("{mul} * {param} - {}", -add),
-                                (mul, add) => format!("{mul} * {param} + {add}"),
-                            };
+                            let label = c.display_formula(&param.name);
                             writeln!(
                                 f,
                                 "    {from_id} -> {to_id} [label=\"{label}\", color=green];"

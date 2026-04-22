@@ -2976,9 +2976,9 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: Some submodule parameters of inf were still unknown: infer_me_conflicting_directions #(V: ?)
 V has no acceptable inference candidates
 The following constraints were found, but aren't used for inference here
-    V * -1 <= q'{*} - x'{*}
+    -V <= q'{*} - x'{*}
     V <= y'{*} - p'{*}
-    V * -1 <= q'{*} - p'{*}
+    -V <= q'{*} - p'{*}
     V <= y'{*} - x'{*}
 
       ╭─[ test.sus:1296:34 ]
@@ -2988,9 +2988,9 @@ The following constraints were found, but aren't used for inference here
       │                                      ╰─── Some submodule parameters of inf were still unknown: infer_me_conflicting_directions #(V: ?)
 V has no acceptable inference candidates
 The following constraints were found, but aren't used for inference here
-    V * -1 <= q'{*} - x'{*}
+    -V <= q'{*} - x'{*}
     V <= y'{*} - p'{*}
-    V * -1 <= q'{*} - p'{*}
+    -V <= q'{*} - p'{*}
     V <= y'{*} - x'{*}
 
 ──────╯

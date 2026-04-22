@@ -590,6 +590,25 @@ impl InferenceTargetPath {
 }
 
 impl InferenceCandidate {
+    pub fn display_formula<'p>(&'p self, candidate_name: &'p str) -> impl Display + 'p {
+        FmtWrapper(move |f| {
+            if self.mul_by == IBig::from(1) {
+                f.write_str(candidate_name)?;
+            } else if self.mul_by == IBig::from(-1) {
+                write!(f, "-{candidate_name}")?;
+            } else {
+                write!(f, "{} * {candidate_name}", self.mul_by)?;
+            }
+            if self.offset != IBig::from(0) {
+                if self.offset < IBig::from(0) {
+                    write!(f, " - {}", -&self.offset)?;
+                } else {
+                    write!(f, " + {}", self.offset)?;
+                }
+            }
+            Ok(())
+        })
+    }
     /// V * 5 + 3 <= {*} in int#(FROM: {*}) port
     /// V * 5 + 3 <= {t} - {f} in a'{t}, b'{f}
     pub fn display(
@@ -599,23 +618,13 @@ impl InferenceCandidate {
         globals: &LinkerGlobals,
     ) -> impl Display {
         FmtWrapper(|f| {
+            let formula = self.display_formula(candidate_name);
             let relation = match self.relation {
                 SubtypeRelation::Exact => "==",
                 SubtypeRelation::Min => "<=",
                 SubtypeRelation::Max => ">=",
             };
-            f.write_str(candidate_name)?;
-            if self.mul_by != IBig::from(1) {
-                write!(f, " * {}", self.mul_by)?;
-            }
-            if self.offset != IBig::from(0) {
-                if self.offset < IBig::from(0) {
-                    write!(f, " - {}", -&self.offset)?;
-                } else {
-                    write!(f, " + {}", self.offset)?;
-                }
-            }
-            write!(f, " {relation} ")?;
+            write!(f, "{formula} {relation} ")?;
 
             match &self.target {
                 InferenceTarget::Subtype(path) => {
