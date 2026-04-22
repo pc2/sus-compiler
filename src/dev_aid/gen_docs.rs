@@ -1,9 +1,12 @@
+use crate::dev_aid::port_diagram;
 use crate::file_position::FileText;
 use crate::flattening::{
     ClockVisibility, FieldDeclKind, InterfaceDeclaration, InterfaceKind, Module,
 };
+use crate::latency::port_latency_inference::InferenceTarget;
 use crate::linker::{GlobalObj, LinkInfo};
 use crate::prelude::*;
+use crate::typing::template::TemplateKind;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -43,12 +46,12 @@ pub fn gen_docs(linker: &Linker, host: &str) {
         let file_text = &file_data.file_text;
         let stem = file_stem_of(&file_data.file_identifier.name);
 
-        let modules: Vec<&Module> = file_data
+        let modules: Vec<(ModuleUUID, &Module)> = file_data
             .associated_values
             .iter()
             .filter_map(|uuid| {
                 if let GlobalObj::Module(id) = uuid {
-                    Some(&linker.globals.modules[*id])
+                    Some((*id, &linker.globals.modules[*id]))
                 } else {
                     None
                 }
@@ -282,6 +285,21 @@ fn split_example(raw: &str) -> (Option<String>, String) {
     (None, raw.to_string())
 }
 
+fn has_port_latency_inference(md: &Module) -> bool {
+    md.inference_info
+        .parameter_inference_candidates
+        .iter()
+        .any(|(_, kind)| {
+            if let TemplateKind::Value(v) = kind {
+                v.candidates
+                    .iter()
+                    .any(|c| matches!(c.target, InferenceTarget::PortLatency { .. }))
+            } else {
+                false
+            }
+        })
+}
+
 fn render_module_section(
     md: &Module,
     ft: &FileText,
@@ -320,14 +338,18 @@ fn render_module_section(
     let interface = build_interface_block(md, ft);
     s.push_str("<div class=\"interface-block\"><pre><code class=\"language-sus\">");
     s.push_str(&html_escape(&interface));
-    s.push_str("</code></pre></div>\n</section>\n");
+    s.push_str("</code></pre></div>\n");
 
+    let show_poison = has_port_latency_inference(md);
+    s.push_str(&port_diagram::render_port_diagram(md, show_poison));
+
+    s.push_str("</section>\n");
     s
 }
 
 fn generate_file_html(
     file_stem: &str,
-    modules: &[&Module],
+    modules: &[(ModuleUUID, &Module)],
     ft: &FileText,
     index: &ModuleIndex,
     all_stems: &[String],
@@ -362,7 +384,7 @@ fn generate_file_html(
         html.push_str("</ul>\n");
     }
     html.push_str("<p class=\"sidebar-title\">Modules</p>\n<ul>\n");
-    for md in modules {
+    for (_, md) in modules {
         let name = &md.link_info.name;
         html.push_str(&format!("<li><a href=\"#{name}\">{name}</a></li>\n"));
     }
@@ -373,7 +395,7 @@ fn generate_file_html(
         "<h1 class=\"page-title\">{}</h1>\n",
         html_escape(file_stem)
     ));
-    for md in modules {
+    for &(_, md) in modules {
         html.push_str(&render_module_section(md, ft, file_stem, index));
     }
     html.push_str("</div>\n</div>\n</main>\n");
