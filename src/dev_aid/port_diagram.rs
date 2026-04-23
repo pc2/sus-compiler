@@ -161,7 +161,11 @@ pub fn render_port_diagram(md: &Module, show_poison: bool) -> String {
         return String::new();
     }
 
-    let box_bot = y - DOUBLE_RULE_HEIGHT;
+    if segs.last().unwrap().clock_name.is_some() {
+        y -= DOUBLE_RULE_HEIGHT; // Compensate for non-existing final double rule. 
+    }
+
+    let box_bot = y;
     let svg_h = box_bot + MARGIN;
 
     // Port → y-coordinate lookup (used for edge drawing)
