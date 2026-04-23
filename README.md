@@ -168,9 +168,10 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Tree Sitter as parsing frontend
 - [x] Arbitrary pipelined full flow
 - [x] Arbitrary single-clock full flow
-- [ ] Arbitrary multi-clock full flow
+- [x] Arbitrary multi-clock full flow
 - [x] Generative Code
 - [x] Generative Parameters
+- [ ] Custom Compile-Time Functions
 - [x] Type Templates
 - [x] Full Template Inference
 - [x] Actions, Triggers ~~and Queries~~
@@ -208,8 +209,8 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Native Module integration syntax
 - [x] Intrinsic Modules
 - [x] Can Parse FIFO implementation
-- [ ] Clock Domain Crossings
-- [ ] Submodule Generators
+- [ ] STL Clock Domain Crossings Primitives
+- [ ] Multi-Interface Generators
 - [x] Standard Library Bundled with compiler
 
 ### Performance, Linking and Name Resolution
@@ -279,8 +280,9 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Can Generate Verilog for Multiply-Add pipeline
 - [x] Can Generate Verilog for Blur2 filter
 - [x] Can Generate Verilog for FIFO
-- [ ] Multi-Clock Modules
-- [ ] Output Clocks for SubModules
+- [x] Multi-Clock Modules
+- [x] Output Clocks for SubModules
+- [x] Testbench stub generation
 
 ### Fun projects to do in SUS
 - [x] [Bit-Serial Matrix Multiply](https://github.com/VonTum/BitSerialMatrixMultiply)
