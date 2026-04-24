@@ -185,6 +185,7 @@ pub fn render_port_diagram(md: &Module, show_poison: bool) -> String {
         to_y: i32,
         color: &'static str,
         label: Option<String>,
+        marker: &'static str,
     }
     let mut edges: Vec<Edge> = Vec::new();
 
@@ -214,6 +215,7 @@ pub fn render_port_diagram(md: &Module, show_poison: bool) -> String {
                 to_y,
                 color: "#22a85a",
                 label: Some(label),
+                marker: "marker-start=\"url(#ah-green)\"",
             });
         }
     }
@@ -260,6 +262,7 @@ pub fn render_port_diagram(md: &Module, show_poison: bool) -> String {
                         to_y: ty,
                         color: "#e53e3e",
                         label: None,
+                        marker: "marker-end=\"url(#ah-red)\"",
                     });
                 }
             }
@@ -275,6 +278,19 @@ pub fn render_port_diagram(md: &Module, show_poison: bool) -> String {
          width=\"{svg_w}\" height=\"{svg_h}\" \
          font-family=\"'Fira Code',monospace\" font-size=\"11\">\n"
     ));
+
+    s.push_str(
+        "<defs>\
+         <marker id=\"ah-green\" markerWidth=\"5\" markerHeight=\"5\" \
+          refX=\"0\" refY=\"2.5\" orient=\"auto\">\
+          <path d=\"M 5,0 L 0,2.5 L 5,5 Z\" fill=\"#22a85a\"/>\
+         </marker>\
+         <marker id=\"ah-red\" markerWidth=\"5\" markerHeight=\"5\" \
+          refX=\"5\" refY=\"2.5\" orient=\"auto\">\
+          <path d=\"M 0,0 L 5,2.5 L 0,5 Z\" fill=\"#e53e3e\"/>\
+         </marker>\
+         </defs>\n",
+    );
 
     // Title
     s.push_str(&format!(
@@ -335,10 +351,11 @@ pub fn render_port_diagram(md: &Module, show_poison: bool) -> String {
     for e in &edges {
         s.push_str(&format!(
             "<path d=\"M {box_left},{from_y} C {box_cx},{from_y} {box_cx},{to_y} {box_right},{to_y}\" \
-             stroke=\"{c}\" fill=\"none\" stroke-width=\"1.2\" opacity=\"0.8\"/>\n",
+             stroke=\"{c}\" fill=\"none\" stroke-width=\"1.2\" opacity=\"0.8\" {m}/>\n",
             from_y = e.from_y,
             to_y = e.to_y,
             c = e.color,
+            m = e.marker,
         ));
         if let Some(ref lbl) = e.label {
             let mid_y = (e.from_y + e.to_y) / 2 - 3;
