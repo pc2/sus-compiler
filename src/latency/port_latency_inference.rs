@@ -86,7 +86,7 @@ impl ParamLinearity {
         found.map(|(some_var, x)| (some_var, x, self.const_factor))
     }
 
-    /// Checks if the two latency annotations are offset by a constant and exactly 1x a template variable
+    /// Checks if the two latency annotations are offset by a constant and a multiple of a template variable
     fn is_pair_latency_candidate(from: &Self, to: &Self) -> EdgeInfo {
         let mut result = EdgeInfo::ConstantOffset(&to.const_factor - &from.const_factor);
 
@@ -94,7 +94,7 @@ impl ParamLinearity {
             let multiplier = b - a;
             if multiplier != IBig::from(0) {
                 let EdgeInfo::ConstantOffset(offset) = result else {
-                    result = EdgeInfo::Poison; // Offset was already by multiple template vars
+                    result = EdgeInfo::Poison; // Linear in multiple template vars, can't make Inference Target
                     break;
                 };
                 result = EdgeInfo::Inferrable {
@@ -259,7 +259,10 @@ pub enum InferenceTarget {
     Subtype(InferenceTargetPath),
     /// |to| - |from|
     /// Always corresponds to [SubtypeRelation::Min]
-    PortLatency { from: PortID, to: PortID },
+    PortLatency {
+        from_input: PortID,
+        to_output: PortID,
+    },
 }
 
 fn walk_type<'t>(path: &[SubtypeInferencePathElem], mut typ: &'t ConcreteType) -> &'t ConcreteType {
@@ -317,6 +320,7 @@ fn make_latency_inference_info(
     port_latency_linearities: &FlatAlloc<FullPortLatencyLinearity, PortIDMarker>,
     parameter_inference_candidates: &mut TVec<TemplateKind<TypeInferInfo, ValueInferInfo>>,
 ) -> MakeAllEdgesResult {
+    // Groups of ports that are at constant offset from one another.
     let mut port_groups: Vec<Vec<(PortID, i64)>> = port_latency_linearities
         .iter()
         .filter_map(|(p_id, lin_info)| {
@@ -333,6 +337,7 @@ fn make_latency_inference_info(
     let mut not_poison_edges: FlatAlloc<Vec<PortID>, PortIDMarker> =
         port_latency_linearities.map(|_| Vec::new());
 
+    // Iterate between all pairs of ports, allow input/input output/output for the fixed-offset groups
     for (from_id, from) in port_latency_linearities {
         for (to_id, to) in port_latency_linearities {
             if from.latency_domain != to.latency_domain {
@@ -360,12 +365,12 @@ fn make_latency_inference_info(
                             .unwrap_value_mut()
                             .candidates
                             .push(InferenceCandidate {
-                                mul_by: multiply_var_by,
-                                offset,
-                                relation: SubtypeRelation::Min,
+                                mul_by: -multiply_var_by, // We negate the formula, because inference always goes from output to input. Otherwise we have minus signs everywhere
+                                offset: -offset,
+                                relation: SubtypeRelation::Max,
                                 target: InferenceTarget::PortLatency {
-                                    from: from_id,
-                                    to: to_id,
+                                    from_input: from_id,
+                                    to_output: to_id,
                                 },
                             });
 

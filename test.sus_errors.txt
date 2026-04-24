@@ -2701,7 +2701,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 ──────╯
 Error: Some submodule parameters of infer_me_with_poison_output were still unknown: infer_me_with_poison_output #(N: ?)
 N can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
-    N <= o'{*} - i'{*}  ({*} = ? not reached)
+    -N >= i'{*} - o'{*}  ({*} = ? not reached)
 
       ╭─[ test.sus:1223:19 ]
       │
@@ -2709,7 +2709,7 @@ N can be inferred as an integer value that is as high as possible, without viola
       │                      ─────────────┬─────────────  
       │                                   ╰─────────────── Some submodule parameters of infer_me_with_poison_output were still unknown: infer_me_with_poison_output #(N: ?)
 N can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
-    N <= o'{*} - i'{*}  ({*} = ? not reached)
+    -N >= i'{*} - o'{*}  ({*} = ? not reached)
 
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
@@ -2976,10 +2976,10 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: Some submodule parameters of inf were still unknown: infer_me_conflicting_directions #(V: ?)
 V has no acceptable inference candidates
 The following constraints were found, but aren't used for inference here
-    -V <= q'{*} - x'{*}
-    V <= y'{*} - p'{*}
-    -V <= q'{*} - p'{*}
-    V <= y'{*} - x'{*}
+    V >= x'{*} - q'{*}
+    -V >= p'{*} - y'{*}
+    V >= p'{*} - q'{*}
+    -V >= x'{*} - y'{*}
 
       ╭─[ test.sus:1296:34 ]
       │
@@ -2988,10 +2988,10 @@ The following constraints were found, but aren't used for inference here
       │                                      ╰─── Some submodule parameters of inf were still unknown: infer_me_conflicting_directions #(V: ?)
 V has no acceptable inference candidates
 The following constraints were found, but aren't used for inference here
-    -V <= q'{*} - x'{*}
-    V <= y'{*} - p'{*}
-    -V <= q'{*} - p'{*}
-    V <= y'{*} - x'{*}
+    V >= x'{*} - q'{*}
+    -V >= p'{*} - y'{*}
+    V >= p'{*} - q'{*}
+    -V >= x'{*} - y'{*}
 
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module

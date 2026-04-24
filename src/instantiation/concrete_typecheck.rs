@@ -738,12 +738,17 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 };
                 InferenceResult::Found(v.unwrap_integer().clone())
             }
-            InferenceTarget::PortLatency { from, to } => {
-                let (Some(from), Some(to)) = (&sm.port_map[*from], &sm.port_map[*to]) else {
+            InferenceTarget::PortLatency {
+                from_input,
+                to_output,
+            } => {
+                let (Some(from_input), Some(to_output)) =
+                    (&sm.port_map[*from_input], &sm.port_map[*to_output])
+                else {
                     return InferenceResult::PortNotUsed;
                 };
-                match latency_infer_problem.infer(from.maps_to_wire, to.maps_to_wire) {
-                    Ok(result) => InferenceResult::Found(IBig::from(result)),
+                match latency_infer_problem.infer(from_input.maps_to_wire, to_output.maps_to_wire) {
+                    Ok(result) => InferenceResult::Found(IBig::from(-result)),
                     Err(InferenceFailure::BadProblem) => InferenceResult::LatencyBadProblem,
                     Err(InferenceFailure::NotReached) => InferenceResult::LatencyNotReached,
                     Err(InferenceFailure::Poison { edge_from, edge_to }) => {

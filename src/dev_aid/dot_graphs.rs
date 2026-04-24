@@ -390,8 +390,13 @@ fn custom_render_latency_count_graph(
             ) {
                 if let TemplateKind::Value(v_info) = infer_info {
                     for c in &v_info.candidates {
-                        if let InferenceTarget::PortLatency { from, to } = &c.target {
-                            let (Some(from), Some(to)) = (&sm.port_map[*from], &sm.port_map[*to])
+                        if let InferenceTarget::PortLatency {
+                            from_input,
+                            to_output,
+                        } = &c.target
+                        {
+                            let (Some(from), Some(to)) =
+                                (&sm.port_map[*from_input], &sm.port_map[*to_output])
                             else {
                                 continue;
                             };

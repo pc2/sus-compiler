@@ -197,10 +197,15 @@ pub fn render_port_diagram(md: &Module, show_poison: bool) -> String {
             continue;
         };
         for c in &v_info.candidates {
-            let InferenceTarget::PortLatency { from, to } = &c.target else {
+            let InferenceTarget::PortLatency {
+                from_input,
+                to_output,
+            } = &c.target
+            else {
                 continue;
             };
-            let (Some(&from_y), Some(&to_y)) = (port_y.get(from), port_y.get(to)) else {
+            let (Some(&from_y), Some(&to_y)) = (port_y.get(from_input), port_y.get(to_output))
+            else {
                 continue;
             };
             let label = c.display_formula(&param.name).to_string();

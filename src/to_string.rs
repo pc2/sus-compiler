@@ -631,10 +631,13 @@ impl InferenceCandidate {
                     let path = path.display(md, globals);
                     write!(f, "{{*}} in {path}")
                 }
-                InferenceTarget::PortLatency { from, to } => {
-                    let from = &md.ports[*from];
-                    let to = &md.ports[*to];
-                    write!(f, "{}'{{*}} - {}'{{*}}", to.name, from.name)
+                InferenceTarget::PortLatency {
+                    from_input,
+                    to_output,
+                } => {
+                    let to_output = &md.ports[*to_output].name;
+                    let from_input = &md.ports[*from_input].name;
+                    write!(f, "{from_input}'{{*}} - {to_output}'{{*}}")
                 }
             }
         })

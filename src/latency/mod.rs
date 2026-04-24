@@ -291,11 +291,16 @@ impl LatencyInferenceProblem {
             latency_count_problem: lc,
         }
     }
-    pub fn infer(&mut self, from: WireID, to: WireID) -> Result<i64, InferenceFailure> {
-        let from = self.latency_count_problem.map_wire_to_latency_node[from];
-        let to = self.latency_count_problem.map_wire_to_latency_node[to];
+    /// Returns the maximum latency an edge in this position would be allowed to be.
+    pub fn infer(
+        &mut self,
+        from_input: WireID,
+        to_output: WireID,
+    ) -> Result<i64, InferenceFailure> {
+        let from_input = self.latency_count_problem.map_wire_to_latency_node[from_input];
+        let to_output = self.latency_count_problem.map_wire_to_latency_node[to_output];
         if let Some(inf_prob) = &mut self.algo_inference_problem {
-            inf_prob.infer_max_edge_latency(from, to)
+            inf_prob.infer_max_edge_latency(from_input, to_output)
         } else {
             Err(InferenceFailure::BadProblem)
         }

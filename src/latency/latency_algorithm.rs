@@ -1043,6 +1043,9 @@ impl LatencyInferenceProblem {
         Some(Self { fanouts, mem })
     }
 
+    /// Computes the maximum edge that can be inserted between `from` and `to` without causing a [LatencyCountingError::NetPositiveLatencyCycle]
+    ///
+    /// It's implemented by starting a Bellman-Ford run from `to`, looping all the way around to `from`. If there's a poison edge on the way, it returns a [InferenceFailure::Poison].
     pub fn infer_max_edge_latency(
         &mut self,
         from: usize,
