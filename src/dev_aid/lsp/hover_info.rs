@@ -150,7 +150,7 @@ pub fn hover(info: LocationInfo, linker: &Linker) -> Vec<MarkedString> {
             hover.documentation(&link_info.documentation, file);
             hover.sus_code(
                 link_info
-                    .display_full_name_and_args(&file.file_text)
+                    .display_full_name_and_args::<true>(&file.file_text)
                     .to_string(),
             );
             match global {

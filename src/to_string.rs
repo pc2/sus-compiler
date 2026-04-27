@@ -128,9 +128,20 @@ impl LinkInfo {
             }) => f.write_str(&file_text[*decl_span]),
         })
     }
-    pub fn display_full_name_and_args<'s>(&'s self, file_text: &'s FileText) -> impl Display + 's {
-        self.display_with_template_args(&self.parameters, |f, (_, t)| {
-            self.display_template_arg(file_text, t).fmt(f)
+    /// set ´TIDY: true´ for a simplified display. Just `bool` instead of `bool #()`
+    pub fn display_full_name_and_args<'s, const TIDY: bool>(
+        &'s self,
+        file_text: &'s FileText,
+    ) -> impl Display + 's {
+        FmtWrapper(|f| {
+            if self.parameters.is_empty() && TIDY {
+                self.display_full_name().fmt(f)
+            } else {
+                self.display_with_template_args(&self.parameters, |f, (_, t)| {
+                    self.display_template_arg(file_text, t).fmt(f)
+                })
+                .fmt(f)
+            }
         })
     }
     pub fn display_with_template_args<'s, T: 's, Iter: Iterator<Item = T> + Clone + 's>(
@@ -139,11 +150,8 @@ impl LinkInfo {
         func: impl Fn(&mut Formatter<'_>, T) -> std::fmt::Result + 's,
     ) -> impl Display + 's {
         let template_args = display_join(", ", iter, func);
-        FmtWrapper(move |f| {
-            let full_name = self.display_full_name();
-
-            write!(f, "{full_name} #({template_args})")
-        })
+        let full_name = self.display_full_name();
+        FmtWrapper(move |f| write!(f, "{full_name} #({template_args})"))
     }
 }
 
@@ -1061,7 +1069,9 @@ impl Module {
     }
 
     pub fn display_all_ports_info<'s>(&'s self, file_text: &'s FileText) -> impl Display {
-        let full_name_with_args = self.link_info.display_full_name_and_args(file_text);
+        let full_name_with_args = self
+            .link_info
+            .display_full_name_and_args::<false>(file_text);
 
         FmtWrapper(move |f| {
             write!(f, "module {full_name_with_args}:")?;

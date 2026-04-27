@@ -2,10 +2,11 @@ use crate::config::GenDocs;
 use crate::dev_aid::port_diagram;
 use crate::file_position::FileText;
 use crate::flattening::{
-    ClockVisibility, FieldDeclKind, InterfaceDeclaration, InterfaceKind, Module,
+    ClockVisibility, FieldDeclKind, InterfaceDeclaration, InterfaceKind, Module, NamedConstant,
+    StructType,
 };
 use crate::latency::port_latency_inference::InferenceTarget;
-use crate::linker::{FileData, GlobalObj, LinkInfo};
+use crate::linker::{FileData, GlobalObj, IsExtern, LinkInfo};
 use crate::prelude::*;
 use crate::typing::template::TemplateKind;
 use pulldown_cmark::{Options, Parser, html::push_html as md_push_html};
@@ -116,14 +117,8 @@ fn build_interface_block(md: &Module, ft: &FileText) -> String {
     let li = &md.link_info;
     let mut out = String::new();
 
-    if li.parameters.is_empty() {
-        out.push_str(&format!("module {} {{\n", li.name));
-    } else {
-        out.push_str(&format!(
-            "module {} {{\n",
-            li.display_full_name_and_args(ft)
-        ));
-    }
+    let name = li.display_full_name_and_args::<true>(ft);
+    out.push_str(&format!("module {name} {{\n"));
 
     // Collect (source_pos, line) for clocks and fields, then sort to preserve source order.
     let mut items: Vec<(usize, String)> = Vec::new();
@@ -251,11 +246,8 @@ fn render_module_section(
     let name = &li.name;
     let raw_doc = li.documentation.to_string(ft);
 
-    let heading = if li.parameters.is_empty() {
-        html_escape(name)
-    } else {
-        html_escape(&li.display_full_name_and_args(ft).to_string())
-    };
+    let module_name = li.display_full_name_and_args::<true>(ft);
+    let heading = html_escape(&module_name.to_string());
 
     let mut s = format!("<section class=\"module\" id=\"{name}\">\n");
     s.push_str(&format!(
@@ -276,6 +268,93 @@ fn render_module_section(
         s.push_str("</div>\n");
     }
 
+    s.push_str("</section>\n");
+    s
+}
+
+fn build_struct_block(typ: &StructType, ft: &FileText) -> String {
+    let li = &typ.link_info;
+    let name = li.display_full_name_and_args::<true>(ft);
+    if matches!(li.is_extern, IsExtern::Builtin) {
+        format!("__builtin__ struct {name}")
+    } else {
+        let mut out = format!("struct {name} {{\n",);
+        let mut items: Vec<(usize, String)> = Vec::new();
+        for (_, field) in &typ.fields {
+            let decl = li.instructions[field.declaration_instruction].unwrap_declaration();
+            items.push((
+                field.name_span.start,
+                format!("    {}\n", li.display_decl(None, decl, ft)),
+            ));
+        }
+        items.sort_by_key(|(pos, _)| *pos);
+        for (_, line) in items {
+            out.push_str(&line);
+        }
+        out.push('}');
+        out
+    }
+}
+
+fn render_struct_section(
+    typ: &StructType,
+    ft: &FileText,
+    current_stem: &str,
+    index: &ModuleIndex,
+) -> String {
+    let li = &typ.link_info;
+    let name = &li.name;
+    let raw_doc = li.documentation.to_string(ft);
+    let struct_name = li.display_full_name_and_args::<true>(ft);
+    let heading = html_escape(&struct_name.to_string());
+    let mut s = format!("<section class=\"module\" id=\"{name}\">\n");
+    s.push_str(&format!(
+        "<div class=\"module-heading\"><h2>{heading}</h2></div>\n"
+    ));
+    let block = build_struct_block(typ, ft);
+    s.push_str("<div class=\"interface-block\"><pre><code class=\"language-sus\">");
+    s.push_str(&html_escape(&block));
+    s.push_str("</code></pre></div>\n");
+    if !raw_doc.trim().is_empty() {
+        s.push_str("<div class=\"doc-prose\">\n");
+        s.push_str(&render_prose(&raw_doc, current_stem, index));
+        s.push_str("</div>\n");
+    }
+    s.push_str("</section>\n");
+    s
+}
+
+fn build_const_block(cst: &NamedConstant, ft: &FileText) -> String {
+    let li = &cst.link_info;
+    let decl = li.instructions[cst.output_decl].unwrap_declaration();
+    let return_type = &ft[decl.typ_expr.get_span()];
+    let const_name = li.display_full_name_and_args::<true>(ft);
+    format!("const {return_type} {const_name}")
+}
+
+fn render_const_section(
+    cst: &NamedConstant,
+    ft: &FileText,
+    current_stem: &str,
+    index: &ModuleIndex,
+) -> String {
+    let li = &cst.link_info;
+    let name = &li.name;
+    let raw_doc = li.documentation.to_string(ft);
+    let heading = html_escape(&li.display_full_name_and_args::<true>(ft).to_string());
+    let mut s = format!("<section class=\"module\" id=\"{name}\">\n");
+    s.push_str(&format!(
+        "<div class=\"module-heading\"><h2>{heading}</h2></div>\n"
+    ));
+    let block = build_const_block(cst, ft);
+    s.push_str("<div class=\"interface-block\"><pre><code class=\"language-sus\">");
+    s.push_str(&html_escape(&block));
+    s.push_str("</code></pre></div>\n");
+    if !raw_doc.trim().is_empty() {
+        s.push_str("<div class=\"doc-prose\">\n");
+        s.push_str(&render_prose(&raw_doc, current_stem, index));
+        s.push_str("</div>\n");
+    }
     s.push_str("</section>\n");
     s
 }
@@ -320,47 +399,55 @@ fn generate_file_html(
         for stem in all_stems {
             if stem == file_stem {
                 html.push_str(&format!(
-                    "<li><a href=\"{stem}.html\" class=\"sidebar-current\">{stem}</a></li>\n"
+                    "<li><a class=\"language-item-ref sidebar-current\" href=\"{stem}.html\">{stem}</a></li>\n"
                 ));
             } else {
-                html.push_str(&format!("<li><a href=\"{stem}.html\">{stem}</a></li>\n"));
+                html.push_str(&format!(
+                    "<li><a class=\"language-item-ref\" href=\"{stem}.html\">{stem}</a></li>\n"
+                ));
             }
         }
         html.push_str("</ul>\n");
     }
 
     if has_structs {
-        html.push_str("<p class=\"sidebar-title\">Structs</p>\n<ul>\n");
+        html.push_str("<a href=\"#Types\" class=\"sidebar-title\">Types</a>\n<ul>\n");
         for obj_id in &file_data.associated_values {
             let GlobalObj::Type(typ_id) = obj_id else {
                 continue;
             };
             let name = &linker.globals.types[*typ_id].link_info.name;
-            html.push_str(&format!("<li><a href=\"#{name}\">{name}</a></li>\n"));
+            html.push_str(&format!(
+                "<li><a class=\"language-item-ref\" href=\"#{name}\">{name}</a></li>\n"
+            ));
         }
         html.push_str("</ul>\n");
     }
 
     if has_modules {
-        html.push_str("<p class=\"sidebar-title\">Modules</p>\n<ul>\n");
+        html.push_str("<a href=\"#Modules\" class=\"sidebar-title\">Modules</a>\n<ul>\n");
         for obj_id in &file_data.associated_values {
             let GlobalObj::Module(md_id) = obj_id else {
                 continue;
             };
             let name = &linker.globals.modules[*md_id].link_info.name;
-            html.push_str(&format!("<li><a href=\"#{name}\">{name}</a></li>\n"));
+            html.push_str(&format!(
+                "<li><a class=\"language-item-ref\" href=\"#{name}\">{name}</a></li>\n"
+            ));
         }
         html.push_str("</ul>\n");
     }
 
     if has_consts {
-        html.push_str("<p class=\"sidebar-title\">Compile-Time Functions</p>\n<ul>\n");
+        html.push_str("<a href=\"#CompileTimeFunctions\" class=\"sidebar-title\">Compile-Time Functions</a>\n<ul>\n");
         for obj_id in &file_data.associated_values {
             let GlobalObj::Constant(const_id) = obj_id else {
                 continue;
             };
             let name = &linker.globals.constants[*const_id].link_info.name;
-            html.push_str(&format!("<li><a href=\"#{name}\">{name}</a></li>\n"));
+            html.push_str(&format!(
+                "<li><a class=\"language-item-ref\" href=\"#{name}\">{name}</a></li>\n"
+            ));
         }
         html.push_str("</ul>\n");
     }
@@ -368,11 +455,25 @@ fn generate_file_html(
     html.push_str("</aside>\n");
 
     html.push_str("<div class=\"doc-main\">\n");
-
     html.push_str(&format!("<h1 class=\"page-title\">{file_stem}</h1>\n"));
 
-    // TODO Add structs
+    if has_structs {
+        html.push_str("<h2 class=\"doc-section\" id=\"Types\">Types</h2>\n");
+        for obj_id in &file_data.associated_values {
+            let GlobalObj::Type(typ_id) = obj_id else {
+                continue;
+            };
+            let typ = &linker.globals.types[*typ_id];
+            html.push_str(&render_struct_section(
+                typ,
+                &file_data.file_text,
+                file_stem,
+                index,
+            ));
+        }
+    }
     if has_modules {
+        html.push_str("<h2 class=\"doc-section\" id=\"Modules\">Modules</h2>\n");
         for obj_id in &file_data.associated_values {
             let GlobalObj::Module(md_id) = obj_id else {
                 continue;
@@ -385,10 +486,26 @@ fn generate_file_html(
                 index,
             ));
         }
-        html.push_str("</div>\n");
     }
-    // TODO Add consts
+    if has_consts {
+        html.push_str(
+            "<h2 class=\"doc-section\" id=\"CompileTimeFunctions\">Compile-Time Functions</h2>\n",
+        );
+        for obj_id in &file_data.associated_values {
+            let GlobalObj::Constant(const_id) = obj_id else {
+                continue;
+            };
+            let cst = &linker.globals.constants[*const_id];
+            html.push_str(&render_const_section(
+                cst,
+                &file_data.file_text,
+                file_stem,
+                index,
+            ));
+        }
+    }
 
+    html.push_str("</div>\n");
     html.push_str("</div>\n</main>\n");
     html.push_str(&format!(
         "<script src=\"{host}/docs/highlight.js\"></script>\n"

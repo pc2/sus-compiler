@@ -114,7 +114,7 @@ pub struct StructType {
     /// Created in Stage 1: Initialization
     ///
     /// [StructField::declaration_instruction] are set in Stage 2: Flattening
-    fields: FlatAlloc<StructField, StructFieldIDMarker>,
+    pub fields: FlatAlloc<StructField, StructFieldIDMarker>,
 }
 
 /// Represents a field in a struct

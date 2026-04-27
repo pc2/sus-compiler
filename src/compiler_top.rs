@@ -295,7 +295,7 @@ impl Linker {
                                 template_args: FlatAlloc::new(),
                             });
                         } else {
-                            let md_with_args = md.link_info.display_full_name_and_args(
+                            let md_with_args = md.link_info.display_full_name_and_args::<false>(
                                 &self.files[md.link_info.span.file].file_text,
                             );
                             fatal_exit!(
