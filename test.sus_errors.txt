@@ -1510,9 +1510,9 @@ Error: int has no template argument named 'beep'
      │                              ──┬─  
      │                                ╰─── int has no template argument named 'beep'
      │
-     ├─[ core.sus:8:20 ]
+     ├─[ core.sus:13:20 ]
      │
-   8 │ __builtin__ struct int #(int FROM, int TO) {}
+  13 │ __builtin__ struct int #(int FROM, int TO) {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -1523,9 +1523,9 @@ Error: int has no template argument named 'BEEP'
      │                                            ──┬─  
      │                                              ╰─── int has no template argument named 'BEEP'
      │
-     ├─[ core.sus:8:20 ]
+     ├─[ core.sus:13:20 ]
      │
-   8 │ __builtin__ struct int #(int FROM, int TO) {}
+  13 │ __builtin__ struct int #(int FROM, int TO) {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -1536,9 +1536,9 @@ Error: int is not a named wire: local or constant, it is a Struct instead!
      │                                                  ─┬─  
      │                                                   ╰─── int is not a named wire: local or constant, it is a Struct instead!
      │
-     ├─[ core.sus:8:20 ]
+     ├─[ core.sus:13:20 ]
      │
-   8 │ __builtin__ struct int #(int FROM, int TO) {}
+  13 │ __builtin__ struct int #(int FROM, int TO) {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -2092,9 +2092,9 @@ Error: int has no template argument named 'ABC'
      │           ─┬─  
      │            ╰─── int has no template argument named 'ABC'
      │
-     ├─[ core.sus:8:20 ]
+     ├─[ core.sus:13:20 ]
      │
-   8 │ __builtin__ struct int #(int FROM, int TO) {}
+  13 │ __builtin__ struct int #(int FROM, int TO) {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -3263,9 +3263,9 @@ Warning: Unused port 'bits'
       │                               ┬  
       │                               ╰── Unused port 'bits'
       │
-      ├─[ core.sus:197:55 ]
+      ├─[ core.sus:206:55 ]
       │
-  197 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
+  206 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                                       ──┬─  
       │                                                         ╰─── Port 'bits' declared here
       │
@@ -3282,9 +3282,9 @@ Warning: Unused port 'value'
       │                               ┬  
       │                               ╰── Unused port 'value'
       │
-      ├─[ core.sus:197:26 ]
+      ├─[ core.sus:206:26 ]
       │
-  197 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
+  206 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
       │                          ──┬──  
       │                            ╰──── Port 'value' declared here
       │

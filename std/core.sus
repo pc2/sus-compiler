@@ -1,16 +1,25 @@
+// core.sus - Every type and module that the compiler needs to handle in a builtin way. 
+// It's maybe a bit hacky, but so that we can use them as builtin IDs, get_builtin_type!("int"), get_builtin_module!("CrossDomain"), and get_builtin_const!("true") refer to values in this file. 
 
-// For now these builtin declarations must be in this order, because they're constants in the code. 
-// We'll get a better system for this at some point
-
-/// The decider of truth and falsity
+/// Boolean values. Can take on `true` or `false`. 
+///
+/// Synthesizes to `logic`. Takes on the values `1'b1` for `true`, and `1'b0` for `false`
 __builtin__ struct bool {}
-// An integer of variable size.
+/// Integers are bounded. From an inclusive `FROM` value, to an exclusive `TO` value. For more information, see [Bounded Integers](https://sus-lang.org/docs/docs/integers.html)
+///
+/// Synthesizes to `logic[sizeof#(T: type int#(FROM, TO)) - 1:0]`. Encoded as unsigned 2s complement for `FROM >= 0`, and as signed 2s complement for `FROM < 0`. 
+///
+/// Generative integers are unbounded of arbitrary size. 
 __builtin__ struct int #(int FROM, int TO) {}
 
-/// Single precision IEEE 32-bit float. Operators are provided by external libraries, but it's defined here for convenience. 
+/// Single precision IEEE 32-bit float. Operators are provided by external libraries, but it's defined here for convenience.
+///
+/// Synthesizes to `logic[31:0]`
 __builtin__ struct float {}
 
 /// Single precision IEEE 64-bit double-precision float. Operators are provided by external libraries, but it's defined here for convenience. 
+///
+/// Synthesizes to `logic[63:0]`
 __builtin__ struct double {}
 
 /// Gen-only type for strings. Only used to pass strings to Verilog submodules - like data files for ROMs. 
