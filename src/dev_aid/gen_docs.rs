@@ -5,7 +5,7 @@ use crate::flattening::{
     ClockVisibility, FieldDeclKind, InterfaceDeclaration, InterfaceKind, Module,
 };
 use crate::latency::port_latency_inference::InferenceTarget;
-use crate::linker::{GlobalObj, LinkInfo};
+use crate::linker::{FileData, GlobalObj, LinkInfo};
 use crate::prelude::*;
 use crate::typing::template::TemplateKind;
 use pulldown_cmark::{Options, Parser, html::push_html as md_push_html};
@@ -45,33 +45,9 @@ pub fn gen_docs(linker: &Linker, settings: &GenDocs) {
 
     // Second pass: generate one HTML file per .sus file.
     for (_, file_data) in &linker.files {
-        let file_text = &file_data.file_text;
         let stem = file_stem_of(&file_data.file_identifier.name);
 
-        let modules: Vec<(ModuleUUID, &Module)> = file_data
-            .associated_values
-            .iter()
-            .filter_map(|uuid| {
-                if let GlobalObj::Module(id) = uuid {
-                    Some((*id, &linker.globals.modules[*id]))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        if modules.is_empty() {
-            continue;
-        }
-
-        let html = generate_file_html(
-            &stem,
-            &modules,
-            file_text,
-            &index,
-            &all_stems,
-            &settings.host,
-        );
+        let html = generate_file_html(&stem, linker, file_data, &index, &all_stems, &settings.host);
         let out_path = docs_dir.join(format!("{stem}.html"));
         match std::fs::write(&out_path, &html) {
             Ok(()) => info!("Generated {}", out_path.display()),
@@ -306,19 +282,29 @@ fn render_module_section(
 
 fn generate_file_html(
     file_stem: &str,
-    modules: &[(ModuleUUID, &Module)],
-    ft: &FileText,
+    linker: &Linker,
+    file_data: &FileData,
     index: &ModuleIndex,
     all_stems: &[String],
     host: &str,
 ) -> String {
+    let mut has_modules = false;
+    let mut has_structs = false;
+    let mut has_consts = false;
+
+    for obj_id in &file_data.associated_values {
+        match obj_id {
+            GlobalObj::Module(_) => has_modules = true,
+            GlobalObj::Type(_) => has_structs = true,
+            GlobalObj::Constant(_) => has_consts = true,
+        }
+    }
     let mut html = String::new();
 
     html.push_str("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n");
     html.push_str("  <meta charset=\"UTF-8\"/>\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"/>\n");
     html.push_str(&format!(
-        "  <title>{} — SUS Documentation</title>\n",
-        html_escape(file_stem)
+        "  <title>{file_stem} — SUS Documentation</title>\n"
     ));
     html.push_str(&format!(
         "  <link rel=\"stylesheet\" href=\"{host}/docs/highlight.css\"/>\n"
@@ -342,22 +328,68 @@ fn generate_file_html(
         }
         html.push_str("</ul>\n");
     }
-    html.push_str("<p class=\"sidebar-title\">Modules</p>\n<ul>\n");
-    for (_, md) in modules {
-        let name = &md.link_info.name;
-        html.push_str(&format!("<li><a href=\"#{name}\">{name}</a></li>\n"));
+
+    if has_structs {
+        html.push_str("<p class=\"sidebar-title\">Structs</p>\n<ul>\n");
+        for obj_id in &file_data.associated_values {
+            let GlobalObj::Type(typ_id) = obj_id else {
+                continue;
+            };
+            let name = &linker.globals.types[*typ_id].link_info.name;
+            html.push_str(&format!("<li><a href=\"#{name}\">{name}</a></li>\n"));
+        }
+        html.push_str("</ul>\n");
     }
-    html.push_str("</ul>\n</aside>\n");
+
+    if has_modules {
+        html.push_str("<p class=\"sidebar-title\">Modules</p>\n<ul>\n");
+        for obj_id in &file_data.associated_values {
+            let GlobalObj::Module(md_id) = obj_id else {
+                continue;
+            };
+            let name = &linker.globals.modules[*md_id].link_info.name;
+            html.push_str(&format!("<li><a href=\"#{name}\">{name}</a></li>\n"));
+        }
+        html.push_str("</ul>\n");
+    }
+
+    if has_consts {
+        html.push_str("<p class=\"sidebar-title\">Compile-Time Functions</p>\n<ul>\n");
+        for obj_id in &file_data.associated_values {
+            let GlobalObj::Constant(const_id) = obj_id else {
+                continue;
+            };
+            let name = &linker.globals.constants[*const_id].link_info.name;
+            html.push_str(&format!("<li><a href=\"#{name}\">{name}</a></li>\n"));
+        }
+        html.push_str("</ul>\n");
+    }
+
+    html.push_str("</aside>\n");
 
     html.push_str("<div class=\"doc-main\">\n");
-    html.push_str(&format!(
-        "<h1 class=\"page-title\">{}</h1>\n",
-        html_escape(file_stem)
-    ));
-    for &(_, md) in modules {
-        html.push_str(&render_module_section(md, ft, file_stem, index));
+
+    html.push_str(&format!("<h1 class=\"page-title\">{file_stem}</h1>\n"));
+
+    // TODO Add structs
+    if has_modules {
+        for obj_id in &file_data.associated_values {
+            let GlobalObj::Module(md_id) = obj_id else {
+                continue;
+            };
+            let md = &linker.globals.modules[*md_id];
+            html.push_str(&render_module_section(
+                md,
+                &file_data.file_text,
+                file_stem,
+                index,
+            ));
+        }
+        html.push_str("</div>\n");
     }
-    html.push_str("</div>\n</div>\n</main>\n");
+    // TODO Add consts
+
+    html.push_str("</div>\n</main>\n");
     html.push_str(&format!(
         "<script src=\"{host}/docs/highlight.js\"></script>\n"
     ));
