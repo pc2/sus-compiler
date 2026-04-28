@@ -171,8 +171,18 @@ fn build_interface_block(md: &Module, ft: &FileText) -> String {
     for (dom_id, dom_info) in &md.latency_domains {
         if prev_clock != Some(dom_info.clock) {
             let clock = &md.clocks[dom_info.clock];
-            if clock.name_span.is_some() {
-                out.push_str(&format!("  clock {}\n", clock.name));
+            match clock.visibility {
+                ClockVisibility::Input => {
+                    if clock.name_span.is_some() {
+                        out.push_str(&format!("  clock {}\n", clock.name));
+                    }
+                }
+                ClockVisibility::Output => {
+                    out.push_str(&format!("  output clock {}\n", clock.name));
+                }
+                ClockVisibility::Local => {
+                    unreachable!("Local clocks cannot be visible on the interface")
+                }
             }
             prev_clock = Some(dom_info.clock);
         }
