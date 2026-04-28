@@ -100,18 +100,40 @@ module ShiftReg#(T, int LATENCY) {
     }
 }
 
+/// A First-In-First-Out memory element. 
+///
+/// Push data in through the `may_push`, and `push` connections.
+/// If `may_push` is high, then you're allowed to perform at most `MAY_PUSH_LATENCY` more pushes before you must stop. 
+/// This is because `MAY_PUSH_LATENCY` translates to the ALMOST_FULL treshold on the FIFO's internals. 
+/// In the most common case, `may_push` has a 1-to-1 correspondence with `push`, hence 
+///
+/// Pop data using the `may_pop` and `pop` connections. `pop` may only be called when `may_pop` is high. 
+/// After `pop` is called, the data is returned, one or more cycles later.
+/// You should not depend on `pop_data` for your decision to `pop`. If you need to do that, opt for [FWFT] instead. 
+///
+/// Example where we're moving data from `from_fifo`, adding one to it with wrap around, and pushing to `to_fifo`:
+/// ```sus
+/// module TwoFIFOs {
+///     FIFO#(T: type int#(FROM: 0, TO: 256), DEPTH: 128) from_fifo
+///     FIFO#(T: type int#(FROM: 0, TO: 256), DEPTH: 128) to_fifo
+/// 
+///     when from_fifo.may_pop & to_fifo.may_push {
+///         int pop_data = from_fifo.pop()
+///         reg int data_incr = pop_data + 1 mod 256
+///         // to_fifo.MAY_PUSH_LATENCY is inferred to 2 here.
+///         // 1 for from_fifo.pop(), and 1 for the `data_incr` reg. 
+///         to_fifo.push(data_incr)
+///     }
+///     
+///     // not shown here is pushing data into from_fifo and popping it again from to_fifo
+/// }
+/// ```
 module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
-    clock clk
     gen int T_WIDTH = sizeof#(T)
 
 	state bool[T_WIDTH][DEPTH] mem
 	state int#(FROM: 0, TO: DEPTH) read_addr
 	state int#(FROM: 0, TO: DEPTH) write_addr
-
-    action rst {
-        write_addr = 0
-        read_addr = 0
-    }
 
 	int space_remaining = read_addr - write_addr - 1 mod DEPTH
 
@@ -130,8 +152,58 @@ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
         pop_data = FromBits(pop_out_reg)
         read_addr = read_addr + 1 mod DEPTH
     }
+
+    domain reset
+    action rst {
+        write_addr = 0
+        read_addr = 0
+    }
 }
 
+/// A First-Word-Fall-Through FIFO. Similar to the regular [FIFO],
+/// but this one allows for inspection of the data that is ready to be popped before popping it. 
+///
+/// Push data in through the `may_push`, and `push` connections.
+/// If `may_push` is high, then you're allowed to perform at most `MAY_PUSH_LATENCY` more pushes before you must stop. 
+/// This is because `MAY_PUSH_LATENCY` translates to the ALMOST_FULL treshold on the FIFO's internals. 
+/// In the most common case, `may_push` has a 1-to-1 correspondence with `push`, hence 
+///
+/// Instead of [FIFO]'s `may_pop` interface, `FWFT` comes with a `pop_available` trigger, which presents you with the data that you can then `pop()`. 
+/// 
+/// The main usecase of `FWFT` is for situations where you need a 0-cycle response time to a `pop` signal. 
+/// 
+/// Below is an of a scenario where we need such a 0-cycle pop latency.
+/// The goal is to produce an `is_last` signal, based on the sequence lengths stored in `segment_sizes_fifo`
+/// Since sequences can be back-to-back, num_left must be refresheable within a single cycle cycle, any number of cycles in a row. 
+/// Let's say it will not happen that `data_stream` is called when no segment is in the fifo for it. 
+/// ```sus
+/// module SplitIntoSegments {
+///     FWFT#(T: type int#(FROM: 1, TO: 256), DEPTH: 128) segment_sizes_fifo
+/// 
+///     state int#(FROM: 0, TO: 256) num_left
+///     bool need_new_num_left = false
+///     when num_left == 0 {
+///         need_new_num_left = true
+///     }
+///     
+///     action data_stream : float _data -> bool is_last {
+///         when num_left == 1 {
+///             is_last = true
+///             need_new_num_left = true
+///         } else {
+///             is_last = false
+///         }
+///         num_left = num_left - 1 mod 256
+///     }
+///     when need_new_num_left {
+///         when segment_sizes_fifo.pop_available: int new_num_left {
+///             num_left = new_num_left
+///         }
+///     }
+///     
+///     // not shown here is pushing data into segment_sizes_fifo
+/// }
+/// ```
 module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {
     gen int T_WIDTH = sizeof#(T)
 
@@ -164,18 +236,9 @@ module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {
         }
     }
 
-    clock clk
-    action rst {
-        write_addr = 0
-        read_addr = 0
-        for int I in 0..OUTFLOW_REGS {
-            outflow_path_valids_reg[I] = false
-        }
-    }
-
 	int space_remaining = read_addr - write_addr - 1 mod DEPTH
 
-    domain write
+    domain push_dom
     // Add in-built pipeline stage for may_push, since its computation is fairly complex, and it's in a latency tolerant path
     reg output bool may_push'-MAY_PUSH_LATENCY = LatencyOffset #(OFFSET: -MAY_PUSH_LATENCY-1)(space_remaining > MAY_PUSH_LATENCY+1)
     action push'0 : T push_data'0 {
@@ -186,7 +249,7 @@ module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {
         read_addr = read_addr + 1 mod DEPTH
     }
     
-    domain read
+    domain pop_dom
     will_shifts[0] = false
     trigger pop_available'0 : T pop_data'0 {
         action pop'0 {
@@ -195,5 +258,14 @@ module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {
     }
     when outflow_path_valids[0] {
         pop_available(FromBits(outflow_path_elems[0]))
+    }
+
+    domain reset
+    action rst {
+        write_addr = 0
+        read_addr = 0
+        for int I in 0..OUTFLOW_REGS {
+            outflow_path_valids_reg[I] = false
+        }
     }
 }
