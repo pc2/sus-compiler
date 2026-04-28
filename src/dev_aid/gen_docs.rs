@@ -2,8 +2,8 @@ use crate::config::GenDocs;
 use crate::dev_aid::port_diagram;
 use crate::file_position::FileText;
 use crate::flattening::{
-    ClockVisibility, FieldDeclKind, InterfaceDeclaration, InterfaceKind, Module, NamedConstant,
-    StructType,
+    ClockVisibility, DeclarationKind, FieldDeclKind, InterfaceDeclaration, InterfaceKind, Module,
+    NamedConstant, StructType,
 };
 use crate::latency::port_latency_inference::InferenceTarget;
 use crate::linker::{FileData, GlobalObj, IsExtern, LinkInfo};
@@ -115,34 +115,28 @@ fn build_interface_params(li: &LinkInfo, iface: &InterfaceDeclaration, ft: &File
 
 fn build_interface_block(md: &Module, ft: &FileText) -> String {
     let li = &md.link_info;
-    let mut out = String::new();
-
     let name = li.display_full_name_and_args::<true>(ft);
-    out.push_str(&format!("module {name} {{\n"));
+    let mut out = format!("module {name} {{\n");
 
-    // Collect (source_pos, line) for clocks and fields, then sort to preserve source order.
-    let mut items: Vec<(usize, String)> = Vec::new();
+    let multiple_domains = md.latency_domains.len() > 1;
 
-    for (_, clock) in &md.clocks {
-        let Some(span) = clock.name_span else {
-            continue;
-        };
-        match clock.visibility {
-            ClockVisibility::Input | ClockVisibility::Output => {
-                items.push((span.start, format!("    clock {}\n", clock.name)));
-            }
-            ClockVisibility::Local => {}
-        }
-    }
+    // Group fields by latency domain, preserving source order within each group.
+    let mut domain_fields: HashMap<LatDomID, Vec<(usize, String)>> = HashMap::new();
 
     for (_, field) in &md.fields {
         let Some(decl_instr) = field.declaration_instruction else {
             continue;
         };
-        let line = match decl_instr {
+        let (lat_dom, line) = match decl_instr {
             FieldDeclKind::SinglePort(decl_id) => {
                 let decl = li.instructions[decl_id].unwrap_declaration();
-                format!("    {}\n", li.display_decl(None, decl, ft))
+                let DeclarationKind::Port { latency_domain, .. } = decl.decl_kind else {
+                    continue;
+                };
+                (
+                    latency_domain,
+                    format!("    {}\n", li.display_decl(None, decl, ft)),
+                )
             }
             FieldDeclKind::Interface(iface_id) => {
                 let iface = li.instructions[iface_id].unwrap_interface();
@@ -156,15 +150,40 @@ fn build_interface_block(md: &Module, ft: &FileText) -> String {
                 };
                 let lat = fmt_latency(li, &iface.latency_specifier, ft);
                 let params = build_interface_params(li, iface, ft);
-                format!("    {kw} {}{lat}{params}\n", iface.name)
+                (
+                    iface.latency_domain,
+                    format!("    {kw} {}{lat}{params}\n", iface.name),
+                )
             }
         };
-        items.push((field.name_span.start, line));
+        domain_fields
+            .entry(lat_dom)
+            .or_default()
+            .push((field.name_span.start, line));
     }
 
-    items.sort_by_key(|(pos, _)| *pos);
-    for (_, line) in items {
-        out.push_str(&line);
+    for fields in domain_fields.values_mut() {
+        fields.sort_by_key(|(pos, _)| *pos);
+    }
+
+    // Emit in domain order: clock header when clock changes, domain header when multiple domains.
+    let mut prev_clock: Option<ClockID> = None;
+    for (dom_id, dom_info) in &md.latency_domains {
+        if prev_clock != Some(dom_info.clock) {
+            let clock = &md.clocks[dom_info.clock];
+            if clock.name_span.is_some() {
+                out.push_str(&format!("  clock {}\n", clock.name));
+            }
+            prev_clock = Some(dom_info.clock);
+        }
+        if multiple_domains {
+            out.push_str(&format!("   domain {}\n", dom_info.name));
+        }
+        if let Some(fields) = domain_fields.get(&dom_id) {
+            for (_, line) in fields {
+                out.push_str(line);
+            }
+        }
     }
 
     out.push('}');
