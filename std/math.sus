@@ -34,52 +34,36 @@ __builtin__ const int min #(int A, int B) {}
 /// Compute the maximum of `A` and `B`
 __builtin__ const int max #(int A, int B) {}
 
-/// Splits the given integer. The upper [LOWER_BITS:] bits are returned as upper, the lower [:LOWER_BITS] bits are returned in lower
-/// See also [BitwiseIntConcat]
-module BitwiseIntSplit #(int TO, int LOWER_BITS) {
-    gen int UPPER_TO = (TO-1) / pow2#(E: LOWER_BITS) + 1
-    interface BitwiseIntSplit :
-        int#(FROM: 0, TO) v'0 ->
-        int#(FROM: 0, TO: UPPER_TO) upper'0,
-        int#(FROM: 0, TO: pow2#(E: LOWER_BITS)) lower'0
+module Abs #(int TO) {
+	interface Abs : int #(FROM: -TO+1, TO) a -> int #(FROM: 0, TO) o
 
-    bool[clog2#(V: TO)] v_bits = UIntToBits(v)
-
-    lower = BitsToUInt(v_bits[:LOWER_BITS])
-	// we use FromBits rather than BitsToUInt, because we can then immediately adjust the range too
-    upper = FromBits#(T: type int#(FROM: 0, TO: UPPER_TO))(v_bits[LOWER_BITS:])
+	when a < 0 {
+		o = IntNarrow#(FROM: 0, TO)(-a)
+	} else {
+		o = IntNarrow#(FROM: 0, TO)(a)
+	}
 }
 
-/// Recombines a lower and upper integer parts.
-/// See also [BitwiseIntSplit]
-module BitwiseIntConcat #(int UPPER_TO, int LOWER_BITS) {
-    interface BitwiseIntConcat :
-        int#(FROM: 0, TO: UPPER_TO) upper'0,
-        int#(FROM: 0, TO: pow2#(E: LOWER_BITS)) lower'0 ->
-        int#(FROM: 0, TO: UPPER_TO * pow2#(E: LOWER_BITS)) v'0
+// Recursive Tree Add module recurses smaller copies of itself.
+module TreeAdd #(int WIDTH, int FROM, int TO) {
+	interface TreeAdd : int#(FROM, TO)[WIDTH] values'0 -> int#(FROM: FROM*WIDTH, TO: (TO - 1)*WIDTH + 1) total
 
-    bool[clog2#(V: UPPER_TO) + LOWER_BITS] v_bits
-    v_bits[:LOWER_BITS] = UIntToBits(lower)
-    v_bits[LOWER_BITS:] = UIntToBits(upper)
-	// we use FromBits rather than BitsToUInt, because we can then immediately adjust the range too
-    v = FromBits#(T: type int#(FROM: 0, TO: UPPER_TO * pow2#(E: LOWER_BITS)))(v_bits)
-}
+	if WIDTH == 0 {
+		// Have to explicitly give zero a latency count.
+		// Otherwise total's latency can't be determined.
+		int zero'0 = 0
+		total = zero
+	} else if WIDTH == 1 {
+		total = values[0]
+	} else {
+		// Or instantiate submodules inline
+		int left_total = TreeAdd(values[:WIDTH / 2])
+		int right_total = TreeAdd(values[WIDTH / 2:])
 
-/// Sets the lower [:LOWER_BITS] bits to false, thus aligning the value
-/// Works for unsigned and signed integers alike
-module AlignToPow2 #(int FROM, int TO, int LOWER_BITS) {
-    gen int ALIGNED_FROM = FROM - (FROM mod clog2#(V: LOWER_BITS))
-    gen int ALIGNED_TO = TO - (TO + 1 mod clog2#(V: LOWER_BITS))
-    interface AlignToPow2 :
-        int#(FROM, TO) i'0 ->
-        int#(FROM: ALIGNED_FROM, TO: ALIGNED_TO) o'0
-
-    bool[sizeof#(T: type int#(FROM, TO))] bits = ToBits(i)
-    bool[sizeof#(T: type int#(FROM, TO))] aligned_bits
-    aligned_bits[:LOWER_BITS] = Repeat(false)
-    aligned_bits[LOWER_BITS:] = bits[LOWER_BITS:]
-	// we use FromBits rather than BitsToInt, because we can then immediately adjust the range too
-    o = FromBits#(T: type int#(FROM: ALIGNED_FROM, TO: ALIGNED_TO))(aligned_bits)
+		// Can add pipelining registers here too.
+		// Latency Counting will figure it out.
+		reg total = left_total + right_total
+	}
 }
 
 /// Unsafely shrinks the bounds of an integer.

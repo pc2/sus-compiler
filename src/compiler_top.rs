@@ -31,6 +31,7 @@ const STL_FILES: &[&str] = &[
     "conversion.sus",
     "control_flow.sus",
     "util.sus",
+    "bitwise.sus",
     "memory.sus",
 ];
 const STL_FILES_FEATURE_XPM: &[&str] = &[
@@ -40,6 +41,7 @@ const STL_FILES_FEATURE_XPM: &[&str] = &[
     "conversion.sus",
     "control_flow.sus",
     "util.sus",
+    "bitwise.sus",
     "feature/xpm/xpm.sus",
     "feature/xpm/memory.sus",
 ];
