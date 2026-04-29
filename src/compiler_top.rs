@@ -23,9 +23,21 @@ pub fn get_std_dir() -> PathBuf {
     config().sus_home.join("std")
 }
 
-const STL_FILES: &[&str] = &["core.sus", "control_flow.sus", "util.sus", "memory.sus"];
+/// The values from [sus-compiler/sus-proc-pacro/src/lib.rs] MUST come first and in-order, such that the IDs map correctly.
+const STL_FILES: &[&str] = &[
+    "core.sus",
+    "array.sus",
+    "math.sus",
+    "conversion.sus",
+    "control_flow.sus",
+    "util.sus",
+    "memory.sus",
+];
 const STL_FILES_FEATURE_XPM: &[&str] = &[
     "core.sus",
+    "array.sus",
+    "math.sus",
+    "conversion.sus",
     "control_flow.sus",
     "util.sus",
     "feature/xpm/xpm.sus",

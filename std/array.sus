@@ -1,0 +1,92 @@
+
+/// Returns an array of SIZE copies of v - should not consume any hardware
+/// Runtime version of [RepeatGen]
+module Repeat #(T, int SIZE) {
+	interface Repeat : T v'0 -> T[SIZE] result'0
+
+	for int I in 0..SIZE {
+		result[I] = v
+	}
+}
+
+/// Reverse an array - should not consume any hardware
+/// Runtime version of [ReverseGen]
+module Reverse #(T, int SIZE) {
+	interface Reverse : T[SIZE] v'0 -> T[SIZE] result'0
+
+	for int I in 0..SIZE {
+		result[I] = v[SIZE - I - 1]
+	}
+}
+
+/// Concatenate two arrays, such that the elements of b come after the elements of a - should not consume any hardware
+/// Runtime version of [ConcatGen]
+module Concat #(T, int SIZE_A, int SIZE_B) {
+	interface Concat : T[SIZE_A] a'0, T[SIZE_B] b'0 -> T[SIZE_A + SIZE_B] result'0
+
+	result[:SIZE_A] = a
+	result[SIZE_A:] = b
+}
+
+/// Rotates towards lower indexes by the provided offset. Implemented as a Barrel Shifter
+///
+/// Example: `RotateLeft([1, 2, 3, 4], 1) == [2, 3, 4, 1]`
+module RotateLeft#(T, int ARRAY_LEN) {
+    interface RotateLeft : T[ARRAY_LEN] data'0, int#(FROM: 0, TO: ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0
+
+    gen int NUM_STAGES = clog2#(V: ARRAY_LEN)
+    bool[NUM_STAGES] offset_bits = UIntToBits(offset)
+
+    T[ARRAY_LEN][NUM_STAGES+1] rotate_stages
+    rotate_stages[0] = data
+
+    for int STAGE in 0..NUM_STAGES {
+        T[ARRAY_LEN] from = rotate_stages[STAGE]
+
+        for int ELEM in 0..ARRAY_LEN {
+            when offset_bits[STAGE] {
+                rotate_stages[STAGE+1][ELEM] = from[ELEM + pow2#(E: STAGE) mod ARRAY_LEN]
+            } else {
+                rotate_stages[STAGE+1][ELEM] = from[ELEM]
+            }
+        }
+    }
+
+    rotated_data = rotate_stages[NUM_STAGES]
+}
+
+/// Rotates towards higher indexes by the provided offset. Implemented as a Barrel Shifter
+///
+/// Example: `RotateRight([1, 2, 3, 4], 1) == [4, 1, 2, 3]`
+module RotateRight#(T, int ARRAY_LEN) {
+    interface RotateRight : T[ARRAY_LEN] data'0, int#(FROM: 0, TO: ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0
+
+    gen int NUM_STAGES = clog2#(V: ARRAY_LEN)
+    bool[NUM_STAGES] offset_bits = UIntToBits(offset)
+
+    T[ARRAY_LEN][NUM_STAGES+1] rotate_stages
+    rotate_stages[0] = data
+
+    for int STAGE in 0..NUM_STAGES {
+        T[ARRAY_LEN] from = rotate_stages[STAGE]
+
+        for int ELEM in 0..ARRAY_LEN {
+            when offset_bits[STAGE] {
+                rotate_stages[STAGE+1][ELEM] = from[ELEM - pow2#(E: STAGE) mod ARRAY_LEN]
+            } else {
+                rotate_stages[STAGE+1][ELEM] = from[ELEM]
+            }
+        }
+    }
+
+    rotated_data = rotate_stages[NUM_STAGES]
+}
+
+/// Generative version of [Repeat]
+__builtin__ const T[SIZE] RepeatGen #(T, int SIZE, T V) {}
+
+/// Generative version of [Reverse]
+__builtin__ const T[SIZE] ReverseGen #(T, int SIZE, T[SIZE] V) {}
+
+/// Generative version of [Concat]
+__builtin__ const T[SIZE_A + SIZE_B] ConcatGen #(T, int SIZE_A, int SIZE_B, T[SIZE_A] V_A, T[SIZE_B] V_B) {}

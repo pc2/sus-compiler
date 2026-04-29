@@ -1,3 +1,5 @@
+use std::{fs::File, io::Read};
+
 use proc_macro::TokenStream;
 
 use quote::{quote, quote_spanned};
@@ -71,31 +73,48 @@ pub fn field(token_stream: TokenStream) -> TokenStream {
     .into()
 }
 
+fn get_standard_library_text() -> String {
+    /// These must be in the same order as [sus-compiler/src/compiler_top.rs]
+    const BUILTIN_FILES: &[&str] = &[
+        "std/core.sus",
+        "std/array.sus",
+        "std/math.sus",
+        "std/conversion.sus",
+    ];
+
+    let mut total_text = String::new();
+    for path in BUILTIN_FILES {
+        let mut file = File::open(path).unwrap();
+        file.read_to_string(&mut total_text).unwrap();
+    }
+    total_text
+}
+
 #[proc_macro]
 pub fn get_builtin_type(token_stream: TokenStream) -> TokenStream {
     let string_literal: LitStr = parse_macro_input!(token_stream);
 
     let object_name = string_literal.value();
 
-    let core_file_text = std::fs::read_to_string("std/core.sus").unwrap();
+    let stl_text = get_standard_library_text();
 
     let re = Regex::new(r"__builtin__\s+struct\s+([a-zA-Z0-9_]+)\s*(?:#\(.*\))?\s*\{").unwrap();
 
-    for (idx, c) in re.captures_iter(&core_file_text).enumerate() {
+    if let Some(idx) = re.captures_iter(&stl_text).position(|c| {
         let (_full, [found_name]) = c.extract();
-        if found_name == object_name {
-            return quote! {
-                crate::alloc::UUID::<crate::prelude::TypeUUIDMarker>(#idx, std::marker::PhantomData)
-            }
-            .into();
+        found_name == object_name
+    }) {
+        quote! {
+            crate::alloc::UUID::<crate::prelude::TypeUUIDMarker>(#idx, std::marker::PhantomData)
         }
+        .into()
+    } else {
+        quote_spanned!(
+            string_literal.span() =>
+            compile_error!("Unknown builtin struct was not found in the standard library")
+        )
+        .into()
     }
-
-    quote_spanned!(
-        string_literal.span() =>
-        compile_error!("Unknown builtin type was not found in std/core.sus")
-    )
-    .into()
 }
 
 #[proc_macro]
@@ -104,25 +123,25 @@ pub fn get_builtin_const(token_stream: TokenStream) -> TokenStream {
 
     let object_name = string_literal.value();
 
-    let core_file_text = std::fs::read_to_string("std/core.sus").unwrap();
+    let stl_text = get_standard_library_text();
 
     let re = Regex::new(r"__builtin__\s+const\s+.+\s+([a-zA-Z0-9_]+)\s*(?:#\(.*\))?\s*\{").unwrap();
 
-    for (idx, c) in re.captures_iter(&core_file_text).enumerate() {
+    if let Some(idx) = re.captures_iter(&stl_text).position(|c| {
         let (_full, [found_name]) = c.extract();
-        if found_name == object_name {
-            return quote! {
-                crate::alloc::UUID::<crate::prelude::ConstantUUIDMarker>(#idx, std::marker::PhantomData)
-            }
-            .into();
+        found_name == object_name
+    }) {
+        quote! {
+            crate::alloc::UUID::<crate::prelude::ConstantUUIDMarker>(#idx, std::marker::PhantomData)
         }
+        .into()
+    } else {
+        quote_spanned!(
+            string_literal.span() =>
+            compile_error!("Unknown builtin const was not found in the standard library")
+        )
+        .into()
     }
-
-    quote_spanned!(
-        string_literal.span() =>
-        compile_error!("Unknown builtin const was not found in std/core.sus")
-    )
-    .into()
 }
 
 /// This could be a macro_rules!, but then rust insists on binding the line number to the macro.

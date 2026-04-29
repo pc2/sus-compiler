@@ -3263,9 +3263,9 @@ Warning: Unused port 'bits'
       │                               ┬  
       │                               ╰── Unused port 'bits'
       │
-      ├─[ core.sus:206:55 ]
+      ├─[ conversion.sus:80:55 ]
       │
-  206 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
+   80 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
       │                                                       ──┬─  
       │                                                         ╰─── Port 'bits' declared here
       │
@@ -3282,9 +3282,9 @@ Warning: Unused port 'value'
       │                               ┬  
       │                               ╰── Unused port 'value'
       │
-      ├─[ core.sus:206:26 ]
+      ├─[ conversion.sus:80:26 ]
       │
-  206 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
+   80 │     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
       │                          ──┬──  
       │                            ╰──── Port 'value' declared here
       │

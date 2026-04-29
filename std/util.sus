@@ -9,37 +9,8 @@ module Abs #(int TO) {
 	}
 }
 
-/// Returns an array of SIZE copies of v - should not consume any hardware
-/// Runtime version of [RepeatGen]
-module Repeat #(T, int SIZE) {
-	interface Repeat : T v'0 -> T[SIZE] result'0
-
-	for int I in 0..SIZE {
-		result[I] = v
-	}
-}
-
-/// Reverse an array - should not consume any hardware
-/// Runtime version of [ReverseGen]
-module Reverse #(T, int SIZE) {
-	interface Reverse : T[SIZE] v'0 -> T[SIZE] result'0
-
-	for int I in 0..SIZE {
-		result[I] = v[SIZE - I - 1]
-	}
-}
-
-/// Concatenate two arrays, such that the elements of b come after the elements of a - should not consume any hardware
-/// Runtime version of [ConcatGen]
-module Concat #(T, int SIZE_A, int SIZE_B) {
-	interface Concat : T[SIZE_A] a'0, T[SIZE_B] b'0 -> T[SIZE_A + SIZE_B] result'0
-
-	result[:SIZE_A] = a
-	result[SIZE_A:] = b
-}
-
-module BitSelect #(int SIZE) {
-	interface BitSelect : int#(FROM: 0, TO: SIZE - 1) selection'0 -> bool[SIZE] bits'0
+module ToOneHot #(int SIZE) {
+	interface ToOneHot : int#(FROM: 0, TO: SIZE - 1) selection'0 -> bool[SIZE] bits'0
 
 	for int I in 0..SIZE {
 		bits[I] = false
@@ -107,71 +78,6 @@ module TreeAdd #(int WIDTH, int FROM, int TO) {
 	}
 }
 
-/// Splits the given integer. The upper [LOWER_BITS:] bits are returned as upper, the lower [:LOWER_BITS] bits are returned in lower
-/// See also [BitwiseIntConcat]
-module BitwiseIntSplit #(int TO, int LOWER_BITS) {
-    gen int UPPER_TO = (TO-1) / pow2#(E: LOWER_BITS) + 1
-    interface BitwiseIntSplit :
-        int#(FROM: 0, TO) v'0 ->
-        int#(FROM: 0, TO: UPPER_TO) upper'0,
-        int#(FROM: 0, TO: pow2#(E: LOWER_BITS)) lower'0
-
-    bool[clog2#(V: TO)] v_bits = UIntToBits(v)
-
-    lower = BitsToUInt(v_bits[:LOWER_BITS])
-	// we use FromBits rather than BitsToUInt, because we can then immediately adjust the range too
-    upper = FromBits#(T: type int#(FROM: 0, TO: UPPER_TO))(v_bits[LOWER_BITS:])
-}
-
-/// Recombines a lower and upper integer parts.
-/// See also [BitwiseIntSplit]
-module BitwiseIntConcat #(int UPPER_TO, int LOWER_BITS) {
-    interface BitwiseIntConcat :
-        int#(FROM: 0, TO: UPPER_TO) upper'0,
-        int#(FROM: 0, TO: pow2#(E: LOWER_BITS)) lower'0 ->
-        int#(FROM: 0, TO: UPPER_TO * pow2#(E: LOWER_BITS)) v'0
-
-    bool[clog2#(V: UPPER_TO) + LOWER_BITS] v_bits
-    v_bits[:LOWER_BITS] = UIntToBits(lower)
-    v_bits[LOWER_BITS:] = UIntToBits(upper)
-	// we use FromBits rather than BitsToUInt, because we can then immediately adjust the range too
-    v = FromBits#(T: type int#(FROM: 0, TO: UPPER_TO * pow2#(E: LOWER_BITS)))(v_bits)
-}
-
-/// Sets the lower [:LOWER_BITS] bits to false, thus aligning the value
-/// Works for unsigned and signed integers alike
-module AlignToPow2 #(int FROM, int TO, int LOWER_BITS) {
-    gen int ALIGNED_FROM = FROM - (FROM mod clog2#(V: LOWER_BITS))
-    gen int ALIGNED_TO = TO - (TO + 1 mod clog2#(V: LOWER_BITS))
-    interface AlignToPow2 :
-        int#(FROM, TO) i'0 ->
-        int#(FROM: ALIGNED_FROM, TO: ALIGNED_TO) o'0
-
-    bool[sizeof#(T: type int#(FROM, TO))] bits = ToBits(i)
-    bool[sizeof#(T: type int#(FROM, TO))] aligned_bits
-    aligned_bits[:LOWER_BITS] = Repeat(false)
-    aligned_bits[LOWER_BITS:] = bits[LOWER_BITS:]
-	// we use FromBits rather than BitsToInt, because we can then immediately adjust the range too
-    o = FromBits#(T: type int#(FROM: ALIGNED_FROM, TO: ALIGNED_TO))(aligned_bits)
-}
-
-/// Converts a '0' or '1' into the equivalent boolean 'false' or 'true' respectively
-module IntToBool {
-    interface IntToBool : int#(FROM: 0, TO: 2) i'0 -> bool o'0
-
-    o = i == 1
-}
-/// Converts a 'false' or 'true' into the equivalent integer '0' or '1' respectively
-module BoolToInt {
-    interface BoolToInt : bool i'0 -> int#(FROM: 0, TO: 2) o'0
-
-    when i {
-        o = 1
-    } else {
-        o = 0
-    }
-}
-
 /// Equivalent to the C/Verilog `cond ? a : b` ternary operator. When `cond` is `true` it returns `a`, otherwise it returns `b`
 module Ternary #(T) {
     interface Ternary : bool cond'0, T a'0, T b'0 -> T o'0
@@ -181,60 +87,6 @@ module Ternary #(T) {
     } else {
         o = b
     }
-}
-
-/// Rotates towards lower indexes by the provided offset. Implemented as a Barrel Shifter
-///
-/// Example: `RotateLeft([1, 2, 3, 4], 1) == [2, 3, 4, 1]`
-module RotateLeft#(T, int ARRAY_LEN) {
-    interface RotateLeft : T[ARRAY_LEN] data'0, int#(FROM: 0, TO: ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0
-
-    gen int NUM_STAGES = clog2#(V: ARRAY_LEN)
-    bool[NUM_STAGES] offset_bits = UIntToBits(offset)
-
-    T[ARRAY_LEN][NUM_STAGES+1] rotate_stages
-    rotate_stages[0] = data
-
-    for int STAGE in 0..NUM_STAGES {
-        T[ARRAY_LEN] from = rotate_stages[STAGE]
-
-        for int ELEM in 0..ARRAY_LEN {
-            when offset_bits[STAGE] {
-                rotate_stages[STAGE+1][ELEM] = from[ELEM + pow2#(E: STAGE) mod ARRAY_LEN]
-            } else {
-                rotate_stages[STAGE+1][ELEM] = from[ELEM]
-            }
-        }
-    }
-
-    rotated_data = rotate_stages[NUM_STAGES]
-}
-
-/// Rotates towards higher indexes by the provided offset. Implemented as a Barrel Shifter
-///
-/// Example: `RotateRight([1, 2, 3, 4], 1) == [4, 1, 2, 3]`
-module RotateRight#(T, int ARRAY_LEN) {
-    interface RotateRight : T[ARRAY_LEN] data'0, int#(FROM: 0, TO: ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0
-
-    gen int NUM_STAGES = clog2#(V: ARRAY_LEN)
-    bool[NUM_STAGES] offset_bits = UIntToBits(offset)
-
-    T[ARRAY_LEN][NUM_STAGES+1] rotate_stages
-    rotate_stages[0] = data
-
-    for int STAGE in 0..NUM_STAGES {
-        T[ARRAY_LEN] from = rotate_stages[STAGE]
-
-        for int ELEM in 0..ARRAY_LEN {
-            when offset_bits[STAGE] {
-                rotate_stages[STAGE+1][ELEM] = from[ELEM - pow2#(E: STAGE) mod ARRAY_LEN]
-            } else {
-                rotate_stages[STAGE+1][ELEM] = from[ELEM]
-            }
-        }
-    }
-
-    rotated_data = rotate_stages[NUM_STAGES]
 }
 
 /// Temporary module for creating and deconstructing tuples, until we have structs
@@ -321,44 +173,4 @@ module Tuple5 #(T1, T2, T3, T4, T5) {
     v3_o = FromBits(packed_i[TO2:TO3])
     v4_o = FromBits(packed_i[TO3:TO4])
     v5_o = FromBits(packed_i[TO4:])
-}
-
-/// A FIFO implemented as a sequence of registers with a accompanying valid bit. 
-///
-/// Bandwidth limited to 1 element every 2 cycles.  
-///
-/// Use for very small FIFOs, in bandwidth-limited circumstances. 
-module RippleFIFO#(T, int DEPTH) {
-    clock clk
-	state T[DEPTH] datas
-	state bool[DEPTH] valids
-
-	for int I in 0..DEPTH - 1 {
-		when !valids[I+1] & valids[I] {
-			datas[I+1] = datas[I]
-			valids[I+1] = true
-			valids[I] = false
-		}
-	}
-
-	domain push_dom
-	output bool may_push'0 = !valids[0]
-	action push'0: T push_data'0 {
-		datas[0] = push_data
-		valids[0] = true
-	}
-
-	domain pop_dom
-	output bool may_pop'0 = valids[DEPTH-1]
-	action pop'0 : -> T pop_data'0 {
-		pop_data = datas[DEPTH-1]
-		valids[DEPTH-1] = false
-	}
-
-    domain reset
-    action rst {
-        for int I in 0..DEPTH {
-            valids[I] = false
-        }
-    }
 }
