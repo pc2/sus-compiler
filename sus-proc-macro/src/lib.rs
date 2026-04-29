@@ -98,7 +98,7 @@ pub fn get_builtin_type(token_stream: TokenStream) -> TokenStream {
 
     let stl_text = get_standard_library_text();
 
-    let re = Regex::new(r"__builtin__\s+struct\s+([a-zA-Z0-9_]+)\s*(?:#\(.*\))?\s*\{").unwrap();
+    let re = Regex::new(r"struct\s+([a-zA-Z0-9_]+)\s*(?:#\(.*\))?\s*\{").unwrap();
 
     if let Some(idx) = re.captures_iter(&stl_text).position(|c| {
         let (_full, [found_name]) = c.extract();
@@ -125,7 +125,7 @@ pub fn get_builtin_const(token_stream: TokenStream) -> TokenStream {
 
     let stl_text = get_standard_library_text();
 
-    let re = Regex::new(r"__builtin__\s+const\s+.+\s+([a-zA-Z0-9_]+)\s*(?:#\(.*\))?\s*\{").unwrap();
+    let re = Regex::new(r"const\s+.+\s+([a-zA-Z0-9_]+)\s*(?:#\(.*\))?\s*\{").unwrap();
 
     if let Some(idx) = re.captures_iter(&stl_text).position(|c| {
         let (_full, [found_name]) = c.extract();
