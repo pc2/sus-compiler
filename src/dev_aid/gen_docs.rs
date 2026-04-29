@@ -9,12 +9,9 @@ use crate::latency::port_latency_inference::InferenceTarget;
 use crate::linker::{FileData, GlobalObj, IsExtern, LinkInfo};
 use crate::prelude::*;
 use crate::typing::template::TemplateKind;
-use pulldown_cmark::{Options, Parser, html::push_html as md_push_html};
+use pulldown_cmark::{BrokenLink, Options, Parser};
 use std::collections::HashMap;
 use std::path::Path;
-
-/// Maps module name → file stem for cross-page link resolution.
-type ModuleIndex = HashMap<String, String>;
 
 pub fn gen_docs(linker: &Linker, settings: &GenDocs) {
     let docs_dir = &settings.dir;
@@ -22,33 +19,18 @@ pub fn gen_docs(linker: &Linker, settings: &GenDocs) {
         fatal_exit!("Could not create docs/ directory: {e}");
     }
 
-    // First pass: build index of all module names → file stems, and collect all stems.
-    let mut index: ModuleIndex = HashMap::new();
-    let mut all_stems: Vec<String> = Vec::new();
-    for (_, file_data) in &linker.files {
-        let stem = file_stem_of(&file_data.file_identifier.name);
-        let mut has_modules = false;
-        for uuid in &file_data.associated_values {
-            if let GlobalObj::Module(id) = uuid {
-                index.insert(
-                    linker.globals.modules[*id].link_info.name.clone(),
-                    stem.clone(),
-                );
-                has_modules = true;
-            }
-        }
-        if has_modules {
-            all_stems.push(stem);
-        }
-    }
-    all_stems.sort();
-    all_stems.dedup();
+    // First pass: gather all files
+    let all_file_stems: Vec<String> = linker
+        .files
+        .iter()
+        .map(|(_, f)| file_stem_of(&f.file_identifier.name))
+        .collect();
 
     // Second pass: generate one HTML file per .sus file.
     for (_, file_data) in &linker.files {
         let stem = file_stem_of(&file_data.file_identifier.name);
 
-        let html = generate_file_html(&stem, linker, file_data, &index, &all_stems, &settings.host);
+        let html = generate_file_html(&stem, linker, file_data, &all_file_stems, &settings.host);
         let out_path = docs_dir.join(format!("{stem}.html"));
         match std::fs::write(&out_path, &html) {
             Ok(()) => info!("Generated {}", out_path.display()),
@@ -200,7 +182,7 @@ fn build_interface_block(md: &Module, ft: &FileText) -> String {
     out
 }
 
-/// Resolve a `[Name]` or `[Module::action]` reference to an href.
+/*/// Resolve a `[Name]` or `[Module::action]` reference to an href.
 /// Uses the first `::` segment as the module name for cross-file lookup.
 fn resolve_ref_href(name: &str, current_stem: &str, index: &ModuleIndex) -> String {
     let module_part = name.split("::").next().unwrap_or(name);
@@ -238,15 +220,31 @@ fn preprocess_refs(raw: &str, current_stem: &str, index: &ModuleIndex) -> String
     }
     result.push_str(rest);
     result
-}
+}*/
 
-fn render_prose(raw: &str, current_stem: &str, index: &ModuleIndex) -> String {
-    let md = preprocess_refs(raw, current_stem, index);
-    let opts =
-        Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TABLES | Options::ENABLE_SMART_PUNCTUATION;
-    let parser = Parser::new_ext(&md, opts);
+fn render_prose(linker: &Linker, raw: &str) -> String {
+    let parser = Parser::new_with_broken_link_callback(
+        raw,
+        Options::all(),
+        Some(|broken_link: BrokenLink| {
+            let name = broken_link.reference.as_ref();
+            match linker.get_by_name(name) {
+                Ok(found_global) => {
+                    let global = &linker.globals[found_global];
+                    let globals_file = &linker.files[global.name_span.file];
+
+                    let file_stem = file_stem_of(&globals_file.file_identifier.name);
+
+                    let link = format!("{file_stem}.html#{name}");
+
+                    Some((link.clone().into(), link.into()))
+                }
+                Err(_) => None,
+            }
+        }),
+    );
     let mut html = String::new();
-    md_push_html(&mut html, parser);
+    pulldown_cmark::html::push_html(&mut html, parser);
     html
 }
 
@@ -265,12 +263,7 @@ fn has_port_latency_inference(md: &Module) -> bool {
         })
 }
 
-fn render_module_section(
-    md: &Module,
-    ft: &FileText,
-    current_stem: &str,
-    index: &ModuleIndex,
-) -> String {
+fn render_module_section(linker: &Linker, md: &Module, ft: &FileText) -> String {
     let li = &md.link_info;
     let name = &li.name;
     let raw_doc = li.documentation.to_string(ft);
@@ -293,7 +286,7 @@ fn render_module_section(
 
     if !raw_doc.trim().is_empty() {
         s.push_str("<div class=\"doc-prose\">\n");
-        s.push_str(&render_prose(&raw_doc, current_stem, index));
+        s.push_str(&render_prose(linker, &raw_doc));
         s.push_str("</div>\n");
     }
 
@@ -325,12 +318,7 @@ fn build_struct_block(typ: &StructType, ft: &FileText) -> String {
     }
 }
 
-fn render_struct_section(
-    typ: &StructType,
-    ft: &FileText,
-    current_stem: &str,
-    index: &ModuleIndex,
-) -> String {
+fn render_struct_section(linker: &Linker, typ: &StructType, ft: &FileText) -> String {
     let li = &typ.link_info;
     let name = &li.name;
     let raw_doc = li.documentation.to_string(ft);
@@ -346,7 +334,7 @@ fn render_struct_section(
     s.push_str("</code></pre></div>\n");
     if !raw_doc.trim().is_empty() {
         s.push_str("<div class=\"doc-prose\">\n");
-        s.push_str(&render_prose(&raw_doc, current_stem, index));
+        s.push_str(&render_prose(linker, &raw_doc));
         s.push_str("</div>\n");
     }
     s.push_str("</section>\n");
@@ -361,12 +349,7 @@ fn build_const_block(cst: &NamedConstant, ft: &FileText) -> String {
     format!("const {return_type} {const_name}")
 }
 
-fn render_const_section(
-    cst: &NamedConstant,
-    ft: &FileText,
-    current_stem: &str,
-    index: &ModuleIndex,
-) -> String {
+fn render_const_section(linker: &Linker, cst: &NamedConstant, ft: &FileText) -> String {
     let li = &cst.link_info;
     let name = &li.name;
     let raw_doc = li.documentation.to_string(ft);
@@ -381,7 +364,7 @@ fn render_const_section(
     s.push_str("</code></pre></div>\n");
     if !raw_doc.trim().is_empty() {
         s.push_str("<div class=\"doc-prose\">\n");
-        s.push_str(&render_prose(&raw_doc, current_stem, index));
+        s.push_str(&render_prose(linker, &raw_doc));
         s.push_str("</div>\n");
     }
     s.push_str("</section>\n");
@@ -392,7 +375,6 @@ fn generate_file_html(
     file_stem: &str,
     linker: &Linker,
     file_data: &FileData,
-    index: &ModuleIndex,
     all_stems: &[String],
     host: &str,
 ) -> String {
@@ -493,12 +475,7 @@ fn generate_file_html(
                 continue;
             };
             let typ = &linker.globals.types[*typ_id];
-            html.push_str(&render_struct_section(
-                typ,
-                &file_data.file_text,
-                file_stem,
-                index,
-            ));
+            html.push_str(&render_struct_section(linker, typ, &file_data.file_text));
         }
     }
     if has_modules {
@@ -508,12 +485,7 @@ fn generate_file_html(
                 continue;
             };
             let md = &linker.globals.modules[*md_id];
-            html.push_str(&render_module_section(
-                md,
-                &file_data.file_text,
-                file_stem,
-                index,
-            ));
+            html.push_str(&render_module_section(linker, md, &file_data.file_text));
         }
     }
     if has_consts {
@@ -525,12 +497,7 @@ fn generate_file_html(
                 continue;
             };
             let cst = &linker.globals.constants[*const_id];
-            html.push_str(&render_const_section(
-                cst,
-                &file_data.file_text,
-                file_stem,
-                index,
-            ));
+            html.push_str(&render_const_section(linker, cst, &file_data.file_text));
         }
     }
 
