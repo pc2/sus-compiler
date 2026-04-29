@@ -2000,13 +2000,13 @@ wire _fifo_may_push;
 /*mux_wire*/ logic[2:0] _fifo_push_data;
 FIFO_T_type_int_FROM_0_TO_6_DEPTH_30_MAY_PUSH_LATENCY_8 fifo(
 	.clk(clk),
-	.rst(),
 	.may_push(_fifo_may_push),
 	.push(_fifo_push),
 	.push_data(_fifo_push_data),
 	.may_pop(),
 	.pop(),
-	.pop_data()
+	.pop_data(),
+	.rst()
 );
 always_comb begin // combinatorial request_data
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -2039,13 +2039,13 @@ endmodule // instantiate_fifo #()
 // FIFO #(T: type int #(FROM: 0, TO: 6), DEPTH: 30, MAY_PUSH_LATENCY: 8)
 module FIFO_T_type_int_FROM_0_TO_6_DEPTH_30_MAY_PUSH_LATENCY_8(
 	/* clock */ input clk,
-	input wire rst,
 	output /*mux_wire*/ logic may_push,
 	input wire push,
 	input wire[2:0] push_data,
 	output /*mux_wire*/ logic may_pop,
 	input wire pop,
-	output /*mux_wire*/ logic[2:0] pop_data
+	output /*mux_wire*/ logic[2:0] pop_data,
+	input wire rst
 );
 
 /*latency*/ logic _pop_D1; always_ff @(posedge clk) begin _pop_D1 <= pop; end
@@ -2053,34 +2053,34 @@ module FIFO_T_type_int_FROM_0_TO_6_DEPTH_30_MAY_PUSH_LATENCY_8(
 /*state*/ logic[4:0] read_addr;
 /*state*/ logic[4:0] write_addr;
 /*mux_wire*/ logic[4:0] space_remaining;
+wire signed[5:0] _3;
+assign _3 = read_addr - write_addr;
 wire signed[5:0] _5;
-assign _5 = read_addr - write_addr;
-wire signed[5:0] _7;
-assign _7 = _5 - $signed({1'b0, 1'd1});
-wire[4:0] _8;
-assign _8 = _7 + ((_7 < 0) ? 30 : 0); // == mod 30
-wire _11;
-assign _11 = space_remaining > 4'd9;
+assign _5 = _3 - $signed({1'b0, 1'd1});
+wire[4:0] _6;
+assign _6 = _5 + ((_5 < 0) ? 30 : 0); // == mod 30
+wire _9;
+assign _9 = space_remaining > 4'd9;
 /*mux_wire*/ logic _LatencyOffset_din;
 wire _LatencyOffset_dout;
 /*latency*/ logic __LatencyOffset_dout_N8; always_ff @(posedge clk) begin __LatencyOffset_dout_N8 <= _LatencyOffset_dout; end
 /*mux_wire*/ logic[2:0] _ToBits_value;
 wire[2:0] _ToBits_bits;
-wire[4:0] _16;
-assign _16 = write_addr + 1'd1;
-wire[4:0] _17;
-assign _17 = (_16 == 30) ? 0 : _16; // == mod 30
-wire _20;
-assign _20 = read_addr != write_addr;
+wire[4:0] _14;
+assign _14 = write_addr + 1'd1;
+wire[4:0] _15;
+assign _15 = (_14 == 30) ? 0 : _14; // == mod 30
+wire _18;
+assign _18 = read_addr != write_addr;
 /*mux_wire*/ logic[2:0] pop_out_reg;
-wire[2:0] _22 = mem[read_addr];
-/*latency*/ logic[2:0] __22_D1; always_ff @(posedge clk) begin __22_D1 <= _22; end
+wire[2:0] _20 = mem[read_addr];
+/*latency*/ logic[2:0] __20_D1; always_ff @(posedge clk) begin __20_D1 <= _20; end
 /*mux_wire*/ logic[2:0] _FromBits_bits;
 wire[2:0] _FromBits_value;
-wire[4:0] _26;
-assign _26 = read_addr + 1'd1;
-wire[4:0] _27;
-assign _27 = (_26 == 30) ? 0 : _26; // == mod 30
+wire[4:0] _24;
+assign _24 = read_addr + 1'd1;
+wire[4:0] _25;
+assign _25 = (_24 == 30) ? 0 : _24; // == mod 30
 LatencyOffset_T_type_bool_OFFSET_9 LatencyOffset(
 	.clk(clk),
 	.din(_LatencyOffset_din),
@@ -2100,17 +2100,17 @@ always_ff @(posedge clk) begin // state mem
 	if(push) mem[write_addr] <= _ToBits_bits;
 end
 always_ff @(posedge clk) begin // state read_addr
+	if(pop) read_addr <= _25;
 	if(rst) read_addr <= 1'd0;
-	if(pop) read_addr <= _27;
 end
 always_ff @(posedge clk) begin // state write_addr
+	if(push) write_addr <= _15;
 	if(rst) write_addr <= 1'd0;
-	if(push) write_addr <= _17;
 end
 always_comb begin // combinatorial space_remaining
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	space_remaining = 5'dx;
-	space_remaining = _8;
+	space_remaining = _6;
 end
 always_comb begin // combinatorial may_push
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -2122,7 +2122,7 @@ end
 always_comb begin // combinatorial _LatencyOffset_din
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	_LatencyOffset_din = 1'bx;
-	_LatencyOffset_din = _11;
+	_LatencyOffset_din = _9;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_LatencyOffset_din = _LatencyOffset_din;
 end
@@ -2134,7 +2134,7 @@ end
 always_comb begin // combinatorial may_pop
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	may_pop = 1'bx;
-	may_pop = _20;
+	may_pop = _18;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	may_pop = may_pop;
 end
@@ -2146,7 +2146,7 @@ end
 always_comb begin // combinatorial pop_out_reg
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	pop_out_reg = 3'bxxx;
-	if(_pop_D1) pop_out_reg = __22_D1;
+	if(_pop_D1) pop_out_reg = __20_D1;
 end
 always_comb begin // combinatorial _FromBits_bits
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches

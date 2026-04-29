@@ -1,16 +1,4 @@
 
-module SlowClockGenerator #(int PERIOD) {
-	interface SlowClockGenerator : -> state int cur_value
-
-	initial cur_value = 0
-
-	when cur_value == PERIOD-1 {
-		cur_value = 0
-	} else {
-		cur_value = cur_value + 1
-	}
-}
-
 module Abs #(int TO) {
 	interface Abs : int #(FROM: -TO+1, TO) a -> int #(FROM: 0, TO) o
 

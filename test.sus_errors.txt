@@ -186,9 +186,9 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated NegativeIntLiterals #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate WeirdlyNamedClock #()
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ memory.sus:136:13 ]
+     ╭─[ memory.sus:208:13 ]
      │
- 136 │     gen int T_WIDTH = sizeof#(T)
+ 208 │     gen int T_WIDTH = sizeof#(T)
      │             ───┬───  
      │                ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
@@ -1068,9 +1068,9 @@ Error: Excess output targets. Function returns 1 results, but 2 targets were giv
      │                 ───────┬──────  
      │                        ╰──────── Excess output targets. Function returns 1 results, but 2 targets were given.
      │
-     ├─[ memory.sus:128:12 ]
+     ├─[ memory.sus:150:12 ]
      │
- 128 │     action pop'0 : -> T pop_data'1 {
+ 150 │     action pop'0 : -> T pop_data'1 {
      │            ─┬─  
      │             ╰─── Interface 'pop' defined here
 ─────╯
@@ -1088,9 +1088,9 @@ Error: Excess argument. Function takes 0 args, but 1 were passed.
      │                                           ──┬─  
      │                                             ╰─── Excess argument. Function takes 0 args, but 1 were passed.
      │
-     ├─[ memory.sus:128:12 ]
+     ├─[ memory.sus:150:12 ]
      │
- 128 │     action pop'0 : -> T pop_data'1 {
+ 150 │     action pop'0 : -> T pop_data'1 {
      │            ─┬─  
      │             ╰─── Interface 'pop' defined here
 ─────╯
@@ -1589,9 +1589,9 @@ Error: FIFO has no template argument named 'BITWIDTH'
      │            ────┬───  
      │                ╰───── FIFO has no template argument named 'BITWIDTH'
      │
-     ├─[ memory.sus:103:8 ]
+     ├─[ memory.sus:131:8 ]
      │
- 103 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+ 131 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
      │        ──┬─  
      │          ╰─── 'FIFO' defined here
 ─────╯
@@ -2348,9 +2348,9 @@ Error: FIFO has no template argument named 'READY_SLACK'
       │                      ─────┬─────  
       │                           ╰─────── FIFO has no template argument named 'READY_SLACK'
       │
-      ├─[ memory.sus:103:8 ]
+      ├─[ memory.sus:131:8 ]
       │
-  103 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+  131 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
       │        ──┬─  
       │          ╰─── 'FIFO' defined here
 ──────╯
@@ -2594,9 +2594,9 @@ Warning: Unused port 'may_pop'
       │                       ──┬─  
       │                         ╰─── Unused port 'may_pop'
       │
-      ├─[ memory.sus:127:17 ]
+      ├─[ memory.sus:149:17 ]
       │
-  127 │     output bool may_pop'0 = read_addr != write_addr
+  149 │     output bool may_pop'0 = read_addr != write_addr
       │                 ───┬───  
       │                    ╰───── Port 'may_pop' declared here
       │
@@ -2613,9 +2613,9 @@ Warning: Unused port 'pop'
       │                       ──┬─  
       │                         ╰─── Unused port 'pop'
       │
-      ├─[ memory.sus:128:12 ]
+      ├─[ memory.sus:150:12 ]
       │
-  128 │     action pop'0 : -> T pop_data'1 {
+  150 │     action pop'0 : -> T pop_data'1 {
       │            ─┬─  
       │             ╰─── Port 'pop' declared here
       │
@@ -2632,9 +2632,9 @@ Warning: Unused port 'pop_data'
       │                       ──┬─  
       │                         ╰─── Unused port 'pop_data'
       │
-      ├─[ memory.sus:128:25 ]
+      ├─[ memory.sus:150:25 ]
       │
-  128 │     action pop'0 : -> T pop_data'1 {
+  150 │     action pop'0 : -> T pop_data'1 {
       │                         ────┬───  
       │                             ╰───── Port 'pop_data' declared here
       │
@@ -2651,9 +2651,9 @@ Warning: Unused port 'rst'
       │                       ──┬─  
       │                         ╰─── Unused port 'rst'
       │
-      ├─[ memory.sus:111:12 ]
+      ├─[ memory.sus:157:12 ]
       │
-  111 │     action rst {
+  157 │     action rst {
       │            ─┬─  
       │             ╰─── Port 'rst' declared here
       │
@@ -3152,9 +3152,9 @@ Error: FIFO has no template argument named 'READY_SLACK'
       │                       ─────┬─────  
       │                            ╰─────── FIFO has no template argument named 'READY_SLACK'
       │
-      ├─[ memory.sus:103:8 ]
+      ├─[ memory.sus:131:8 ]
       │
-  103 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+  131 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
       │        ──┬─  
       │          ╰─── 'FIFO' defined here
 ──────╯
@@ -3165,9 +3165,9 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │                  ┬  
       │                  ╰── Excess argument. Function takes 1 args, but 2 were passed.
       │
-      ├─[ memory.sus:121:12 ]
+      ├─[ memory.sus:143:12 ]
       │
-  121 │     action push'0 : T push_data'0 {
+  143 │     action push'0 : T push_data'0 {
       │            ──┬─  
       │              ╰─── Interface 'push' defined here
 ──────╯
