@@ -2,7 +2,9 @@
 /// Creates a One-Hot encoding of the given integer. 
 ///
 /// Examples:
+/// 
 /// `ToOneHot#(SIZE: 5)(3) == [false, false, false, true, false]`
+/// 
 /// `ToOneHot#(SIZE: 2)(0) == [true, false]`
 module ToOneHot #(int SIZE) {
 	interface ToOneHot : int#(FROM: 0, TO: SIZE - 1) selection'0 -> bool[SIZE] bits'0
@@ -17,13 +19,13 @@ module ToOneHot #(int SIZE) {
 /// If there is at least one set ('1') bit, `is_nonzero` triggers with the index of the first '1' bit. 
 ///
 /// Usage:
-/// ´´´sus
+/// ```sus
 /// FindFirst find_first_bit
 /// find_first_bit.find([false, false, true, false, true])
 /// when find_first_bit.is_nonzero : int first_nonzero {
 ///     // Fires with `2`
 /// }
-/// ´´´
+/// ```
 module FindFirst #(int SIZE) {
     trigger is_nonzero : int#(FROM: 0, TO: SIZE) first_nonzero'0
 	
@@ -61,8 +63,10 @@ module FindFirst #(int SIZE) {
 
 /// Counts the number of set ('1') bits in the bitstring. 
 ///
-/// Example:
+/// Examples:
+/// 
 /// `PopCount([true, false, true, true, true]) == 4`
+/// 
 /// `PopCount(8'b00111011) == 5`
 module PopCount #(int SIZE) {
 	// Should be chosen based on what's most efficient for the target architecture
@@ -101,7 +105,7 @@ module PopCount #(int SIZE) {
 }
 
 
-/// Splits the given integer. The upper [LOWER_BITS:] bits are returned as upper, the lower [:LOWER_BITS] bits are returned in lower
+/// Splits the given integer. The upper `[LOWER_BITS:]` bits are returned as upper, the lower `[:LOWER_BITS]` bits are returned in lower
 /// See also [BitwiseIntConcat]
 module BitwiseIntSplit #(int TO, int LOWER_BITS) {
     gen int UPPER_TO = (TO-1) / pow2#(E: LOWER_BITS) + 1
@@ -132,7 +136,7 @@ module BitwiseIntConcat #(int UPPER_TO, int LOWER_BITS) {
     v = FromBits#(T: type int#(FROM: 0, TO: UPPER_TO * pow2#(E: LOWER_BITS)))(v_bits)
 }
 
-/// Sets the lower [:LOWER_BITS] bits to false, thus aligning the value
+/// Sets the lower `[:LOWER_BITS]` bits to false, thus aligning the value
 /// Works for unsigned and signed integers alike
 module AlignToPow2 #(int FROM, int TO, int LOWER_BITS) {
     gen int ALIGNED_FROM = FROM - (FROM mod clog2#(V: LOWER_BITS))

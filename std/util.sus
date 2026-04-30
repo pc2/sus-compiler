@@ -1,5 +1,5 @@
 
-/// Equivalent to the C/Verilog `cond ? a : b` ternary operator. When `cond` is `true` it returns `a`, otherwise it returns `b`
+/// Equivalent to the C/Verilog `cond ? a : b` ternary operator. When `cond` is `true` it returns `a`, otherwise it returns `b`. 
 module Ternary #(T) {
     interface Ternary : bool cond'0, T a'0, T b'0 -> T o'0
 

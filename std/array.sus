@@ -1,6 +1,9 @@
 
-/// Returns an array of SIZE copies of v - should not consume any hardware
-/// Runtime version of [RepeatGen]
+/// Returns an array of `SIZE` copies of `v`.
+///
+/// Should not consume any hardware.
+///
+/// Runtime version of [RepeatGen].
 module Repeat #(T, int SIZE) {
 	interface Repeat : T v'0 -> T[SIZE] result'0
 
@@ -9,8 +12,11 @@ module Repeat #(T, int SIZE) {
 	}
 }
 
-/// Reverse an array - should not consume any hardware
-/// Runtime version of [ReverseGen]
+/// Reverse an array.
+///
+/// Should not consume any hardware.
+///
+/// Runtime version of [ReverseGen].
 module Reverse #(T, int SIZE) {
 	interface Reverse : T[SIZE] v'0 -> T[SIZE] result'0
 
@@ -19,8 +25,11 @@ module Reverse #(T, int SIZE) {
 	}
 }
 
-/// Concatenate two arrays, such that the elements of b come after the elements of a - should not consume any hardware
-/// Runtime version of [ConcatGen]
+/// Concatenate two arrays, such that the elements of `b` come after the elements of `a`.
+///
+/// Should not consume any hardware.
+///
+/// Runtime version of [ConcatGen].
 module Concat #(T, int SIZE_A, int SIZE_B) {
 	interface Concat : T[SIZE_A] a'0, T[SIZE_B] b'0 -> T[SIZE_A + SIZE_B] result'0
 
@@ -28,7 +37,7 @@ module Concat #(T, int SIZE_A, int SIZE_B) {
 	result[SIZE_A:] = b
 }
 
-/// Rotates towards lower indexes by the provided offset. Implemented as a Barrel Shifter
+/// Rotates towards lower indexes by the provided offset. Implemented as a Barrel Shifter.
 ///
 /// Example: `RotateLeft([1, 2, 3, 4], 1) == [2, 3, 4, 1]`
 module RotateLeft#(T, int ARRAY_LEN) {
@@ -55,7 +64,7 @@ module RotateLeft#(T, int ARRAY_LEN) {
     rotated_data = rotate_stages[NUM_STAGES]
 }
 
-/// Rotates towards higher indexes by the provided offset. Implemented as a Barrel Shifter
+/// Rotates towards higher indexes by the provided offset. Implemented as a Barrel Shifter.
 ///
 /// Example: `RotateRight([1, 2, 3, 4], 1) == [4, 1, 2, 3]`
 module RotateRight#(T, int ARRAY_LEN) {

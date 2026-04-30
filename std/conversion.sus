@@ -86,7 +86,8 @@ __builtin__ module FromBits #(T) {
 }
 
 /// Bitwise conversion of T1 into T2. 
-/// sizeof#(T: type T1) == sizeof#(T: type T2)
+///
+/// Requires `sizeof#(T: type T1) == sizeof#(T: type T2)`
 module Transmute #(T1, T2) {
     interface Transmute : T1 a'0 -> T2 b'0
 

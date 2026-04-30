@@ -5,8 +5,12 @@
 ///
 /// Requires V > 0
 ///
+/// Examples:
+///
 /// `clog2 #(V: 15) = 4`
+/// 
 /// `clog2 #(V: 16) = 4`
+/// 
 /// `clog2 #(V: 17) = 5`
 __builtin__ const int clog2 #(int V) {}
 
@@ -34,6 +38,13 @@ __builtin__ const int min #(int A, int B) {}
 /// Compute the maximum of `A` and `B`
 __builtin__ const int max #(int A, int B) {}
 
+/// Compute the Absolute Value of the given integer. 
+///
+/// Examples:
+///
+/// `Abs(3) == 3`
+/// 
+/// `Abs(-7) == 7`
 module Abs #(int TO) {
 	interface Abs : int #(FROM: -TO+1, TO) a -> int #(FROM: 0, TO) o
 
