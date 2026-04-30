@@ -2,10 +2,10 @@
 /// Creates a One-Hot encoding of the given integer. 
 ///
 /// Examples:
-/// 
-/// `ToOneHot#(SIZE: 5)(3) == [false, false, false, true, false]`
-/// 
-/// `ToOneHot#(SIZE: 2)(0) == [true, false]`
+/// ```sus
+/// ToOneHot#(SIZE: 5)(3) == [false, false, false, true, false]
+/// ToOneHot#(SIZE: 2)(0) == [true, false]
+/// ```
 module ToOneHot #(int SIZE) {
 	interface ToOneHot : int#(FROM: 0, TO: SIZE - 1) selection'0 -> bool[SIZE] bits'0
 
@@ -64,10 +64,10 @@ module FindFirst #(int SIZE) {
 /// Counts the number of set ('1') bits in the bitstring. 
 ///
 /// Examples:
-/// 
-/// `PopCount([true, false, true, true, true]) == 4`
-/// 
-/// `PopCount(8'b00111011) == 5`
+/// ```sus
+/// PopCount([true, false, true, true, true]) == 4
+/// PopCount(8'b00111011) == 5
+/// ```
 module PopCount #(int SIZE) {
 	// Should be chosen based on what's most efficient for the target architecture
 	gen int BASE_CASE_SIZE = 6
@@ -106,7 +106,7 @@ module PopCount #(int SIZE) {
 
 
 /// Splits the given integer. The upper `[LOWER_BITS:]` bits are returned as upper, the lower `[:LOWER_BITS]` bits are returned in lower
-/// See also [BitwiseIntConcat]
+/// See also [BitwiseIntConcat].
 module BitwiseIntSplit #(int TO, int LOWER_BITS) {
     gen int UPPER_TO = (TO-1) / pow2#(E: LOWER_BITS) + 1
     interface BitwiseIntSplit :
@@ -122,7 +122,7 @@ module BitwiseIntSplit #(int TO, int LOWER_BITS) {
 }
 
 /// Recombines a lower and upper integer parts.
-/// See also [BitwiseIntSplit]
+/// See also [BitwiseIntSplit].
 module BitwiseIntConcat #(int UPPER_TO, int LOWER_BITS) {
     interface BitwiseIntConcat :
         int#(FROM: 0, TO: UPPER_TO) upper'0,
@@ -137,7 +137,7 @@ module BitwiseIntConcat #(int UPPER_TO, int LOWER_BITS) {
 }
 
 /// Sets the lower `[:LOWER_BITS]` bits to false, thus aligning the value
-/// Works for unsigned and signed integers alike
+/// Works for unsigned and signed integers alike.
 module AlignToPow2 #(int FROM, int TO, int LOWER_BITS) {
     gen int ALIGNED_FROM = FROM - (FROM mod clog2#(V: LOWER_BITS))
     gen int ALIGNED_TO = TO - (TO + 1 mod clog2#(V: LOWER_BITS))

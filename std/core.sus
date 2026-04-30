@@ -39,12 +39,11 @@ __builtin__ const bool assert #(bool C) {}
 /// Returns the size of the given type, in bits. 
 ///
 /// Examples:
-///
-/// `sizeof #(T: type bool) = 1`
-/// 
-/// `sizeof #(T: type bool[50]) = 50`
-/// 
-/// `sizeof #(T: type int[10][10]) = 3200`
+/// ```sus
+/// sizeof #(T: type bool) = 1
+/// sizeof #(T: type bool[50]) = 50
+/// sizeof #(T: type int[10][10]) = 3200
+/// ```
 __builtin__ const int sizeof #(T) {}
 
 /// `Result == V`, but this prevents this from being included in the inference parameters. 

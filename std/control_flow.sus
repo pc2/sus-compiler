@@ -52,7 +52,7 @@ module FixedSizeIterator #(int TO) {
 
 
 /// Allows us to update a blob of state with a pipelined update function
-/// update() may only be called if may_update, upon which may_update goes low for UPDATE_PIPELINE_DEPTH cycles
+/// `update()` may only be called if may_update, upon which may_update goes low for `UPDATE_PIPELINE_DEPTH` cycles
 module SlowState #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
     assert#(C: OLD_DELAY >= 0)
     gen int UPDATE_TOTAL_DEPTH = max#(A: OLD_DELAY, B: OLD_DELAY + NEW_DELAY)
@@ -228,7 +228,6 @@ module SlowPipelineBegin#(T, int PIPELINE_DEPTH) {
 /// }
 /// ```
 /// 
-///
 /// The order in which results arrive is not the same as the order of inputs, due to some taking more cycles to execute.
 module ParallelWhile #(int COMPUTATION_LATENCY, int REQUEST_DATA_LATENCY) {
     clock clk

@@ -75,19 +75,22 @@ __builtin__ const int BitsToIntGen #(int NUM_BITS, bool[NUM_BITS] BITS) {}
 __builtin__ const int BitsToUIntGen #(int NUM_BITS, bool[NUM_BITS] BITS) {}
 
 
-/// Bitwise conversion of type T to a sizeof#(T)-bit bitset. 
+/// Bitwise conversion of type `T` to a `sizeof#(T)`-bit bitset. 
 __builtin__ module ToBits #(T) {
     interface ToBits : T value'0 -> bool[sizeof #(T)] bits'0
 }
 
-/// Bitwise conversion of a sizeof#(T)-bit bitset to type T. 
+/// Bitwise conversion of a `sizeof#(T)`-bit bitset to type `T`. 
 __builtin__ module FromBits #(T) {
     interface FromBits : bool[sizeof #(T)] bits'0 -> T value'0
 }
 
 /// Bitwise conversion of T1 into T2. 
 ///
-/// Requires `sizeof#(T: type T1) == sizeof#(T: type T2)`
+/// Requires:
+/// ```sus
+/// sizeof#(T: type T1) == sizeof#(T: type T2)
+/// ```
 module Transmute #(T1, T2) {
     interface Transmute : T1 a'0 -> T2 b'0
 

@@ -66,7 +66,8 @@ module RotateLeft#(T, int ARRAY_LEN) {
 
 /// Rotates towards higher indexes by the provided offset. Implemented as a Barrel Shifter.
 ///
-/// Example: `RotateRight([1, 2, 3, 4], 1) == [4, 1, 2, 3]`
+/// Example:
+/// ```sus RotateRight([1, 2, 3, 4], 1) == [4, 1, 2, 3]```
 module RotateRight#(T, int ARRAY_LEN) {
     interface RotateRight : T[ARRAY_LEN] data'0, int#(FROM: 0, TO: ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0
 
