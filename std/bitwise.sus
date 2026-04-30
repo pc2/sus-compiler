@@ -20,13 +20,13 @@ module ToOneHot #(int SIZE) {
 ///
 /// Usage:
 /// ```sus
-/// FindFirst find_first_bit
+/// FirstSetBit find_first_bit
 /// find_first_bit.find([false, false, true, false, true])
 /// when find_first_bit.is_nonzero : int first_nonzero {
 ///     // Fires with `2`
 /// }
 /// ```
-module FindFirst #(int SIZE) {
+module FirstSetBit #(int SIZE) {
     trigger is_nonzero : int#(FROM: 0, TO: SIZE) first_nonzero'0
 	
     action find : bool[SIZE] bits'0 {
@@ -46,8 +46,8 @@ module FindFirst #(int SIZE) {
             // Split recursively
             gen int LEFT_SIZE = SIZE / 2
             
-            FindFirst left_part
-            FindFirst right_part
+            FirstSetBit left_part
+            FirstSetBit right_part
 
             left_part.find(bits[LEFT_SIZE:])
             right_part.find(bits[:LEFT_SIZE])
