@@ -185,6 +185,7 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated IntNarrowToZero #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated NegativeIntLiterals #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate WeirdlyNamedClock #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TwoDomainsWithLatRegs #()
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test.sus:26:6 ]
     │

@@ -1872,3 +1872,14 @@ module WeirdlyNamedClock {
 	state output bool y_st
 	y_st = y_i
 }
+
+module TwoDomainsWithLatRegs {
+	domain a
+	input bool a_i'9
+	reg reg reg output bool a_o = a_i
+	output bool a_o2'20 = a_i
+
+	domain b
+	input bool b_i'-20
+	output bool b_o = b_i
+}

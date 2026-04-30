@@ -167,7 +167,8 @@ impl<'g> CodeGenerationContext<'g> {
                 continue;
             }
             if matches!(port_wire.is_port, IsPort::Port(_, _)) {
-                self.add_latency_registers(port_wire_id, port_wire).unwrap();
+                self.add_latency_registers(port_wire, self.needed_untils[port_wire_id], "")
+                    .unwrap();
             }
         }
     }
@@ -203,13 +204,14 @@ impl<'g> CodeGenerationContext<'g> {
 
     fn add_latency_registers(
         &mut self,
-        wire_id: WireID,
         w: &RealWire,
+        needed_until: i64,
+        indent: &str,
     ) -> Result<(), std::fmt::Error> {
         assert!(!w.typ.is_zero_sized());
 
         // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it instantiates no registers
-        for i in w.absolute_latency.unwrap()..self.needed_untils[wire_id] {
+        for i in w.absolute_latency.unwrap()..needed_until {
             let from = self.wire_name_no_inling(w, AbsLat::new(i));
             let to = self.wire_name_no_inling(w, AbsLat::new(i + 1));
 
@@ -218,7 +220,7 @@ impl<'g> CodeGenerationContext<'g> {
             let clk_name = &self.instance.clocks[w.clock].name;
             writeln!(
                 self.program_text,
-                "/*latency*/ logic{to_decl}; always_ff @(posedge {clk_name}) begin {to} <= {from}; end"
+                "{indent}/*latency*/ logic{to_decl}; always_ff @(posedge {clk_name}) begin {to} <= {from}; end"
             ).unwrap();
         }
         Ok(())
@@ -691,7 +693,8 @@ impl<'g> CodeGenerationContext<'g> {
                     writeln!(self.program_text, "{decl_stm};").unwrap();
                 }
             }
-            self.add_latency_registers(wire_id, w).unwrap();
+            self.add_latency_registers(w, self.needed_untils[wire_id], "")
+                .unwrap();
         }
     }
 
@@ -1085,6 +1088,25 @@ impl<'g> CodeGenerationContext<'g> {
                     .unwrap(),
                 }
             }
+        }
+
+        let mut max_latency_per_domain = self.md.latency_domains.map(|_| i64::MIN);
+        for (_, port) in &self.instance.interface_ports {
+            let Some(port) = port else { continue };
+            let port_lat = port.absolute_latency.unwrap();
+            if port_lat > max_latency_per_domain[port.latency_domain] {
+                max_latency_per_domain[port.latency_domain] = port_lat;
+            }
+        }
+
+        writeln!(self.program_text, "\n\t// Latency Registers").unwrap();
+        for (_, port) in &self.instance.interface_ports {
+            let Some(port) = port else { continue };
+
+            let port_wire = &self.instance.wires[port.wire];
+            let needed_until = max_latency_per_domain[port.latency_domain];
+            self.add_latency_registers(port_wire, needed_until, "\t")
+                .unwrap();
         }
 
         writeln!(self.program_text, "\n\t// DUT").unwrap();

@@ -1,3 +1,47 @@
+// TwoDomainsWithLatRegs #()
+module TwoDomainsWithLatRegs(
+	/* clock */ input clk,
+	input wire a_i,
+	output /*mux_wire*/ logic a_o,
+	output /*mux_wire*/ logic a_o2,
+	input wire b_i,
+	output /*mux_wire*/ logic b_o
+);
+
+/*latency*/ logic _a_i_D10; always_ff @(posedge clk) begin _a_i_D10 <= a_i; end
+/*latency*/ logic _a_i_D11; always_ff @(posedge clk) begin _a_i_D11 <= _a_i_D10; end
+/*latency*/ logic _a_i_D12; always_ff @(posedge clk) begin _a_i_D12 <= _a_i_D11; end
+/*latency*/ logic _a_i_D13; always_ff @(posedge clk) begin _a_i_D13 <= _a_i_D12; end
+/*latency*/ logic _a_i_D14; always_ff @(posedge clk) begin _a_i_D14 <= _a_i_D13; end
+/*latency*/ logic _a_i_D15; always_ff @(posedge clk) begin _a_i_D15 <= _a_i_D14; end
+/*latency*/ logic _a_i_D16; always_ff @(posedge clk) begin _a_i_D16 <= _a_i_D15; end
+/*latency*/ logic _a_i_D17; always_ff @(posedge clk) begin _a_i_D17 <= _a_i_D16; end
+/*latency*/ logic _a_i_D18; always_ff @(posedge clk) begin _a_i_D18 <= _a_i_D17; end
+/*latency*/ logic _a_i_D19; always_ff @(posedge clk) begin _a_i_D19 <= _a_i_D18; end
+/*latency*/ logic _a_i_D20; always_ff @(posedge clk) begin _a_i_D20 <= _a_i_D19; end
+always_comb begin // combinatorial a_o
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	a_o = 1'bx;
+	a_o = _a_i_D12;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	a_o = a_o;
+end
+always_comb begin // combinatorial a_o2
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	a_o2 = 1'bx;
+	a_o2 = _a_i_D20;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	a_o2 = a_o2;
+end
+always_comb begin // combinatorial b_o
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	b_o = 1'bx;
+	b_o = b_i;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	b_o = b_o;
+end
+endmodule // TwoDomainsWithLatRegs #()
+
 // NegativeIntLiterals #()
 module NegativeIntLiterals(
 	/* clock */ input clk
