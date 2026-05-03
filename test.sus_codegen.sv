@@ -1,3 +1,40 @@
+// PositiveAndNegativeLatencyOffset #()
+module PositiveAndNegativeLatencyOffset(
+	/* clock */ input clk
+);
+
+LatencyOffset_T_type_bool_OFFSET_3 pos(
+	.clk(clk),
+	.din(),
+	.dout()
+);
+LatencyOffset_T_type_bool_OFFSET_N3 neg(
+	.clk(clk),
+	.din(),
+	.dout()
+);
+endmodule // PositiveAndNegativeLatencyOffset #()
+
+// LatencyOffset #(T: type bool #(), OFFSET: -3)
+module LatencyOffset_T_type_bool_OFFSET_N3(
+	/* clock */ input clk,
+	input wire din,
+	output /*mux_wire*/ logic dout
+);
+
+	assign dout = din;
+endmodule // LatencyOffset #(T: type bool #(), OFFSET: -3)
+
+// LatencyOffset #(T: type bool #(), OFFSET: 3)
+module LatencyOffset_T_type_bool_OFFSET_3(
+	/* clock */ input clk,
+	input wire din,
+	output /*mux_wire*/ logic dout
+);
+
+	assign dout = din;
+endmodule // LatencyOffset #(T: type bool #(), OFFSET: 3)
+
 // TwoDomainsWithLatRegs #()
 module TwoDomainsWithLatRegs(
 	/* clock */ input clk,
