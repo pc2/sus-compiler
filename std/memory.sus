@@ -35,8 +35,8 @@ module RAM_Unbalanced #(ElemT, int DEPTH, int WRITE_SIZE, int READ_SIZE) {
     gen int WRITE_WIDTH = WRITE_SIZE * ELEM_WIDTH
     gen int READ_WIDTH = READ_SIZE * ELEM_WIDTH
     gen int MEMORY_WIDTH = max#(A: WRITE_WIDTH, B: READ_WIDTH)
-    gen int NUM_WRITE_SEGMENTS = MEMORY_WIDTH / WRITE_SIZE
-    gen int NUM_READ_SEGMENTS = MEMORY_WIDTH / READ_SIZE
+    gen int NUM_WRITE_SEGMENTS = MEMORY_WIDTH / WRITE_SIZE / ELEM_WIDTH
+    gen int NUM_READ_SEGMENTS = MEMORY_WIDTH / READ_SIZE / ELEM_WIDTH
     
     gen int MEMORY_DEPTH = DEPTH / (MEMORY_WIDTH / ELEM_WIDTH)
     
@@ -66,7 +66,7 @@ module RAM_Unbalanced #(ElemT, int DEPTH, int WRITE_SIZE, int READ_SIZE) {
         reg bool[MEMORY_WIDTH] rd_data = mem[read_row]
         bool[READ_WIDTH][NUM_READ_SEGMENTS] segments
         for int RD_SEGMENT in 0..NUM_READ_SEGMENTS {
-            segments[RD_SEGMENT] = rd_data[RD_SEGMENT * WRITE_WIDTH +: WRITE_WIDTH]
+            segments[RD_SEGMENT] = rd_data[RD_SEGMENT * READ_WIDTH +: READ_WIDTH]
         }
         read_data = FromBits(segments[selected_read_segment])
 	}
