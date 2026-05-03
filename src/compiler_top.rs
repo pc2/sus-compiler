@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
 use std::cell::OnceCell;
+use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -327,5 +328,26 @@ impl Linker {
         }
         self.instantiator
             .instantiate_tops(&self.globals, &self.files, tops);
+
+        self.assert_no_duplicate_names();
+    }
+
+    pub fn assert_no_duplicate_names(&self) {
+        let mut all_names_hashmap = HashMap::new();
+        for (_, inst) in self.instantiator.iter() {
+            if inst.errors.did_error {
+                // Duplicate modules would still have the same name. Checking for duplicates in non-error modules because duplication only interferes with codegen
+                continue;
+            }
+            if let Some(existing_inst) = all_names_hashmap.insert(&inst.mangled_name, inst) {
+                // It's a duplicate!
+                fatal_exit!(
+                    "Duplicate mangled name, of '{}' and '{}' ({})",
+                    inst.name,
+                    existing_inst.name,
+                    inst.mangled_name
+                );
+            }
+        }
     }
 }

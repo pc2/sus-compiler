@@ -184,7 +184,7 @@ IntNarrow_FROM_I_5_TO_I_6_FROM_0_TO_1 IntNarrow(
 	.din(_IntNarrow_din)
 	// (zero sized port) .dout(_IntNarrow_dout)
 );
-IntNarrow_FROM_I_0_TO_I_1_FROM_3_TO_6 IntNarrow_2(
+IntNarrow_FROM_I_0_TO_I_1_FROM_N3_TO_6 IntNarrow_2(
 	.clk(clk),
 	// (zero sized port) .din(_IntNarrow_2_din)
 	.dout(_IntNarrow_2_dout)
@@ -202,7 +202,7 @@ end
 endmodule // IntNarrowToZero #()
 
 // IntNarrow #(FROM_I: 0, TO_I: 1, FROM: -3, TO: 6)
-module IntNarrow_FROM_I_0_TO_I_1_FROM_3_TO_6(
+module IntNarrow_FROM_I_0_TO_I_1_FROM_N3_TO_6(
 	/* clock */ input clk,
 	// (zero sized) input din
 	output /*mux_wire*/ logic signed[3:0] dout
@@ -1775,7 +1775,7 @@ wire _inf_y;
 /*latency*/ logic __inf_y_N1; always_ff @(posedge clk) begin __inf_y_N1 <= __inf_y_N2; end
 /*mux_wire*/ logic _inf_p;
 wire _inf_q;
-infer_me_with_delta_V_31 inf(
+infer_me_with_delta_V_N31 inf(
 	.clk(clk),
 	.x(_inf_x),
 	.y(_inf_y),
@@ -1807,7 +1807,7 @@ end
 endmodule // use_infer_me_with_delta #()
 
 // infer_me_with_delta #(V: -31)
-module infer_me_with_delta_V_31(
+module infer_me_with_delta_V_N31(
 	/* clock */ input clk,
 	input wire x,
 	output /*mux_wire*/ logic y,
@@ -2125,7 +2125,7 @@ wire[4:0] _24;
 assign _24 = read_addr + 1'd1;
 wire[4:0] _25;
 assign _25 = (_24 == 30) ? 0 : _24; // == mod 30
-LatencyOffset_T_type_bool_OFFSET_9 LatencyOffset(
+LatencyOffset_T_type_bool_OFFSET_N9 LatencyOffset(
 	.clk(clk),
 	.din(_LatencyOffset_din),
 	.dout(_LatencyOffset_dout)
@@ -2220,7 +2220,7 @@ assign bits = value;
 endmodule // ToBits #(T: type int #(FROM: 0, TO: 6))
 
 // LatencyOffset #(T: type bool #(), OFFSET: -9)
-module LatencyOffset_T_type_bool_OFFSET_9(
+module LatencyOffset_T_type_bool_OFFSET_N9(
 	/* clock */ input clk,
 	input wire din,
 	output /*mux_wire*/ logic dout

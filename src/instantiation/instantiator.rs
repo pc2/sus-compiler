@@ -246,6 +246,9 @@ fn mangle_name(str: &str) -> String {
         if c.is_alphanumeric() {
             result.push(c);
             last_was_underscore = false;
+        } else if c == '-' {
+            result.push('N');
+            last_was_underscore = false;
         } else {
             // Max 1 underscore at a time, as some tools don't like it (#128)
             if !last_was_underscore {

@@ -1883,3 +1883,8 @@ module TwoDomainsWithLatRegs {
 	input bool b_i'-20
 	output bool b_o = b_i
 }
+
+module PositiveAndNegativeLatencyOffset {
+	LatencyOffset#(T: type bool, OFFSET: 3) pos
+	LatencyOffset#(T: type bool, OFFSET: -3) neg
+}
