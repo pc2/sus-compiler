@@ -1199,7 +1199,7 @@ impl ConcreteType {
                     {
                         return format!("[{sz}:0] {name}{array_string}");
                     }
-                    write!(array_string, "[{sz}:0]").unwrap();
+                    write!(array_string, "[0:{sz}]").unwrap();
                     typ = content_typ;
                 }
             }

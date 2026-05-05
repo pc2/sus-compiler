@@ -944,29 +944,29 @@ module TestZerosArrays(
 genvar _g0;
 // (zero sized) zeros
 // (zero sized) _1
-/*mux_wire*/ logic signed[3:0] vs[1:0];
+/*mux_wire*/ logic signed[3:0] vs[0:1];
 // (zero sized) _2
 // (zero sized) _ReceiveZerosArray_values
 // (zero sized) _3
 // (zero sized) manyzeros
-/*mux_wire*/ logic[3:0] nums[1:0];
-localparam[3:0] _5[1:0] = '{4'd5, 4'd9};
-/*mux_wire*/ logic[3:0] sums[1:0];
+/*mux_wire*/ logic[3:0] nums[0:1];
+localparam[3:0] _5[0:1] = '{4'd5, 4'd9};
+/*mux_wire*/ logic[3:0] sums[0:1];
 // (zero sized) _7
-wire[3:0] _8[1:0];
+wire[3:0] _8[0:1];
 generate
 for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
 assign _8[_g0] = nums[_g0] + 1'd0;
 end
 endgenerate
-wire[3:0] _10[1:0];
+wire[3:0] _10[0:1];
 generate
 for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
 assign _10[_g0] = _8[_g0] + 1'd0;
 end
 endgenerate
 // (zero sized) _11
-wire[3:0] _12[1:0];
+wire[3:0] _12[0:1];
 generate
 for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
 assign _12[_g0] = _10[_g0] + 1'd0;
@@ -1022,7 +1022,7 @@ endmodule // TestGenArrayOps #()
 module ModuleWithInitialStates(
 	/* clock */ input clk,
 	output /*state*/ logic[4:0] O = 5'bx10xx,
-	output /*state*/ logic[1:0] X[1:0] = '{2'd1, 2'd2}
+	output /*state*/ logic[1:0] X[0:1] = '{2'd1, 2'd2}
 );
 
 /*state*/ logic[4:0] A = 5'bx1xxx;
@@ -1416,11 +1416,11 @@ module check_non_inlineds(
 	/* clock */ input clk
 );
 
-/*mux_wire*/ logic[31:0] fs[4:0];
-localparam[31:0] floats[4:0] = '{32'h3e99999a /* 0.3 */, 32'h3ecccccd /* 0.4 */, 32'h3e4ccccd /* 0.2 */, 32'h3e99999a /* 0.3 */, 32'h3f000000 /* 0.5 */};
+/*mux_wire*/ logic[31:0] fs[0:4];
+localparam[31:0] floats[0:4] = '{32'h3e99999a /* 0.3 */, 32'h3ecccccd /* 0.4 */, 32'h3e4ccccd /* 0.2 */, 32'h3e99999a /* 0.3 */, 32'h3f000000 /* 0.5 */};
 /*mux_wire*/ logic[1:0] y;
 /*mux_wire*/ logic[31:0] x;
-localparam[31:0] floats_2[4:0] = '{32'h3e99999a /* 0.3 */, 32'h3ecccccd /* 0.4 */, 32'h3e4ccccd /* 0.2 */, 32'h3e99999a /* 0.3 */, 32'h3f000000 /* 0.5 */};
+localparam[31:0] floats_2[0:4] = '{32'h3e99999a /* 0.3 */, 32'h3ecccccd /* 0.4 */, 32'h3e4ccccd /* 0.2 */, 32'h3e99999a /* 0.3 */, 32'h3f000000 /* 0.5 */};
 wire[31:0] _3 = floats_2[y];
 always_comb begin // combinatorial fs
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -1448,8 +1448,8 @@ module float_literal(
 
 /*mux_wire*/ logic[31:0] ff;
 /*mux_wire*/ logic[31:0] fff;
-/*mux_wire*/ logic[31:0] many_floats[4:0];
-localparam[31:0] _2[4:0] = '{32'h3f333333 /* 0.7 */, 32'h3f666666 /* 0.9 */, 32'hbf333333 /* -0.7 */, 32'hbf666666 /* -0.9 */, 32'h3dcccccd /* 0.1 */};
+/*mux_wire*/ logic[31:0] many_floats[0:4];
+localparam[31:0] _2[0:4] = '{32'h3f333333 /* 0.7 */, 32'h3f666666 /* 0.9 */, 32'hbf333333 /* -0.7 */, 32'hbf666666 /* -0.9 */, 32'h3dcccccd /* 0.1 */};
 always_comb begin // combinatorial ff
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	ff = 'x;
@@ -1474,11 +1474,11 @@ module multi_slice_reverse(
 	/* clock */ input clk,
 	input wire[4:0] a,
 	input wire[4:0] b,
-	input wire[19:0] slice[8:0],
-	input wire[1:0] slice2[26:0],
-	input wire[4:0] gen_partselect[8:0],
-	input wire[1:0] partselect[2:0],
-	output /*mux_wire*/ logic[19:0] matrix[29:0]
+	input wire[19:0] slice[0:8],
+	input wire[1:0] slice2[0:26],
+	input wire[4:0] gen_partselect[0:8],
+	input wire[1:0] partselect[0:2],
+	output /*mux_wire*/ logic[19:0] matrix[0:29]
 );
 
 always_comb begin // combinatorial matrix
@@ -1510,18 +1510,18 @@ endmodule // multi_slice_reverse #()
 // multi_slice #()
 module multi_slice(
 	/* clock */ input clk,
-	input wire[19:0] matrix[29:0],
+	input wire[19:0] matrix[0:29],
 	input wire[4:0] a,
 	input wire[4:0] b,
-	output /*mux_wire*/ logic[19:0] slice[8:0],
-	output /*mux_wire*/ logic[1:0] slice2[26:0],
-	output /*mux_wire*/ logic[4:0] gen_partselect[8:0],
-	output /*mux_wire*/ logic[1:0] partselect[2:0]
+	output /*mux_wire*/ logic[19:0] slice[0:8],
+	output /*mux_wire*/ logic[1:0] slice2[0:26],
+	output /*mux_wire*/ logic[4:0] gen_partselect[0:8],
+	output /*mux_wire*/ logic[1:0] partselect[0:2]
 );
 
 genvar _g0;
 genvar _g1;
-wire[19:0] _1[8:0];
+wire[19:0] _1[0:8];
 generate
 for(_g0 = 0; _g0 < 9; _g0 = _g0 + 1) begin
 for(_g1 = 0; _g1 < 20; _g1 = _g1 + 1) begin
@@ -1529,7 +1529,7 @@ assign _1[_g0][_g1] = matrix[_g0][_g1];
 end
 end
 endgenerate
-wire[1:0] _2[26:0];
+wire[1:0] _2[0:26];
 generate
 for(_g0 = 0; _g0 < 27; _g0 = _g0 + 1) begin
 for(_g1 = 0; _g1 < 2; _g1 = _g1 + 1) begin
@@ -1537,7 +1537,7 @@ assign _2[_g0][_g1] = matrix[3 + _g0][4 + _g1];
 end
 end
 endgenerate
-wire[4:0] _3[8:0];
+wire[4:0] _3[0:8];
 generate
 for(_g0 = 0; _g0 < 9; _g0 = _g0 + 1) begin
 for(_g1 = 0; _g1 < 5; _g1 = _g1 + 1) begin
@@ -1545,7 +1545,7 @@ assign _3[_g0][_g1] = matrix[3 + _g0][7 + _g1];
 end
 end
 endgenerate
-wire[1:0] _6[2:0];
+wire[1:0] _6[0:2];
 generate
 for(_g0 = 0; _g0 < 3; _g0 = _g0 + 1) begin
 for(_g1 = 0; _g1 < 2; _g1 = _g1 + 1) begin
@@ -1665,8 +1665,8 @@ module testInts(
 	/* clock */ input clk
 );
 
-/*mux_wire*/ logic[2:0] vs[4:0];
-localparam[2:0] _1[4:0] = '{3'd1, 3'd2, 3'd3, 3'd4, 3'd5};
+/*mux_wire*/ logic[2:0] vs[0:4];
+localparam[2:0] _1[0:4] = '{3'd1, 3'd2, 3'd3, 3'd4, 3'd5};
 always_comb begin // combinatorial vs
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	vs = '{3'dx, 3'dx, 3'dx, 3'dx, 3'dx};
@@ -1869,13 +1869,13 @@ endmodule // infer_me_with_delta #(V: -31)
 // testArrayWrite #()
 module testArrayWrite(
 	/* clock */ input clk,
-	input wire signed[3:0] in_arr[1:0][5:0][9:0],
-	output /*mux_wire*/ logic signed[3:0] out_arr[5:0][9:0]
+	input wire signed[3:0] in_arr[0:1][0:5][0:9],
+	output /*mux_wire*/ logic signed[3:0] out_arr[0:5][0:9]
 );
 
 genvar _g0;
 genvar _g1;
-wire signed[3:0] _1[5:0][9:0];
+wire signed[3:0] _1[0:5][0:9];
 generate
 for(_g0 = 0; _g0 < 6; _g0 = _g0 + 1) begin
 for(_g1 = 0; _g1 < 10; _g1 = _g1 + 1) begin
@@ -2130,7 +2130,7 @@ module FIFO_T_type_int_FROM_0_TO_6_DEPTH_30_MAY_PUSH_LATENCY_8(
 );
 
 /*latency*/ logic _pop_D1; always_ff @(posedge clk) begin _pop_D1 <= pop; end
-/*state*/ logic[2:0] mem[29:0];
+/*state*/ logic[2:0] mem[0:29];
 /*state*/ logic[4:0] read_addr;
 /*state*/ logic[4:0] write_addr;
 /*mux_wire*/ logic[4:0] space_remaining;
@@ -2379,9 +2379,9 @@ module numbersToAddUp(
 	/* clock */ input clk
 );
 
-/*mux_wire*/ logic[1:0] arr[4:0];
+/*mux_wire*/ logic[1:0] arr[0:4];
 /*mux_wire*/ logic[3:0] total;
-/*mux_wire*/ logic[1:0] _adder_values[4:0];
+/*mux_wire*/ logic[1:0] _adder_values[0:4];
 wire[3:0] _adder_total;
 TreeAdd_WIDTH_5_FROM_3_TO_4 adder(
 	.clk(clk),
@@ -2414,29 +2414,29 @@ endmodule // numbersToAddUp #()
 // TreeAdd #(WIDTH: 5, FROM: 3, TO: 4)
 module TreeAdd_WIDTH_5_FROM_3_TO_4(
 	/* clock */ input clk,
-	input wire[1:0] values[4:0],
+	input wire[1:0] values[0:4],
 	output /*mux_wire*/ logic[3:0] total
 );
 
 genvar _g0;
 /*mux_wire*/ logic[2:0] left_total;
 /*latency*/ logic[2:0] _left_total_D2; always_ff @(posedge clk) begin _left_total_D2 <= left_total; end
-wire[1:0] _1[1:0];
+wire[1:0] _1[0:1];
 generate
 for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
 assign _1[_g0] = values[_g0];
 end
 endgenerate
-/*mux_wire*/ logic[1:0] _TreeAdd_values[1:0];
+/*mux_wire*/ logic[1:0] _TreeAdd_values[0:1];
 wire[2:0] _TreeAdd_total;
 /*mux_wire*/ logic[3:0] right_total;
-wire[1:0] _2[2:0];
+wire[1:0] _2[0:2];
 generate
 for(_g0 = 0; _g0 < 3; _g0 = _g0 + 1) begin
 assign _2[_g0] = values[2 + _g0];
 end
 endgenerate
-/*mux_wire*/ logic[1:0] _TreeAdd_2_values[2:0];
+/*mux_wire*/ logic[1:0] _TreeAdd_2_values[0:2];
 wire[3:0] _TreeAdd_2_total;
 wire[3:0] _5;
 assign _5 = _left_total_D2 + right_total;
@@ -2485,7 +2485,7 @@ endmodule // TreeAdd #(WIDTH: 5, FROM: 3, TO: 4)
 // TreeAdd #(WIDTH: 3, FROM: 3, TO: 4)
 module TreeAdd_WIDTH_3_FROM_3_TO_4(
 	/* clock */ input clk,
-	input wire[1:0] values[2:0],
+	input wire[1:0] values[0:2],
 	output /*mux_wire*/ logic[3:0] total
 );
 
@@ -2501,13 +2501,13 @@ endgenerate
 /*mux_wire*/ logic[1:0] _TreeAdd_values[0:0];
 wire[1:0] _TreeAdd_total;
 /*mux_wire*/ logic[2:0] right_total;
-wire[1:0] _2[1:0];
+wire[1:0] _2[0:1];
 generate
 for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
 assign _2[_g0] = values[1 + _g0];
 end
 endgenerate
-/*mux_wire*/ logic[1:0] _TreeAdd_2_values[1:0];
+/*mux_wire*/ logic[1:0] _TreeAdd_2_values[0:1];
 wire[2:0] _TreeAdd_2_total;
 wire[3:0] _5;
 assign _5 = _left_total_D1 + right_total;
@@ -2556,7 +2556,7 @@ endmodule // TreeAdd #(WIDTH: 3, FROM: 3, TO: 4)
 // TreeAdd #(WIDTH: 2, FROM: 3, TO: 4)
 module TreeAdd_WIDTH_2_FROM_3_TO_4(
 	/* clock */ input clk,
-	input wire[1:0] values[1:0],
+	input wire[1:0] values[0:1],
 	output /*mux_wire*/ logic[2:0] total
 );
 
@@ -2662,11 +2662,11 @@ module use_permute(
 	/* clock */ input clk
 );
 
-/*mux_wire*/ logic[19:0] inArr[1:0];
-/*mux_wire*/ logic[2:0] beep[7:0];
-/*mux_wire*/ logic[2:0] _permut_d_in[7:0];
-wire[2:0] _permut_d_out[7:0];
-localparam[2:0] SOURCES[7:0] = '{3'd3, 3'd2, 3'd4, 3'd5, 3'd1, 3'd2, 3'd7, 3'd6};
+/*mux_wire*/ logic[19:0] inArr[0:1];
+/*mux_wire*/ logic[2:0] beep[0:7];
+/*mux_wire*/ logic[2:0] _permut_d_in[0:7];
+wire[2:0] _permut_d_out[0:7];
+localparam[2:0] SOURCES[0:7] = '{3'd3, 3'd2, 3'd4, 3'd5, 3'd1, 3'd2, 3'd7, 3'd6};
 permute_t_T_type_int_FROM_1_TO_8_SIZE_8_SOURCES_3_2_4_5_1_2_7_6 permut(
 	.clk(clk),
 	.d_in(_permut_d_in),
@@ -2697,8 +2697,8 @@ endmodule // use_permute #()
 // permute_t #(T: type int #(FROM: 1, TO: 8), SIZE: 8, SOURCES: [3, 2, 4, 5, 1, 2, 7, 6])
 module permute_t_T_type_int_FROM_1_TO_8_SIZE_8_SOURCES_3_2_4_5_1_2_7_6(
 	/* clock */ input clk,
-	input wire[2:0] d_in[7:0],
-	output /*mux_wire*/ logic[2:0] d_out[7:0]
+	input wire[2:0] d_in[0:7],
+	output /*mux_wire*/ logic[2:0] d_out[0:7]
 );
 
 wire[2:0] _1 = d_in[3];
@@ -2805,8 +2805,8 @@ endmodule // offset_backwards #()
 // cross_memory #()
 module cross_memory(
 	/* clock */ input clk,
-	input wire[19:0] i[511:0],
-	output /*mux_wire*/ logic[19:0] o[511:0]
+	input wire[19:0] i[0:511],
+	output /*mux_wire*/ logic[19:0] o[0:511]
 );
 
 always_comb begin // combinatorial o
@@ -4214,12 +4214,12 @@ endmodule // module_taking_a_lot_of_time #()
 // matrix_vector_mul #()
 module matrix_vector_mul(
 	/* clock */ input clk,
-	input wire[6:0] mat[3:0][5:0],
-	input wire[6:0] vec[3:0],
-	output /*mux_wire*/ logic[15:0] result[5:0]
+	input wire[6:0] mat[0:3][0:5],
+	input wire[6:0] vec[0:3],
+	output /*mux_wire*/ logic[15:0] result[0:5]
 );
 
-/*mux_wire*/ logic[13:0] row_products[3:0];
+/*mux_wire*/ logic[13:0] row_products[0:3];
 wire[6:0] _1 = mat[0][0];
 wire[6:0] _2 = vec[0];
 wire[13:0] _3;
@@ -4241,7 +4241,7 @@ always_comb begin
 	_14 = 0;
 	for(int _v0 = 0; _v0 < 4; _v0 += 1) _14 += row_products[_v0];
 end
-/*mux_wire*/ logic[13:0] row_products_2[3:0];
+/*mux_wire*/ logic[13:0] row_products_2[0:3];
 wire[6:0] _15 = mat[0][1];
 wire[6:0] _16 = vec[0];
 wire[13:0] _17;
@@ -4263,7 +4263,7 @@ always_comb begin
 	_28 = 0;
 	for(int _v0 = 0; _v0 < 4; _v0 += 1) _28 += row_products_2[_v0];
 end
-/*mux_wire*/ logic[13:0] row_products_3[3:0];
+/*mux_wire*/ logic[13:0] row_products_3[0:3];
 wire[6:0] _29 = mat[0][2];
 wire[6:0] _30 = vec[0];
 wire[13:0] _31;
@@ -4285,7 +4285,7 @@ always_comb begin
 	_42 = 0;
 	for(int _v0 = 0; _v0 < 4; _v0 += 1) _42 += row_products_3[_v0];
 end
-/*mux_wire*/ logic[13:0] row_products_4[3:0];
+/*mux_wire*/ logic[13:0] row_products_4[0:3];
 wire[6:0] _43 = mat[0][3];
 wire[6:0] _44 = vec[0];
 wire[13:0] _45;
@@ -4307,7 +4307,7 @@ always_comb begin
 	_56 = 0;
 	for(int _v0 = 0; _v0 < 4; _v0 += 1) _56 += row_products_4[_v0];
 end
-/*mux_wire*/ logic[13:0] row_products_5[3:0];
+/*mux_wire*/ logic[13:0] row_products_5[0:3];
 wire[6:0] _57 = mat[0][4];
 wire[6:0] _58 = vec[0];
 wire[13:0] _59;
@@ -4329,7 +4329,7 @@ always_comb begin
 	_70 = 0;
 	for(int _v0 = 0; _v0 < 4; _v0 += 1) _70 += row_products_5[_v0];
 end
-/*mux_wire*/ logic[13:0] row_products_6[3:0];
+/*mux_wire*/ logic[13:0] row_products_6[0:3];
 wire[6:0] _71 = mat[0][5];
 wire[6:0] _72 = vec[0];
 wire[13:0] _73;
@@ -4637,8 +4637,8 @@ endmodule // first_bit_idx_6 #()
 // add_indices_to_array #()
 module add_indices_to_array(
 	/* clock */ input clk,
-	input wire[6:0] values[9:0],
-	output /*mux_wire*/ logic[6:0] added_values[9:0]
+	input wire[6:0] values[0:9],
+	output /*mux_wire*/ logic[6:0] added_values[0:9]
 );
 
 /*mux_wire*/ logic[6:0] t;
@@ -4750,12 +4750,12 @@ endmodule // add_indices_to_array #()
 // Unpack4 #()
 module Unpack4(
 	/* clock */ input clk,
-	input wire[6:0] packed_1[3:0],
+	input wire[6:0] packed_1[0:3],
 	output /*mux_wire*/ logic[6:0] out_stream
 );
 
 /*state*/ logic[1:0] st = 2'd0;
-/*state*/ logic[6:0] stored_packed[2:0];
+/*state*/ logic[6:0] stored_packed[0:2];
 wire _2;
 assign _2 = st == 1'd0;
 wire[6:0] _3 = packed_1[0];
@@ -4860,7 +4860,7 @@ endmodule // Accumulator #()
 // Tree_Multiply #()
 module Tree_Multiply(
 	/* clock */ input clk,
-	input wire[6:0] values[3:0],
+	input wire[6:0] values[0:3],
 	output /*mux_wire*/ logic[26:0] total
 );
 
@@ -5055,7 +5055,7 @@ endmodule // multiply_add #()
 // example_md #()
 module example_md(
 	/* clock */ input clk,
-	input wire[6:0] factors[3:0],
+	input wire[6:0] factors[0:3],
 	input wire[6:0] add_to,
 	output /*mux_wire*/ logic[26:0] product,
 	output /*mux_wire*/ logic[26:0] total
