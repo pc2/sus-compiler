@@ -1,0 +1,136 @@
+
+
+module TestVectorGenerator#(int SIZE, int[SIZE] LEFTS, int[SIZE] RIGHTS, int[SIZE] RESULTS) {
+
+    state int#(FROM: 0, TO: SIZE) cur = 0
+
+    trigger case'0 : int left'0, int right'0, int expected'0
+
+    when cur < SIZE - 1 {
+        case(LEFTS[cur], RIGHTS[cur], RESULTS[cur])
+        cur = cur + 1 mod SIZE
+    }
+}
+
+extern module assert_eq_int#(string ID) {
+    action assert_eq_int'0 : 
+        int#(FROM: -pow2#(E: 31), TO: pow2#(E: 31)) found'0,
+        int#(FROM: -pow2#(E: 31), TO: pow2#(E: 31)) expected'0 {}
+}
+
+extern module assert_eq_bools#(string ID, int BITWIDTH) {
+    input bool activate'0
+    input int#(FROM: 0, TO: 1 << 32) idx'0
+    input bool[BITWIDTH] found'0
+    input bool[BITWIDTH] expected'0
+}
+
+module assert_eq#(T, string ID) {
+    assert_eq_bools#(ID) asserter
+    action assert_eq'0 : int#(FROM: 0, TO: 1 << 32) idx'0, T found'0, T expected'0 {
+        asserter.activate = true
+        asserter.found = ToBits(found)
+        asserter.idx = idx
+        asserter.expected = ToBits(expected)
+    } else {
+        asserter.activate = false
+    }
+}
+
+module TestBools {
+    gen int SIZE = 6
+    gen bool[SIZE] GEN_VALUES = [false, true, false, false, true, true]
+    bool[SIZE] non_gen_values = GEN_VALUES
+    bool[SIZE] per_idx
+    for int I in 0..SIZE {
+        per_idx[I] = GEN_VALUES[I]
+    }
+    bool[SIZE] array_concat = [per_idx[0], per_idx[1], per_idx[2], per_idx[3], per_idx[4], per_idx[5]]
+
+    for int COMPTIME_IDX in 0..SIZE {
+        int runtime_idx = COMPTIME_IDX
+        assert_eq#(ID: "Bool Gen[Gen]/NonGen[Gen]")(COMPTIME_IDX, GEN_VALUES[COMPTIME_IDX], non_gen_values[COMPTIME_IDX])
+        assert_eq#(ID: "Bool Gen[Gen]/NonGen[NonGen]")(COMPTIME_IDX, GEN_VALUES[COMPTIME_IDX], non_gen_values[runtime_idx])
+        assert_eq#(ID: "Bool Gen[Gen]/Gen[NonGen]")(COMPTIME_IDX, GEN_VALUES[COMPTIME_IDX], GEN_VALUES[runtime_idx])
+    }
+}
+
+module TestUnsignedInts {
+    gen int SIZE = 6
+    gen int[SIZE] GEN_VALUES = [0, 5, 3, 4, 9, 2]
+    int[SIZE] non_gen_values = GEN_VALUES
+    int[SIZE] per_idx
+    for int I in 0..SIZE {
+        per_idx[I] = GEN_VALUES[I]
+    }
+    int[SIZE] array_concat = [per_idx[0], per_idx[1], per_idx[2], per_idx[3], per_idx[4], per_idx[5]]
+
+    for int COMPTIME_IDX in 0..SIZE {
+        int runtime_idx = COMPTIME_IDX
+        assert_eq#(ID: "Unsigned Ints Gen[Gen]/NonGen[Gen]")(COMPTIME_IDX, GEN_VALUES[COMPTIME_IDX], non_gen_values[COMPTIME_IDX])
+        assert_eq#(ID: "Unsigned Ints Gen[Gen]/NonGen[NonGen]")(COMPTIME_IDX, GEN_VALUES[COMPTIME_IDX], non_gen_values[runtime_idx])
+        assert_eq#(ID: "Unsigned Ints Gen[Gen]/Gen[NonGen]")(COMPTIME_IDX, GEN_VALUES[COMPTIME_IDX], GEN_VALUES[runtime_idx])
+    }
+}
+
+module TestSignedInts {
+    gen int SIZE = 6
+    gen int[SIZE] GEN_VALUES = [0, -5, 3, -4, 9, 2]
+    int[SIZE] non_gen_values = GEN_VALUES
+    int[SIZE] per_idx
+    for int I in 0..SIZE {
+        per_idx[I] = GEN_VALUES[I]
+    }
+    int[SIZE] array_concat = [per_idx[0], per_idx[1], per_idx[2], per_idx[3], per_idx[4], per_idx[5]]
+
+    for int COMPTIME_IDX in 0..SIZE {
+        int runtime_idx = COMPTIME_IDX
+        assert_eq#(ID: "Signed Ints Gen[Gen]/NonGen[Gen]")(COMPTIME_IDX, GEN_VALUES[COMPTIME_IDX], non_gen_values[COMPTIME_IDX])
+        assert_eq#(ID: "Signed Ints Gen[Gen]/NonGen[NonGen]")(COMPTIME_IDX, GEN_VALUES[COMPTIME_IDX], non_gen_values[runtime_idx])
+        assert_eq#(ID: "Signed Ints Gen[Gen]/Gen[NonGen]")(COMPTIME_IDX, GEN_VALUES[COMPTIME_IDX], GEN_VALUES[runtime_idx])
+    }
+}
+
+module TestBoolArrs {
+    gen int SIZE = 6
+    gen bool[2][SIZE] GEN_VALUES = [[true, false], [true, true], [false, false], [false, true], [true, true], [true, true]]
+    bool[2][SIZE] non_gen_values = GEN_VALUES
+    bool[2][SIZE] per_idx
+    for int I in 0..SIZE {
+        per_idx[I] = GEN_VALUES[I]
+    }
+    bool[2][SIZE] array_concat = [per_idx[0], per_idx[1], per_idx[2], per_idx[3], per_idx[4], per_idx[5]]
+
+    for int COMPTIME_IDX in 0..SIZE {
+        int runtime_idx = COMPTIME_IDX
+        assert_eq#(ID: "Bool[] Gen[Gen]/NonGen[Gen]")(COMPTIME_IDX, GEN_VALUES[COMPTIME_IDX], non_gen_values[COMPTIME_IDX])
+        assert_eq#(ID: "Bool[] Gen[Gen]/NonGen[NonGen]")(COMPTIME_IDX, GEN_VALUES[COMPTIME_IDX], non_gen_values[runtime_idx])
+        assert_eq#(ID: "Bool[] Gen[Gen]/Gen[NonGen]")(COMPTIME_IDX, GEN_VALUES[COMPTIME_IDX], GEN_VALUES[runtime_idx])
+    }
+}
+
+module TestIntArrs {
+    gen int SIZE = 6
+    gen int[2][SIZE] GEN_VALUES = [[3, 5], [7, 3], [2, -1], [0, -6], [7, 3], [1, -9]]
+    int[2][SIZE] non_gen_values = GEN_VALUES
+    int[2][SIZE] per_idx
+    for int I in 0..SIZE {
+        per_idx[I] = GEN_VALUES[I]
+    }
+    int[2][SIZE] array_concat = [per_idx[0], per_idx[1], per_idx[2], per_idx[3], per_idx[4], per_idx[5]]
+
+    for int COMPTIME_IDX in 0..SIZE {
+        int runtime_idx = COMPTIME_IDX
+        assert_eq#(ID: "Int[] Gen[Gen]/NonGen[Gen]")(COMPTIME_IDX, GEN_VALUES[COMPTIME_IDX], non_gen_values[COMPTIME_IDX])
+        assert_eq#(ID: "Int[] Gen[Gen]/NonGen[NonGen]")(COMPTIME_IDX, GEN_VALUES[COMPTIME_IDX], non_gen_values[runtime_idx])
+        assert_eq#(ID: "Int[] Gen[Gen]/Gen[NonGen]")(COMPTIME_IDX, GEN_VALUES[COMPTIME_IDX], GEN_VALUES[runtime_idx])
+    }
+}
+
+module AllTests {
+    TestBools tb1
+    TestUnsignedInts tb2
+    TestSignedInts tb3
+    TestBoolArrs tb4
+    TestIntArrs tb5
+}
