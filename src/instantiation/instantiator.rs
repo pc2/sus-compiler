@@ -21,6 +21,8 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct Instantiator {
     cache: BTreeMap<Rc<ConcreteGlobalReference<ModuleUUID>>, InstantiatorCacheElem>,
+    /// Some mangled names may map to the same mangled name: `MyMod#(STR: "%")` and `MyMod#(STR: "/")` map to `MyMod_STR`.
+    mangled_name_deconflicter: HashSet<String>,
     stack: Vec<Rc<ConcreteGlobalReference<ModuleUUID>>>,
     pub tops: Vec<ConcreteGlobalReference<ModuleUUID>>,
 }
@@ -46,13 +48,55 @@ impl Instantiator {
     pub fn new() -> Self {
         Self {
             cache: BTreeMap::new(),
+            mangled_name_deconflicter: HashSet::new(),
             stack: Vec::new(),
             tops: Vec::new(),
         }
     }
 
     pub fn clear_instances(&mut self) {
-        self.cache.clear()
+        self.cache.clear();
+        self.mangled_name_deconflicter.clear();
+    }
+
+    /// Mangle the module name for use in code generation
+    fn mangle_name(&mut self, name: &str) -> String {
+        let mut result = String::with_capacity(name.len());
+
+        let mut last_was_underscore = false;
+        for c in name.chars() {
+            if c.is_alphanumeric() {
+                result.push(c);
+                last_was_underscore = false;
+            } else if c == '-' {
+                result.push('N');
+                last_was_underscore = false;
+            } else {
+                // Max 1 underscore at a time, as some tools don't like it (#128)
+                if !last_was_underscore {
+                    result.push('_');
+                }
+                last_was_underscore = true;
+            }
+        }
+        result = result.trim_matches('_').to_owned();
+
+        if self.mangled_name_deconflicter.insert(result.clone()) {
+            // Try the non-deduplicated version first
+            result
+        } else {
+            let mut dedup_idx = 2;
+            loop {
+                let deduplicated_name = format!("{result}_Dedup_{dedup_idx}");
+                if self
+                    .mangled_name_deconflicter
+                    .insert(deduplicated_name.clone())
+                {
+                    return deduplicated_name;
+                } // Else, this deduplicated name is already taken. Try the next one
+                dedup_idx += 1;
+            }
+        }
     }
 
     pub fn display_cur_stack(&self, globals: &LinkerGlobals) -> impl Display {
@@ -109,7 +153,16 @@ impl Instantiator {
             let name = global_ref.display(globals).to_string();
 
             let result = crate::debug::debug_context("instantiating", name, || {
-                match start_instantiation(globals, linker_files, global_ref.clone()) {
+                let name = global_ref.display(globals).to_string();
+                let mangled_name = self.mangle_name(&name);
+
+                match start_instantiation(
+                    globals,
+                    linker_files,
+                    global_ref.clone(),
+                    name,
+                    mangled_name,
+                ) {
                     Ok(mut context) => {
                         loop {
                             let submodules_to_instantiate = context.typecheck_step();
@@ -208,6 +261,7 @@ impl Executed {
         md: &'l Module,
         global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
         name: String,
+        mangled_name: String,
     ) -> ModuleTypingContext<'l> {
         let errors = ErrorCollector::new_empty(md.link_info.span, linker_files);
         if let Err(err) = self.execution_status {
@@ -222,7 +276,7 @@ impl Executed {
             &errors,
         );
         ModuleTypingContext {
-            mangled_name: mangle_name(&name),
+            mangled_name,
             name,
             global_ref,
             clocks,
@@ -237,38 +291,15 @@ impl Executed {
     }
 }
 
-/// Mangle the module name for use in code generation
-fn mangle_name(str: &str) -> String {
-    let mut result = String::with_capacity(str.len());
-
-    let mut last_was_underscore = false;
-    for c in str.chars() {
-        if c.is_alphanumeric() {
-            result.push(c);
-            last_was_underscore = false;
-        } else if c == '-' {
-            result.push('N');
-            last_was_underscore = false;
-        } else {
-            // Max 1 underscore at a time, as some tools don't like it (#128)
-            if !last_was_underscore {
-                result.push('_');
-            }
-            last_was_underscore = true;
-        }
-    }
-    result.trim_matches('_').to_owned()
-}
-
 #[allow(clippy::result_large_err)]
 fn start_instantiation<'l>(
     linker_globals: &'l LinkerGlobals,
     linker_files: &'l LinkerFiles,
     global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
+    name: String,
+    mangled_name: String,
 ) -> Result<ModuleTypingSuperContext<'l>, InstantiatedModule> {
     let md = &linker_globals.modules[global_ref.id];
-
-    let name = global_ref.display(linker_globals).to_string();
 
     // Don't instantiate modules that already errored. Otherwise instantiator may crash
     if md.link_info.errors.did_error {
@@ -278,7 +309,7 @@ fn start_instantiation<'l>(
         errors.warn(md.link_info.name_span, msg);
         return Err(InstantiatedModule {
             global_ref,
-            mangled_name: mangle_name(&name),
+            mangled_name,
             name,
             errors: errors.into_storage(),
             clocks: Default::default(),
@@ -318,7 +349,7 @@ fn start_instantiation<'l>(
 
         return Err(InstantiatedModule {
             global_ref,
-            mangled_name: mangle_name(&name),
+            mangled_name,
             name,
             errors: errors.into_storage(),
             clocks: Default::default(),
@@ -335,7 +366,14 @@ fn start_instantiation<'l>(
     debug!("Executing {name}");
     let exec = execute::execute(&md.link_info, linker_globals, &global_ref.template_args);
 
-    let typed = exec.into_module_typing_context(linker_globals, linker_files, md, global_ref, name);
+    let typed = exec.into_module_typing_context(
+        linker_globals,
+        linker_files,
+        md,
+        global_ref,
+        name,
+        mangled_name,
+    );
     let name = &typed.name;
 
     if typed.errors.did_error() {

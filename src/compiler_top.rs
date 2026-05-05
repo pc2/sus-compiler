@@ -99,7 +99,11 @@ impl Linker {
     }
 
     pub fn add_file(&mut self, path: &Path) {
-        assert!(path.is_file());
+        assert!(
+            path.is_file(),
+            "Path is not a file??? {}",
+            path.to_string_lossy()
+        );
         match UniqueFileID::from_path(path, path.to_string_lossy().to_string()) {
             Ok(file_identifier) => {
                 self.add_or_update_file_from_disk(file_identifier);
