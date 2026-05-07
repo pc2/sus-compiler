@@ -2358,31 +2358,26 @@ Warning: Not Instantiating use_Iterator #() due to abstract typing errors
       │        ──────┬─────  
       │              ╰─────── Not Instantiating use_Iterator #() due to abstract typing errors
 ──────╯
-Error: Typing Error: function argument expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
-      ╭─[ test.sus:1061:20 ]
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1054:35 ]
       │
- 1061 │     arrayStream.start(do_start, 10)
-      │                       ────┬───  
-      │                           ╰───── Typing Error: function argument expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
-      │
-      ├─[ control_flow.sus:11:47 ]
-      │
-   11 │     action start'0 : int #(FROM: 0, TO: MAX + 2) up_to'0 {
-      │                                                  ──┬──  
-      │                                                    ╰──── 'up_to' declared here
+ 1054 │     interface start_iteration : bool do_start
+      │                                      ────┬───  
+      │                                          ╰───── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Excess argument. Function takes 1 args, but 2 were passed.
-      ╭─[ test.sus:1061:30 ]
+Error: No Global 'Iterator' was found.
+      ╭─[ test.sus:1058:2 ]
+      │
+ 1058 │     Iterator arrayStream
+      │     ────┬───  
+      │         ╰───── No Global 'Iterator' was found.
+──────╯
+Error: A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
+      ╭─[ test.sus:1061:2 ]
       │
  1061 │     arrayStream.start(do_start, 10)
-      │                                 ─┬  
-      │                                  ╰── Excess argument. Function takes 1 args, but 2 were passed.
-      │
-      ├─[ control_flow.sus:11:9 ]
-      │
-   11 │     action start'0 : int #(FROM: 0, TO: MAX + 2) up_to'0 {
-      │            ──┬──  
-      │              ╰──── Interface 'start' defined here
+      │     ────────┬────────  
+      │             ╰────────── A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
 ──────╯
 Error: A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
       ╭─[ test.sus:1064:31 ]
@@ -2390,27 +2385,6 @@ Error: A function call expects this to be an interface, but whatever it was the 
  1064 │     bool iter_valid, int value = arrayStream.iter()
       │                                  ────────┬───────  
       │                                          ╰───────── A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
-──────╯
-Error: No such field 'iter' on Iterator #(MAX: _). Available fields are 'Iterator', 'may_next', 'start', 'next'
-      ╭─[ test.sus:1064:43 ]
-      │
- 1064 │     bool iter_valid, int value = arrayStream.iter()
-      │                                              ──┬─  
-      │                                                ╰─── No such field 'iter' on Iterator #(MAX: _). Available fields are 'Iterator', 'may_next', 'start', 'next'
-      │
-      ├─[ control_flow.sus:2:8 ]
-      │
-    2 │ module Iterator #(int MAX) {
-      │        ────┬───  
-      │            ╰───── Module 'Iterator' defined here. module Iterator #(int MAX):
-domain default:
-output state bool may_next'0
-action start'0:
-	input int #(FROM: 0, TO: MAX + 2) up_to'0
-action next'0:
-	->
-	output int #(FROM: 0, TO: MAX + 1) value'0
-	output bool last'0
 ──────╯
 Error: Used 'if' in a non generative context, use 'when' instead
       ╭─[ test.sus:1065:2 ]
