@@ -50,10 +50,93 @@ module FixedSizeIterator #(int TO) {
 }
 
 
+/// Allows us to update a blob of state with a pipelined update function.
+/// Because the new value for the register takes a few cycles to arrive,
+/// the throughput of this module is at best one per `DELAY+1` cycles. 
+/// 
+/// Check `slow_state.is_stable` to get the currently stored value. 
+/// From this, you can update it with `slow_state.set_slow(new_value_slow)`.
+/// Note that `set_slow` itself must be known within the same cycle as `is_stable`.
+/// The `new_value_slow` may take as many cycles as desired. 
+/// When you do, `is_stable` will disengage until `new_value_slow` is computed. 
+/// 
+/// You can also immediately set the state with `slow_state.set_fast(new_value_fast)`.
+/// In this case, the new value is visible on `is_stable` immediately. 
+/// 
+/// Example, taken from some batching memory reading code. In this code, the goal was
+/// to make sequential `double` (8 bytes) requests from memory, based on the counts passed via the `sizes_fifo`. 
+/// In this example, the `SlowState` takes one pipeline stage for the `sizes_fifo.pop()`,
+/// and one for adding `(size * 8)` to the current address. This means it has a maximum rate of 1 update per 3 cycles. 
+/// ```sus
+/// SlowState#(T: type int#(FROM: 0, TO: 1 << 64)) current_addr
+/// 
+/// action set_new_addr : int#(FROM: 0, TO: 1 << 64) new_addr {
+///     current_addr.set_fast(new_addr)
+/// }
+/// 
+/// FIFO sizes_fifo
+/// input bool may_request_read
+/// trigger request_read: int addr, int count
+/// when sizes_fifo.may_pop & may_request_read {
+///     when current_addr.is_stable : int cur_addr {
+///         int size = sizes_fifo.pop() // pop()'s output may have some pipeline stages
+///         push_addr(cur_addr, size)
+///         // Add a pipeline stage for next_addr. 64-bit adds are *expensive*
+///         reg int next_addr = cur_addr + (size * 8) mod 1 << 64
+///         current_addr.set_slow(next_addr)
+///     }
+/// }
+/// ```
+module SlowState #(T, int DELAY) {
+    assert#(C: DELAY >= 0)
+
+    domain data
+    trigger is_stable'0: T old'0
+
+    state T old_v
+    state bool old_is_stable
+    when old_is_stable {
+        is_stable(old_v)
+    }
+    state bool[DELAY] wait_for_slow
+
+    T new_value_slow_d'DELAY
+    T new_value_slow_0'0 = LatencyOffset#(OFFSET: -DELAY)(new_value_slow_d)    
+    when wait_for_slow[DELAY-1] {
+        old_is_stable = true
+        old_v = new_value_slow_0
+    }
+
+    action set_slow'0 : T new_value_slow'DELAY {
+        if DELAY == 0 {
+            old_v = new_value_slow
+            old_is_stable = true
+        } else {
+            wait_for_slow[0] = true
+            wait_for_slow[1:] = RepeatGen#(T: type bool, V: false, SIZE: DELAY)
+            old_is_stable = false
+        }
+        new_value_slow_d = new_value_slow
+    } else {
+        wait_for_slow[0] = false
+        wait_for_slow[1:] = wait_for_slow[0:DELAY-1]
+    }
+
+    action set_fast'0 : T new_value_fast'0 {
+        old_v = new_value_fast
+        old_is_stable = true
+        wait_for_slow = RepeatGen#(T: type bool, V: false, SIZE: DELAY)
+    }
+
+    domain reset
+    action rst {
+        wait_for_slow = RepeatGen#(T: type bool, V: false, SIZE: DELAY)
+    }
+}
 
 /// Allows us to update a blob of state with a pipelined update function
 /// `update()` may only be called if may_update, upon which may_update goes low for `UPDATE_PIPELINE_DEPTH` cycles
-module SlowState #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
+module SlowStateAdvanced #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
     assert#(C: OLD_DELAY >= 0)
     gen int UPDATE_TOTAL_DEPTH = max#(A: OLD_DELAY, B: OLD_DELAY + NEW_DELAY)
     clock clk
