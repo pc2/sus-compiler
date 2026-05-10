@@ -562,11 +562,10 @@ impl ModuleTypingContext<'_> {
                     let mut error_infos = Vec::with_capacity(options.len());
                     for opt in options {
                         let desired = opt.desired_latency;
-                        let from_port_instr = self.md.link_info.instructions
-                            [self.wires[latency_node_meanings[opt.from.node]].original_instruction]
-                            .unwrap_declaration();
+                        let from_port_instr = &self.md.link_info.instructions
+                            [self.wires[latency_node_meanings[opt.from.node]].original_instruction];
                         error_infos.push(from_port_instr.make_info().unwrap());
-                        let from_port_name = &from_port_instr.name;
+                        let from_port_name = &from_port_instr.get_name();
                         let from_port_latency = opt.from.latency;
                         writeln!(
                             error_text,
