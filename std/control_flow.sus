@@ -49,10 +49,12 @@ module SlowState #(T, int DELAY) {
     state bool[DELAY] wait_for_slow
 
     T new_value_slow_d'DELAY
-    T new_value_slow_0'0 = LatencyOffset#(OFFSET: -DELAY)(new_value_slow_d)    
-    when wait_for_slow[DELAY-1] {
-        old_is_stable = true
-        old_v = new_value_slow_0
+    T new_value_slow_0'0 = LatencyOffset#(OFFSET: -DELAY)(new_value_slow_d)   
+    if DELAY != 0 { 
+        when wait_for_slow[DELAY-1] {
+            old_is_stable = true
+            old_v = new_value_slow_0
+        }
     }
 
     action set_slow'0 : T new_value_slow'DELAY {
@@ -66,8 +68,10 @@ module SlowState #(T, int DELAY) {
         }
         new_value_slow_d = new_value_slow
     } else {
-        wait_for_slow[0] = false
-        wait_for_slow[1:] = wait_for_slow[0:DELAY-1]
+        if DELAY != 0 {
+            wait_for_slow[0] = false
+            wait_for_slow[1:] = wait_for_slow[0:DELAY-1]
+        }
     }
 
     action set_fast'0 : T new_value_fast'0 {
