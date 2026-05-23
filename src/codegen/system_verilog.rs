@@ -564,16 +564,6 @@ impl<'g> CodeGenerationContext<'g> {
                             let left_with_path = left_name.with_path(path);
                             let right_with_path = right_name.with_path(path);
 
-                            fn wrap_in_signed_if_needed(name_with_path: impl Display, require_signed: bool, bounds: IntBounds<&IBig>) -> impl Display {
-                                FmtWrapper(move |f| {
-                                    if require_signed && !bounds.is_signed() {
-                                        write!(f, "$signed({{1'b0, {name_with_path}}})")
-                                    } else {
-                                        name_with_path.fmt(f)
-                                    }
-                                })
-                            }
-
                             match *op {
                                 BinaryOperator::ShiftLeft | BinaryOperator::ShiftRight => {
                                     let left_int_range = left_typ.unwrap_int_bounds();
@@ -605,7 +595,6 @@ impl<'g> CodeGenerationContext<'g> {
                                 BinaryOperator::Add |
                                 BinaryOperator::Subtract |
                                 BinaryOperator::Multiply |
-                                BinaryOperator::Divide |
                                 BinaryOperator::Remainder |
                                 BinaryOperator::Equals |
                                 BinaryOperator::NotEquals |
@@ -617,7 +606,6 @@ impl<'g> CodeGenerationContext<'g> {
                                         BinaryOperator::Add => "+",
                                         BinaryOperator::Subtract => "-",
                                         BinaryOperator::Multiply => "*",
-                                        BinaryOperator::Divide => "/",
                                         BinaryOperator::Remainder => "%",
                                         BinaryOperator::Equals => "==",
                                         BinaryOperator::NotEquals => "!=",
@@ -643,6 +631,20 @@ impl<'g> CodeGenerationContext<'g> {
                                         right.typ.walk_path(path).unwrap_int_bounds();
 
                                     let content = codegen_optimized_modulo(
+                                        left_int_range,
+                                        right_int_range,
+                                        &format!("{left_with_path}"),
+                                        &format!("{right_with_path}"),
+                                    );
+                                    format!("assign {output_with_path} = {content}\n")
+                                }
+                                BinaryOperator::Divide => {
+                                    let left_int_range =
+                                        left.typ.walk_path(path).unwrap_int_bounds();
+                                    let right_int_range =
+                                        right.typ.walk_path(path).unwrap_int_bounds();
+
+                                    let content = codegen_optimized_divide(
                                         left_int_range,
                                         right_int_range,
                                         &format!("{left_with_path}"),
@@ -1263,16 +1265,31 @@ impl RealWire {
     }
 }
 
+fn wrap_in_signed_if_needed(
+    name_with_path: impl Display,
+    require_signed: bool,
+    bounds: IntBounds<&IBig>,
+) -> impl Display {
+    FmtWrapper(move |f| {
+        if require_signed && !bounds.is_signed() {
+            write!(f, "$signed({{1'b0, {name_with_path}}})")
+        } else {
+            name_with_path.fmt(f)
+        }
+    })
+}
+
 fn codegen_optimized_modulo(
     left_int_range: IntBounds<&IBig>,
     right_int_range: IntBounds<&IBig>,
     left: &str,
     right: &str,
 ) -> String {
-    let modulo_to_minus_one = right_int_range.to - 1;
-    if right_int_range.from == &modulo_to_minus_one {
+    assert!(!right_int_range.is_signed());
+    let modulo_max = right_int_range.to - 1;
+    if right_int_range.from == &modulo_max {
         let mod_s = right_int_range.from;
-        let mod_u = UBig::try_from(modulo_to_minus_one).unwrap();
+        let mod_u = UBig::try_from(modulo_max).unwrap();
         if mod_u.is_power_of_two() {
             // Unsigned/Signed mod power of two
             let num_bits_to_slice = mod_u.trailing_zeros().unwrap();
@@ -1312,12 +1329,36 @@ fn codegen_optimized_modulo(
                 "$unsigned({left} % {mod_u}) + (({left} % {mod_u} < 0) ? {mod_u} : 0); // == mod {mod_u}"
             )
         }
-    } else if left_int_range.is_signed() {
-        format!(
-            "$unsigned({left} % $signed({{1'b0, {right}}})) + ({left} % $signed({{1'b0, {right}}}) < 0 ? {right} : 0); // == mod"
-        )
-    } else {
+    } else if !left_int_range.is_signed() {
         format!("{left} % {right}; // == mod")
+    } else {
+        let right_s = wrap_in_signed_if_needed(right, true, right_int_range);
+        format!("$unsigned({left} % {right_s}) + ({left} % {right_s} < 0 ? {right} : 0); // == mod")
+    }
+}
+
+fn codegen_optimized_divide(
+    left_int_range: IntBounds<&IBig>,
+    right_int_range: IntBounds<&IBig>,
+    left: &str,
+    right: &str,
+) -> String {
+    let divide_max = right_int_range.to - 1;
+    let is_signed_div = left_int_range.is_signed() || right_int_range.is_signed();
+    let right_is_const = right_int_range.from == &divide_max;
+    if right_is_const
+        && !is_signed_div
+        && let Ok(div_u) = UBig::try_from(divide_max)
+        && div_u.is_power_of_two()
+    {
+        // Unsigned div power of two
+        let num_bits_to_slice = div_u.trailing_zeros().unwrap();
+        let left_high_bit = left_int_range.bitwidth() - 1;
+        format!("{left}[{left_high_bit}:{num_bits_to_slice}]; // == div {div_u}")
+    } else {
+        let left = wrap_in_signed_if_needed(left, is_signed_div, left_int_range);
+        let right = wrap_in_signed_if_needed(right, is_signed_div, right_int_range);
+        format!("{left} / {right}")
     }
 }
 
