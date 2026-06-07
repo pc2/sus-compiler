@@ -63,7 +63,7 @@ module SlowState #(T, int DELAY) {
             old_is_stable = true
         } else {
             wait_for_slow[0] = true
-            wait_for_slow[1:] = RepeatGen#(T: type bool, V: false, SIZE: DELAY)
+            wait_for_slow[1:] = RepeatGen#(T: type bool, V: false, SIZE: DELAY-1)
             old_is_stable = false
         }
         new_value_slow_d = new_value_slow
