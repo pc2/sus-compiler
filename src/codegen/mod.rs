@@ -80,6 +80,9 @@ pub fn codegen(linker: &Linker) -> ExitCode {
             error!("Cannot codegen {} due to errors!", inst.name);
         }
     }
+    if any_error {
+        return ExitCode::FAILURE;
+    }
     if let Some(path) = &config.codegen_file {
         let mut out_file = make_output_file(path);
 
