@@ -80,7 +80,8 @@ pub fn codegen(linker: &Linker) -> ExitCode {
             error!("Cannot codegen {} due to errors!", inst.name);
         }
     }
-    if any_error {
+    if any_error && !config.ci {
+        // Do generate the output file in CI mode, because there will be failing modules in it.
         return ExitCode::FAILURE;
     }
     if let Some(path) = &config.codegen_file {
