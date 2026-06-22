@@ -1,4 +1,33 @@
 # Changelog
+## 0.4.0: Standard Library Changes, Clock Domains and more Documentation!
+SUS 0.4.0 brings with it clock domains as a language feature, a major rework of the standard library, as well as much-improved documentation generation and automatic testbench stub generation. 
+
+- Fix ICE when hovering over module params in another file
+- Add --feature xpm (#187)
+- Fix Clock names don't check for reserved keywords (#182)
+- Implement Clock Domains (#7) You can now use `clock` and `output clock` in your modules to declare clocks. 
+- Add automatic tesbench stub generation (`--gen-tb`)
+- Add automatic documentation generation (`--gen-docs`)
+- Improve the understandability of latency inference hover info a little
+
+### Standard Library
+There is now automatically generated documentation available for the standard library. View it here: https://sus-lang.org/std/control_flow.html
+- Add a single register stage to `RAM` and `ROM` (#187)
+- Add `SlowPipelineBegin`
+- Add `SlowPipelineEnd`
+- Add `RAM_Unbalanced`
+- Add `ShiftReg`
+- Add `SlowPipelineEnd`
+- Remove `JoinDomains`
+- Remove `SlowClockGenerator`
+- Remove `Iterator`
+- Remove `FixedSizeIterator`
+- `__builtin__` can now be used outside of `core.sus`
+- Spread out standard library over `array.sus`, `conversion.sus` and `math.sus`
+- Rename `FindFirst` to `FirstSetBit`
+- Revamp `SlowState`, it no longer resets the contents, and has a `set_slow` and `set_fast` interface. 
+- Use `pop_available` for `RippleFIFO`
+
 ## 0.3.10: Fond Memories
 - Fix ICE on partial arrays assigns (#184)
 - Fix incorrect negative integer literals (#186)
