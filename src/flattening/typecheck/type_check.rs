@@ -684,6 +684,17 @@ impl<'l> TypeCheckingContext<'l> {
     fn typecheck_multi_output_expr(&self, expr: &'l Expression, multi_write: &'l [WriteTo]) {
         for wr in multi_write {
             self.typecheck_wire_reference(&wr.to);
+
+            match &wr.write_modifiers {
+                WriteModifiers::Connection { regs, nexts } => {
+                    for r in regs {
+                        if let Some((r_id, _)) = r.reg_parameter {
+                            self.must_be_int(r_id);
+                        }
+                    }
+                }
+                WriteModifiers::Initial { .. } => {}
+            }
         }
         match &expr.source {
             ExpressionSource::FuncCall(func_call) => {

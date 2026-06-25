@@ -870,7 +870,24 @@ impl<'l> ExecutionContext<'l> {
         let mut num_regs = 0;
         for r in regs {
             if let Some(param) = &r.reg_parameter {
-                num_regs += self
+                let num_regs_here = self
+                    .generation_state
+                    .get_generation_small_int::<i64>(param.0)?;
+
+                if num_regs_here < 0 {
+                    return Err(CompileError::error(
+                        param.1.inner_span(),
+                        format!(
+                            "The number of registers passed to reg(...) must be positive! It was reg({num_regs_here}) instead."
+                        ),
+                    ));
+                } else {
+                    num_regs += num_regs_here;
+                }
+            } else {
+                num_regs += 1;
+            }
+        }
                     .generation_state
                     .get_generation_small_int::<i64>(param.0)?;
             } else {
