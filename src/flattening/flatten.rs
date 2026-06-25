@@ -1690,36 +1690,61 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         self.alloc_local_name(clock_name_span, clock_name, NamedLocal::ClockDecl(clock_id));
     }
 
-    fn flatten_write_modifiers(&self, cursor: &mut Cursor<'c>) -> WriteModifiers {
+    fn flatten_reg_modifier(&mut self, cursor: &mut Cursor<'c>) -> RegExpression {
+        let whole_span = cursor.span();
+        cursor.go_down(kind!("reg_modifier"), move |cursor| {
+            let reg_parameter = if cursor.optional_field(field!("reg_param")) {
+                let bracket_span = BracketSpan::from_outer(cursor.span());
+                cursor.go_down_content(kind!("parenthesis_expression"), move |cursor| {
+                    let expr_id = self.flatten_subexpr(cursor);
+                    Some((expr_id, bracket_span))
+                })
+            } else {
+                None
+            };
+            RegExpression {
+                whole_span,
+                reg_parameter,
+            }
+        })
+    }
+
+    fn flatten_write_modifiers(&mut self, cursor: &mut Cursor<'c>) -> WriteModifiers {
         if cursor.optional_field(field!("write_modifiers")) {
-            let modifiers_span = cursor.span();
-            let mut initial_count = 0;
-            let mut reg_count = 0;
+            let mut initial_kw_span: Option<Span> = None;
+            let mut regs: Vec<RegExpression> = Vec::new();
             cursor.list(kind!("write_modifiers"), |cursor| {
                 let kw_kind = cursor.kind();
-                if kw_kind == kw!("reg") {
-                    reg_count += 1;
+                if kw_kind == kind!("reg_modifier") {
+                    regs.push(self.flatten_reg_modifier(cursor));
                 } else if kw_kind == kw!("initial") {
-                    initial_count += 1;
+                    let span = cursor.span();
+                    if let Some(prev_kw) = initial_kw_span {
+                        self.errors
+                            .error(span, "This write already has an 'initial' keyword")
+                            .info(prev_kw, "Previous 'initial' keyword");
+                    } else {
+                        initial_kw_span = Some(span);
+                    }
                 } else {
                     unreachable!()
                 }
             });
-            match (initial_count, reg_count) {
-                (0, num_regs) => WriteModifiers::Connection {
-                    num_regs,
-                    regs_span: modifiers_span,
-                },
-                (1, 0) => WriteModifiers::Initial {
-                    initial_kw_span: modifiers_span,
-                },
-                _other => unreachable!(),
+            if let Some(initial_kw_span) = initial_kw_span {
+                for r in &regs {
+                    self.errors
+                        .error(
+                            r.whole_span,
+                            "Cannot both place pipeline regs on an 'initial' write.",
+                        )
+                        .info(initial_kw_span, "'Initial' keyword used here");
+                }
+                WriteModifiers::Initial { initial_kw_span }
+            } else {
+                WriteModifiers::Connection { regs }
             }
         } else {
-            WriteModifiers::Connection {
-                num_regs: 0,
-                regs_span: cursor.span().empty_span_at_front(),
-            }
+            WriteModifiers::Connection { regs: Vec::new() }
         }
     }
 

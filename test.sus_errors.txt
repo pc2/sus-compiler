@@ -189,6 +189,7 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated LatencyOffset #(T: type bool #(), OFFSET: 3)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated LatencyOffset #(T: type bool #(), OFFSET: -3)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated PositiveAndNegativeLatencyOffset #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated ParametrizeableRegs #()
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test.sus:26:6 ]
     │
@@ -4783,6 +4784,27 @@ Warning: Unused port 'dout'
  1889 │     LatencyOffset#(T: type bool, OFFSET: -3) neg
       │                                              ─┬─  
       │                                               ╰─── neg declared here
+──────╯
+Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+      ╭─[ test.sus:1893:6 ]
+      │
+ 1893 │     int x = 5
+      │         ┬  
+      │         ╰── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1893:6 ]
+      │
+ 1893 │     int x = 5
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1894:13 ]
+      │
+ 1894 │     reg(5) int y = x
+      │                ┬  
+      │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!

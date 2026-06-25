@@ -401,6 +401,12 @@ impl WireReference {
     }
 }
 
+#[derive(Debug)]
+pub struct RegExpression {
+    pub whole_span: Span,
+    pub reg_parameter: Option<(FlatID, BracketSpan)>,
+}
+
 /// In a [Write], this represents what kind of write it is, based on keywords `reg` or `initial`
 #[derive(Debug)]
 pub enum WriteModifiers {
@@ -409,7 +415,7 @@ pub enum WriteModifiers {
     /// int v
     /// reg reg v = a * 3
     /// ```
-    Connection { num_regs: i64, regs_span: Span },
+    Connection { regs: Vec<RegExpression> },
     /// Set the initial value of a `state` register
     /// ```sus
     /// state int count

@@ -1624,6 +1624,22 @@
     }
   },
   {
+    "type": "reg_modifier",
+    "named": true,
+    "fields": {
+      "reg_param": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "parenthesis_expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "slice",
     "named": true,
     "fields": {
@@ -2051,8 +2067,8 @@
             "named": false
           },
           {
-            "type": "reg",
-            "named": false
+            "type": "reg_modifier",
+            "named": true
           }
         ]
       }

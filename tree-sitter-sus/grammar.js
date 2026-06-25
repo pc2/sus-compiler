@@ -129,10 +129,14 @@ module.exports = grammar({
                 $._expression
             ))
         ),
-        write_modifiers: $ => choice(
-            repeat1(field('item', 'reg')),
-            field('item', 'initial')
-        ),
+        reg_modifier: $ => prec.right(seq( // Have to add prescedence because otherwise it conflicts with the $._expression that comes after
+            'reg',
+            optional(field('reg_param', $.parenthesis_expression))
+        )),
+        write_modifiers: $ => repeat1(field('item', choice(
+            $.reg_modifier,
+            'initial'
+        ))),
 
         _then_else_block: $ => seq(
             field('then_block', $.block),

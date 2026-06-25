@@ -1,3 +1,27 @@
+// ParametrizeableRegs #()
+module ParametrizeableRegs(
+	/* clock */ input clk
+);
+
+/*mux_wire*/ logic[2:0] x;
+/*latency*/ logic[2:0] _x_D1; always_ff @(posedge clk) begin _x_D1 <= x; end
+/*latency*/ logic[2:0] _x_D2; always_ff @(posedge clk) begin _x_D2 <= _x_D1; end
+/*latency*/ logic[2:0] _x_D3; always_ff @(posedge clk) begin _x_D3 <= _x_D2; end
+/*latency*/ logic[2:0] _x_D4; always_ff @(posedge clk) begin _x_D4 <= _x_D3; end
+/*latency*/ logic[2:0] _x_D5; always_ff @(posedge clk) begin _x_D5 <= _x_D4; end
+/*mux_wire*/ logic[2:0] y;
+always_comb begin // combinatorial x
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x = 3'dx;
+	x = 3'd5;
+end
+always_comb begin // combinatorial y
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	y = 3'dx;
+	y = _x_D5;
+end
+endmodule // ParametrizeableRegs #()
+
 // PositiveAndNegativeLatencyOffset #()
 module PositiveAndNegativeLatencyOffset(
 	/* clock */ input clk

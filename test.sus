@@ -1888,3 +1888,8 @@ module PositiveAndNegativeLatencyOffset {
 	LatencyOffset#(T: type bool, OFFSET: 3) pos
 	LatencyOffset#(T: type bool, OFFSET: -3) neg
 }
+
+module ParametrizeableRegs {
+	int x = 5
+	reg(5) int y = x
+}

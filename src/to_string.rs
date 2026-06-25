@@ -427,12 +427,17 @@ impl UniCell<ClockDomain> {
 impl Display for WriteModifiers {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            WriteModifiers::Connection { num_regs, .. } => {
-                for _ in 0..*num_regs {
-                    f.write_str("reg ")?;
-                }
-                Ok(())
-            }
+            WriteModifiers::Connection { regs } => write!(
+                f,
+                "{}",
+                display_join(" ", regs.iter(), |f, r| {
+                    f.write_str("reg")?;
+                    if r.reg_parameter.is_some() {
+                        f.write_str("(...)")?;
+                    }
+                    Ok(())
+                })
+            ),
             WriteModifiers::Initial { .. } => f.write_str("initial"),
         }
     }

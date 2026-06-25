@@ -94,8 +94,8 @@ impl<'l> TypeCheckingContext<'l> {
                             .unwrap_or(Physical(ClockID::UNKNOWN));
                         let mut target_span = wr.to.root_span;
 
-                        match wr.write_modifiers {
-                            WriteModifiers::Connection { .. } => {
+                        match &wr.write_modifiers {
+                            WriteModifiers::Connection { regs } => {
                                 if let Some(condition_domain) =
                                     self.get_condition_domain(expr.parent_condition)
                                     && let Physical(target_phys) = &mut target_domain
@@ -108,10 +108,18 @@ impl<'l> TypeCheckingContext<'l> {
                                         "the runtime condition",
                                     );
                                 }
+                                for r in regs {
+                                    if let Some(param) = r.reg_parameter {
+                                        self.must_be_generative(
+                                            param.0,
+                                            "the number of pipeline regs parameter",
+                                        );
+                                    }
+                                }
                             }
                             WriteModifiers::Initial { initial_kw_span } => {
                                 target_domain = Generative;
-                                target_span = initial_kw_span;
+                                target_span = *initial_kw_span;
                             }
                         }
                         wr.target_domain.set_initial(target_domain);

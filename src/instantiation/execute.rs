@@ -863,16 +863,25 @@ impl<'l> ExecutionContext<'l> {
         domain: ClockID,
     ) -> ExecutionResult<()> {
         let_unwrap!(
-            WriteModifiers::Connection {
-                num_regs,
-                regs_span: _,
-            },
+            WriteModifiers::Connection { regs },
             &write_to.write_modifiers
         );
+
+        let mut num_regs = 0;
+        for r in regs {
+            if let Some(param) = &r.reg_parameter {
+                num_regs += self
+                    .generation_state
+                    .get_generation_small_int::<i64>(param.0)?;
+            } else {
+                num_regs += 1;
+            }
+        }
+
         let (target_wire, path) =
             self.wire_ref_to_real_path(&write_to.to, original_instruction, domain)?;
 
-        self.instantiate_write_to_wire(target_wire, path, from, *num_regs, write_span);
+        self.instantiate_write_to_wire(target_wire, path, from, num_regs, write_span);
         Ok(())
     }
 
