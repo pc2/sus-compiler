@@ -30,11 +30,10 @@ pub enum LocationKind<'linker> {
         #[allow(unused)]
         in_wire_ref: &'linker WireReference,
     },
-    UsedTemplateArg(
-        GlobalUUID,
-        &'linker WrittenTemplateArg,
-        MultiGlobalRef<'linker>,
-    ),
+    UsedTemplateArg {
+        written_arg: &'linker WrittenTemplateArg,
+        in_global_ref: MultiGlobalRef<'linker>,
+    },
     TypeTemplateParam(GlobalUUID, TemplateID),
     Global(GlobalUUID),
 }
@@ -197,11 +196,15 @@ impl<'linker> LocationInfo<'linker> {
                     interface_decl_id,
                 ))
             }
-            LocationKind::UsedTemplateArg(obj, param, _in_global_ref) => {
+            LocationKind::UsedTemplateArg {
+                written_arg: param,
+                in_global_ref,
+            } => {
                 if let Some(param_refers_to) = param.refers_to.get() {
-                    let param_obj = &linker.globals[obj];
+                    let in_global = in_global_ref.get_global().0;
+                    let param_obj = &linker.globals[in_global];
                     Some(RefersTo::Parameter(
-                        obj,
+                        in_global,
                         &param_obj.parameters[*param_refers_to],
                         *param_refers_to,
                     ))
@@ -449,7 +452,10 @@ impl<'linker, 'fns> TreeWalker<'linker, 'fns> {
         for arg in template_args {
             self.visit(LocationInfo {
                 span: arg.name_span,
-                kind: LocationKind::UsedTemplateArg(target_name_elem, arg, global_ref),
+                kind: LocationKind::UsedTemplateArg {
+                    written_arg: arg,
+                    in_global_ref: global_ref,
+                },
                 in_global,
             });
             match &arg.kind {

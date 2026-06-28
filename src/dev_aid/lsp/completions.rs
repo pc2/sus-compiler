@@ -339,9 +339,10 @@ pub fn gather_completions(
         LocationKind::GlobalReference(global_ref) => {
             complete_multi_global_ref(linker, found_location.in_global, global_ref, position)
         }
-        LocationKind::UsedTemplateArg(_global_obj, _param, global_ref) => {
-            complete_multi_global_ref(linker, found_location.in_global, global_ref, position)
-        }
+        LocationKind::UsedTemplateArg {
+            written_arg: _param,
+            in_global_ref,
+        } => complete_multi_global_ref(linker, found_location.in_global, in_global_ref, position),
         /*LocationKind::WireRefRoot(wire_reference_root) => todo!(),
         LocationKind::LocalDecl(uuid) => todo!(),
         LocationKind::LocalInterface(uuid) => todo!(),
