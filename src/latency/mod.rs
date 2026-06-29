@@ -162,12 +162,12 @@ impl LatencyCountingProblem {
         for (_id, w, wire_lat_node) in zip_eq(ctx.wires.iter(), map_wire_to_latency_node.iter()) {
             // Wire to wire Fanin
             w.source
-                .iter_sources_with_min_latency(|from, delta_latency| {
+                .iter_sources_with_min_latency(|from, delta_latency, num_nexts| {
                     edges.push((
                         *wire_lat_node,
                         FanInOut {
                             to_node: map_wire_to_latency_node[from],
-                            delta_latency: Some(delta_latency),
+                            delta_latency: Some(delta_latency - num_nexts),
                         },
                     ));
                 });
@@ -308,7 +308,8 @@ impl LatencyInferenceProblem {
 }
 
 impl RealWireDataSource {
-    fn iter_sources_with_min_latency(&self, mut f: impl FnMut(WireID, i64)) {
+    /// f(wire, num_regs, num_nexts)
+    fn iter_sources_with_min_latency(&self, mut f: impl FnMut(WireID, i64, i64)) {
         match self {
             RealWireDataSource::ReadOnly => {}
             RealWireDataSource::Multiplexer {
@@ -316,23 +317,23 @@ impl RealWireDataSource {
                 sources,
             } => {
                 for s in sources {
-                    s.for_each_wire(&mut |from| f(from, s.num_regs));
+                    s.for_each_wire(&mut |from| f(from, s.num_regs, s.num_nexts));
                 }
             }
             RealWireDataSource::UnaryOp { right, .. } => {
-                f(*right, 0);
+                f(*right, 0, 0);
             }
             RealWireDataSource::BinaryOp { left, right, .. } => {
-                f(*left, 0);
-                f(*right, 0);
+                f(*left, 0, 0);
+                f(*right, 0, 0);
             }
             RealWireDataSource::Select { root, path } => {
-                f(*root, 0);
-                path.for_each_wire(&mut |w| f(w, 0));
+                f(*root, 0, 0);
+                path.for_each_wire(&mut |w| f(w, 0, 0));
             }
             RealWireDataSource::ConstructArray { array_wires } => {
                 for w in array_wires {
-                    f(*w, 0);
+                    f(*w, 0, 0);
                 }
             }
             RealWireDataSource::Constant { value: _ } => {}
@@ -348,7 +349,7 @@ impl InstantiatedModule {
         let mut result = self.wires.map(|(_id, w)| w.absolute_latency.unwrap());
 
         for (_id, w) in &self.wires {
-            w.source.iter_sources_with_min_latency(|other, _| {
+            w.source.iter_sources_with_min_latency(|other, _, nexts| {
                 let other = match &self.wires[other].source {
                     // For inlining path-less Selects
                     RealWireDataSource::Select { root, path } if path.is_empty() => *root,
@@ -356,7 +357,8 @@ impl InstantiatedModule {
                 };
                 let nu = &mut result[other];
 
-                *nu = max(*nu, w.absolute_latency.unwrap());
+                let w_required_at = w.absolute_latency.unwrap() + nexts;
+                *nu = max(*nu, w_required_at);
             });
         }
 

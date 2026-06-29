@@ -573,6 +573,35 @@
         ]
       }
     },
+    "next_modifier": {
+      "type": "PREC_RIGHT",
+      "value": 0,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "next"
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "FIELD",
+                "name": "next_param",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "parenthesis_expression"
+                }
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          }
+        ]
+      }
+    },
     "write_modifiers": {
       "type": "REPEAT1",
       "content": {
@@ -584,6 +613,10 @@
             {
               "type": "SYMBOL",
               "name": "reg_modifier"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "next_modifier"
             },
             {
               "type": "STRING",

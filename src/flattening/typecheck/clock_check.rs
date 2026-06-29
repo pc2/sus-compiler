@@ -95,7 +95,7 @@ impl<'l> TypeCheckingContext<'l> {
                         let mut target_span = wr.to.root_span;
 
                         match &wr.write_modifiers {
-                            WriteModifiers::Connection { regs } => {
+                            WriteModifiers::Connection { regs, nexts } => {
                                 if let Some(condition_domain) =
                                     self.get_condition_domain(expr.parent_condition)
                                     && let Physical(target_phys) = &mut target_domain
@@ -113,6 +113,14 @@ impl<'l> TypeCheckingContext<'l> {
                                         self.must_be_generative(
                                             param.0,
                                             "the number of pipeline regs parameter",
+                                        );
+                                    }
+                                }
+                                for n in nexts {
+                                    if let Some(param) = n.next_parameter {
+                                        self.must_be_generative(
+                                            param.0,
+                                            "the next offset parameter",
                                         );
                                     }
                                 }

@@ -91,6 +91,7 @@ pub enum RealWirePathElem {
 pub struct MultiplexerSource {
     pub to_path: Vec<RealWirePathElem>,
     pub num_regs: i64,
+    pub num_nexts: i64,
     pub from: WireID,
     pub condition: Box<[ConditionStackElem]>,
     pub write_span: Span,
@@ -253,7 +254,7 @@ pub struct InstantiatedModule {
     pub global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
     /// Unique name involving all template arguments
     pub name: String,
-    /// Used in code generation. Only contains characters allowed in SV and VHDL
+    /// Used in code generation. Contains only contains characters that are allowed in SV and VHDL.
     pub mangled_name: String,
     pub errors: ErrorStore,
     pub clocks: FlatAlloc<InstantiatedClock, ClockIDMarker>,

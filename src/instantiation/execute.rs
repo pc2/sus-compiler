@@ -833,6 +833,7 @@ impl<'l> ExecutionContext<'l> {
         to_path: Vec<RealWirePathElem>,
         from: WireID,
         num_regs: i64,
+        num_nexts: i64,
         write_span: Span,
     ) {
         let target_wire = &mut self.wires[write_to_wire];
@@ -848,6 +849,7 @@ impl<'l> ExecutionContext<'l> {
         sources.push(MultiplexerSource {
             to_path,
             num_regs,
+            num_nexts,
             from,
             condition: self.condition_stack.clone().into_boxed_slice(),
             write_span,
@@ -863,7 +865,7 @@ impl<'l> ExecutionContext<'l> {
         domain: ClockID,
     ) -> ExecutionResult<()> {
         let_unwrap!(
-            WriteModifiers::Connection { regs },
+            WriteModifiers::Connection { regs, nexts },
             &write_to.write_modifiers
         );
 
@@ -888,17 +890,21 @@ impl<'l> ExecutionContext<'l> {
                 num_regs += 1;
             }
         }
+        let mut num_nexts = 0;
+        for n in nexts {
+            if let Some(param) = &n.next_parameter {
+                num_nexts += self
                     .generation_state
                     .get_generation_small_int::<i64>(param.0)?;
             } else {
-                num_regs += 1;
+                num_nexts += 1;
             }
         }
 
         let (target_wire, path) =
             self.wire_ref_to_real_path(&write_to.to, original_instruction, domain)?;
 
-        self.instantiate_write_to_wire(target_wire, path, from, num_regs, write_span);
+        self.instantiate_write_to_wire(target_wire, path, from, num_regs, num_nexts, write_span);
         Ok(())
     }
 
@@ -1094,6 +1100,7 @@ impl<'l> ExecutionContext<'l> {
                 sources.push(MultiplexerSource {
                     to_path: Vec::new(),
                     num_regs: 0,
+                    num_nexts: 0,
                     from: false_wire,
                     condition: Box::new([]),
                     write_span,
@@ -1300,6 +1307,7 @@ impl<'l> ExecutionContext<'l> {
                         Vec::new(),
                         true_wire,
                         0,
+                        0,
                         func_interface.interface_span,
                     );
                 }
@@ -1307,7 +1315,7 @@ impl<'l> ExecutionContext<'l> {
                 for (port_wire, arg) in zip_eq(&func_interface.inputs, &fc.arguments) {
                     let arg_span = self.link_info.instructions[*arg].get_span();
                     let from = self.get_wire_or_constant_as_wire(*arg, clock)?;
-                    self.instantiate_write_to_wire(*port_wire, Vec::new(), from, 0, arg_span);
+                    self.instantiate_write_to_wire(*port_wire, Vec::new(), from, 0, 0, arg_span);
                 }
 
                 return Ok(func_interface.outputs);
@@ -1739,6 +1747,7 @@ impl<'l> ExecutionContext<'l> {
                                     Vec::new(),
                                     *port_wire,
                                     0,
+                                    0,
                                     binding_span,
                                 );
                             }
@@ -1752,6 +1761,7 @@ impl<'l> ExecutionContext<'l> {
                                     *port_wire,
                                     Vec::new(),
                                     binding,
+                                    0,
                                     0,
                                     binding_span,
                                 );
@@ -1817,6 +1827,7 @@ impl<'l> ExecutionContext<'l> {
                                 condition_wire,
                                 Vec::new(),
                                 false_wire,
+                                0,
                                 0,
                                 interface.name_span,
                             );

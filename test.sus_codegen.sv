@@ -1,3 +1,52 @@
+// TestNexts #()
+module TestNexts(
+	/* clock */ input clk,
+	input wire[2:0] x,
+	output /*mux_wire*/ logic[2:0] y,
+	output /*mux_wire*/ logic[2:0] z,
+	input wire a
+);
+
+/*latency*/ logic _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
+/*latency*/ logic _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
+/*latency*/ logic _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
+/*latency*/ logic _a_D4; always_ff @(posedge clk) begin _a_D4 <= _a_D3; end
+/*latency*/ logic _a_D5; always_ff @(posedge clk) begin _a_D5 <= _a_D4; end
+/*mux_wire*/ logic b;
+/*mux_wire*/ logic c;
+/*mux_wire*/ logic d;
+always_comb begin // combinatorial y
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	y = 3'dx;
+	y = x;
+end
+always_comb begin // combinatorial z
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	z = 3'dx;
+	z = x;
+end
+always_comb begin // combinatorial b
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	b = 1'bx;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	b = b;
+end
+always_comb begin // combinatorial c
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	c = 1'bx;
+	if(b) c = _a_D5;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	c = c;
+end
+always_comb begin // combinatorial d
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	d = 1'bx;
+	if(b) d = _a_D5;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	d = d;
+end
+endmodule // TestNexts #()
+
 // ParametrizeableRegs #()
 module ParametrizeableRegs(
 	/* clock */ input clk

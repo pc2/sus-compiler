@@ -793,15 +793,16 @@ impl<'g> CodeGenerationContext<'g> {
         s: &'g MultiplexerSource,
         target: &'g RealWire,
     ) {
+        let computed_target_latency = AbsLat::new(target.absolute_latency.unwrap() + s.num_nexts);
         let from = &self.instance.wires[s.from];
         from.get_span(&self.md.link_info).debug();
-        let from_name = self.wire_name(from, target.absolute_latency);
+        let from_name = self.wire_name(from, computed_target_latency);
         self.program_text.write_char('\t').unwrap();
         let mut if_stack = String::new();
         for cond in s.condition.iter() {
             let condition_wire = &self.instance.wires[cond.condition_wire];
             condition_wire.get_span(&self.md.link_info).debug();
-            let cond_name = self.wire_name(condition_wire, target.absolute_latency);
+            let cond_name = self.wire_name(condition_wire, computed_target_latency);
             let invert = if cond.inverse { "!" } else { "" };
             write!(if_stack, "if({invert}{cond_name}) ").unwrap();
         }
@@ -809,7 +810,7 @@ impl<'g> CodeGenerationContext<'g> {
         let content = self.foreach_for_real_path(
             &target.typ,
             &s.to_path,
-            target.absolute_latency,
+            computed_target_latency,
             true,
             |slf, source_path, target_path, copy_typ| {
                 slf.foreach_for_copy_unpacked(copy_typ, true, |path, _| {

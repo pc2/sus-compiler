@@ -1893,3 +1893,23 @@ module ParametrizeableRegs {
 	int x = 5
 	reg(5) int y = x
 }
+
+module TestNexts {
+    input int#(FROM: 0, TO: 6) x'0
+    output int y
+    output int z
+
+    next y = x
+    next(-1) z = x
+
+
+    input bool a'0
+    bool b'5
+
+    bool c
+    bool d
+    when b {
+        next c = a
+        next d = a
+    }
+}

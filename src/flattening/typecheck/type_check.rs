@@ -692,6 +692,11 @@ impl<'l> TypeCheckingContext<'l> {
                             self.must_be_int(r_id);
                         }
                     }
+                    for n in nexts {
+                        if let Some((r_id, _)) = n.next_parameter {
+                            self.must_be_int(r_id);
+                        }
+                    }
                 }
                 WriteModifiers::Initial { .. } => {}
             }

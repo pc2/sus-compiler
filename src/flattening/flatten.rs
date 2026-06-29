@@ -1709,15 +1709,38 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         })
     }
 
+    fn flatten_next_modifier(&mut self, cursor: &mut Cursor<'c>) -> NextExpression {
+        let whole_span = cursor.span();
+        cursor.go_down(kind!("next_modifier"), move |cursor| {
+            let next_parameter = if cursor.optional_field(field!("next_param")) {
+                let bracket_span = BracketSpan::from_outer(cursor.span());
+                cursor.go_down_content(kind!("parenthesis_expression"), move |cursor| {
+                    let expr_id = self.flatten_subexpr(cursor);
+                    Some((expr_id, bracket_span))
+                })
+            } else {
+                None
+            };
+            NextExpression {
+                whole_span,
+                next_parameter,
+            }
+        })
+    }
+
     fn flatten_write_modifiers(&mut self, cursor: &mut Cursor<'c>) -> WriteModifiers {
         if cursor.optional_field(field!("write_modifiers")) {
             let mut initial_kw_span: Option<Span> = None;
             let mut regs: Vec<RegExpression> = Vec::new();
-            cursor.list(kind!("write_modifiers"), |cursor| {
-                let kw_kind = cursor.kind();
-                if kw_kind == kind!("reg_modifier") {
+            let mut nexts: Vec<NextExpression> = Vec::new();
+            cursor.list(kind!("write_modifiers"), |cursor| match cursor.kind() {
+                kind!("reg_modifier") => {
                     regs.push(self.flatten_reg_modifier(cursor));
-                } else if kw_kind == kw!("initial") {
+                }
+                kind!("next_modifier") => {
+                    nexts.push(self.flatten_next_modifier(cursor));
+                }
+                kw!("initial") => {
                     let span = cursor.span();
                     if let Some(prev_kw) = initial_kw_span {
                         self.errors
@@ -1726,25 +1749,35 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     } else {
                         initial_kw_span = Some(span);
                     }
-                } else {
-                    unreachable!()
                 }
+                _ => unreachable!(),
             });
             if let Some(initial_kw_span) = initial_kw_span {
                 for r in &regs {
                     self.errors
                         .error(
                             r.whole_span,
-                            "Cannot both place pipeline regs on an 'initial' write.",
+                            "Cannot place pipeline regs on an 'initial' write.",
                         )
-                        .info(initial_kw_span, "'Initial' keyword used here");
+                        .info(initial_kw_span, "'initial' keyword used here");
+                }
+                for n in &nexts {
+                    self.errors
+                        .error(
+                            n.whole_span,
+                            "Cannot place 'next' offset on an 'initial' write.",
+                        )
+                        .info(initial_kw_span, "'initial' keyword used here");
                 }
                 WriteModifiers::Initial { initial_kw_span }
             } else {
-                WriteModifiers::Connection { regs }
+                WriteModifiers::Connection { regs, nexts }
             }
         } else {
-            WriteModifiers::Connection { regs: Vec::new() }
+            WriteModifiers::Connection {
+                regs: Vec::new(),
+                nexts: Vec::new(),
+            }
         }
     }
 

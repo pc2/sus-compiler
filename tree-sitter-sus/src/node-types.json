@@ -1504,6 +1504,22 @@
     }
   },
   {
+    "type": "next_modifier",
+    "named": true,
+    "fields": {
+      "next_param": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "parenthesis_expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "parenthesis_expression",
     "named": true,
     "fields": {
@@ -2067,6 +2083,10 @@
             "named": false
           },
           {
+            "type": "next_modifier",
+            "named": true
+          },
+          {
             "type": "reg_modifier",
             "named": true
           }
@@ -2291,6 +2311,10 @@
     "type": "multi_line_comment",
     "named": true,
     "extra": true
+  },
+  {
+    "type": "next",
+    "named": false
   },
   {
     "type": "number",

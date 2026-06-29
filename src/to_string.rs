@@ -427,17 +427,23 @@ impl UniCell<ClockDomain> {
 impl Display for WriteModifiers {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            WriteModifiers::Connection { regs } => write!(
-                f,
-                "{}",
-                display_join(" ", regs.iter(), |f, r| {
+            WriteModifiers::Connection { regs, nexts } => {
+                for r in regs {
                     f.write_str("reg")?;
                     if r.reg_parameter.is_some() {
                         f.write_str("(...)")?;
                     }
-                    Ok(())
-                })
-            ),
+                    f.write_str(" ")?;
+                }
+                for n in nexts {
+                    f.write_str("next")?;
+                    if n.next_parameter.is_some() {
+                        f.write_str("(...)")?;
+                    }
+                    f.write_str(" ")?;
+                }
+                Ok(())
+            }
             WriteModifiers::Initial { .. } => f.write_str("initial"),
         }
     }
@@ -1300,6 +1306,7 @@ impl ModuleTypingContext<'_> {
                     for MultiplexerSource {
                         to_path,
                         num_regs,
+                        num_nexts,
                         from,
                         condition,
                         write_span: _,
@@ -1317,10 +1324,12 @@ impl ModuleTypingContext<'_> {
                             let invert = if c.inverse { "!" } else { "" };
                             write!(f, "{if_or_and}{invert}{}", self.name(c.condition_wire))?;
                         }
+                        write!(f, ":")?;
                         if *num_regs != 0 {
                             write!(f, ": reg({num_regs})")?;
-                        } else {
-                            write!(f, ":")?;
+                        }
+                        if *num_nexts != 0 {
+                            write!(f, ": next({num_nexts})")?;
                         }
                         let to_path = self.display_path(to_path);
                         let from = self.name(*from);

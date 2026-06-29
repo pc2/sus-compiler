@@ -406,6 +406,11 @@ pub struct RegExpression {
     pub whole_span: Span,
     pub reg_parameter: Option<(FlatID, BracketSpan)>,
 }
+#[derive(Debug)]
+pub struct NextExpression {
+    pub whole_span: Span,
+    pub next_parameter: Option<(FlatID, BracketSpan)>,
+}
 
 /// In a [Write], this represents what kind of write it is, based on keywords `reg` or `initial`
 #[derive(Debug)]
@@ -415,7 +420,10 @@ pub enum WriteModifiers {
     /// int v
     /// reg reg v = a * 3
     /// ```
-    Connection { regs: Vec<RegExpression> },
+    Connection {
+        regs: Vec<RegExpression>,
+        nexts: Vec<NextExpression>,
+    },
     /// Set the initial value of a `state` register
     /// ```sus
     /// state int count
