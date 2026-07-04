@@ -1,0 +1,83 @@
+
+extern module xpm_cdc_single #(
+	int DEST_SYNC_FF,    // 4
+	int INIT_SYNC_FF,    // 0
+	int SIM_ASSERT_CHK,  // 0
+	int SRC_INPUT_REG,   // 1
+	int VERSION,         // 0
+) {
+	clock src_clk
+	input  bool src_in'0
+	clock dest_clk
+	output bool dest_out'0
+}
+
+extern module xpm_cdc_array_single #(
+	int DEST_SYNC_FF,    // 4
+	int INIT_SYNC_FF,    // 0
+	int SIM_ASSERT_CHK,  // 0
+	int SRC_INPUT_REG,   // 1
+	int VERSION,         // 0
+	int WIDTH,           // 2
+) {
+	clock src_clk
+	input  bool[WIDTH] src_in'0
+	clock dest_clk
+	output bool[WIDTH] dest_out'0
+}
+
+extern module xpm_cdc_gray #(
+	int DEST_SYNC_FF,           // 4
+	int INIT_SYNC_FF,           // 0
+	int REG_OUTPUT,             // 0
+	int SIM_ASSERT_CHK,         // 0
+	int SIM_LOSSLESS_GRAY_CHK,  // 0
+	int VERSION,                // 0
+	int WIDTH,                  // 2
+) {
+	clock src_clk
+	input  int#(FROM: 0, TO: pow2#(E: WIDTH)) src_in_bin'0
+	clock dest_clk
+	output int#(FROM: 0, TO: pow2#(E: WIDTH)) dest_out_bin'0
+}
+
+extern module xpm_cdc_pulse #(
+	int DEST_SYNC_FF,    // 4
+	int INIT_SYNC_FF,    // 0
+	int REG_OUTPUT,      // 0
+	int RST_USED,        // 1
+	int SIM_ASSERT_CHK,  // 0
+	int VERSION,         // 0
+) {
+	clock src_clk
+	input  bool src_pulse'0
+	input  bool src_rst'0
+	clock dest_clk
+	input  bool dest_rst'0
+	output bool dest_pulse'0
+}
+
+extern module xpm_cdc_sync_rst #(
+	int DEST_SYNC_FF,    // 4
+	int INIT,            // 1
+	int INIT_SYNC_FF,    // 0
+	int SIM_ASSERT_CHK,  // 0
+	int VERSION,         // 0
+) {
+    clock _no_src_clk
+	input  bool src_rst'0
+	clock dest_clk
+	output bool dest_rst'0
+}
+
+extern module xpm_cdc_async_rst #(
+	int DEST_SYNC_FF,     // 4
+	int INIT_SYNC_FF,     // 0
+	int RST_ACTIVE_HIGH,  // 0
+	int VERSION,          // 0
+) {
+    clock _no_src_clk
+	input  bool src_arst'0
+	clock dest_clk
+	output bool dest_arst'0
+}

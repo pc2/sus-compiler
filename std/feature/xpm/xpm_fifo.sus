@@ -1,0 +1,120 @@
+
+extern module xpm_fifo_sync #(
+	// Common module strings
+	string FIFO_MEMORY_TYPE, // "auto",
+	string ECC_MODE, // "no_ecc",
+	int    SIM_ASSERT_CHK, // 0,
+	int    CASCADE_HEIGHT, // 0,
+
+	int    FIFO_WRITE_DEPTH, // 2048,
+	int    WRITE_DATA_WIDTH, // 32,
+	int    WR_DATA_COUNT_WIDTH, // 1,
+	int    PROG_FULL_THRESH, // 10,
+	int    FULL_RESET_VALUE, // 0,
+	string USE_ADV_FEATURES, // "0707",
+
+	string READ_MODE, // "std",
+	int    FIFO_READ_LATENCY, // 1,
+	int    READ_DATA_WIDTH, // WRITE_DATA_WIDTH,
+	int    RD_DATA_COUNT_WIDTH, // 1,
+	int    PROG_EMPTY_THRESH, // 10,
+	string DOUT_RESET_VALUE, // "0",
+
+	int WAKEUP_TIME          // should be string, but is 0
+) {
+	clock wr_clk
+
+	// Common module ports
+	input  bool sleep'0
+	input  bool rst'0
+
+	// Write Domain ports
+	input  bool                        wr_en'0
+	input  bool[WRITE_DATA_WIDTH]      din'0
+	output bool                        full'0
+	output bool                        prog_full'0
+	output int#(FROM: 0, TO: pow2#(E: WR_DATA_COUNT_WIDTH))   wr_data_count'0
+	output bool                        overflow'0
+	output bool                        wr_rst_busy'0
+	output bool                        almost_full'0
+	output bool                        wr_ack'0
+
+	// Read Domain ports
+	clock rd_clk
+	input  bool                        rd_en'0
+	output bool[READ_DATA_WIDTH]       dout'0
+	output bool                        empty'0
+	output bool                        prog_empty'0
+	output int#(FROM: 0, TO: pow2#(E: RD_DATA_COUNT_WIDTH))   rd_data_count'0
+	output bool                        underflow'0
+	output bool                        rd_rst_busy'0
+	output bool                        almost_empty'0
+	output bool                        data_valid'0
+
+	// ECC Related ports
+	input  bool injectsbiterr'0
+	input  bool injectdbiterr'0
+	output bool sbiterr'0
+	output bool dbiterr'0
+}
+
+extern module xpm_fifo_async #(
+	// Common module parameters
+	string FIFO_MEMORY_TYPE,    // "auto"
+	string ECC_MODE,            // "no_ecc"
+	int    RELATED_CLOCKS,      // 0
+	int    SIM_ASSERT_CHK,      // 0
+	int    CASCADE_HEIGHT,      // 0
+
+	int    FIFO_WRITE_DEPTH,    // 2048
+	int    WRITE_DATA_WIDTH,    // 32
+	int    WR_DATA_COUNT_WIDTH, // 1
+	int    PROG_FULL_THRESH,    // 10
+	int    FULL_RESET_VALUE,    // 0
+	string USE_ADV_FEATURES,    // "0707"
+
+	string READ_MODE,           // "std"
+	int    FIFO_READ_LATENCY,   // 1
+	int    READ_DATA_WIDTH,     // WRITE_DATA_WIDTH
+	int    RD_DATA_COUNT_WIDTH, // 1
+	int    PROG_EMPTY_THRESH,   // 10
+	string DOUT_RESET_VALUE,    // "0"
+	int    CDC_SYNC_STAGES,     // 2
+
+	int    WAKEUP_TIME          // 0
+) {
+	clock wr_clk
+    
+	// Common module ports
+	input  bool sleep'0
+	input  bool rst'0
+
+	// Write Domain ports
+	input  bool                        wr_en'0
+	input  bool[WRITE_DATA_WIDTH]      din'0
+	output bool                        full'0
+	output bool                        prog_full'0
+	output int#(FROM: 0, TO: pow2#(E: WR_DATA_COUNT_WIDTH)) wr_data_count'0
+	output bool                        overflow'0
+	output bool                        wr_rst_busy'0
+	output bool                        almost_full'0
+	output bool                        wr_ack'0
+
+	// Read Domain ports
+	clock rd_clk
+	input  bool                        rd_en'0
+	output bool[READ_DATA_WIDTH]       dout'0
+	output bool                        empty'0
+	output bool                        prog_empty'0
+	output int#(FROM: 0, TO: pow2#(E: RD_DATA_COUNT_WIDTH)) rd_data_count'0
+	output bool                        underflow'0
+	output bool                        rd_rst_busy'0
+	output bool                        almost_empty'0
+	output bool                        data_valid'0
+
+	// ECC Related ports
+	input  bool injectsbiterr'0
+	input  bool injectdbiterr'0
+	output bool sbiterr'0
+	output bool dbiterr'0
+}

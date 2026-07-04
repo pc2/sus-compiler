@@ -43,7 +43,9 @@ const STL_FILES_FEATURE_XPM: &[&str] = &[
     "control_flow.sus",
     "util.sus",
     "bitwise.sus",
-    "feature/xpm/xpm.sus",
+    "feature/xpm/xpm_memory.sus",
+    "feature/xpm/xpm_fifo.sus",
+    "feature/xpm/xpm_cdc.sus",
     "feature/xpm/memory.sus",
 ];
 
