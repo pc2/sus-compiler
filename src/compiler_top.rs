@@ -34,6 +34,7 @@ const STL_FILES: &[&str] = &[
     "util.sus",
     "bitwise.sus",
     "memory.sus",
+    "fifo.sus",
 ];
 const STL_FILES_FEATURE_XPM: &[&str] = &[
     "core.sus",
@@ -47,6 +48,7 @@ const STL_FILES_FEATURE_XPM: &[&str] = &[
     "feature/xpm/xpm_fifo.sus",
     "feature/xpm/xpm_cdc.sus",
     "feature/xpm/memory.sus",
+    "fifo.sus",
 ];
 
 impl Linker {
