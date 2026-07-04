@@ -5,6 +5,10 @@ module ROM #(T, int DEPTH, T[DEPTH] DATA) {
     }
 }
 
+/// Simple Dual Port RAM Module. 
+///
+/// The write port and read port are fully independent.
+/// The RAM has a write-after-read policy, so when writing and reading to the same address in the same cycle, the old value is returned. 
 module RAM #(T, int DEPTH) {
     gen int T_WIDTH = sizeof#(T)
 
@@ -20,6 +24,63 @@ module RAM #(T, int DEPTH) {
         reg bool[T_WIDTH] mem_read = mem[read_addr]
         read_data = FromBits(mem_read)
 	}
+}
+
+/// True Dual Port RAM Module. 
+///
+/// Ports a and b are fully independent, and each can be used to perform either a read or a write each cycle. 
+///
+/// It is an error to call both `write_a` and `read_a` at the same time, as well as `write_b` and `read_b`. 
+///
+/// When writing with both `write_a` and `write_b` to the same address at the same time, `write_b` takes prescedence. 
+module DPRAM #(T, int DEPTH) {
+    gen int T_WIDTH = sizeof#(T)
+
+    state bool[T_WIDTH][DEPTH] mem
+
+    domain dom_a
+    bool do_write_a = false
+    bool do_read_a = false
+    int addr_a
+    bool[T_WIDTH] write_bits_a
+    bool[T_WIDTH] read_bits_a
+	action write_a'0 : int#(FROM: 0, TO: DEPTH) write_addr_a'0, T write_data_a'0 {
+        addr_a = write_addr_a
+		do_write_a = true
+        write_bits_a = ToBits(write_data_a)
+	}
+	action read_a'0: int#(FROM: 0, TO: DEPTH) read_addr_a'0 -> T read_data_a'1 {
+        addr_a = read_addr_a
+        do_read_a = true
+        read_data_a = FromBits(read_bits_a)
+	}
+    when do_write_a {
+        mem[addr_a] = write_bits_a
+    } else when do_read_a {
+        reg read_bits_a = mem[addr_a]
+    }
+
+    domain dom_b
+    bool do_write_b = false
+    bool do_read_b = false
+    int addr_b
+    bool[T_WIDTH] write_bits_b
+    bool[T_WIDTH] read_bits_b
+	action write_b'0 : int#(FROM: 0, TO: DEPTH) write_addr_b'0, T write_data_b'0 {
+        addr_b = write_addr_b
+		do_write_b = true
+        write_bits_b = ToBits(write_data_b)
+	}
+	action read_b'0: int#(FROM: 0, TO: DEPTH) read_addr_b'0 -> T read_data_b'1 {
+        addr_b = read_addr_b
+        do_read_b = true
+        read_data_b = FromBits(read_bits_b)
+	}
+    when do_write_b {
+        mem[addr_b] = write_bits_b
+    } else when do_read_b {
+        reg read_bits_b = mem[addr_b]
+    }
 }
 
 module RAM_Unbalanced #(ElemT, int DEPTH, int WRITE_SIZE, int READ_SIZE) {

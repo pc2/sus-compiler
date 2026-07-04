@@ -1067,9 +1067,9 @@ Error: Excess output targets. Function returns 1 results, but 2 targets were giv
      │                 ───────┬──────  
      │                        ╰──────── Excess output targets. Function returns 1 results, but 2 targets were given.
      │
-     ├─[ memory.sus:150:12 ]
+     ├─[ memory.sus:211:12 ]
      │
- 150 │     action pop'0 : -> T pop_data'1 {
+ 211 │     action pop'0 : -> T pop_data'1 {
      │            ─┬─  
      │             ╰─── Interface 'pop' defined here
 ─────╯
@@ -1087,9 +1087,9 @@ Error: Excess argument. Function takes 0 args, but 1 were passed.
      │                                           ──┬─  
      │                                             ╰─── Excess argument. Function takes 0 args, but 1 were passed.
      │
-     ├─[ memory.sus:150:12 ]
+     ├─[ memory.sus:211:12 ]
      │
- 150 │     action pop'0 : -> T pop_data'1 {
+ 211 │     action pop'0 : -> T pop_data'1 {
      │            ─┬─  
      │             ╰─── Interface 'pop' defined here
 ─────╯
@@ -1588,9 +1588,9 @@ Error: FIFO has no template argument named 'BITWIDTH'
      │            ────┬───  
      │                ╰───── FIFO has no template argument named 'BITWIDTH'
      │
-     ├─[ memory.sus:131:8 ]
+     ├─[ memory.sus:192:8 ]
      │
- 131 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+ 192 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
      │        ──┬─  
      │          ╰─── 'FIFO' defined here
 ─────╯
@@ -2347,9 +2347,9 @@ Error: FIFO has no template argument named 'READY_SLACK'
       │                      ─────┬─────  
       │                           ╰─────── FIFO has no template argument named 'READY_SLACK'
       │
-      ├─[ memory.sus:131:8 ]
+      ├─[ memory.sus:192:8 ]
       │
-  131 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+  192 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
       │        ──┬─  
       │          ╰─── 'FIFO' defined here
 ──────╯
@@ -2567,9 +2567,9 @@ Warning: Unused port 'may_pop'
       │                       ──┬─  
       │                         ╰─── Unused port 'may_pop'
       │
-      ├─[ memory.sus:149:17 ]
+      ├─[ memory.sus:210:17 ]
       │
-  149 │     output bool may_pop'0 = read_addr != write_addr
+  210 │     output bool may_pop'0 = read_addr != write_addr
       │                 ───┬───  
       │                    ╰───── Port 'may_pop' declared here
       │
@@ -2586,9 +2586,9 @@ Warning: Unused port 'pop'
       │                       ──┬─  
       │                         ╰─── Unused port 'pop'
       │
-      ├─[ memory.sus:150:12 ]
+      ├─[ memory.sus:211:12 ]
       │
-  150 │     action pop'0 : -> T pop_data'1 {
+  211 │     action pop'0 : -> T pop_data'1 {
       │            ─┬─  
       │             ╰─── Port 'pop' declared here
       │
@@ -2605,9 +2605,9 @@ Warning: Unused port 'pop_data'
       │                       ──┬─  
       │                         ╰─── Unused port 'pop_data'
       │
-      ├─[ memory.sus:150:25 ]
+      ├─[ memory.sus:211:25 ]
       │
-  150 │     action pop'0 : -> T pop_data'1 {
+  211 │     action pop'0 : -> T pop_data'1 {
       │                         ────┬───  
       │                             ╰───── Port 'pop_data' declared here
       │
@@ -2624,9 +2624,9 @@ Warning: Unused port 'rst'
       │                       ──┬─  
       │                         ╰─── Unused port 'rst'
       │
-      ├─[ memory.sus:157:12 ]
+      ├─[ memory.sus:218:12 ]
       │
-  157 │     action rst {
+  218 │     action rst {
       │            ─┬─  
       │             ╰─── Port 'rst' declared here
       │
@@ -3125,9 +3125,9 @@ Error: FIFO has no template argument named 'READY_SLACK'
       │                       ─────┬─────  
       │                            ╰─────── FIFO has no template argument named 'READY_SLACK'
       │
-      ├─[ memory.sus:131:8 ]
+      ├─[ memory.sus:192:8 ]
       │
-  131 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
+  192 │ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
       │        ──┬─  
       │          ╰─── 'FIFO' defined here
 ──────╯
@@ -3138,9 +3138,9 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │                  ┬  
       │                  ╰── Excess argument. Function takes 1 args, but 2 were passed.
       │
-      ├─[ memory.sus:143:12 ]
+      ├─[ memory.sus:204:12 ]
       │
-  143 │     action push'0 : T push_data'0 {
+  204 │     action push'0 : T push_data'0 {
       │            ──┬─  
       │              ╰─── Interface 'push' defined here
 ──────╯
