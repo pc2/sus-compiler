@@ -55,6 +55,15 @@ __builtin__ module LatencyOffset #(T, int OFFSET) {
     interface LatencyOffset : T din'0 -> T dout'OFFSET
 }
 
+/// Cuts Latency Counting information between `din` and `dout`. 
+/// Internally implemented as a simple wire. 
+module LatencyCut#(T) {
+    domain a
+    input T din
+    domain b
+    output T dout = din
+}
+
 /// Unsafe builtin to connect wires from different clock domains. 
 /// Important: This is a plain connection from a wire in one clock domain to a wire in another.
 /// This performs no synchronization or other data integrity measures!

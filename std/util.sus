@@ -10,6 +10,22 @@ module Ternary #(T) {
     }
 }
 
+/// Lengthens the incoming reset signal for `MIN_RESET_CYCLES`. 
+/// It provides enough time for the many deep pipelines in your design to reset fully throughout. 
+module ResetLengthener#(int MIN_RESET_CYCLES) {
+    state int#(FROM: 0, TO: MIN_RESET_CYCLES) reset_countdown
+
+    domain reset_in
+    action rst_in {
+        reset_countdown = MIN_RESET_CYCLES - 1
+    } else when reset_countdown != 0 {
+        reset_countdown = IntNarrow#(FROM: 0, TO: MIN_RESET_CYCLES)(reset_countdown - 1)
+    }
+
+    domain reset_out
+    reg output bool rst_out = reset_countdown != 0
+}
+
 /// Temporary module for creating and deconstructing tuples, until we have structs
 module Tuple2 #(T1, T2) {
     gen int TO1 = sizeof#(T: type T1)

@@ -350,3 +350,72 @@ module ParallelStore #(T, int NUM_PARALLEL_STATES) {
         }
     }
 }
+
+/// The Semaphore is a construct for distributing a limited resource,
+/// such as memory buffers or compute units. 
+/// It has an internal counter called the "permits" counter which keeps track of
+/// how many of the guarded resource have been given out thus far. 
+/// 
+/// With `may_acquire` and `acquire()`, you request a "permit" for a resource. 
+/// You use the resource for a while, and when you're done with it, you return it with `release()`
+/// 
+/// For this mode of operation, you start the Semaphore out with `INITIAL_PERMITS=MAX` permits. 
+/// 
+/// You can also use the Semaphore in reverse mode, acting somewhat akin to a FIFO. 
+/// In this case, the Semaphore should be set to `INITIAL_PERMITS=0`, and then when a compute job becomes available `release()` first.
+module Semaphore#(int MAX, int INITIAL_PERMITS) {
+    domain write
+    state int#(FROM: 0, TO: MAX+1) available_permits
+    output bool may_acquire'0 = available_permits != 0
+    int do_acquire = 0
+    action acquire'0 {
+        do_acquire = 1
+    }
+
+    domain read
+    int do_release = 0
+    action release'0 {
+        do_release = 1
+    }
+
+    available_permits = IntNarrow#(FROM: 0, TO: MAX+1)(available_permits - do_acquire + do_release)
+
+    domain reset
+    action rst {
+        available_permits = INITIAL_PERMITS
+    }
+}
+
+/// Equivalent of combining multiple [Semaphore]s together.
+/// The releases are independent, whereas `may_acquire` and `acquire_all` are shared among all. 
+module SharedAcquireSemaphore#(int MAX, int INITIAL_PERMITS, int NUM_SEMAPHORES) {
+    domain tmp
+    output state int#(FROM: 0, TO: MAX+1)[NUM_SEMAPHORES] available_permits
+
+    domain default
+    input bool[NUM_SEMAPHORES] releases
+
+    output bool may_acquire = true
+
+    for int I in 0..NUM_SEMAPHORES {
+        when available_permits[I] == 0 {
+            may_acquire = false
+        }
+    }
+
+    int acquire_all_dec = 0
+    action acquire_all {
+        acquire_all_dec = 1
+    }
+
+    for int I in 0..NUM_SEMAPHORES {
+        available_permits[I] = IntNarrow#(FROM: 0, TO: MAX+1)(available_permits[I] - acquire_all_dec + BoolToInt(releases[I]))
+    }
+
+    domain reset
+    action rst {
+        for int I in 0..NUM_SEMAPHORES {
+            available_permits[I] = INITIAL_PERMITS
+        }
+    }
+}

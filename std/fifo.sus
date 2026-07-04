@@ -210,6 +210,69 @@ module RippleFIFO#(T, int DEPTH) {
     }
 }
 
+/// This is a combination of multiple [FIFO]s, where the `may_push` and `push` ports are separate, but the `may_pop` and `pop` ports are shared. 
+///
+/// It can pipeline the internals efficiently, by storing the pipeline stages in an internal [TreeMax] of the write addresses. 
+/// Due to the fact that the addresses increment monotically this is safe,
+/// and only adds a bit of latency between when an element is `push`-ed, and it becomes visible to be `pop`-ed. 
+module JoiningFIFO#(T, int NUM_FIFOS, int DEPTH, int MAY_PUSH_LATENCY) {
+    state int#(FROM: 0, TO: DEPTH * 2)[NUM_FIFOS] write_addrs'0
+    state int#(FROM: 0, TO: DEPTH * 2) read_addr'0
+    
+    state bool[sizeof#(T)][DEPTH][NUM_FIFOS] memory
+
+    domain push_side
+    output bool[NUM_FIFOS] may_pushes'-MAY_PUSH_LATENCY
+    input bool[NUM_FIFOS] pushes'0
+    input T[NUM_FIFOS] datas'0
+
+    bool[NUM_FIFOS] internal_may_pushes
+    may_pushes = LatencyOffset #(OFFSET: -MAY_PUSH_LATENCY-1)(internal_may_pushes)
+
+    for int I in 0..NUM_FIFOS {
+	    int space_remaining = (read_addr mod DEPTH) - (write_addrs[I] mod DEPTH) - 1 mod DEPTH
+        reg internal_may_pushes[I] = space_remaining > MAY_PUSH_LATENCY + 1
+
+        when pushes[I] {
+            memory[I][write_addrs[I] mod DEPTH] = ToBits(datas[I])
+            write_addrs[I] = write_addrs[I] + 1 mod DEPTH * 2
+        }
+    }
+
+    int#(FROM: 0, TO: DEPTH * 2)[NUM_FIFOS] relative_write_addrs
+    reg bool read_addr_in_second_half = read_addr >= DEPTH
+    for int I in 0..NUM_FIFOS {
+        when read_addr_in_second_half {
+            relative_write_addrs[I] = write_addrs[I] + DEPTH mod DEPTH * 2
+        } else {
+            relative_write_addrs[I] = write_addrs[I]
+        }
+    }
+    /// We don't actually care about the pipelining of minimum_write_addr
+    /// because it is monotonically ascending, 
+    LatencyCut cut_minimum_write_addr
+    reg int pipelined_relative_write_addrs = TreeMin(relative_write_addrs)
+    cut_minimum_write_addr.din = pipelined_relative_write_addrs
+    int minimum_write_addr = cut_minimum_write_addr.dout
+
+    domain pop_side
+    output bool may_pop'0 = (minimum_write_addr mod DEPTH) != (read_addr mod DEPTH)
+    action pop'0 : -> T[NUM_FIFOS] pop_data {
+        for int I in 0..NUM_FIFOS {
+            reg pop_data[I] = FromBits(memory[I][read_addr mod DEPTH])
+        }
+        read_addr = read_addr + 1 mod DEPTH * 2
+    }
+
+    domain reset
+    action rst {
+        read_addr = 0
+        for int I in 0..NUM_FIFOS {
+            write_addrs[I] = 0
+        }
+    }
+}
+
 /// This shift register is implemented as a memory block with a rotating index.
 ///
 /// It is meant to bridge a long latency difference. 

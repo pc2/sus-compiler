@@ -54,26 +54,121 @@ module Abs #(int TO) {
 	}
 }
 
-// Recursive Tree Add module recurses smaller copies of itself.
-module TreeAdd #(int WIDTH, int FROM, int TO) {
-	interface TreeAdd : int#(FROM, TO)[WIDTH] values'0 -> int#(FROM: FROM*WIDTH, TO: (TO - 1)*WIDTH + 1) total
+/// In a tree fashion, add up the given numbers.
+/// This will take clog2#(V: SIZE) stages, and each stage receives a pipeline stage. 
+module TreeAdd #(int SIZE, int FROM, int TO) {
+	action TreeAdd : int#(FROM, TO)[SIZE] values -> int sum {
+        if SIZE == 0 {
+            int zero'0 = 0
+            sum = zero
+        } else if SIZE == 1 {
+            sum = values[0]
+        } else {
+            split int[][clog2#(V: SIZE)] inter_sums
 
-	if WIDTH == 0 {
-		// Have to explicitly give zero a latency count.
-		// Otherwise total's latency can't be determined.
-		int zero'0 = 0
-		total = zero
-	} else if WIDTH == 1 {
-		total = values[0]
-	} else {
-		// Or instantiate submodules inline
-		int left_total = TreeAdd(values[:WIDTH / 2])
-		int right_total = TreeAdd(values[WIDTH / 2:])
+            for int I in 0..SIZE {
+                inter_sums[0] = values
+            }
+            gen int CUR_SIZE = SIZE
+            for int LAYER in 0..clog2#(V: SIZE) {
+                gen int NEXT_SIZE = (CUR_SIZE + 1) / 2
+                int[CUR_SIZE] cur_sums = inter_sums[LAYER]
+                int[NEXT_SIZE] next_sums
 
-		// Can add pipelining registers here too.
-		// Latency Counting will figure it out.
-		reg total = left_total + right_total
-	}
+                for int I in 0..NEXT_SIZE {
+                    if I == CUR_SIZE / 2 {
+                        reg next_sums[I] = cur_sums[I * 2]
+                    } else {
+                        reg next_sums[I] = cur_sums[I * 2] + cur_sums[I * 2 + 1]
+                    }
+                }
+                inter_sums[LAYER+1] = next_sums
+                CUR_SIZE = NEXT_SIZE
+            }
+            int[1] last = inter_sums[clog2#(V: SIZE)]
+            sum = last[0]
+        }
+    }
+}
+
+/// In a tree fashion, find the maximum of the given numbers.
+/// This will take clog2#(V: SIZE) stages, and each stage receives a pipeline stage. 
+module TreeMax#(int SIZE, int FROM, int TO) {
+    action TreeMax : int#(FROM, TO)[SIZE] values -> int max {
+        if SIZE == 0 {
+            max = FROM
+        } else if SIZE == 1 {
+            max = values[0]
+        } else {
+            split int[][clog2#(V: SIZE)] inter_maxes
+
+            for int I in 0..SIZE {
+                inter_maxes[0] = values
+            }
+            gen int CUR_SIZE = SIZE
+            for int LAYER in 0..clog2#(V: SIZE) {
+                gen int NEXT_SIZE = (CUR_SIZE + 1) / 2
+                int[CUR_SIZE] cur_maxes = inter_maxes[LAYER]
+                int[NEXT_SIZE] next_maxes
+
+                for int I in 0..NEXT_SIZE {
+                    if I == CUR_SIZE / 2 {
+                        reg next_maxes[I] = cur_maxes[I * 2]
+                    } else {
+                        when cur_maxes[I * 2] > cur_maxes[I * 2 + 1] {
+                            reg next_maxes[I] = cur_maxes[I * 2]
+                        } else {
+                            reg next_maxes[I] = cur_maxes[I * 2 + 1]
+                        }
+                    }
+                }
+                inter_maxes[LAYER+1] = next_maxes
+                CUR_SIZE = NEXT_SIZE
+            }
+            int[1] last = inter_maxes[clog2#(V: SIZE)]
+            max = last[0]
+        }
+    }
+}
+
+/// In a tree fashion, find the minimum of the given numbers.
+/// This will take clog2#(V: SIZE) stages, and each stage receives a pipeline stage. 
+module TreeMin#(int SIZE, int FROM, int TO) {
+    action TreeMin : int#(FROM, TO)[SIZE] values -> int min {
+        if SIZE == 0 {
+            min = TO-1
+        } else if SIZE == 1 {
+            min = values[0]
+        } else {
+            split int[][clog2#(V: SIZE)+1] inter_mins
+
+            for int I in 0..SIZE {
+                inter_mins[0] = values
+            }
+            gen int CUR_SIZE = SIZE
+            for int LAYER in 0..clog2#(V: SIZE) {
+                gen int NEXT_SIZE = (CUR_SIZE + 1) / 2
+                int[CUR_SIZE] cur_mins = inter_mins[LAYER]
+                int[NEXT_SIZE] next_mins
+
+                for int I in 0..NEXT_SIZE {
+                    if I == CUR_SIZE / 2 {
+                        reg next_mins[I] = cur_mins[I * 2]
+                    } else {
+                        when cur_mins[I * 2] < cur_mins[I * 2 + 1] {
+                            reg next_mins[I] = cur_mins[I * 2]
+                        } else {
+                            reg next_mins[I] = cur_mins[I * 2 + 1]
+                        }
+                    }
+                }
+                inter_mins[LAYER+1] = next_mins
+                CUR_SIZE = NEXT_SIZE
+            }
+            int[1] last = inter_mins[clog2#(V: SIZE)]
+            min = last[0]
+        }
+    }
 }
 
 /// Unsafely shrinks the bounds of an integer.

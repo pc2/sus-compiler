@@ -2453,13 +2453,15 @@ module numbersToAddUp(
 );
 
 /*mux_wire*/ logic[1:0] arr[0:4];
-/*mux_wire*/ logic[3:0] total;
+/*mux_wire*/ logic[4:0] total;
+/*mux_wire*/ logic _adder_TreeAdd;
 /*mux_wire*/ logic[1:0] _adder_values[0:4];
-wire[3:0] _adder_total;
-TreeAdd_WIDTH_5_FROM_3_TO_4 adder(
+wire[4:0] _adder_sum;
+TreeAdd_SIZE_5_FROM_3_TO_4 adder(
 	.clk(clk),
+	.TreeAdd(_adder_TreeAdd),
 	.values(_adder_values),
-	.total(_adder_total)
+	.sum(_adder_sum)
 );
 always_comb begin // combinatorial arr
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -2472,8 +2474,16 @@ always_comb begin // combinatorial arr
 end
 always_comb begin // combinatorial total
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	total = 4'dx;
-	total = _adder_total;
+	total = 5'dx;
+	total = _adder_sum;
+end
+always_comb begin // combinatorial _adder_TreeAdd
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_adder_TreeAdd = 1'bx;
+	_adder_TreeAdd = 1'b0;
+	_adder_TreeAdd = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_adder_TreeAdd = _adder_TreeAdd;
 end
 always_comb begin // combinatorial _adder_values
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -2484,232 +2494,145 @@ end
 end
 endmodule // numbersToAddUp #()
 
-// TreeAdd #(WIDTH: 5, FROM: 3, TO: 4)
-module TreeAdd_WIDTH_5_FROM_3_TO_4(
+// TreeAdd #(SIZE: 5, FROM: 3, TO: 4)
+module TreeAdd_SIZE_5_FROM_3_TO_4(
 	/* clock */ input clk,
+	input wire TreeAdd,
 	input wire[1:0] values[0:4],
-	output /*mux_wire*/ logic[3:0] total
+	output /*mux_wire*/ logic[4:0] sum
 );
 
-genvar _g0;
-/*mux_wire*/ logic[2:0] left_total;
-/*latency*/ logic[2:0] _left_total_D2; always_ff @(posedge clk) begin _left_total_D2 <= left_total; end
-wire[1:0] _1[0:1];
-generate
-for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
-assign _1[_g0] = values[_g0];
-end
-endgenerate
-/*mux_wire*/ logic[1:0] _TreeAdd_values[0:1];
-wire[2:0] _TreeAdd_total;
-/*mux_wire*/ logic[3:0] right_total;
-wire[1:0] _2[0:2];
-generate
-for(_g0 = 0; _g0 < 3; _g0 = _g0 + 1) begin
-assign _2[_g0] = values[2 + _g0];
-end
-endgenerate
-/*mux_wire*/ logic[1:0] _TreeAdd_2_values[0:2];
-wire[3:0] _TreeAdd_2_total;
-wire[3:0] _5;
-assign _5 = _left_total_D2 + right_total;
-/*latency*/ logic[3:0] __5_D3; always_ff @(posedge clk) begin __5_D3 <= _5; end
-TreeAdd_WIDTH_2_FROM_3_TO_4 TreeAdd(
-	.clk(clk),
-	.values(_TreeAdd_values),
-	.total(_TreeAdd_total)
-);
-TreeAdd_WIDTH_3_FROM_3_TO_4 TreeAdd_2(
-	.clk(clk),
-	.values(_TreeAdd_2_values),
-	.total(_TreeAdd_2_total)
-);
-always_comb begin // combinatorial total
+/*latency*/ logic _TreeAdd_D1; always_ff @(posedge clk) begin _TreeAdd_D1 <= TreeAdd; end
+/*latency*/ logic _TreeAdd_D2; always_ff @(posedge clk) begin _TreeAdd_D2 <= _TreeAdd_D1; end
+/*latency*/ logic _TreeAdd_D3; always_ff @(posedge clk) begin _TreeAdd_D3 <= _TreeAdd_D2; end
+/*mux_wire*/ logic[1:0] inter_sums_split_0[0:4];
+/*mux_wire*/ logic[1:0] cur_sums[0:4];
+/*mux_wire*/ logic[2:0] next_sums[0:2];
+wire[1:0] _7 = cur_sums[0];
+wire[1:0] _8 = cur_sums[1];
+wire[2:0] _9;
+assign _9 = _7 + _8;
+/*latency*/ logic[2:0] __9_D1; always_ff @(posedge clk) begin __9_D1 <= _9; end
+wire[1:0] _10 = cur_sums[2];
+wire[1:0] _11 = cur_sums[3];
+wire[2:0] _12;
+assign _12 = _10 + _11;
+/*latency*/ logic[2:0] __12_D1; always_ff @(posedge clk) begin __12_D1 <= _12; end
+wire[1:0] _13 = cur_sums[4];
+/*latency*/ logic[1:0] __13_D1; always_ff @(posedge clk) begin __13_D1 <= _13; end
+/*mux_wire*/ logic[2:0] inter_sums_split_1[0:2];
+/*mux_wire*/ logic[2:0] cur_sums_2[0:2];
+/*mux_wire*/ logic[3:0] next_sums_2[0:1];
+wire[2:0] _16 = cur_sums_2[0];
+wire[2:0] _17 = cur_sums_2[1];
+wire[3:0] _18;
+assign _18 = _16 + _17;
+/*latency*/ logic[3:0] __18_D2; always_ff @(posedge clk) begin __18_D2 <= _18; end
+wire[2:0] _19 = cur_sums_2[2];
+/*latency*/ logic[2:0] __19_D2; always_ff @(posedge clk) begin __19_D2 <= _19; end
+/*mux_wire*/ logic[3:0] inter_sums_split_2[0:1];
+/*mux_wire*/ logic[3:0] cur_sums_3[0:1];
+/*mux_wire*/ logic[4:0] next_sums_3[0:0];
+wire[3:0] _22 = cur_sums_3[0];
+wire[3:0] _23 = cur_sums_3[1];
+wire[4:0] _24;
+assign _24 = _22 + _23;
+/*latency*/ logic[4:0] __24_D3; always_ff @(posedge clk) begin __24_D3 <= _24; end
+/*mux_wire*/ logic[4:0] inter_sums_split_3[0:0];
+/*mux_wire*/ logic[4:0] last[0:0];
+wire[4:0] _27 = last[0];
+always_comb begin // combinatorial sum
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	total = 4'dx;
-	total = __5_D3;
+	sum = 5'dx;
+	if(_TreeAdd_D3) sum = _27;
 end
-always_comb begin // combinatorial left_total
+always_comb begin // combinatorial inter_sums_split_0
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	left_total = 3'dx;
-	left_total = _TreeAdd_total;
+	inter_sums_split_0 = '{2'dx, 2'dx, 2'dx, 2'dx, 2'dx};
+	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
+if(TreeAdd) inter_sums_split_0[_v0] = values[_v0];
 end
-always_comb begin // combinatorial _TreeAdd_values
+	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
+if(TreeAdd) inter_sums_split_0[_v0] = values[_v0];
+end
+	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
+if(TreeAdd) inter_sums_split_0[_v0] = values[_v0];
+end
+	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
+if(TreeAdd) inter_sums_split_0[_v0] = values[_v0];
+end
+	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
+if(TreeAdd) inter_sums_split_0[_v0] = values[_v0];
+end
+end
+always_comb begin // combinatorial cur_sums
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_TreeAdd_values = '{2'dx, 2'dx};
-	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
-_TreeAdd_values[_v0] = _1[_v0];
+	cur_sums = '{2'dx, 2'dx, 2'dx, 2'dx, 2'dx};
+	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
+if(TreeAdd) cur_sums[_v0] = inter_sums_split_0[_v0];
 end
 end
-always_comb begin // combinatorial right_total
+always_comb begin // combinatorial next_sums
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	right_total = 4'dx;
-	right_total = _TreeAdd_2_total;
+	next_sums = '{3'dx, 3'dx, 3'dx};
+	if(_TreeAdd_D1) next_sums[0] = __9_D1;
+	if(_TreeAdd_D1) next_sums[1] = __12_D1;
+	if(_TreeAdd_D1) next_sums[2] = __13_D1;
 end
-always_comb begin // combinatorial _TreeAdd_2_values
+always_comb begin // combinatorial inter_sums_split_1
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_TreeAdd_2_values = '{2'dx, 2'dx, 2'dx};
+	inter_sums_split_1 = '{3'dx, 3'dx, 3'dx};
 	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
-_TreeAdd_2_values[_v0] = _2[_v0];
+if(_TreeAdd_D1) inter_sums_split_1[_v0] = next_sums[_v0];
 end
 end
-endmodule // TreeAdd #(WIDTH: 5, FROM: 3, TO: 4)
-
-// TreeAdd #(WIDTH: 3, FROM: 3, TO: 4)
-module TreeAdd_WIDTH_3_FROM_3_TO_4(
-	/* clock */ input clk,
-	input wire[1:0] values[0:2],
-	output /*mux_wire*/ logic[3:0] total
-);
-
-genvar _g0;
-/*mux_wire*/ logic[1:0] left_total;
-/*latency*/ logic[1:0] _left_total_D1; always_ff @(posedge clk) begin _left_total_D1 <= left_total; end
-wire[1:0] _1[0:0];
-generate
-for(_g0 = 0; _g0 < 1; _g0 = _g0 + 1) begin
-assign _1[_g0] = values[_g0];
-end
-endgenerate
-/*mux_wire*/ logic[1:0] _TreeAdd_values[0:0];
-wire[1:0] _TreeAdd_total;
-/*mux_wire*/ logic[2:0] right_total;
-wire[1:0] _2[0:1];
-generate
-for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
-assign _2[_g0] = values[1 + _g0];
-end
-endgenerate
-/*mux_wire*/ logic[1:0] _TreeAdd_2_values[0:1];
-wire[2:0] _TreeAdd_2_total;
-wire[3:0] _5;
-assign _5 = _left_total_D1 + right_total;
-/*latency*/ logic[3:0] __5_D2; always_ff @(posedge clk) begin __5_D2 <= _5; end
-TreeAdd_WIDTH_1_FROM_3_TO_4 TreeAdd(
-	.clk(clk),
-	.values(_TreeAdd_values),
-	.total(_TreeAdd_total)
-);
-TreeAdd_WIDTH_2_FROM_3_TO_4 TreeAdd_2(
-	.clk(clk),
-	.values(_TreeAdd_2_values),
-	.total(_TreeAdd_2_total)
-);
-always_comb begin // combinatorial total
+always_comb begin // combinatorial cur_sums_2
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	total = 4'dx;
-	total = __5_D2;
+	cur_sums_2 = '{3'dx, 3'dx, 3'dx};
+	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
+if(_TreeAdd_D1) cur_sums_2[_v0] = inter_sums_split_1[_v0];
 end
-always_comb begin // combinatorial left_total
+end
+always_comb begin // combinatorial next_sums_2
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	left_total = 2'dx;
-	left_total = _TreeAdd_total;
+	next_sums_2 = '{4'dx, 4'dx};
+	if(_TreeAdd_D2) next_sums_2[0] = __18_D2;
+	if(_TreeAdd_D2) next_sums_2[1] = __19_D2;
 end
-always_comb begin // combinatorial _TreeAdd_values
+always_comb begin // combinatorial inter_sums_split_2
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_TreeAdd_values = '{2'dx};
-	for(int _v0 = 0; _v0 < 1; _v0 = _v0 + 1) begin
-_TreeAdd_values[_v0] = _1[_v0];
-end
-end
-always_comb begin // combinatorial right_total
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	right_total = 3'dx;
-	right_total = _TreeAdd_2_total;
-end
-always_comb begin // combinatorial _TreeAdd_2_values
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_TreeAdd_2_values = '{2'dx, 2'dx};
+	inter_sums_split_2 = '{4'dx, 4'dx};
 	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
-_TreeAdd_2_values[_v0] = _2[_v0];
+if(_TreeAdd_D2) inter_sums_split_2[_v0] = next_sums_2[_v0];
 end
 end
-endmodule // TreeAdd #(WIDTH: 3, FROM: 3, TO: 4)
-
-// TreeAdd #(WIDTH: 2, FROM: 3, TO: 4)
-module TreeAdd_WIDTH_2_FROM_3_TO_4(
-	/* clock */ input clk,
-	input wire[1:0] values[0:1],
-	output /*mux_wire*/ logic[2:0] total
-);
-
-genvar _g0;
-/*mux_wire*/ logic[1:0] left_total;
-wire[1:0] _1[0:0];
-generate
-for(_g0 = 0; _g0 < 1; _g0 = _g0 + 1) begin
-assign _1[_g0] = values[_g0];
-end
-endgenerate
-/*mux_wire*/ logic[1:0] _TreeAdd_values[0:0];
-wire[1:0] _TreeAdd_total;
-/*mux_wire*/ logic[1:0] right_total;
-wire[1:0] _2[0:0];
-generate
-for(_g0 = 0; _g0 < 1; _g0 = _g0 + 1) begin
-assign _2[_g0] = values[1 + _g0];
-end
-endgenerate
-/*mux_wire*/ logic[1:0] _TreeAdd_2_values[0:0];
-wire[1:0] _TreeAdd_2_total;
-wire[2:0] _5;
-assign _5 = left_total + right_total;
-/*latency*/ logic[2:0] __5_D1; always_ff @(posedge clk) begin __5_D1 <= _5; end
-TreeAdd_WIDTH_1_FROM_3_TO_4 TreeAdd(
-	.clk(clk),
-	.values(_TreeAdd_values),
-	.total(_TreeAdd_total)
-);
-TreeAdd_WIDTH_1_FROM_3_TO_4 TreeAdd_2(
-	.clk(clk),
-	.values(_TreeAdd_2_values),
-	.total(_TreeAdd_2_total)
-);
-always_comb begin // combinatorial total
+always_comb begin // combinatorial cur_sums_3
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	total = 3'dx;
-	total = __5_D1;
+	cur_sums_3 = '{4'dx, 4'dx};
+	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
+if(_TreeAdd_D2) cur_sums_3[_v0] = inter_sums_split_2[_v0];
 end
-always_comb begin // combinatorial left_total
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	left_total = 2'dx;
-	left_total = _TreeAdd_total;
 end
-always_comb begin // combinatorial _TreeAdd_values
+always_comb begin // combinatorial next_sums_3
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_TreeAdd_values = '{2'dx};
+	next_sums_3 = '{5'dx};
+	if(_TreeAdd_D3) next_sums_3[0] = __24_D3;
+end
+always_comb begin // combinatorial inter_sums_split_3
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	inter_sums_split_3 = '{5'dx};
 	for(int _v0 = 0; _v0 < 1; _v0 = _v0 + 1) begin
-_TreeAdd_values[_v0] = _1[_v0];
+if(_TreeAdd_D3) inter_sums_split_3[_v0] = next_sums_3[_v0];
 end
 end
-always_comb begin // combinatorial right_total
+always_comb begin // combinatorial last
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	right_total = 2'dx;
-	right_total = _TreeAdd_2_total;
-end
-always_comb begin // combinatorial _TreeAdd_2_values
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_TreeAdd_2_values = '{2'dx};
+	last = '{5'dx};
 	for(int _v0 = 0; _v0 < 1; _v0 = _v0 + 1) begin
-_TreeAdd_2_values[_v0] = _2[_v0];
+if(_TreeAdd_D3) last[_v0] = inter_sums_split_3[_v0];
 end
 end
-endmodule // TreeAdd #(WIDTH: 2, FROM: 3, TO: 4)
-
-// TreeAdd #(WIDTH: 1, FROM: 3, TO: 4)
-module TreeAdd_WIDTH_1_FROM_3_TO_4(
-	/* clock */ input clk,
-	input wire[1:0] values[0:0],
-	output /*mux_wire*/ logic[1:0] total
-);
-
-wire[1:0] _1 = values[0];
-always_comb begin // combinatorial total
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	total = 2'dx;
-	total = _1;
-end
-endmodule // TreeAdd #(WIDTH: 1, FROM: 3, TO: 4)
+endmodule // TreeAdd #(SIZE: 5, FROM: 3, TO: 4)
 
 // no_main_interface #()
 module no_main_interface(
