@@ -230,6 +230,56 @@ module SlowPipelineBegin#(T, int PIPELINE_DEPTH) {
 }
 
 
+/// This module lets you take a value from a slow pipelined stream
+/// (where computing the value takes several pipeline stages, yet the validity of the resulting value is known immediately),
+/// and resynchronizes it to the valid wire by waiting until the pipeline is finished. 
+/// 
+/// Due to the waiting, this module constricts the throughput to `1/LATENCY` cycles. 
+///
+/// Usage:
+/// ```sus
+/// SlowPut resynchronize_fifo_output
+/// FIFO take_stream
+/// when take_stream.may_pop & resynchronize_fifo_output.may_put {
+///     float my_float = take_stream.pop()
+///     // Pipelined to 8 stages
+///     float my_float_squared = fp32_mul(my_float, my_float)
+///     resynchronize_fifo_output.put(my_float_squared)
+/// }
+/// // Once ready, we can take values from the SlowPut
+/// when resynchronize_fifo_output.take_available: float f_sq {
+///     resynchronize_fifo_output.take()
+///     //...
+/// }
+/// ```
+module SlowPut#(T, int LATENCY) {
+    state bool stored_valid'0
+    state T stored_data'0
+    domain put_side
+    output state bool may_put'0
+    action put'0 : T put_data'LATENCY {
+        may_put = false
+        next(LATENCY) stored_valid = true
+        next(LATENCY) stored_data = put_data
+    }
+
+    domain take_side
+    trigger take_available'0: T take_data'0
+    action take'0 {
+        stored_valid = false
+        may_put = true
+    }
+    when stored_valid {
+        take_available(stored_data)
+    }
+
+    domain reset
+    action rst'0 {
+        stored_valid = false
+        may_put = true
+    }
+}
+
 /// This module lets you create pipelined feedback loops of variable latency. 
 ///
 /// Use as follows:
