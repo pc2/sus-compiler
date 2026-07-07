@@ -173,8 +173,13 @@ module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {
 ///
 /// Bandwidth limited to 1 element every 2 cycles.  
 ///
-/// Use for very small FIFOs, in bandwidth-limited circumstances. 
-module RippleFIFO#(T, int DEPTH) {
+/// Use for very small FIFOs, in bandwidth-non-critical circumstances. 
+///
+/// Additionally, this FIFO allows the data to be offset from the valid flags by
+/// an arbitrary amount, which is preserved on the output of the module. 
+/// This allows you to do minor buffering on a line,
+/// without needing to compensate for pipeline latency beforehand. 
+module RippleFIFO#(T, int DEPTH, int DATA_LATENCY) {
 	state T[DEPTH] datas
 	state bool[DEPTH] valids
 
@@ -188,13 +193,13 @@ module RippleFIFO#(T, int DEPTH) {
 
 	domain push_dom
 	output bool may_push'0 = !valids[0]
-	action push'0: T push_data'0 {
+	action push'0: T push_data'DATA_LATENCY {
 		datas[0] = push_data
 		valids[0] = true
 	}
 
 	domain pop_dom
-	trigger pop_available'0 : T pop_data'0
+	trigger pop_available'0 : T pop_data'DATA_LATENCY
     when valids[DEPTH-1] {
         pop_available(datas[DEPTH-1])
     }
