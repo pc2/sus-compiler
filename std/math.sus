@@ -96,7 +96,8 @@ module TreeAdd #(int SIZE, int FROM, int TO) {
 module TreeMax#(int SIZE, int FROM, int TO) {
     action TreeMax : int#(FROM, TO)[SIZE] values -> int max {
         if SIZE == 0 {
-            max = FROM
+            int max_v'0 = FROM
+            max = max_v
         } else if SIZE == 1 {
             max = values[0]
         } else {
@@ -136,7 +137,8 @@ module TreeMax#(int SIZE, int FROM, int TO) {
 module TreeMin#(int SIZE, int FROM, int TO) {
     action TreeMin : int#(FROM, TO)[SIZE] values -> int min {
         if SIZE == 0 {
-            min = TO-1
+            int min_v'0 = TO-1
+            min = min_v
         } else if SIZE == 1 {
             min = values[0]
         } else {
