@@ -634,7 +634,7 @@ impl ModuleTypingContext<'_> {
                 strongly_connected_ports_cycle,
                 final_ports,
             } => {
-                let mut error_text = 
+                let mut error_text =
                     "There is no unique assignment for weakly connected ports. Starting from the strongly connected port group ".to_string();
                 let mut infos = Vec::new();
                 for (port_group, direction) in &strongly_connected_ports_cycle {
