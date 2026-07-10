@@ -80,6 +80,7 @@ pub struct LocationInfo<'linker> {
 
 /// A unique representation of what an object refers to.
 #[derive(Clone, Copy, Debug)]
+#[allow(unused)]
 pub enum RefersTo<'linker> {
     LocalDecl(GlobalUUID, &'linker Declaration, FlatID),
     LocalSubModule(GlobalUUID, &'linker SubModuleInstance, FlatID),
