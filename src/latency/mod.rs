@@ -672,7 +672,7 @@ impl ModuleTypingContext<'_> {
                 let first_port_lat_b = final_ports[0].latency;
 
                 write!(error_text, "({ports_text}) \nIt is recommended to explicitly mark this port, {first_port_name}'{first_port_lat_a} or {first_port_name}'{first_port_lat_b}").unwrap();
-                self.errors.error(first_port_wire.get_span(self.link_info), error_text).add_info_list(infos);
+                error(first_port_wire.get_span(self.link_info), error_text).add_info_list(infos);
             }
         }
         assert!(error_placed_successfully);

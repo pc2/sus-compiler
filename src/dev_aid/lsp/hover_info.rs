@@ -38,7 +38,7 @@ impl HoverCollector<'_> {
         self.list.push(MarkedString::String(result_str));
     }
 
-    fn gather_hover_infos(
+    fn gather_decl_hover_infos(
         &mut self,
         obj_id: GlobalUUID,
         id: FlatID,
@@ -71,6 +71,26 @@ impl HoverCollector<'_> {
                     self.sus_code(wire.display_decl(&self.linker.globals).to_string());
                 }
             }
+        }
+    }
+
+    fn gather_interface_hover_infos(
+        &mut self,
+        obj_id: GlobalUUID,
+        interf_id: FlatID,
+        instantiated_modules: &[&InstantiatedModule],
+    ) {
+        let GlobalUUID::Module(md_id) = obj_id else {
+            return;
+        };
+
+        let md = &self.linker.modules[md_id];
+
+        for inst in instantiated_modules {
+            self.sus_code(
+                inst.display_action(md, interf_id, &self.linker.globals)
+                    .to_string(),
+            );
         }
     }
 
@@ -135,7 +155,7 @@ impl HoverCollector<'_> {
                 .to_string(),
         );
 
-        self.gather_hover_infos(in_global, decl_id, instantiated_modules);
+        self.gather_decl_hover_infos(in_global, decl_id, instantiated_modules);
     }
 
     fn hover_interface(
@@ -156,6 +176,8 @@ impl HoverCollector<'_> {
             )
             .to_string(),
         );
+
+        self.gather_interface_hover_infos(in_global, interface_id, instantiated_modules);
     }
 
     fn hover_submodule(

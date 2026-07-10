@@ -1148,7 +1148,66 @@ impl RealWire {
 }
 
 impl InstantiatedModule {
-    pub fn display_interface(&self, globals: &LinkerGlobals) -> impl Display {
+    pub fn display_action(
+        &self,
+        md: &Module,
+        interf_id: FlatID,
+        globals: &LinkerGlobals,
+    ) -> impl Display {
+        FmtWrapper(move |f| {
+            let interf = md.link_info.instructions[interf_id].unwrap_interface();
+            // If an execution error occurred, interface may only be half-finished. Just abort if any port is invalid
+            let interf_is_valid = interf
+                .inputs
+                .iter()
+                .chain(interf.outputs.iter())
+                .all(|id| matches!(&self.generation_state[*id], SubModuleOrWire::Wire(_)));
+            if !interf_is_valid {
+                return Ok(());
+            }
+            match interf.interface_kind {
+                InterfaceKind::RegularInterface => {
+                    write!(f, "    interface {}", interf.name)?;
+                }
+                InterfaceKind::Action(_) => {
+                    if let SubModuleOrWire::Wire(w) = &self.generation_state[interf_id] {
+                        let w = &self.wires[*w];
+                        write!(f, "    action {}'{}", w.name, w.absolute_latency)?;
+                    } else {
+                        return Ok(());
+                    }
+                }
+                InterfaceKind::Trigger(_) => {
+                    if let SubModuleOrWire::Wire(w) = &self.generation_state[interf_id] {
+                        let w = &self.wires[*w];
+                        write!(f, "    trigger {}'{}", w.name, w.absolute_latency)?;
+                    } else {
+                        return Ok(());
+                    }
+                }
+            }
+            if !interf.inputs.is_empty() {
+                let inputs = display_join(", ", &interf.inputs, |f, i| {
+                    let i_wire = self.generation_state[*i].unwrap_wire(); // Safely unwrap due to earlier check
+                    let w = &self.wires[i_wire];
+
+                    write!(f, "{}", w.display_decl(globals))
+                });
+                write!(f, ": {inputs}")?;
+            }
+            if !interf.outputs.is_empty() {
+                let outputs = display_join(", ", &interf.outputs, |f, i| {
+                    let i_wire = self.generation_state[*i].unwrap_wire(); // Safely unwrap due to earlier check
+                    let w = &self.wires[i_wire];
+
+                    write!(f, "{}", w.display_decl(globals))
+                });
+                write!(f, " -> {outputs}")?;
+            }
+            writeln!(f)
+        })
+    }
+    pub fn display_all_ports(&self, globals: &LinkerGlobals) -> impl Display {
         FmtWrapper(|f| {
             let md = &globals.modules[self.global_ref.id];
 
@@ -1156,57 +1215,8 @@ impl InstantiatedModule {
             for (_, field) in &md.fields {
                 match field.declaration_instruction {
                     Some(FieldDeclKind::Interface(interf_id)) => {
-                        let interf = md.link_info.instructions[interf_id].unwrap_interface();
-                        // If an execution error occurred, interface may only be half-finished. Just abort if any port is invalid
-                        let interf_is_valid =
-                            interf.inputs.iter().chain(interf.outputs.iter()).all(|id| {
-                                matches!(&self.generation_state[*id], SubModuleOrWire::Wire(_))
-                            });
-                        if !interf_is_valid {
-                            continue;
-                        }
-                        match interf.interface_kind {
-                            InterfaceKind::RegularInterface => {
-                                write!(f, "    interface {}", interf.name)?;
-                            }
-                            InterfaceKind::Action(_) => {
-                                if let SubModuleOrWire::Wire(w) = &self.generation_state[interf_id]
-                                {
-                                    let w = &self.wires[*w];
-                                    write!(f, "    action {}'{}", w.name, w.absolute_latency)?;
-                                } else {
-                                    continue;
-                                }
-                            }
-                            InterfaceKind::Trigger(_) => {
-                                if let SubModuleOrWire::Wire(w) = &self.generation_state[interf_id]
-                                {
-                                    let w = &self.wires[*w];
-                                    write!(f, "    trigger {}'{}", w.name, w.absolute_latency)?;
-                                } else {
-                                    continue;
-                                }
-                            }
-                        }
-                        if !interf.inputs.is_empty() {
-                            let inputs = display_join(", ", &interf.inputs, |f, i| {
-                                let i_wire = self.generation_state[*i].unwrap_wire(); // Safely unwrap due to earlier check
-                                let w = &self.wires[i_wire];
-
-                                write!(f, "{}", w.display_decl(globals))
-                            });
-                            write!(f, ": {inputs}")?;
-                        }
-                        if !interf.outputs.is_empty() {
-                            let outputs = display_join(", ", &interf.outputs, |f, i| {
-                                let i_wire = self.generation_state[*i].unwrap_wire(); // Safely unwrap due to earlier check
-                                let w = &self.wires[i_wire];
-
-                                write!(f, "{}", w.display_decl(globals))
-                            });
-                            write!(f, " -> {outputs}")?;
-                        }
-                        writeln!(f)?;
+                        let disp_interf = self.display_action(md, interf_id, globals);
+                        disp_interf.fmt(f)?;
                     }
                     Some(FieldDeclKind::SinglePort(port)) => {
                         if let SubModuleOrWire::Wire(w) = &self.generation_state[port] {
@@ -1433,7 +1443,7 @@ impl SubModule {
     pub fn display_interface(&self, globals: &LinkerGlobals) -> impl Display {
         FmtWrapper(|f| {
             if let Some(instance) = self.instance.get() {
-                instance.display_interface(globals).fmt(f)
+                instance.display_all_ports(globals).fmt(f)
             } else {
                 write!(
                     f,
