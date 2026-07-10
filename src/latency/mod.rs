@@ -8,7 +8,7 @@ use std::{cmp::max, iter::zip};
 
 use crate::alloc::zip_eq;
 use crate::dev_aid::dot_graphs::display_latency_count_graph;
-use crate::errors::ErrorInfoObject;
+use crate::errors::{ErrorInfo, ErrorInfoObject};
 use crate::latency::latency_algorithm::IndeterminablePort;
 use crate::prelude::*;
 use crate::to_string::{FmtWrapper, display_join};
@@ -629,6 +629,50 @@ impl ModuleTypingContext<'_> {
                 let specified_end_latency = end_wire.specified_latency.unwrap();
                 error(end_latency_decl.span, format!("Conflicting specified latency\n\n{path_message}\nBut this was specified as {end_name}'{specified_end_latency}"))
                     .info_obj(start_decl);
+            }
+            LatencyCountingError::NotUniqueWeakPorts {
+                strongly_connected_ports_cycle,
+                final_ports,
+            } => {
+                let mut error_text = 
+                    "There is no unique assignment for weakly connected ports. Starting from the strongly connected port group ".to_string();
+                let mut infos = Vec::new();
+                for (port_group, direction) in &strongly_connected_ports_cycle {
+                    let mut ports_vec = Vec::new();
+                    for port in port_group {
+                        let port_wire = &self.wires[latency_node_meanings[port.node]];
+
+                        let port_text = format!("{}'{}", port_wire.name, port.latency);
+
+                        infos.push(ErrorInfo {
+                            span: port_wire.get_span(self.link_info),
+                            info: format!("{port_text} declared here"),
+                        });
+
+                        ports_vec.push(port_text);
+                    }
+                    let ports_text = ports_vec.join(", ");
+
+                    writeln!(error_text, "({ports_text}) via {direction}s to ").unwrap();
+                }
+
+                let mut ports_vec = Vec::new();
+                for port in &final_ports {
+                    let port_wire = &self.wires[latency_node_meanings[port.node]];
+
+                    let port_text = format!("{}'{}", port_wire.name, port.latency);
+
+                    ports_vec.push(port_text);
+                }
+                let ports_text = ports_vec.join(", ");
+
+                let first_port_wire = &self.wires[latency_node_meanings[final_ports[0].node]];
+                let first_port_name = &first_port_wire.name;
+                let first_port_lat_a = strongly_connected_ports_cycle[0].0[0].latency;
+                let first_port_lat_b = final_ports[0].latency;
+
+                write!(error_text, "({ports_text}) \nIt is recommended to explicitly mark this port, {first_port_name}'{first_port_lat_a} or {first_port_name}'{first_port_lat_b}").unwrap();
+                self.errors.error(first_port_wire.get_span(self.link_info), error_text).add_info_list(infos);
             }
         }
         assert!(error_placed_successfully);

@@ -74,6 +74,10 @@ pub enum LatencyCountingError {
     },
     /// One or more ports' latencies cannot be decided upon, where pushing back an input that still has give pushes another output out of place.
     NotUniquePortLatency { bad_ports: Vec<IndeterminablePort> },
+    NotUniqueWeakPorts {
+        strongly_connected_ports_cycle: Vec<(Vec<SpecifiedLatency>, Direction)>,
+        final_ports: Vec<SpecifiedLatency>,
+    },
     /// Result is a partitioning of all ports in this domain.
     /// The ports before the partition are all strongly connected,
     /// and the ports after it are not strongly connected to this first cluster.
@@ -170,7 +174,7 @@ impl SolutionMemory {
             to_explore_queue: VecDeque::with_capacity(size),
         }
     }
-    fn make_solution_with_initial_values<'s>(
+    fn make_solution_with_initial_values<'s, const INVERT: bool>(
         &'s mut self,
         specified_latencies: &[SpecifiedLatency],
     ) -> Solution<'s> {
@@ -180,7 +184,11 @@ impl SolutionMemory {
             let target_node = &mut self.solution[spec.node];
             assert!(*target_node == UNSET, "Duplicate Specified Latency");
             assert!(is_valid(spec.latency));
-            *target_node = spec.latency;
+            if INVERT {
+                *target_node = -spec.latency;
+            } else {
+                *target_node = spec.latency;
+            }
             self.to_explore_queue.push_back(spec.node)
         }
         Solution {
@@ -617,7 +625,7 @@ fn solve_port_latencies(
             latency: 0, // 'out - 0
         };
         let mut working_latencies =
-            solution_memory.make_solution_with_initial_values(&[start_node]);
+            solution_memory.make_solution_with_initial_values::<false>(&[start_node]);
         working_latencies
             .latency_count_bellman_ford(fanouts, NO_STOP_AT_NODE)
             .unwrap();
@@ -736,6 +744,249 @@ fn solve_port_latencies(
     }
 }
 
+/// Tries to also provide sensible absolute latencies for ports that are weakly connected.
+/// IE: Input/Input connection, or Output/Output connection
+/// The strongly connected port groups must have already been connected internally.
+fn refine_weak_port_connections(
+    fanins: &ListOfLists<FanInOut>,
+    fanouts: &ListOfLists<FanInOut>,
+    ports: &LatencyCountingPorts,
+    solution_memory: &mut SolutionMemory,
+    strong_port_groups: Vec<Vec<SpecifiedLatency>>,
+) -> Result<Vec<Vec<SpecifiedLatency>>, LatencyCountingError> {
+    if strong_port_groups.len() <= 1 {
+        return Ok(strong_port_groups); // No need for merging for a single port group
+    }
+
+    // Indexed as matrix[source_group * port_groups.len() + target_group]
+    // Denotes the offset the target group would have to be moved, such that it is synchronized with the source group.
+    let mut relative_latency_matrix: Vec<(i64, i64)> =
+        vec![(UNSET, UNSET); strong_port_groups.len() * strong_port_groups.len()];
+
+    fn find_port_group_for(
+        port_groups: &[Vec<SpecifiedLatency>],
+        port: usize,
+    ) -> (usize, usize, i64) {
+        for (pg_idx, pg) in port_groups.iter().enumerate() {
+            if let Some(found) = pg.iter().find(|pg_port| pg_port.node == port) {
+                return (port, pg_idx, found.latency);
+            }
+        }
+        unreachable!("All ports should be part of a port group")
+    }
+    let input_to_port_group_map: Vec<(usize, usize, i64)> = ports
+        .inputs
+        .iter()
+        .map(|input| find_port_group_for(&strong_port_groups, *input))
+        .collect();
+    let output_to_port_group_map: Vec<(usize, usize, i64)> = ports
+        .outputs
+        .iter()
+        .map(|output| find_port_group_for(&strong_port_groups, *output))
+        .collect();
+
+    for (sourge_port_group, port_group) in strong_port_groups.iter().enumerate() {
+        let mut solution = solution_memory.make_solution_with_initial_values::<false>(port_group);
+        solution
+            .latency_count_bellman_ford(fanouts, NO_STOP_AT_NODE)
+            .unwrap();
+        solution.invert_and_generate_queue();
+        solution
+            .latency_count_bellman_ford(fanins, NO_STOP_AT_NODE)
+            .unwrap();
+
+        for (input, target_group, original_port_latency) in &input_to_port_group_map {
+            if *target_group != sourge_port_group && is_valid(solution.solution[*input]) {
+                let target_latency = -solution.solution[*input] - original_port_latency;
+                let result_ref = &mut relative_latency_matrix
+                    [sourge_port_group * strong_port_groups.len() + target_group];
+                if result_ref.0 == UNSET {
+                    result_ref.0 = target_latency;
+                } else {
+                    assert_eq!(result_ref.0, target_latency);
+                }
+            }
+        }
+
+        let mut solution = solution_memory.make_solution_with_initial_values::<true>(port_group);
+        solution
+            .latency_count_bellman_ford(fanins, NO_STOP_AT_NODE)
+            .unwrap();
+        solution.invert_and_generate_queue();
+        solution
+            .latency_count_bellman_ford(fanouts, NO_STOP_AT_NODE)
+            .unwrap();
+
+        for (output, target_group, original_port_latency) in &output_to_port_group_map {
+            if is_valid(solution.solution[*output]) && !port_group.iter().any(|s| s.node == *output)
+            {
+                let target_latency = solution.solution[*output] - original_port_latency;
+                let result_ref = &mut relative_latency_matrix
+                    [sourge_port_group * strong_port_groups.len() + target_group];
+                if result_ref.1 == UNSET {
+                    result_ref.1 = target_latency;
+                } else {
+                    assert_eq!(result_ref.1, target_latency);
+                }
+            }
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    struct ResultVecElem {
+        selected_latency: i64,
+        discovered_from_group: usize,
+        discovery_through_direction: Direction,
+    }
+    let mut result_vec: Vec<Option<ResultVecElem>> = vec![None; strong_port_groups.len()];
+
+    let mut explore_queue: VecDeque<usize> = VecDeque::new();
+
+    let mut current_group: Vec<SpecifiedLatency> = Vec::new();
+    let mut result_groups: Vec<Vec<SpecifiedLatency>> = Vec::new();
+
+    loop {
+        // Use a queue so it's a Breath-First search, which will give the smallest error cycles.
+        if let Some(source_group) = explore_queue.pop_front() {
+            let start_result = result_vec[source_group].unwrap();
+            for (target_group, target_connection) in relative_latency_matrix[source_group
+                * strong_port_groups.len()
+                ..(source_group + 1) * strong_port_groups.len()]
+                .iter()
+                .enumerate()
+            {
+                for (target_offset, discovery_through_outputs) in [
+                    (target_connection.0, Direction::Input),
+                    (target_connection.1, Direction::Output),
+                ] {
+                    if target_offset == UNSET {
+                        continue;
+                    }
+                    let new_target_offset = start_result.selected_latency + target_offset;
+                    if let Some(existing_target) = &mut result_vec[target_group] {
+                        if existing_target.selected_latency != new_target_offset {
+                            // ERROR! Weak Port Connection Error.
+                            // Find a cycle which shows the error
+
+                            /*
+                                We found an error, this means that there is a fork somewhere in the Breadth-first search
+                                (The pointers are back-pointers. discovered_from_group)
+
+                                            A <- . <- . <- .
+                                          </                <\
+                                0 <- . <- F                target_group
+                                          <\                /?
+                                            B <- source_group
+
+                                We then reverse the previous path to target_group, such that there's now a cycle,
+                                starting from source_group, back to target_group the other way
+
+                                            A -> . -> . -> .
+                                           />                \>
+                                0 -> . -> F                target_group
+                                          <\                </
+                                            B <- source_group
+                            */
+                            let mut bad_cycle_finder = result_vec.clone();
+
+                            let mut new_pointer = source_group;
+                            let mut new_is_output = discovery_through_outputs;
+                            let mut cur_editing_ptr = target_group;
+
+                            while new_pointer != cur_editing_ptr {
+                                let edit_group =
+                                    bad_cycle_finder[cur_editing_ptr].as_mut().unwrap();
+                                let prev_edit_group = *edit_group;
+                                edit_group.discovered_from_group = new_pointer;
+                                edit_group.discovery_through_direction = new_is_output;
+
+                                new_pointer = cur_editing_ptr;
+                                new_is_output = prev_edit_group.discovery_through_direction;
+                                cur_editing_ptr = prev_edit_group.discovered_from_group;
+                            }
+
+                            // Now bad_cycle_finder contains a cycle,
+                            // when we start from any node inside it (like source_group),
+                            // we can iterate until we hit source_group again
+                            let mut cur_ptr = target_group;
+                            let mut strongly_connected_ports_cycle = Vec::new();
+                            loop {
+                                let cur_group = bad_cycle_finder[cur_ptr].as_ref().unwrap();
+
+                                let group_ports = &strong_port_groups[cur_ptr];
+
+                                let modified_ports: Vec<_> = group_ports
+                                    .iter()
+                                    .map(|spec| SpecifiedLatency {
+                                        node: spec.node,
+                                        latency: spec.latency + cur_group.selected_latency,
+                                    })
+                                    .collect();
+
+                                strongly_connected_ports_cycle
+                                    .push((modified_ports, cur_group.discovery_through_direction));
+
+                                if cur_group.discovered_from_group == target_group {
+                                    break;
+                                }
+                                cur_ptr = cur_group.discovered_from_group;
+                            }
+                            let target_port_group = &strong_port_groups[target_group];
+                            let final_ports: Vec<_> = target_port_group
+                                .iter()
+                                .map(|spec| SpecifiedLatency {
+                                    node: spec.node,
+                                    latency: spec.latency + new_target_offset,
+                                })
+                                .collect();
+
+                            return Err(LatencyCountingError::NotUniqueWeakPorts {
+                                strongly_connected_ports_cycle,
+                                final_ports,
+                            });
+                        }
+                    } else {
+                        result_vec[target_group] = Some(ResultVecElem {
+                            selected_latency: new_target_offset,
+                            discovered_from_group: source_group,
+                            discovery_through_direction: discovery_through_outputs,
+                        });
+                        explore_queue.push_back(target_group);
+                        for spec in &strong_port_groups[target_group] {
+                            current_group.push(SpecifiedLatency {
+                                node: spec.node,
+                                latency: spec.latency + new_target_offset,
+                            });
+                        }
+                    }
+                }
+            }
+        } else if let Some(first_missing) = result_vec.iter().position(|e| e.is_none()) {
+            // Ran out of new nodes in this connected component. Store it and seed the next one
+            if !current_group.is_empty() {
+                result_groups.push(current_group);
+            }
+            explore_queue.push_back(first_missing);
+            result_vec[first_missing] = Some(ResultVecElem {
+                selected_latency: 0,
+                discovered_from_group: first_missing,
+                discovery_through_direction: Direction::Input,
+            });
+            current_group = strong_port_groups[first_missing].clone();
+            assert!(!current_group.is_empty());
+        } else {
+            break;
+        }
+    }
+    result_groups.push(current_group);
+
+    for v in &result_groups {
+        assert!(!v.is_empty());
+    }
+
+    Ok(result_groups)
+}
+
 enum InitialGroupFromSpecified {
     NotFound,
     FromInput,
@@ -752,7 +1003,8 @@ fn get_initial_group_from_specified(
 ) -> InitialGroupFromSpecified {
     // When no specified latencies, we don't even need to try
     if let Some(first_specified_latency) = specified_latencies.first() {
-        let find_set_ports = solution_memory.make_solution_with_initial_values(specified_latencies);
+        let find_set_ports =
+            solution_memory.make_solution_with_initial_values::<false>(specified_latencies);
         find_set_ports.gather(input_latencies);
         if input_latencies.iter().any(|l| is_valid(l.latency)) {
             return InitialGroupFromSpecified::FromInput;
@@ -766,7 +1018,7 @@ fn get_initial_group_from_specified(
         // Turns out no ports had a specified latency. Try to get an estimate for a *single* port (if we were to take multiple estimates, we could create spurious indeterminable port latency conflicts).
         // Try to estimate an input port by going backward first
         let mut backtrack_for_port =
-            solution_memory.make_solution_with_initial_values(&[SpecifiedLatency {
+            solution_memory.make_solution_with_initial_values::<false>(&[SpecifiedLatency {
                 node: first_specified_latency.node,
                 latency: -first_specified_latency.latency,
             }]);
@@ -781,7 +1033,7 @@ fn get_initial_group_from_specified(
 
         // No input port could be set, try to estimate an output port by going forward instead
         let mut backtrack_for_port =
-            solution_memory.make_solution_with_initial_values(&[*first_specified_latency]);
+            solution_memory.make_solution_with_initial_values::<false>(&[*first_specified_latency]);
         backtrack_for_port
             .latency_count_bellman_ford(fanouts, NO_STOP_AT_NODE)
             .unwrap();
@@ -924,6 +1176,22 @@ fn check_for_unconnected_ports(
     }
 }
 
+fn extend_faninout(
+    fanins: ListOfLists<FanInOut>,
+    extra_fanins: &[Vec<SpecifiedLatency>],
+) -> (ListOfLists<FanInOut>, ListOfLists<FanInOut>) {
+    // Tightly bind the known ports together
+    // to ensure that if one port group bleeds into another without the ports being strongly connected,
+    // then the second group is still at the correct offsets, even if some internal latencies may not be as expected.
+    let mut bind_port_groups_extra_fanin = Vec::new();
+    for seed in extra_fanins {
+        add_cycle_to_extra_fanin(seed, &mut bind_port_groups_extra_fanin);
+    }
+    let fanins = fanins.extend_lists_with_new_elements(bind_port_groups_extra_fanin);
+    let fanouts = fanins.faninout_complement();
+    (fanins, fanouts)
+}
+
 /// Solves the whole latency counting problem. No inference
 ///
 /// Requires fanins to have [ListOfLists::add_extra_fanin_and_specified_latencies] to have been run with `specified_latencies`
@@ -956,24 +1224,26 @@ pub fn solve_latencies(
     let (solution_seeds, mut seed_start) =
         solve_port_latencies(&fanins, &fanouts, ports, &mut mem, specified_latencies)?;
 
+    let (fanins, fanouts) = extend_faninout(fanins, &solution_seeds);
+
+    let solution_seeds =
+        refine_weak_port_connections(&fanins, &fanouts, ports, &mut mem, solution_seeds)?;
+
     check_for_unconnected_ports(ports_per_domain, &solution_seeds, fanouts.len())?;
 
     let mut final_solution = vec![UNSET; fanouts.len()];
 
-    // Tightly bind the known ports together, to ensure that if one port group bleeds into another without the ports being strongly connected, then the second group is still at the correct offsets, even if some internal latencies may not be as expected.
-    let mut bind_port_groups_extra_fanin = Vec::new();
-    for seed in &solution_seeds {
-        add_cycle_to_extra_fanin(seed, &mut bind_port_groups_extra_fanin);
-    }
-    let fanins = fanins.extend_lists_with_new_elements(bind_port_groups_extra_fanin);
-    let fanouts = fanins.faninout_complement();
+    let (fanins, fanouts) = extend_faninout(fanins, &solution_seeds);
 
     for seed in solution_seeds {
         if is_valid(final_solution[seed[0].node]) {
-            continue; // This port group seems to have already been covered when exploring around another port group. Because we bound the latency of the ports together already, it will not have been damaged. Only internal latencies might be a bit shuffled up. 
+            // This port group seems to have already been covered when exploring around another port group.
+            // Because we bound the latency of the ports together already, it will not have been damaged.
+            // Only internal latencies might be a bit shuffled up.
+            continue;
         }
 
-        let mut solution = mem.make_solution_with_initial_values(&seed);
+        let mut solution = mem.make_solution_with_initial_values::<false>(&seed);
         solution.explore_all_connected_nodes(&fanins, &fanouts);
 
         // Of course, all other specified latencies are in the exact same solution
@@ -995,7 +1265,7 @@ pub fn solve_latencies(
                 latency: seed_start,
             };
             seed_start += SEPARATE_SEED_OFFSET;
-            let mut solution = mem.make_solution_with_initial_values(&[seed]);
+            let mut solution = mem.make_solution_with_initial_values::<false>(&[seed]);
             solution.explore_all_connected_nodes(&fanins, &fanouts);
             solution.copy_to(&mut final_solution);
         }
@@ -1051,12 +1321,12 @@ impl LatencyInferenceProblem {
         from: usize,
         to: usize,
     ) -> Result<i64, InferenceFailure> {
-        let mut solution = self
-            .mem
-            .make_solution_with_initial_values(&[SpecifiedLatency {
-                node: to,
-                latency: 0,
-            }]);
+        let mut solution =
+            self.mem
+                .make_solution_with_initial_values::<false>(&[SpecifiedLatency {
+                    node: to,
+                    latency: 0,
+                }]);
 
         solution.latency_count_bellman_ford(&self.fanouts, from)?;
 
@@ -1492,7 +1762,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Don't support only inputs anymore"]
     fn test_inputs_only() {
         let fanins: [&[FanInOut]; 7] = [
             /*0*/ &[],
@@ -1511,7 +1780,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Don't support only outputs anymore"]
     fn test_outputs_only() {
         let fanins: [&[FanInOut]; 7] = [
             /*0*/ &[],
@@ -1862,9 +2130,6 @@ mod tests {
         }
     }
 
-    /*
-    These tests were commented out because joining non-strongly-connected ports is no longer supported
-
     #[test]
     fn check_disjoint_input_still_should_succeed() {
         /*
@@ -1955,11 +2220,10 @@ mod tests {
         let err_solution =
             solve_latencies_test_case(fanins, &inputs, &outputs, &specified_latencies);
 
-        let Err(LatencyCountingError::PartialSolutionMergeConflict { bad_nodes: _ }) = err_solution
-        else {
+        let Err(LatencyCountingError::NotUniqueWeakPorts { .. }) = err_solution else {
             panic!("{err_solution:?}")
         };
-    }*/
+    }
 
     #[test]
     fn check_bad_cycle() {
