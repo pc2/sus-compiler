@@ -102,7 +102,7 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_Iterator #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate UseBuiltinConstants #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate FailingAssert #()
-[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate latency_counting_disjoint_blocks #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated latency_counting_disjoint_blocks #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate latency_counting_disjoint_blocks_merge_error #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_infer_me #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated infer_me #(A: 5)
@@ -2434,89 +2434,30 @@ Error: Used 'when' in a generative context, use 'if' instead
       │            ──┬─  
       │              ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
-Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
-An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
-Strongly connected ports are also transitive.
-If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-      ╭─[ test.sus:1108:21 ]
-      │
- 1108 │     interface y : bool c -> bool d
-      │                        ┬  
-      │                        ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
-An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
-Strongly connected ports are also transitive.
-If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-      │
-      ├─[ test.sus:1108:21 ]
-      │
- 1107 │     interface x : bool a -> bool b
-      │                        ┬         ┬  
-      │                        ╰──────────── 'a' declared here
-      │                                  │  
-      │                                  ╰── 'b' declared here
-──────╯
-Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
-An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
-Strongly connected ports are also transitive.
-If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-      ╭─[ test.sus:1108:31 ]
-      │
- 1108 │     interface y : bool c -> bool d
-      │                                  ┬  
-      │                                  ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
-An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
-Strongly connected ports are also transitive.
-If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-      │
-      ├─[ test.sus:1108:31 ]
-      │
- 1107 │     interface x : bool a -> bool b
-      │                        ┬         ┬  
-      │                        ╰──────────── 'a' declared here
-      │                                  │  
-      │                                  ╰── 'b' declared here
-──────╯
-Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
-An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
-Strongly connected ports are also transitive.
-If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+Error: There is no unique assignment for weakly connected ports. Starting from the strongly connected port group (c'1, d'1) via outputs to 
+(a'0, b'0) via inputs to 
+(c'0, d'0) 
+It is recommended to explicitly mark this port, c'1 or c'0
       ╭─[ test.sus:1118:21 ]
       │
  1118 │     interface y : bool c -> bool d
-      │                        ┬  
-      │                        ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
-An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
-Strongly connected ports are also transitive.
-If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      │                        ┬         ┬  
+      │                        ╰──────────── There is no unique assignment for weakly connected ports. Starting from the strongly connected port group (c'1, d'1) via outputs to 
+(a'0, b'0) via inputs to 
+(c'0, d'0) 
+It is recommended to explicitly mark this port, c'1 or c'0
+      │                        │         │  
+      │                        ╰──────────── c'1 declared here
+      │                                  │  
+      │                                  ╰── d'1 declared here
       │
       ├─[ test.sus:1118:21 ]
       │
  1117 │     interface x : bool a -> bool b
       │                        ┬         ┬  
-      │                        ╰──────────── 'a' declared here
+      │                        ╰──────────── a'0 declared here
       │                                  │  
-      │                                  ╰── 'b' declared here
-──────╯
-Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
-An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
-Strongly connected ports are also transitive.
-If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-      ╭─[ test.sus:1118:31 ]
-      │
- 1118 │     interface y : bool c -> bool d
-      │                                  ┬  
-      │                                  ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
-An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
-Strongly connected ports are also transitive.
-If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-      │
-      ├─[ test.sus:1118:31 ]
-      │
- 1117 │     interface x : bool a -> bool b
-      │                        ┬         ┬  
-      │                        ╰──────────── 'a' declared here
-      │                                  │  
-      │                                  ╰── 'b' declared here
+      │                                  ╰── b'0 declared here
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1122:11 ]
@@ -4873,7 +4814,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [ERROR sus_compiler::codegen] Cannot codegen use_Iterator #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen UseBuiltinConstants #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen FailingAssert #() due to errors!
-[ERROR sus_compiler::codegen] Cannot codegen latency_counting_disjoint_blocks #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen latency_counting_disjoint_blocks_merge_error #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen use_infer_me #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen inference_edge_case #() due to errors!

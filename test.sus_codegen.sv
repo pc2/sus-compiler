@@ -2405,6 +2405,43 @@ always_comb begin // combinatorial y
 end
 endmodule // infer_me #(A: 5)
 
+// latency_counting_disjoint_blocks #()
+module latency_counting_disjoint_blocks(
+	/* clock */ input clk,
+	input wire a,
+	output /*mux_wire*/ logic b,
+	input wire c,
+	output /*mux_wire*/ logic d
+);
+
+/*mux_wire*/ logic shared;
+wire _3;
+assign _3 = a ^ shared;
+wire _6;
+assign _6 = c ^ shared;
+always_comb begin // combinatorial b
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	b = 1'bx;
+	b = _3;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	b = b;
+end
+always_comb begin // combinatorial d
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	d = 1'bx;
+	d = _6;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	d = d;
+end
+always_comb begin // combinatorial shared
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	shared = 1'bx;
+	shared = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	shared = shared;
+end
+endmodule // latency_counting_disjoint_blocks #()
+
 // use_sized_int_add #()
 module use_sized_int_add(
 	/* clock */ input clk,
