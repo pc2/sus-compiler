@@ -251,7 +251,7 @@ where
     GlobalUUID: From<ID>,
 {
     let inside_brackets = global_ref.get_inner_bracket_span()?;
-    if inside_brackets.contains_pos(position) {
+    if !inside_brackets.contains_pos(position) {
         return None;
     }
 
