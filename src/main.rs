@@ -5,6 +5,7 @@ use prelude::*;
 
 mod alloc;
 mod append_only_vec;
+mod block_vector;
 
 mod config;
 mod debug;
