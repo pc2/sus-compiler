@@ -39,6 +39,9 @@ impl ArrayValue {
     pub fn len(&self) -> usize {
         self.0.0.len()
     }
+    pub fn is_empty(&self) -> bool {
+        self.0.0.is_empty()
+    }
     pub fn get(&self, idx: &IBig) -> Result<&Value, String> {
         let Ok(idx) = i64::try_from(idx) else {
             return Err(format!("Index out of range of i64: {idx}"));
@@ -86,7 +89,7 @@ impl ArrayValue {
 }
 
 impl<'bv> IntoIterator for &'bv ArrayValue {
-    type Item = (i64, &'bv Value);
+    type Item = &'bv Value;
     type IntoIter = BlockVecIter<'bv, Value>;
     fn into_iter(self) -> Self::IntoIter {
         let store = &self.0.0;
@@ -94,7 +97,7 @@ impl<'bv> IntoIterator for &'bv ArrayValue {
     }
 }
 impl<'bv> IntoIterator for &'bv mut ArrayValue {
-    type Item = (i64, &'bv mut Value);
+    type Item = &'bv mut Value;
     type IntoIter = BlockVecIterMut<'bv, Value>;
     fn into_iter(self) -> Self::IntoIter {
         let store = &mut self.0.0;
@@ -102,7 +105,7 @@ impl<'bv> IntoIterator for &'bv mut ArrayValue {
     }
 }
 impl IntoIterator for ArrayValue {
-    type Item = (i64, Value);
+    type Item = Value;
     type IntoIter = BlockVecConsumingIter<Value>;
     fn into_iter(self) -> Self::IntoIter {
         let store = self.0.0;

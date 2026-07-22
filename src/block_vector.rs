@@ -18,7 +18,7 @@ fn make_block<T, const BLOCK_SIZE: usize>() -> *mut [MaybeUninit<T>; BLOCK_SIZE]
     Box::into_raw(Box::new([const { MaybeUninit::<T>::uninit() }; BLOCK_SIZE]))
 }
 
-unsafe fn free_block<T, const BLOCK_SIZE: usize>(block: *mut [MaybeUninit<T>; BLOCK_SIZE]) {
+fn free_block<T, const BLOCK_SIZE: usize>(block: *mut [MaybeUninit<T>; BLOCK_SIZE]) {
     unsafe { std::mem::drop(Box::from_raw(block)) }
 }
 
@@ -29,63 +29,53 @@ impl<T, const BLOCK_SIZE: usize> BlockVecDequeInner<T, BLOCK_SIZE> {
             range: 0..0,
         }
     }
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            blocks: VecDeque::with_capacity(capacity.div_ceil(BLOCK_SIZE) + 1),
+            range: 0..0,
+        }
+    }
     fn len(&self) -> usize {
         (self.range.end - self.range.start) as usize
     }
+    fn is_empty(&self) -> bool {
+        self.range.is_empty()
+    }
+    fn push_front(&mut self, v: T) {
+        self.range.start -= 1;
+        let index_in_first_block = self.range.start.rem_euclid(BLOCK_SIZE as i64) as usize;
+        if index_in_first_block == BLOCK_SIZE - 1 {
+            self.blocks.push_front(make_block());
+        }
+        let first_block = *self.blocks.front().unwrap();
+        unsafe {
+            (*first_block)[index_in_first_block].write(v);
+        }
+    }
+    fn push_back(&mut self, v: T) {
+        let index_in_last_block = self.range.end.rem_euclid(BLOCK_SIZE as i64) as usize;
+        if index_in_last_block == 0 {
+            self.blocks.push_back(make_block());
+        }
+        let last_block = *self.blocks.back().unwrap();
+        unsafe {
+            (*last_block)[index_in_last_block].write(v);
+        }
+        self.range.end += 1;
+    }
     /// It is an error for `make_default` to access this vector. Should be caught by the [RefCell]. It should also not panic
     fn get_mut(&mut self, idx: i64, mut make_default: impl FnMut() -> T) -> *mut T {
-        let idx_block_index = idx.div_euclid(BLOCK_SIZE as i64);
+        while idx < self.range.start {
+            self.push_front(make_default());
+        }
+        while idx >= self.range.end {
+            self.push_back(make_default());
+        }
+
+        let first_block = self.range.start.div_euclid(BLOCK_SIZE as i64);
+        let idx_block = idx.div_euclid(BLOCK_SIZE as i64);
         let idx_block_offset = idx.rem_euclid(BLOCK_SIZE as i64) as usize;
-        let block: *mut [MaybeUninit<T>; BLOCK_SIZE] = if self.range.is_empty() {
-            self.range = idx..(idx + 1);
-            self.blocks.push_back(make_block());
-            self.blocks[0]
-        } else {
-            let last_idx = self.range.end - 1;
-
-            let first_stored_block = self.range.start.div_euclid(BLOCK_SIZE as i64);
-            let last_stored_block = last_idx.div_euclid(BLOCK_SIZE as i64);
-            let new_data_range = if idx < self.range.start {
-                let num_extra_blocks = (first_stored_block - idx_block_index) as usize;
-                self.blocks.reserve(num_extra_blocks);
-
-                for _ in 0..num_extra_blocks {
-                    self.blocks.push_front(make_block());
-                }
-
-                Some((idx..self.range.start, idx..(last_idx + 1)))
-            } else if idx > last_idx {
-                let num_extra_blocks = (idx_block_index - last_stored_block) as usize;
-                self.blocks.reserve(num_extra_blocks);
-
-                for _ in 0..num_extra_blocks {
-                    self.blocks.push_back(make_block());
-                }
-
-                Some((last_idx..idx, self.range.start..(idx + 1)))
-            } else {
-                None
-            };
-
-            if let Some((new_data_range, new_range)) = new_data_range {
-                self.range = new_range;
-
-                let first_block = self.range.start.div_euclid(BLOCK_SIZE as i64);
-                for v in new_data_range {
-                    let v_block_idx = v.div_euclid(BLOCK_SIZE as i64);
-                    let v_idx_in_block = v.rem_euclid(BLOCK_SIZE as i64) as usize;
-
-                    let block = self.blocks[(v_block_idx - first_block) as usize];
-                    unsafe {
-                        let elem_ptr = block.cast::<MaybeUninit<T>>().add(v_idx_in_block);
-                        (*elem_ptr).write(make_default());
-                    }
-                }
-            }
-
-            self.blocks[(idx_block_index - first_stored_block) as usize]
-        };
-
+        let block = self.blocks[(idx_block - first_block) as usize];
         unsafe {
             block
                 .cast::<MaybeUninit<T>>()
@@ -126,24 +116,27 @@ impl<T, const BLOCK_SIZE: usize> Drop for BlockVecDequeInner<T, BLOCK_SIZE> {
             if let Some(last_block) = self.blocks.pop_back() {
                 let last_block = &mut *last_block;
                 // first block and last block are separate
-                for v in first_elem_offset..BLOCK_SIZE {
-                    first_block[v].assume_init_drop();
+                for v in &mut first_block[first_elem_offset..BLOCK_SIZE] {
+                    v.assume_init_drop();
                 }
-                for v in 0..=last_elem_offset {
-                    last_block[v].assume_init_drop();
+                for v in &mut last_block[0..=last_elem_offset] {
+                    v.assume_init_drop();
                 }
+                free_block(first_block);
+                free_block(last_block);
             } else {
                 // first block and last block are the same block
-                for v in first_elem_offset..=last_elem_offset {
-                    first_block[v].assume_init_drop();
+                for v in &mut first_block[first_elem_offset..=last_elem_offset] {
+                    v.assume_init_drop();
                 }
+                free_block(first_block);
             }
 
             for middle_block in self.blocks.drain(..) {
-                let middle_block = &mut *middle_block;
-                for v in middle_block {
+                for v in &mut *middle_block {
                     v.assume_init_drop();
                 }
+                free_block(middle_block);
             }
         }
     }
@@ -167,20 +160,17 @@ impl<T, const BLOCK_SIZE: usize> Default for BlockVecDeque<T, BLOCK_SIZE> {
         Self::new()
     }
 }
-impl<T: Clone, const BLOCK_SIZE: usize> Clone for BlockVecDeque<T, BLOCK_SIZE> {
+impl<T: Clone, const BLOCK_SIZE: usize> Clone for BlockVecDequeInner<T, BLOCK_SIZE> {
     fn clone(&self) -> Self {
-        let inner_borrow = self.0.borrow();
-        let blocks: VecDeque<_> = (0..inner_borrow.blocks.len())
-            .map(|_| make_block())
-            .collect();
+        let blocks: VecDeque<_> = (0..self.blocks.len()).map(|_| make_block()).collect();
 
-        let first_block = inner_borrow.range.start.div_euclid(BLOCK_SIZE as i64);
+        let first_block = self.range.start.div_euclid(BLOCK_SIZE as i64);
 
-        for i in inner_borrow.range.clone() {
+        for i in self.range.clone() {
             let block_idx = i.div_euclid(BLOCK_SIZE as i64);
             let idx_in_block = i.rem_euclid(BLOCK_SIZE as i64) as usize;
 
-            let from_block = inner_borrow.blocks[(block_idx - first_block) as usize];
+            let from_block = self.blocks[(block_idx - first_block) as usize];
             let to_block = blocks[(block_idx - first_block) as usize];
 
             unsafe {
@@ -191,11 +181,16 @@ impl<T: Clone, const BLOCK_SIZE: usize> Clone for BlockVecDeque<T, BLOCK_SIZE> {
             }
         }
 
-        let new_inner = BlockVecDequeInner {
+        BlockVecDequeInner {
             blocks,
-            range: inner_borrow.range.clone(),
-        };
-        Self(RefCell::new(new_inner))
+            range: self.range.clone(),
+        }
+    }
+}
+impl<T: Clone, const BLOCK_SIZE: usize> Clone for BlockVecDeque<T, BLOCK_SIZE> {
+    fn clone(&self) -> Self {
+        let inner_borrow = self.0.borrow();
+        Self(RefCell::new(inner_borrow.clone()))
     }
 }
 impl<T: Hash, const BLOCK_SIZE: usize> Hash for BlockVecDeque<T, BLOCK_SIZE> {
@@ -210,9 +205,7 @@ impl<T: PartialEq, const BLOCK_SIZE: usize> PartialEq for BlockVecDeque<T, BLOCK
         if self.len() != other.len() {
             return false;
         }
-        self.iter()
-            .zip(other.iter())
-            .all(|((_, a), (_, b))| a.eq(b))
+        self.iter().zip(other.iter()).all(|(a, b)| a.eq(b))
     }
 }
 impl<T: Eq, const BLOCK_SIZE: usize> Eq for BlockVecDeque<T, BLOCK_SIZE> {}
@@ -223,7 +216,7 @@ impl<T: PartialOrd, const BLOCK_SIZE: usize> PartialOrd for BlockVecDeque<T, BLO
         if found_order != Ordering::Equal {
             return Some(found_order);
         }
-        for ((_, a), (_, b)) in self.iter().zip(other.iter()) {
+        for (a, b) in self.iter().zip(other.iter()) {
             match a.partial_cmp(b) {
                 Some(Ordering::Less) => {
                     return Some(Ordering::Less);
@@ -244,7 +237,7 @@ impl<T: Ord, const BLOCK_SIZE: usize> Ord for BlockVecDeque<T, BLOCK_SIZE> {
         if found_order != Ordering::Equal {
             return found_order;
         }
-        for ((_, a), (_, b)) in self.iter().zip(other.iter()) {
+        for (a, b) in self.iter().zip(other.iter()) {
             match a.cmp(b) {
                 Ordering::Less => {
                     return Ordering::Less;
@@ -279,6 +272,10 @@ impl<T, const BLOCK_SIZE: usize> BlockVecDeque<T, BLOCK_SIZE> {
         Self(RefCell::new(inner))
     }
 
+    fn with_capacity(capacity: usize) -> Self {
+        Self(RefCell::new(BlockVecDequeInner::with_capacity(capacity)))
+    }
+
     pub fn get_or_insert(&self, idx: i64, make_default: impl FnMut() -> T) -> &T {
         unsafe { &*self.0.borrow_mut().get(idx, make_default) }
     }
@@ -300,9 +297,18 @@ impl<T, const BLOCK_SIZE: usize> BlockVecDeque<T, BLOCK_SIZE> {
             None
         }
     }
+    pub fn push_back(&mut self, v: T) {
+        self.0.borrow_mut().push_back(v);
+    }
+    pub fn push_front(&mut self, v: T) {
+        self.0.borrow_mut().push_front(v);
+    }
 
     pub fn len(&self) -> usize {
         self.0.borrow().len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.0.borrow().is_empty()
     }
     pub fn range(&self) -> Range<i64> {
         self.0.borrow().range.clone()
@@ -347,21 +353,36 @@ impl<T, const BLOCK_SIZE: usize> IndexMut<i64> for BlockVecDeque<T, BLOCK_SIZE> 
     }
 }
 
+#[derive(Clone)]
 pub struct BlockVecIter<'bv, T, const BLOCK_SIZE: usize = 64> {
     block_vec: &'bv BlockVecDeque<T, BLOCK_SIZE>,
     range: Range<i64>,
 }
 
 impl<'bv, T, const BLOCK_SIZE: usize> Iterator for BlockVecIter<'bv, T, BLOCK_SIZE> {
-    type Item = (i64, &'bv T);
+    type Item = &'bv T;
 
-    fn next(&mut self) -> Option<(i64, &'bv T)> {
+    fn next(&mut self) -> Option<&'bv T> {
         if !self.range.is_empty() {
             let selected_idx = self.range.start;
             self.range.start += 1;
 
             let result = &self.block_vec[selected_idx];
-            Some((selected_idx, result))
+            Some(result)
+        } else {
+            None
+        }
+    }
+}
+
+impl<'bv, T, const BLOCK_SIZE: usize> DoubleEndedIterator for BlockVecIter<'bv, T, BLOCK_SIZE> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if !self.range.is_empty() {
+            self.range.end -= 1;
+            let selected_idx = self.range.end;
+
+            let result = &self.block_vec[selected_idx];
+            Some(result)
         } else {
             None
         }
@@ -369,7 +390,7 @@ impl<'bv, T, const BLOCK_SIZE: usize> Iterator for BlockVecIter<'bv, T, BLOCK_SI
 }
 
 impl<'bv, T, const BLOCK_SIZE: usize> IntoIterator for &'bv BlockVecDeque<T, BLOCK_SIZE> {
-    type Item = (i64, &'bv T);
+    type Item = &'bv T;
 
     type IntoIter = BlockVecIter<'bv, T, BLOCK_SIZE>;
 
@@ -388,16 +409,31 @@ pub struct BlockVecIterMut<'bv, T, const BLOCK_SIZE: usize = 64> {
 }
 
 impl<'bv, T, const BLOCK_SIZE: usize> Iterator for BlockVecIterMut<'bv, T, BLOCK_SIZE> {
-    type Item = (i64, &'bv mut T);
+    type Item = &'bv mut T;
 
-    fn next(&mut self) -> Option<(i64, &'bv mut T)> {
+    fn next(&mut self) -> Option<&'bv mut T> {
         if !self.range.is_empty() {
             let selected_idx = self.range.start;
             self.range.start += 1;
 
             unsafe {
                 let result = &mut *self.block_vec.get_existing_mut(selected_idx);
-                Some((selected_idx, result))
+                Some(result)
+            }
+        } else {
+            None
+        }
+    }
+}
+impl<'bv, T, const BLOCK_SIZE: usize> DoubleEndedIterator for BlockVecIterMut<'bv, T, BLOCK_SIZE> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if !self.range.is_empty() {
+            self.range.end -= 1;
+            let selected_idx = self.range.end;
+
+            unsafe {
+                let result = &mut *self.block_vec.get_existing_mut(selected_idx);
+                Some(result)
             }
         } else {
             None
@@ -406,7 +442,7 @@ impl<'bv, T, const BLOCK_SIZE: usize> Iterator for BlockVecIterMut<'bv, T, BLOCK
 }
 
 impl<'bv, T, const BLOCK_SIZE: usize> IntoIterator for &'bv mut BlockVecDeque<T, BLOCK_SIZE> {
-    type Item = (i64, &'bv mut T);
+    type Item = &'bv mut T;
 
     type IntoIter = BlockVecIterMut<'bv, T, BLOCK_SIZE>;
 
@@ -417,14 +453,15 @@ impl<'bv, T, const BLOCK_SIZE: usize> IntoIterator for &'bv mut BlockVecDeque<T,
     }
 }
 
+#[derive(Clone)]
 pub struct BlockVecConsumingIter<T, const BLOCK_SIZE: usize = 64> {
     inner: BlockVecDequeInner<T, BLOCK_SIZE>,
 }
 
 impl<T, const BLOCK_SIZE: usize> Iterator for BlockVecConsumingIter<T, BLOCK_SIZE> {
-    type Item = (i64, T);
+    type Item = T;
 
-    fn next(&mut self) -> Option<(i64, T)> {
+    fn next(&mut self) -> Option<T> {
         if self.inner.range.is_empty() {
             None
         } else {
@@ -441,15 +478,39 @@ impl<T, const BLOCK_SIZE: usize> Iterator for BlockVecConsumingIter<T, BLOCK_SIZ
             };
 
             if selected_idx.rem_euclid(BLOCK_SIZE as i64) == BLOCK_SIZE as i64 - 1 {
-                self.inner.blocks.pop_front();
+                free_block(self.inner.blocks.pop_front().unwrap());
             }
-            Some((selected_idx, result))
+            Some(result)
+        }
+    }
+}
+impl<T, const BLOCK_SIZE: usize> DoubleEndedIterator for BlockVecConsumingIter<T, BLOCK_SIZE> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.inner.range.is_empty() {
+            None
+        } else {
+            self.inner.range.end -= 1;
+            let selected_idx = self.inner.range.end;
+            let front_block = self.inner.blocks.front().unwrap();
+
+            let index_in_first_block = selected_idx.div_euclid(BLOCK_SIZE as i64) as usize;
+            let result = unsafe {
+                let elem_ptr = front_block
+                    .cast::<MaybeUninit<T>>()
+                    .add(index_in_first_block);
+                (*elem_ptr).assume_init_read()
+            };
+
+            if selected_idx.rem_euclid(BLOCK_SIZE as i64) == BLOCK_SIZE as i64 - 1 {
+                free_block(self.inner.blocks.pop_front().unwrap());
+            }
+            Some(result)
         }
     }
 }
 
 impl<T, const BLOCK_SIZE: usize> IntoIterator for BlockVecDeque<T, BLOCK_SIZE> {
-    type Item = (i64, T);
+    type Item = T;
 
     type IntoIter = BlockVecConsumingIter<T, BLOCK_SIZE>;
 
@@ -460,8 +521,16 @@ impl<T, const BLOCK_SIZE: usize> IntoIterator for BlockVecDeque<T, BLOCK_SIZE> {
     }
 }
 
-impl<T, const BLOCK_SIZE: usize> Drop for BlockVecConsumingIter<T, BLOCK_SIZE> {
-    fn drop(&mut self) {
-        while let Some(_) = self.next() {} // Automatically drops all remaining elements of the iterator
+impl<T, const BLOCK_SIZE: usize> FromIterator<T> for BlockVecDeque<T, BLOCK_SIZE> {
+    fn from_iter<Iter: IntoIterator<Item = T>>(iter: Iter) -> Self {
+        let iterator = iter.into_iter();
+
+        let mut result = Self::with_capacity(iterator.size_hint().0);
+
+        for (idx, v) in iterator.enumerate() {
+            result[idx as i64] = v;
+        }
+
+        result
     }
 }
