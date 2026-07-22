@@ -1,4 +1,5 @@
-use std::ops::Deref;
+use std::cmp::Ordering;
+use std::ops::{Deref, Range};
 
 use ibig::modular::{IntoModulo, ModuloRing};
 use ibig::{IBig, UBig};
@@ -6,10 +7,119 @@ use ordered_float::NotNan;
 
 use sus_proc_macro::get_builtin_type;
 
+use crate::block_vector::{BlockVecConsumingIter, BlockVecDeque, BlockVecIter, BlockVecIterMut};
 use crate::flattening::{BinaryOperator, UnaryOperator};
 
 use crate::typing::concrete_type::{ConcreteTemplateArg, ConcreteType};
 use crate::typing::unifyable_cell::UniCell;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ArrayValueRange {
+    KnownBounds(Range<i64>),
+    UnknownBounds(Value),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ArrayValue(Box<(BlockVecDeque<Value>, ArrayValueRange)>);
+
+impl ArrayValue {
+    pub fn new_unknown_size(default_value: Value) -> Self {
+        Self(Box::new((
+            BlockVecDeque::new(),
+            ArrayValueRange::UnknownBounds(default_value),
+        )))
+    }
+    pub fn new_known_size(from: i64, length: usize, default_value: &Value) -> Self {
+        let range = from..(from + length as i64);
+        Self(Box::new((
+            BlockVecDeque::new_with_range(range.clone(), || default_value.clone()),
+            ArrayValueRange::KnownBounds(range),
+        )))
+    }
+    pub fn len(&self) -> usize {
+        self.0.0.len()
+    }
+    pub fn get(&self, idx: &IBig) -> Result<&Value, String> {
+        let Ok(idx) = i64::try_from(idx) else {
+            return Err(format!("Index out of range of i64: {idx}"));
+        };
+        let (store, bounds) = &*self.0;
+        match bounds {
+            ArrayValueRange::KnownBounds(range) => {
+                if range.contains(&idx) {
+                    return Err(format!(
+                        "Index out of bounds for array: {idx} is not in the bounds {range:?}"
+                    ));
+                }
+                Ok(store.get(idx).unwrap())
+            }
+            ArrayValueRange::UnknownBounds(value) => Ok(store.get_or_insert(idx, || value.clone())),
+        }
+    }
+    pub fn get_mut(&mut self, idx: &IBig) -> Result<&mut Value, String> {
+        let Ok(idx) = i64::try_from(idx) else {
+            return Err(format!("Index out of range of i64: {idx}"));
+        };
+        let (store, bounds) = &mut *self.0;
+        match bounds {
+            ArrayValueRange::KnownBounds(range) => {
+                if range.contains(&idx) {
+                    return Err(format!(
+                        "Index out of bounds for array: {idx} is not in the bounds {range:?}"
+                    ));
+                }
+                Ok(store.get_mut(idx).unwrap())
+            }
+            ArrayValueRange::UnknownBounds(value) => {
+                Ok(store.get_or_insert_mut(idx, || value.clone()))
+            }
+        }
+    }
+    pub fn iter(&self) -> BlockVecIter<Value> {
+        let store = &self.0.0;
+        store.iter()
+    }
+    pub fn iter_mut(&mut self) -> BlockVecIterMut<Value> {
+        let store = &mut self.0.0;
+        store.iter_mut()
+    }
+}
+
+impl<'bv> IntoIterator for &'bv ArrayValue {
+    type Item = (i64, &'bv Value);
+    type IntoIter = BlockVecIter<'bv, Value>;
+    fn into_iter(self) -> Self::IntoIter {
+        let store = &self.0.0;
+        store.into_iter()
+    }
+}
+impl<'bv> IntoIterator for &'bv mut ArrayValue {
+    type Item = (i64, &'bv mut Value);
+    type IntoIter = BlockVecIterMut<'bv, Value>;
+    fn into_iter(self) -> Self::IntoIter {
+        let store = &mut self.0.0;
+        store.into_iter()
+    }
+}
+impl IntoIterator for ArrayValue {
+    type Item = (i64, Value);
+    type IntoIter = BlockVecConsumingIter<Value>;
+    fn into_iter(self) -> Self::IntoIter {
+        let store = self.0.0;
+        store.into_iter()
+    }
+}
+
+impl PartialOrd for ArrayValue {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for ArrayValue {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.0.cmp(&other.0.0)
+    }
+}
 
 /// Top type for any kind of compiletime value while executing.
 ///
