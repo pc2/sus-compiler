@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::ops::{Deref, Range};
+use std::ops::Deref;
 
 use ibig::modular::{IntoModulo, ModuloRing};
 use ibig::{IBig, UBig};
@@ -7,120 +7,149 @@ use ordered_float::NotNan;
 
 use sus_proc_macro::get_builtin_type;
 
-use crate::block_vector::{BlockVecConsumingIter, BlockVecDeque, BlockVecIter, BlockVecIterMut};
 use crate::flattening::{BinaryOperator, UnaryOperator};
 
 use crate::typing::concrete_type::{ConcreteTemplateArg, ConcreteType};
 use crate::typing::unifyable_cell::UniCell;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ArrayValueRange {
-    KnownBounds(Range<i64>),
-    UnknownBounds(Value),
+#[derive(Debug, Clone)]
+pub struct ArrayValue {
+    pub values: Vec<Value>,
+    pub default: Option<Box<Value>>,
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ArrayValue(Box<(BlockVecDeque<Value>, ArrayValueRange)>);
-
-impl ArrayValue {
-    pub fn new_unknown_size(default_value: Value) -> Self {
-        Self(Box::new((
-            BlockVecDeque::new(),
-            ArrayValueRange::UnknownBounds(default_value),
-        )))
-    }
-    pub fn new_known_size(from: i64, length: usize, default_value: &Value) -> Self {
-        let range = from..(from + length as i64);
-        Self(Box::new((
-            BlockVecDeque::new_with_range(range.clone(), || default_value.clone()),
-            ArrayValueRange::KnownBounds(range),
-        )))
-    }
-    pub fn len(&self) -> usize {
-        self.0.0.len()
-    }
-    pub fn is_empty(&self) -> bool {
-        self.0.0.is_empty()
-    }
-    pub fn get(&self, idx: &IBig) -> Result<&Value, String> {
-        let Ok(idx) = i64::try_from(idx) else {
-            return Err(format!("Index out of range of i64: {idx}"));
-        };
-        let (store, bounds) = &*self.0;
-        match bounds {
-            ArrayValueRange::KnownBounds(range) => {
-                if range.contains(&idx) {
-                    return Err(format!(
-                        "Index out of bounds for array: {idx} is not in the bounds {range:?}"
-                    ));
-                }
-                Ok(store.get(idx).unwrap())
+impl PartialEq for ArrayValue {
+    fn eq(&self, other: &Self) -> bool {
+        if let (Some(a), Some(b)) = (&self.default, &other.default) {
+            if *a != *b {
+                return false;
             }
-            ArrayValueRange::UnknownBounds(value) => Ok(store.get_or_insert(idx, || value.clone())),
         }
-    }
-    pub fn get_mut(&mut self, idx: &IBig) -> Result<&mut Value, String> {
-        let Ok(idx) = i64::try_from(idx) else {
-            return Err(format!("Index out of range of i64: {idx}"));
-        };
-        let (store, bounds) = &mut *self.0;
-        match bounds {
-            ArrayValueRange::KnownBounds(range) => {
-                if range.contains(&idx) {
-                    return Err(format!(
-                        "Index out of bounds for array: {idx} is not in the bounds {range:?}"
-                    ));
-                }
-                Ok(store.get_mut(idx).unwrap())
+        match self.values.len().cmp(&other.values.len()) {
+            Ordering::Equal => self.values.eq(&other.values),
+            Ordering::Less => {
+                let Some(found_default) = &self.default else {
+                    return false;
+                };
+                let (matching_values, excess_values) = other.values.split_at(self.values.len());
+                self.values.as_slice().eq(matching_values)
+                    && excess_values.iter().all(|v| v.eq(&**found_default))
             }
-            ArrayValueRange::UnknownBounds(value) => {
-                Ok(store.get_or_insert_mut(idx, || value.clone()))
+            Ordering::Greater => {
+                let Some(found_default) = &other.default else {
+                    return false;
+                };
+                let (matching_values, excess_values) = self.values.split_at(other.values.len());
+                other.values.as_slice().eq(matching_values)
+                    && excess_values.iter().all(|v| v.eq(&**found_default))
             }
         }
     }
-    pub fn iter(&self) -> BlockVecIter<Value> {
-        let store = &self.0.0;
-        store.iter()
-    }
-    pub fn iter_mut(&mut self) -> BlockVecIterMut<Value> {
-        let store = &mut self.0.0;
-        store.iter_mut()
-    }
 }
-
-impl<'bv> IntoIterator for &'bv ArrayValue {
-    type Item = &'bv Value;
-    type IntoIter = BlockVecIter<'bv, Value>;
-    fn into_iter(self) -> Self::IntoIter {
-        let store = &self.0.0;
-        store.into_iter()
-    }
-}
-impl<'bv> IntoIterator for &'bv mut ArrayValue {
-    type Item = &'bv mut Value;
-    type IntoIter = BlockVecIterMut<'bv, Value>;
-    fn into_iter(self) -> Self::IntoIter {
-        let store = &mut self.0.0;
-        store.into_iter()
-    }
-}
-impl IntoIterator for ArrayValue {
-    type Item = Value;
-    type IntoIter = BlockVecConsumingIter<Value>;
-    fn into_iter(self) -> Self::IntoIter {
-        let store = self.0.0;
-        store.into_iter()
-    }
-}
-
+impl Eq for ArrayValue {}
 impl PartialOrd for ArrayValue {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 impl Ord for ArrayValue {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.0.0.cmp(&other.0.0)
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self.values.len().cmp(&other.values.len()) {
+            Ordering::Equal => self.values.cmp(&other.values),
+            Ordering::Less => {
+                if let Some(found_default) = &self.default {
+                    let (matching_values, excess_values) = other.values.split_at(self.values.len());
+                    self.values.as_slice().cmp(matching_values).then_with(|| {
+                        for v in excess_values {
+                            let cmp_val = (**found_default).cmp(v);
+                            if cmp_val != Ordering::Equal {
+                                return cmp_val;
+                            }
+                        }
+                        Ordering::Equal
+                    })
+                } else {
+                    Ordering::Less
+                }
+            }
+            Ordering::Greater => {
+                if let Some(found_default) = &other.default {
+                    let (matching_values, excess_values) = self.values.split_at(other.values.len());
+                    matching_values.cmp(other.values.as_slice()).then_with(|| {
+                        for v in excess_values {
+                            let cmp_val = v.cmp(&**found_default);
+                            if cmp_val != Ordering::Equal {
+                                return cmp_val;
+                            }
+                        }
+                        Ordering::Equal
+                    })
+                } else {
+                    Ordering::Greater
+                }
+            }
+        }
+    }
+}
+impl std::hash::Hash for ArrayValue {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        assert!(
+            self.default.is_none(),
+            "Cannot hash ValueArray with unknown size"
+        );
+        self.values.hash(state);
+    }
+}
+impl ArrayValue {
+    pub fn get(&self, idx: usize) -> Option<&Value> {
+        if let Some(found) = self.values.get(idx) {
+            Some(found)
+        } else if let Some(default) = &self.default {
+            Some(&**default)
+        } else {
+            None
+        }
+    }
+    pub fn get_mut(&mut self, idx: usize) -> Option<&mut Value> {
+        if idx < self.values.len() {
+        } else if let Some(default) = &self.default {
+            self.values.resize(idx + 1, (**default).clone());
+        } else {
+            return None;
+        }
+        Some(&mut self.values[idx])
+    }
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+    pub fn iter(&self) -> std::slice::Iter<'_, Value> {
+        self.into_iter()
+    }
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Value> {
+        self.into_iter()
+    }
+}
+impl<'v> IntoIterator for &'v ArrayValue {
+    type Item = &'v Value;
+    type IntoIter = std::slice::Iter<'v, Value>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.values.iter()
+    }
+}
+impl<'v> IntoIterator for &'v mut ArrayValue {
+    type Item = &'v mut Value;
+    type IntoIter = std::slice::IterMut<'v, Value>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.values.iter_mut()
+    }
+}
+impl IntoIterator for ArrayValue {
+    type Item = Value;
+    type IntoIter = std::vec::IntoIter<Value>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.values.into_iter()
     }
 }
 
@@ -163,69 +192,14 @@ impl Ord for Value {
         }
     }
 }
-/*impl ConcreteType {
-    fn update_smallest_common_supertype(&mut self, other: &Self) -> Option<()> {
-        match (self, other) {
-            (_, ConcreteType::Unknown(_)) | (ConcreteType::Unknown(_), _) => None,
-            (ConcreteType::Named(left), ConcreteType::Named(right)) => {
-                assert_eq!(left.id, right.id);
-                if left.id == get_builtin_type!("int") {
-                    if let (
-                        [TemplateKind::Value(ConcreteType::Value(Value::Integer(left_min))), TemplateKind::Value(ConcreteType::Value(Value::Integer(left_max)))],
-                        [TemplateKind::Value(ConcreteType::Value(Value::Integer(right_min))), TemplateKind::Value(ConcreteType::Value(Value::Integer(right_max)))],
-                    ) = (
-                        left.template_args.cast_to_array_mut(),
-                        right.template_args.cast_to_array(),
-                    ) {
-                        if right_min < left_min {
-                            *left_min = right_min.clone();
-                        }
-                        if right_max > left_max {
-                            *left_max = right_max.clone();
-                        }
-                        Some(())
-                    } else {
-                        None
-                    }
-                } else {
-                    for (_, left_arg, right_arg) in
-                        zip_eq(left.template_args.iter_mut(), right.template_args.iter())
-                    {
-                        left_arg.update_smallest_common_supertype(right_arg)?;
-                    }
-                    Some(())
-                }
-            }
-            (ConcreteType::Array(left), ConcreteType::Array(right)) => {
-                let (left_content, left_size) = left.deref_mut();
-                let (right_content, right_size) = right.deref();
-                left_size.update_smallest_common_supertype(right_size)?;
-                left_content.update_smallest_common_supertype(right_content)
-            }
-            (ConcreteType::Value(left), ConcreteType::Value(right)) => {
-                (left == right).then_some(())
-            }
-            _ => unreachable!("Caught by typecheck"),
+impl From<Vec<Value>> for ArrayValue {
+    fn from(values: Vec<Value>) -> Self {
+        Self {
+            values,
+            default: None,
         }
     }
-    /// On the road to implementing subtyping. Takes in a list of types,
-    /// and computes the smallest supertype that all list elements can coerce to.
-    /// TODO integrate into Hindley-Milner more closely
-    fn get_smallest_common_supertype(
-        mut iter: impl Iterator<Item = Self>,
-        type_substitutor: &mut TypeSubstitutor<ConcreteType>,
-    ) -> Option<Self> {
-        let mut first = iter.next()?;
-        let _ = type_substitutor.fully_substitute(&mut first);
-
-        for mut elem in iter {
-            let _ = type_substitutor.fully_substitute(&mut elem);
-            first.update_smallest_common_supertype(&elem)?;
-        }
-
-        Some(first)
-    }
-}*/
+}
 
 impl Value {
     pub fn contains_unset(&self) -> bool {
