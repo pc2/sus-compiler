@@ -294,6 +294,28 @@ impl Value {
             Value::Unset => true,
         }
     }
+
+    pub fn size_unsized_arrays(&mut self, typ: &ConcreteType) {
+        let Value::Array(arr) = self else { return };
+
+        let (content_typ, sz) = typ.unwrap_array();
+        if let Some(sz) = sz.get() {
+            let sz: usize = sz.unwrap_int();
+
+            if arr.values.len() != sz {
+                let default = arr
+                    .default
+                    .take()
+                    .expect("non-dynamic-size arrays should already be of the correct size.");
+
+                arr.values.resize(sz, *default);
+            }
+        }
+        arr.default = None;
+        for v in &mut arr.values {
+            v.size_unsized_arrays(content_typ);
+        }
+    }
 }
 
 pub fn compute_unary_op(op: UnaryOperator, v: &Value) -> Value {

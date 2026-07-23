@@ -1127,9 +1127,12 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         for w_id in self.wires.id_range() {
             let w = &mut self.wires[w_id];
             match &mut w.source {
-                RealWireDataSource::Multiplexer { sources, .. } => {
+                RealWireDataSource::Multiplexer { sources, is_state } => {
                     for s in sources {
                         Self::finalize_partial_bounds(&mut s.to_path, &w.typ);
+                    }
+                    if let Some(is_state) = is_state {
+                        is_state.size_unsized_arrays(&w.typ);
                     }
                 }
                 RealWireDataSource::Select { root, .. } => {
