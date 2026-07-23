@@ -669,7 +669,7 @@ impl<'l> TypeCheckingContext<'l> {
                 Value::String(_) => STRING_SCALAR,
                 Value::Integer(_) => INT_SCALAR.clone(),
                 Value::Array(elements) => {
-                    if let Some(fst) = elements.first() {
+                    if let Some(fst) = elements.values.first() {
                         assert!(
                             matches!(fst, Value::Bool(_)),
                             "The only type of array literal we have is boolean arrays!"

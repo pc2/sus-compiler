@@ -1913,3 +1913,17 @@ module TestNexts {
         next d = a
     }
 }
+
+module TestUnknownSizeArray {
+    state float[] breaking_array
+}
+
+module UnknownSizeArraySynth {
+	gen int[] MY_INTS
+	for int I in 0..5 {
+		MY_INTS[I] = I
+	}
+	input int#(FROM: 0, TO: 5) idx
+
+	int result = MY_INTS[idx]
+}

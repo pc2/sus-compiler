@@ -188,6 +188,8 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated PositiveAndNegativeLatencyOffset #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated ParametrizeableRegs #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestNexts #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestUnknownSizeArray #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated UnknownSizeArraySynth #()
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test.sus:26:6 ]
     │
@@ -4773,6 +4775,55 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │          ┬  
       │          ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+      ╭─[ test.sus:1918:19 ]
+      │
+ 1918 │     state float[] breaking_array
+      │                   ───────┬──────  
+      │                          ╰──────── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+──────╯
+Error: Some parameters of 'breaking_array' were still unknown: float #()[_]
+      ╭─[ test.sus:1918:19 ]
+      │
+ 1918 │     state float[] breaking_array
+      │                   ───────┬──────  
+      │                          ╰──────── Some parameters of 'breaking_array' were still unknown: float #()[_]
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1918:19 ]
+      │
+ 1918 │     state float[] breaking_array
+      │                   ───────┬──────  
+      │                          ╰──────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1922:12 ]
+      │
+ 1922 │     gen int[] MY_INTS
+      │               ───┬───  
+      │                  ╰───── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1923:10 ]
+      │
+ 1923 │     for int I in 0..5 {
+      │             ┬  
+      │             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1926:29 ]
+      │
+ 1926 │     input int#(FROM: 0, TO: 5) idx
+      │                                ─┬─  
+      │                                 ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1928:6 ]
+      │
+ 1928 │     int result = MY_INTS[idx]
+      │         ───┬──  
+      │            ╰──── Unused Variable: This variable does not affect the output ports of this module
+──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen test_various_assignments #() due to errors!
@@ -4845,3 +4896,4 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [ERROR sus_compiler::codegen] Cannot codegen ReadUnsetArrayElem #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen RegressionForBadPort #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen WeirdlyNamedClock #() due to errors!
+[ERROR sus_compiler::codegen] Cannot codegen TestUnknownSizeArray #() due to errors!

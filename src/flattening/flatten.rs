@@ -975,7 +975,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             self.errors.warn(expr_span, format!("Truncating ones in this boolean array literal! Last '1' bit occurs at position {} but specified size is {specified_size}", minimum_non_truncating_size - 1));
         }
         bools.resize(specified_size, Value::Bool(false));
-        Ok(ExpressionSource::Literal(Value::Array(bools)))
+        Ok(ExpressionSource::Literal(Value::Array(bools.into())))
     }
 
     fn flatten_expr_source(&mut self, cursor: &mut Cursor<'c>) -> (ExpressionSource, Span) {

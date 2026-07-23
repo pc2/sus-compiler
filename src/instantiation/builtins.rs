@@ -152,7 +152,7 @@ pub fn evaluate_builtin_constant(
             }
 
             match cvt_ubig_to_bits::<false, 0>(&v, num_bits) {
-                Ok(bits) => Ok((Value::Array(bits), INT_SCALAR.clone())),
+                Ok(bits) => Ok((Value::Array(bits.into()), INT_SCALAR.clone())),
                 Err(expected_num_bits) => Err(format!(
                     "NUM_BITS is too small to store the {expected_num_bits} bits needed for {v} (signed)!"
                 )),
@@ -163,7 +163,7 @@ pub fn evaluate_builtin_constant(
             let num_bits = must_be_small_uint::<usize>(num_bits, "V", usize::MAX)?;
 
             match cvt_ibig_to_signed_bits(v.clone(), num_bits) {
-                Ok(bits) => Ok((Value::Array(bits), INT_SCALAR.clone())),
+                Ok(bits) => Ok((Value::Array(bits.into()), INT_SCALAR.clone())),
                 Err(expected_num_bits) => Err(format!(
                     "NUM_BITS is too small to store the {expected_num_bits} bits needed for {v} (signed)!"
                 )),
@@ -179,7 +179,7 @@ pub fn evaluate_builtin_constant(
 
             let v_copies: Vec<Value> = (0..size).map(|_| v.clone()).collect();
 
-            Ok((Value::Array(v_copies), t.to_abstract().rank_up()))
+            Ok((Value::Array(v_copies.into()), t.to_abstract().rank_up()))
         }
         get_builtin_const!("ReverseGen") => {
             let [t, size, v] = cst_ref.template_args.cast_to_array();
@@ -199,7 +199,7 @@ pub fn evaluate_builtin_constant(
 
             let v_copies: Vec<Value> = v.iter().rev().cloned().collect();
 
-            Ok((Value::Array(v_copies), t.to_abstract().rank_up()))
+            Ok((Value::Array(v_copies.into()), t.to_abstract().rank_up()))
         }
         get_builtin_const!("ConcatGen") => {
             let [t, size_a, size_b, v_a, v_b] = cst_ref.template_args.cast_to_array();
@@ -235,7 +235,7 @@ pub fn evaluate_builtin_constant(
 
             let v_copies: Vec<Value> = v_a.iter().chain(v_b.iter()).cloned().collect();
 
-            Ok((Value::Array(v_copies), t.to_abstract().rank_up()))
+            Ok((Value::Array(v_copies.into()), t.to_abstract().rank_up()))
         }
         get_builtin_const!("__crash_compiler") => {
             panic!("__crash_compiler Intentional ICE. This is for debugging the compiler and LSP.")

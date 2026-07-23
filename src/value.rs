@@ -100,6 +100,12 @@ impl std::hash::Hash for ArrayValue {
     }
 }
 impl ArrayValue {
+    pub fn new_unknown_size(default: Value) -> Self {
+        Self {
+            values: Vec::new(),
+            default: Some(Box::new(default)),
+        }
+    }
     pub fn get(&self, idx: usize) -> Option<&Value> {
         if let Some(found) = self.values.get(idx) {
             Some(found)
@@ -110,11 +116,12 @@ impl ArrayValue {
         }
     }
     pub fn get_mut(&mut self, idx: usize) -> Option<&mut Value> {
-        if idx < self.values.len() {
-        } else if let Some(default) = &self.default {
-            self.values.resize(idx + 1, (**default).clone());
-        } else {
-            return None;
+        if idx >= self.values.len() {
+            if let Some(default) = &self.default {
+                self.values.resize(idx + 1, (**default).clone());
+            } else {
+                return None;
+            }
         }
         Some(&mut self.values[idx])
     }
@@ -129,6 +136,16 @@ impl ArrayValue {
     }
     pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Value> {
         self.into_iter()
+    }
+    pub fn get_slice_mut(&mut self, range: std::ops::Range<usize>) -> Option<&mut [Value]> {
+        if range.end > self.values.len() {
+            if let Some(default) = &self.default {
+                self.values.resize(range.end, (**default).clone());
+            } else {
+                return None;
+            }
+        }
+        Some(&mut self.values[range])
     }
 }
 impl<'v> IntoIterator for &'v ArrayValue {
@@ -165,7 +182,7 @@ pub enum Value {
     /// Temporary, one day we'll have Rationals here instead
     Double(NotNan<f64>),
     String(String),
-    Array(Vec<Value>),
+    Array(ArrayValue),
     /// The initial [Value] a variable has, before it's been set. (translates to `'x` don't care)
     Unset,
 }
@@ -253,7 +270,7 @@ impl Value {
         let Self::Array(arr) = self else {
             panic!("{self:?} is not an array!")
         };
-        arr
+        &arr.values
     }
 
     /// Requires `typ` to be fully substituted
@@ -394,13 +411,14 @@ impl ConcreteType {
             ConcreteType::Named(_name) => Value::Unset,
             ConcreteType::Array(arr) => {
                 let (arr_typ, arr_size) = arr.deref();
-                let arr_size: usize = arr_size.unwrap_int();
-                let mut arr = Vec::new();
-                if arr_size > 0 {
-                    let content_typ = arr_typ.get_initial_val();
-                    arr.resize(arr_size, content_typ);
+                let content_typ = arr_typ.get_initial_val();
+                if let Some(found_size) = arr_size.get() {
+                    let arr_size: usize = found_size.unwrap_int();
+                    let arr = vec![content_typ; arr_size];
+                    Value::Array(arr.into())
+                } else {
+                    Value::Array(ArrayValue::new_unknown_size(content_typ))
                 }
-                Value::Array(arr)
             }
         }
     }
@@ -420,7 +438,7 @@ impl From<bool> for Value {
 
 impl From<Vec<Value>> for Value {
     fn from(value: Vec<Value>) -> Self {
-        Value::Array(value)
+        Value::Array(value.into())
     }
 }
 
@@ -438,7 +456,7 @@ impl From<bool> for ConcreteTemplateArg {
 
 impl From<Vec<Value>> for ConcreteTemplateArg {
     fn from(value: Vec<Value>) -> Self {
-        ConcreteTemplateArg::Value(UniCell::from(Value::Array(value)))
+        ConcreteTemplateArg::Value(UniCell::from(Value::Array(value.into())))
     }
 }
 

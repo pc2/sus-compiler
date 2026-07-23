@@ -1,3 +1,19 @@
+// UnknownSizeArraySynth #()
+module UnknownSizeArraySynth(
+	/* clock */ input clk,
+	input wire[2:0] idx
+);
+
+/*mux_wire*/ logic[2:0] result;
+localparam[2:0] MY_INTS[0:4] = '{3'd0, 3'd1, 3'd2, 3'd3, 3'd4};
+wire[2:0] _2 = MY_INTS[idx];
+always_comb begin // combinatorial result
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	result = 3'dx;
+	result = _2;
+end
+endmodule // UnknownSizeArraySynth #()
+
 // TestNexts #()
 module TestNexts(
 	/* clock */ input clk,

@@ -225,7 +225,7 @@ impl GenerationState<'_> {
                 let Value::Array(tgt_arr) = tgt_ref else {
                     unreachable!()
                 };
-                (Ok(()), &mut tgt_arr[idx_as_usize.unwrap()])
+                (Ok(()), tgt_arr.get_mut(idx_as_usize.unwrap()).unwrap())
             } else {
                 let err = Err(CompileError::error(
                     span,
@@ -275,7 +275,10 @@ impl GenerationState<'_> {
                                 ),
                             ));
                         }
-                        for new_pair in zip_eq(&mut target[slice.clone()], value.into_iter()) {
+                        for new_pair in zip_eq(
+                            target.get_slice_mut(slice.clone()).unwrap(),
+                            value.into_iter(),
+                        ) {
                             new_targets.push(new_pair)
                         }
                     }
@@ -328,8 +331,8 @@ impl GenerationState<'_> {
                     for vp in &mut flattened_result_tensor {
                         let_unwrap!(Value::Array(arr), *vp);
 
-                        for a in &arr[slice.clone()] {
-                            new_value_parts.push(a);
+                        for idx in slice.clone() {
+                            new_value_parts.push(arr.get(idx).unwrap());
                         }
                     }
 
@@ -341,7 +344,7 @@ impl GenerationState<'_> {
 
         // If we've created a zero-sized tensor, this prevents a div-by-zero error downstream
         if flattened_result_tensor.is_empty() {
-            return Ok(Value::Array(Vec::new()));
+            return Ok(Value::Array(Vec::new().into()));
         }
         // Then we re-consitute the array until we have one element again
         let mut flattened_result_tensor: Vec<Value> =
@@ -353,11 +356,10 @@ impl GenerationState<'_> {
             let mut result_iter = flattened_result_tensor.into_iter();
             flattened_result_tensor = (0..num_sub_tensors)
                 .map(|_| {
-                    Value::Array(
-                        (0..dimension_len)
-                            .map(|_| result_iter.next().unwrap())
-                            .collect(),
-                    )
+                    let array_data: Vec<_> = (0..dimension_len)
+                        .map(|_| result_iter.next().unwrap())
+                        .collect();
+                    Value::Array(array_data.into())
                 })
                 .collect();
 
@@ -1521,7 +1523,7 @@ impl<'l> ExecutionContext<'l> {
                     let values_parts: [_; SZ] = std::array::from_fn(|i| &all_arrs[i][j]);
                     results.push(duplicate_for_all_array_ranks(&values_parts, rank - 1, f)?);
                 }
-                Ok(Value::Array(results))
+                Ok(Value::Array(results.into()))
             }
         }
 
@@ -1561,7 +1563,7 @@ impl<'l> ExecutionContext<'l> {
                     let val = self.generation_state.get_generation_value(*v_id);
                     result.push(val.clone());
                 }
-                Value::Array(result)
+                Value::Array(result.into())
             }
             ExpressionSource::Literal(value) => value.clone(),
         })
