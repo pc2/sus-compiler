@@ -451,17 +451,21 @@ impl<'g> CodeGenerationContext<'g> {
                 self.write_wire_declaration(w);
             }
         }
-        // And only then temporaries
-        for (_wire_id, w) in &self.instance.wires {
-            if w.name.starts_with("_") {
-                self.write_wire_declaration(w);
+        // Add latency regs for named wires after all have been declared, because named wires are guaranteed to be Multiplexers
+        for (wire_id, w) in &self.instance.wires {
+            if !w.name.starts_with("_") {
+                self.add_latency_registers(w, self.needed_untils[wire_id], "")
+                    .unwrap();
             }
         }
-
-        // Finally add all latency registers
+        // And only then temporaries
         for (wire_id, w) in &self.instance.wires {
-            self.add_latency_registers(w, self.needed_untils[wire_id], "")
-                .unwrap();
+            if w.name.starts_with("_") {
+                self.write_wire_declaration(w);
+                // Add latency regs for temporaries immediately, because they may immediately depend on each other
+                self.add_latency_registers(w, self.needed_untils[wire_id], "")
+                    .unwrap();
+            }
         }
     }
 

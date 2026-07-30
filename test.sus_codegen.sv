@@ -1790,8 +1790,6 @@ module use_infer_me_with_negative_delta(
 
 /*mux_wire*/ logic _inf_x;
 wire _inf_y;
-/*mux_wire*/ logic _inf_p;
-wire _inf_q;
 /*latency*/ logic __inf_y_N30; always_ff @(posedge clk) begin __inf_y_N30 <= _inf_y; end
 /*latency*/ logic __inf_y_N29; always_ff @(posedge clk) begin __inf_y_N29 <= __inf_y_N30; end
 /*latency*/ logic __inf_y_N28; always_ff @(posedge clk) begin __inf_y_N28 <= __inf_y_N29; end
@@ -1822,6 +1820,8 @@ wire _inf_q;
 /*latency*/ logic __inf_y_N3; always_ff @(posedge clk) begin __inf_y_N3 <= __inf_y_N4; end
 /*latency*/ logic __inf_y_N2; always_ff @(posedge clk) begin __inf_y_N2 <= __inf_y_N3; end
 /*latency*/ logic __inf_y_N1; always_ff @(posedge clk) begin __inf_y_N1 <= __inf_y_N2; end
+/*mux_wire*/ logic _inf_p;
+wire _inf_q;
 infer_me_with_negative_delta_V_31 inf(
 	.clk(clk),
 	.x(_inf_x),
@@ -1885,8 +1885,6 @@ module use_infer_me_with_delta(
 
 /*mux_wire*/ logic _inf_x;
 wire _inf_y;
-/*mux_wire*/ logic _inf_p;
-wire _inf_q;
 /*latency*/ logic __inf_y_N30; always_ff @(posedge clk) begin __inf_y_N30 <= _inf_y; end
 /*latency*/ logic __inf_y_N29; always_ff @(posedge clk) begin __inf_y_N29 <= __inf_y_N30; end
 /*latency*/ logic __inf_y_N28; always_ff @(posedge clk) begin __inf_y_N28 <= __inf_y_N29; end
@@ -1917,6 +1915,8 @@ wire _inf_q;
 /*latency*/ logic __inf_y_N3; always_ff @(posedge clk) begin __inf_y_N3 <= __inf_y_N4; end
 /*latency*/ logic __inf_y_N2; always_ff @(posedge clk) begin __inf_y_N2 <= __inf_y_N3; end
 /*latency*/ logic __inf_y_N1; always_ff @(posedge clk) begin __inf_y_N1 <= __inf_y_N2; end
+/*mux_wire*/ logic _inf_p;
+wire _inf_q;
 infer_me_with_delta_V_N31 inf(
 	.clk(clk),
 	.x(_inf_x),
@@ -2135,13 +2135,13 @@ module specified_latencies_not_ports_edge_case(
 /*latency*/ logic _in_port_D5; always_ff @(posedge clk) begin _in_port_D5 <= _in_port_D4; end
 /*mux_wire*/ logic in_spec;
 /*mux_wire*/ logic out_spec;
-wire _4;
-assign _4 = out_spec | _in_port_D5;
 /*latency*/ logic _in_port_D1; always_ff @(posedge clk) begin _in_port_D1 <= in_port; end
 /*latency*/ logic _in_port_D2; always_ff @(posedge clk) begin _in_port_D2 <= _in_port_D1; end
 /*latency*/ logic _in_port_D3; always_ff @(posedge clk) begin _in_port_D3 <= _in_port_D2; end
 /*latency*/ logic _in_port_D4; always_ff @(posedge clk) begin _in_port_D4 <= _in_port_D3; end
 /*latency*/ logic _in_port_D5; always_ff @(posedge clk) begin _in_port_D5 <= _in_port_D4; end
+wire _4;
+assign _4 = out_spec | _in_port_D5;
 always_comb begin // combinatorial out_port
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	out_port = 1'bx;
@@ -2178,14 +2178,12 @@ module instantiate_fifo(
 /*latency*/ logic[2:0] _data_received_D7; always_ff @(posedge clk) begin _data_received_D7 <= _data_received_D6; end
 /*latency*/ logic[2:0] _data_received_D8; always_ff @(posedge clk) begin _data_received_D8 <= _data_received_D7; end
 /*mux_wire*/ logic[2:0] heavy_computation;
-wire _fifo_may_push;
-/*mux_wire*/ logic _fifo_push;
-/*mux_wire*/ logic[2:0] _fifo_push_data;
 /*latency*/ logic[2:0] _data_received_D4; always_ff @(posedge clk) begin _data_received_D4 <= data_received; end
 /*latency*/ logic[2:0] _data_received_D5; always_ff @(posedge clk) begin _data_received_D5 <= _data_received_D4; end
 /*latency*/ logic[2:0] _data_received_D6; always_ff @(posedge clk) begin _data_received_D6 <= _data_received_D5; end
 /*latency*/ logic[2:0] _data_received_D7; always_ff @(posedge clk) begin _data_received_D7 <= _data_received_D6; end
 /*latency*/ logic[2:0] _data_received_D8; always_ff @(posedge clk) begin _data_received_D8 <= _data_received_D7; end
+wire _fifo_may_push;
 /*latency*/ logic __fifo_may_push_D1; always_ff @(posedge clk) begin __fifo_may_push_D1 <= _fifo_may_push; end
 /*latency*/ logic __fifo_may_push_D2; always_ff @(posedge clk) begin __fifo_may_push_D2 <= __fifo_may_push_D1; end
 /*latency*/ logic __fifo_may_push_D3; always_ff @(posedge clk) begin __fifo_may_push_D3 <= __fifo_may_push_D2; end
@@ -2194,6 +2192,8 @@ wire _fifo_may_push;
 /*latency*/ logic __fifo_may_push_D6; always_ff @(posedge clk) begin __fifo_may_push_D6 <= __fifo_may_push_D5; end
 /*latency*/ logic __fifo_may_push_D7; always_ff @(posedge clk) begin __fifo_may_push_D7 <= __fifo_may_push_D6; end
 /*latency*/ logic __fifo_may_push_D8; always_ff @(posedge clk) begin __fifo_may_push_D8 <= __fifo_may_push_D7; end
+/*mux_wire*/ logic _fifo_push;
+/*mux_wire*/ logic[2:0] _fifo_push_data;
 FIFO_T_type_int_FROM_0_TO_6_DEPTH_30_MAY_PUSH_LATENCY_8 fifo(
 	.clk(clk),
 	.may_push(_fifo_may_push),
@@ -2250,6 +2250,7 @@ module FIFO_T_type_int_FROM_0_TO_6_DEPTH_30_MAY_PUSH_LATENCY_8(
 /*state*/ logic[4:0] write_addr;
 /*mux_wire*/ logic[4:0] space_remaining;
 /*mux_wire*/ logic[2:0] pop_out_reg;
+/*latency*/ logic _pop_D1; always_ff @(posedge clk) begin _pop_D1 <= pop; end
 wire signed[5:0] _3;
 assign _3 = read_addr - write_addr;
 wire signed[5:0] _5;
@@ -2260,6 +2261,7 @@ wire _9;
 assign _9 = space_remaining > 4'd9;
 /*mux_wire*/ logic _LatencyOffset_din;
 wire _LatencyOffset_dout;
+/*latency*/ logic __LatencyOffset_dout_N8; always_ff @(posedge clk) begin __LatencyOffset_dout_N8 <= _LatencyOffset_dout; end
 /*mux_wire*/ logic[2:0] _ToBits_value;
 wire[2:0] _ToBits_bits;
 wire[4:0] _14;
@@ -2269,15 +2271,13 @@ assign _15 = (_14 == 30) ? 0 : _14; // == mod 30
 wire _18;
 assign _18 = read_addr != write_addr;
 wire[2:0] _20 = mem[read_addr];
+/*latency*/ logic[2:0] __20_D1; always_ff @(posedge clk) begin __20_D1 <= _20; end
 /*mux_wire*/ logic[2:0] _FromBits_bits;
 wire[2:0] _FromBits_value;
 wire[4:0] _24;
 assign _24 = read_addr + 1'd1;
 wire[4:0] _25;
 assign _25 = (_24 == 30) ? 0 : _24; // == mod 30
-/*latency*/ logic __LatencyOffset_dout_N8; always_ff @(posedge clk) begin __LatencyOffset_dout_N8 <= _LatencyOffset_dout; end
-/*latency*/ logic _pop_D1; always_ff @(posedge clk) begin _pop_D1 <= pop; end
-/*latency*/ logic[2:0] __20_D1; always_ff @(posedge clk) begin __20_D1 <= _20; end
 LatencyOffset_T_type_bool_OFFSET_N9 LatencyOffset(
 	.clk(clk),
 	.din(_LatencyOffset_din),
@@ -2395,15 +2395,15 @@ module infer_from_local_context(
 /*latency*/ logic _in_val_D4; always_ff @(posedge clk) begin _in_val_D4 <= _in_val_D3; end
 /*latency*/ logic _in_val_D5; always_ff @(posedge clk) begin _in_val_D5 <= _in_val_D4; end
 /*mux_wire*/ logic heavily_pipelined_computation;
-/*mux_wire*/ logic _infer_me_x;
-wire _infer_me_y;
-wire _4;
-assign _4 = _infer_me_y | heavily_pipelined_computation;
 /*latency*/ logic _in_val_D1; always_ff @(posedge clk) begin _in_val_D1 <= in_val; end
 /*latency*/ logic _in_val_D2; always_ff @(posedge clk) begin _in_val_D2 <= _in_val_D1; end
 /*latency*/ logic _in_val_D3; always_ff @(posedge clk) begin _in_val_D3 <= _in_val_D2; end
 /*latency*/ logic _in_val_D4; always_ff @(posedge clk) begin _in_val_D4 <= _in_val_D3; end
 /*latency*/ logic _in_val_D5; always_ff @(posedge clk) begin _in_val_D5 <= _in_val_D4; end
+/*mux_wire*/ logic _infer_me_x;
+wire _infer_me_y;
+wire _4;
+assign _4 = _infer_me_y | heavily_pipelined_computation;
 infer_me_A_5 infer_me(
 	.clk(clk),
 	.x(_infer_me_x),
@@ -2606,34 +2606,34 @@ module TreeAdd_SIZE_5_FROM_3_TO_4(
 /*mux_wire*/ logic[4:0] next_sums_3[0:0];
 /*mux_wire*/ logic[4:0] inter_sums_split_3[0:0];
 /*mux_wire*/ logic[4:0] last[0:0];
+/*latency*/ logic _TreeAdd_D1; always_ff @(posedge clk) begin _TreeAdd_D1 <= TreeAdd; end
+/*latency*/ logic _TreeAdd_D2; always_ff @(posedge clk) begin _TreeAdd_D2 <= _TreeAdd_D1; end
+/*latency*/ logic _TreeAdd_D3; always_ff @(posedge clk) begin _TreeAdd_D3 <= _TreeAdd_D2; end
 wire[1:0] _7 = cur_sums[0];
 wire[1:0] _8 = cur_sums[1];
 wire[2:0] _9;
 assign _9 = _7 + _8;
+/*latency*/ logic[2:0] __9_D1; always_ff @(posedge clk) begin __9_D1 <= _9; end
 wire[1:0] _10 = cur_sums[2];
 wire[1:0] _11 = cur_sums[3];
 wire[2:0] _12;
 assign _12 = _10 + _11;
+/*latency*/ logic[2:0] __12_D1; always_ff @(posedge clk) begin __12_D1 <= _12; end
 wire[1:0] _13 = cur_sums[4];
+/*latency*/ logic[1:0] __13_D1; always_ff @(posedge clk) begin __13_D1 <= _13; end
 wire[2:0] _16 = cur_sums_2[0];
 wire[2:0] _17 = cur_sums_2[1];
 wire[3:0] _18;
 assign _18 = _16 + _17;
+/*latency*/ logic[3:0] __18_D2; always_ff @(posedge clk) begin __18_D2 <= _18; end
 wire[2:0] _19 = cur_sums_2[2];
+/*latency*/ logic[2:0] __19_D2; always_ff @(posedge clk) begin __19_D2 <= _19; end
 wire[3:0] _22 = cur_sums_3[0];
 wire[3:0] _23 = cur_sums_3[1];
 wire[4:0] _24;
 assign _24 = _22 + _23;
-wire[4:0] _27 = last[0];
-/*latency*/ logic _TreeAdd_D1; always_ff @(posedge clk) begin _TreeAdd_D1 <= TreeAdd; end
-/*latency*/ logic _TreeAdd_D2; always_ff @(posedge clk) begin _TreeAdd_D2 <= _TreeAdd_D1; end
-/*latency*/ logic _TreeAdd_D3; always_ff @(posedge clk) begin _TreeAdd_D3 <= _TreeAdd_D2; end
-/*latency*/ logic[2:0] __9_D1; always_ff @(posedge clk) begin __9_D1 <= _9; end
-/*latency*/ logic[2:0] __12_D1; always_ff @(posedge clk) begin __12_D1 <= _12; end
-/*latency*/ logic[1:0] __13_D1; always_ff @(posedge clk) begin __13_D1 <= _13; end
-/*latency*/ logic[3:0] __18_D2; always_ff @(posedge clk) begin __18_D2 <= _18; end
-/*latency*/ logic[2:0] __19_D2; always_ff @(posedge clk) begin __19_D2 <= _19; end
 /*latency*/ logic[4:0] __24_D3; always_ff @(posedge clk) begin __24_D3 <= _24; end
+wire[4:0] _27 = last[0];
 always_comb begin // combinatorial sum
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	sum = 5'dx;
@@ -3980,10 +3980,10 @@ module multiple_outputs_only(
 );
 
 /*state*/ logic loop = 1'b0;
-wire _2;
-assign _2 = ~loop;
 /*latency*/ logic _loop_N1; always_ff @(posedge clk) begin _loop_N1 <= loop; end
 /*latency*/ logic _loop_D0; always_ff @(posedge clk) begin _loop_D0 <= _loop_N1; end
+wire _2;
+assign _2 = ~loop;
 always_comb begin // combinatorial o
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	o = 1'bx;
@@ -4010,9 +4010,9 @@ module output_only(
 );
 
 /*state*/ logic loop = 1'b0;
+/*latency*/ logic _loop_D0; always_ff @(posedge clk) begin _loop_D0 <= loop; end
 wire _2;
 assign _2 = ~loop;
-/*latency*/ logic _loop_D0; always_ff @(posedge clk) begin _loop_D0 <= loop; end
 always_comb begin // combinatorial o
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	o = 1'bx;
@@ -4738,13 +4738,13 @@ module determinable_because_no_input_output_ports(
 /*mux_wire*/ logic[6:0] t;
 /*mux_wire*/ logic[6:0] a_dd;
 /*mux_wire*/ logic[6:0] t_d;
-wire[7:0] _7;
-assign _7 = _t_d_D3 + a_dd;
 /*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
 /*latency*/ logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
 /*latency*/ logic[6:0] _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
 /*latency*/ logic[6:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
 /*latency*/ logic[6:0] _t_d_D3; always_ff @(posedge clk) begin _t_d_D3 <= t_d; end
+wire[7:0] _7;
+assign _7 = _t_d_D3 + a_dd;
 always_comb begin // combinatorial x
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	x = 8'dx;
@@ -4787,13 +4787,13 @@ module determinable_input_latency(
 /*mux_wire*/ logic[7:0] t;
 /*mux_wire*/ logic[6:0] a_dd;
 /*mux_wire*/ logic[7:0] t_d;
+/*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
+/*latency*/ logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
+/*latency*/ logic[7:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
 wire[7:0] _4;
 assign _4 = a_d + b;
 wire[8:0] _9;
 assign _9 = t_d + a_dd;
-/*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
-/*latency*/ logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
-/*latency*/ logic[7:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
 always_comb begin // combinatorial x
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	x = 9'dx;
@@ -4842,15 +4842,15 @@ module specified_input_latency(
 /*mux_wire*/ logic[7:0] t;
 /*mux_wire*/ logic[6:0] a_dd;
 /*mux_wire*/ logic[7:0] t_d;
-wire[7:0] _4;
-assign _4 = a_d + b;
-wire[8:0] _9;
-assign _9 = _t_d_D3 + a_dd;
 /*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
 /*latency*/ logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
 /*latency*/ logic[6:0] _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
 /*latency*/ logic[7:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
 /*latency*/ logic[7:0] _t_d_D3; always_ff @(posedge clk) begin _t_d_D3 <= t_d; end
+wire[7:0] _4;
+assign _4 = a_d + b;
+wire[8:0] _9;
+assign _9 = _t_d_D3 + a_dd;
 always_comb begin // combinatorial x
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	x = 9'dx;
@@ -5104,16 +5104,16 @@ module blur(
 
 /*state*/ logic working = 1'b0;
 /*state*/ logic[6:0] prev;
-wire[7:0] _4;
-assign _4 = prev + a;
-wire _7;
-assign _7 = ~done;
 /*latency*/ logic _working_D1; always_ff @(posedge clk) begin _working_D1 <= working; end
 /*latency*/ logic _working_D2; always_ff @(posedge clk) begin _working_D2 <= _working_D1; end
 /*latency*/ logic _working_D3; always_ff @(posedge clk) begin _working_D3 <= _working_D2; end
+wire[7:0] _4;
+assign _4 = prev + a;
 /*latency*/ logic[7:0] __4_D1; always_ff @(posedge clk) begin __4_D1 <= _4; end
 /*latency*/ logic[7:0] __4_D2; always_ff @(posedge clk) begin __4_D2 <= __4_D1; end
 /*latency*/ logic[7:0] __4_D3; always_ff @(posedge clk) begin __4_D3 <= __4_D2; end
+wire _7;
+assign _7 = ~done;
 always_comb begin // combinatorial result
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	result = 8'dx;
@@ -5138,12 +5138,12 @@ module Accumulator(
 /*latency*/ logic _done_D1; always_ff @(posedge clk) begin _done_D1 <= done; end
 /*state*/ logic[6:0] tot = 7'd0;
 /*mux_wire*/ logic[6:0] new_tot;
+/*latency*/ logic _done_D1; always_ff @(posedge clk) begin _done_D1 <= done; end
+/*latency*/ logic[6:0] _new_tot_D1; always_ff @(posedge clk) begin _new_tot_D1 <= new_tot; end
 wire[7:0] _3;
 assign _3 = tot + term;
 wire[6:0] _5;
 assign _5 = _3 - ((_3 >= 100) ? 100 : 0); // == mod 100
-/*latency*/ logic _done_D1; always_ff @(posedge clk) begin _done_D1 <= done; end
-/*latency*/ logic[6:0] _new_tot_D1; always_ff @(posedge clk) begin _new_tot_D1 <= new_tot; end
 always_comb begin // combinatorial total
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	total = 7'dx;
@@ -5173,14 +5173,14 @@ wire[6:0] _1 = values[0];
 wire[6:0] _2 = values[1];
 wire[13:0] _3;
 assign _3 = _1 * _2;
+/*latency*/ logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
 wire[6:0] _4 = values[2];
 wire[6:0] _5 = values[3];
 wire[13:0] _6;
 assign _6 = _4 * _5;
+/*latency*/ logic[13:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
 wire[26:0] _9;
 assign _9 = a * b;
-/*latency*/ logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
-/*latency*/ logic[13:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
 /*latency*/ logic[26:0] __9_D2; always_ff @(posedge clk) begin __9_D2 <= _9; end
 always_comb begin // combinatorial total
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -5289,20 +5289,20 @@ module pow17(
 /*mux_wire*/ logic[26:0] i4;
 /*mux_wire*/ logic[53:0] i8;
 /*mux_wire*/ logic[106:0] i16;
+/*latency*/ logic[6:0] _i_D1; always_ff @(posedge clk) begin _i_D1 <= i; end
+/*latency*/ logic[6:0] _i_D2; always_ff @(posedge clk) begin _i_D2 <= _i_D1; end
 wire[13:0] _3;
 assign _3 = i * i;
 wire[26:0] _6;
 assign _6 = i2 * i2;
+/*latency*/ logic[26:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
 wire[53:0] _9;
 assign _9 = i4 * i4;
 wire[106:0] _12;
 assign _12 = i8 * i8;
+/*latency*/ logic[106:0] __12_D2; always_ff @(posedge clk) begin __12_D2 <= _12; end
 wire[112:0] _15;
 assign _15 = i16 * _i_D2;
-/*latency*/ logic[6:0] _i_D1; always_ff @(posedge clk) begin _i_D1 <= i; end
-/*latency*/ logic[6:0] _i_D2; always_ff @(posedge clk) begin _i_D2 <= _i_D1; end
-/*latency*/ logic[26:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
-/*latency*/ logic[106:0] __12_D2; always_ff @(posedge clk) begin __12_D2 <= _12; end
 always_comb begin // combinatorial o
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	o = 113'dx;
@@ -5342,9 +5342,9 @@ module multiply_add(
 /*mux_wire*/ logic[13:0] tmp;
 wire[13:0] _3;
 assign _3 = a * b;
+/*latency*/ logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
 wire[13:0] _6;
 assign _6 = tmp + c;
-/*latency*/ logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
 always_comb begin // combinatorial total
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	total = 14'dx;
@@ -5372,17 +5372,17 @@ wire[6:0] _1 = factors[0];
 wire[6:0] _2 = factors[1];
 wire[13:0] _3;
 assign _3 = _1 * _2;
+/*latency*/ logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
 wire[6:0] _4 = factors[2];
 wire[6:0] _5 = factors[3];
 wire[13:0] _6;
 assign _6 = _4 * _5;
+/*latency*/ logic[13:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
 wire[26:0] _9;
 assign _9 = mul0 * mul1;
+/*latency*/ logic[26:0] __9_D2; always_ff @(posedge clk) begin __9_D2 <= _9; end
 wire[26:0] _12;
 assign _12 = product + add_to;
-/*latency*/ logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
-/*latency*/ logic[13:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
-/*latency*/ logic[26:0] __9_D2; always_ff @(posedge clk) begin __9_D2 <= _9; end
 /*latency*/ logic[26:0] __12_D3; always_ff @(posedge clk) begin __12_D3 <= _12; end
 always_comb begin // combinatorial product
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
