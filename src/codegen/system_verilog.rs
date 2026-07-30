@@ -195,7 +195,7 @@ impl<'g> CodeGenerationContext<'g> {
         needed_until: i64,
         indent: &str,
     ) -> Result<(), std::fmt::Error> {
-        if w.typ.is_zero_sized() {
+        if w.typ.is_zero_sized() || can_inline(w) {
             return Ok(());
         }
 
