@@ -158,19 +158,6 @@ impl<'g> CodeGenerationContext<'g> {
                 port_list.line(format!("/* local clock */ wire {clk_name}"));
             }
         }
-
-        // Add latency registers for the interface declarations
-        // Should not appear in the program text for extern modules
-        for (port_wire_id, port_wire) in &self.instance.wires {
-            port_wire.get_span(&self.md.link_info).debug();
-            if port_wire.typ.is_zero_sized() {
-                continue;
-            }
-            if matches!(port_wire.is_port, IsPort::Port(_, _)) {
-                self.add_latency_registers(port_wire, self.needed_untils[port_wire_id], "")
-                    .unwrap();
-            }
-        }
     }
 
     fn write_endmodule(&mut self) {

@@ -23,11 +23,6 @@ module TestNexts(
 	input wire a
 );
 
-/*latency*/ logic _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
-/*latency*/ logic _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
-/*latency*/ logic _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
-/*latency*/ logic _a_D4; always_ff @(posedge clk) begin _a_D4 <= _a_D3; end
-/*latency*/ logic _a_D5; always_ff @(posedge clk) begin _a_D5 <= _a_D4; end
 /*mux_wire*/ logic b;
 /*mux_wire*/ logic c;
 /*mux_wire*/ logic d;
@@ -139,17 +134,6 @@ module TwoDomainsWithLatRegs(
 	output /*mux_wire*/ logic b_o
 );
 
-/*latency*/ logic _a_i_D10; always_ff @(posedge clk) begin _a_i_D10 <= a_i; end
-/*latency*/ logic _a_i_D11; always_ff @(posedge clk) begin _a_i_D11 <= _a_i_D10; end
-/*latency*/ logic _a_i_D12; always_ff @(posedge clk) begin _a_i_D12 <= _a_i_D11; end
-/*latency*/ logic _a_i_D13; always_ff @(posedge clk) begin _a_i_D13 <= _a_i_D12; end
-/*latency*/ logic _a_i_D14; always_ff @(posedge clk) begin _a_i_D14 <= _a_i_D13; end
-/*latency*/ logic _a_i_D15; always_ff @(posedge clk) begin _a_i_D15 <= _a_i_D14; end
-/*latency*/ logic _a_i_D16; always_ff @(posedge clk) begin _a_i_D16 <= _a_i_D15; end
-/*latency*/ logic _a_i_D17; always_ff @(posedge clk) begin _a_i_D17 <= _a_i_D16; end
-/*latency*/ logic _a_i_D18; always_ff @(posedge clk) begin _a_i_D18 <= _a_i_D17; end
-/*latency*/ logic _a_i_D19; always_ff @(posedge clk) begin _a_i_D19 <= _a_i_D18; end
-/*latency*/ logic _a_i_D20; always_ff @(posedge clk) begin _a_i_D20 <= _a_i_D19; end
 /*latency*/ logic _a_i_D10; always_ff @(posedge clk) begin _a_i_D10 <= a_i; end
 /*latency*/ logic _a_i_D11; always_ff @(posedge clk) begin _a_i_D11 <= _a_i_D10; end
 /*latency*/ logic _a_i_D12; always_ff @(posedge clk) begin _a_i_D12 <= _a_i_D11; end
@@ -2128,11 +2112,6 @@ module specified_latencies_not_ports_edge_case(
 	output /*mux_wire*/ logic out_port
 );
 
-/*latency*/ logic _in_port_D1; always_ff @(posedge clk) begin _in_port_D1 <= in_port; end
-/*latency*/ logic _in_port_D2; always_ff @(posedge clk) begin _in_port_D2 <= _in_port_D1; end
-/*latency*/ logic _in_port_D3; always_ff @(posedge clk) begin _in_port_D3 <= _in_port_D2; end
-/*latency*/ logic _in_port_D4; always_ff @(posedge clk) begin _in_port_D4 <= _in_port_D3; end
-/*latency*/ logic _in_port_D5; always_ff @(posedge clk) begin _in_port_D5 <= _in_port_D4; end
 /*mux_wire*/ logic in_spec;
 /*mux_wire*/ logic out_spec;
 /*latency*/ logic _in_port_D1; always_ff @(posedge clk) begin _in_port_D1 <= in_port; end
@@ -2172,11 +2151,6 @@ module instantiate_fifo(
 	input wire[2:0] data_received
 );
 
-/*latency*/ logic[2:0] _data_received_D4; always_ff @(posedge clk) begin _data_received_D4 <= data_received; end
-/*latency*/ logic[2:0] _data_received_D5; always_ff @(posedge clk) begin _data_received_D5 <= _data_received_D4; end
-/*latency*/ logic[2:0] _data_received_D6; always_ff @(posedge clk) begin _data_received_D6 <= _data_received_D5; end
-/*latency*/ logic[2:0] _data_received_D7; always_ff @(posedge clk) begin _data_received_D7 <= _data_received_D6; end
-/*latency*/ logic[2:0] _data_received_D8; always_ff @(posedge clk) begin _data_received_D8 <= _data_received_D7; end
 /*mux_wire*/ logic[2:0] heavy_computation;
 /*latency*/ logic[2:0] _data_received_D4; always_ff @(posedge clk) begin _data_received_D4 <= data_received; end
 /*latency*/ logic[2:0] _data_received_D5; always_ff @(posedge clk) begin _data_received_D5 <= _data_received_D4; end
@@ -2244,7 +2218,6 @@ module FIFO_T_type_int_FROM_0_TO_6_DEPTH_30_MAY_PUSH_LATENCY_8(
 	input wire rst
 );
 
-/*latency*/ logic _pop_D1; always_ff @(posedge clk) begin _pop_D1 <= pop; end
 /*state*/ logic[2:0] mem[0:29];
 /*state*/ logic[4:0] read_addr;
 /*state*/ logic[4:0] write_addr;
@@ -2389,11 +2362,6 @@ module infer_from_local_context(
 	output /*mux_wire*/ logic out_val
 );
 
-/*latency*/ logic _in_val_D1; always_ff @(posedge clk) begin _in_val_D1 <= in_val; end
-/*latency*/ logic _in_val_D2; always_ff @(posedge clk) begin _in_val_D2 <= _in_val_D1; end
-/*latency*/ logic _in_val_D3; always_ff @(posedge clk) begin _in_val_D3 <= _in_val_D2; end
-/*latency*/ logic _in_val_D4; always_ff @(posedge clk) begin _in_val_D4 <= _in_val_D3; end
-/*latency*/ logic _in_val_D5; always_ff @(posedge clk) begin _in_val_D5 <= _in_val_D4; end
 /*mux_wire*/ logic heavily_pipelined_computation;
 /*latency*/ logic _in_val_D1; always_ff @(posedge clk) begin _in_val_D1 <= in_val; end
 /*latency*/ logic _in_val_D2; always_ff @(posedge clk) begin _in_val_D2 <= _in_val_D1; end
@@ -2439,11 +2407,6 @@ module infer_me_A_5(
 	output /*mux_wire*/ logic y
 );
 
-/*latency*/ logic _x_D1; always_ff @(posedge clk) begin _x_D1 <= x; end
-/*latency*/ logic _x_D2; always_ff @(posedge clk) begin _x_D2 <= _x_D1; end
-/*latency*/ logic _x_D3; always_ff @(posedge clk) begin _x_D3 <= _x_D2; end
-/*latency*/ logic _x_D4; always_ff @(posedge clk) begin _x_D4 <= _x_D3; end
-/*latency*/ logic _x_D5; always_ff @(posedge clk) begin _x_D5 <= _x_D4; end
 /*latency*/ logic _x_D1; always_ff @(posedge clk) begin _x_D1 <= x; end
 /*latency*/ logic _x_D2; always_ff @(posedge clk) begin _x_D2 <= _x_D1; end
 /*latency*/ logic _x_D3; always_ff @(posedge clk) begin _x_D3 <= _x_D2; end
@@ -2592,9 +2555,6 @@ module TreeAdd_SIZE_5_FROM_3_TO_4(
 	output /*mux_wire*/ logic[4:0] sum
 );
 
-/*latency*/ logic _TreeAdd_D1; always_ff @(posedge clk) begin _TreeAdd_D1 <= TreeAdd; end
-/*latency*/ logic _TreeAdd_D2; always_ff @(posedge clk) begin _TreeAdd_D2 <= _TreeAdd_D1; end
-/*latency*/ logic _TreeAdd_D3; always_ff @(posedge clk) begin _TreeAdd_D3 <= _TreeAdd_D2; end
 /*mux_wire*/ logic[1:0] inter_sums_split_0[0:4];
 /*mux_wire*/ logic[1:0] cur_sums[0:4];
 /*mux_wire*/ logic[2:0] next_sums[0:2];
@@ -4293,206 +4253,6 @@ module module_taking_a_lot_of_time(
 /*latency*/ logic[6:0] _data_in_D198; always_ff @(posedge clk) begin _data_in_D198 <= _data_in_D197; end
 /*latency*/ logic[6:0] _data_in_D199; always_ff @(posedge clk) begin _data_in_D199 <= _data_in_D198; end
 /*latency*/ logic[6:0] _data_in_D200; always_ff @(posedge clk) begin _data_in_D200 <= _data_in_D199; end
-/*latency*/ logic[6:0] _data_in_D1; always_ff @(posedge clk) begin _data_in_D1 <= data_in; end
-/*latency*/ logic[6:0] _data_in_D2; always_ff @(posedge clk) begin _data_in_D2 <= _data_in_D1; end
-/*latency*/ logic[6:0] _data_in_D3; always_ff @(posedge clk) begin _data_in_D3 <= _data_in_D2; end
-/*latency*/ logic[6:0] _data_in_D4; always_ff @(posedge clk) begin _data_in_D4 <= _data_in_D3; end
-/*latency*/ logic[6:0] _data_in_D5; always_ff @(posedge clk) begin _data_in_D5 <= _data_in_D4; end
-/*latency*/ logic[6:0] _data_in_D6; always_ff @(posedge clk) begin _data_in_D6 <= _data_in_D5; end
-/*latency*/ logic[6:0] _data_in_D7; always_ff @(posedge clk) begin _data_in_D7 <= _data_in_D6; end
-/*latency*/ logic[6:0] _data_in_D8; always_ff @(posedge clk) begin _data_in_D8 <= _data_in_D7; end
-/*latency*/ logic[6:0] _data_in_D9; always_ff @(posedge clk) begin _data_in_D9 <= _data_in_D8; end
-/*latency*/ logic[6:0] _data_in_D10; always_ff @(posedge clk) begin _data_in_D10 <= _data_in_D9; end
-/*latency*/ logic[6:0] _data_in_D11; always_ff @(posedge clk) begin _data_in_D11 <= _data_in_D10; end
-/*latency*/ logic[6:0] _data_in_D12; always_ff @(posedge clk) begin _data_in_D12 <= _data_in_D11; end
-/*latency*/ logic[6:0] _data_in_D13; always_ff @(posedge clk) begin _data_in_D13 <= _data_in_D12; end
-/*latency*/ logic[6:0] _data_in_D14; always_ff @(posedge clk) begin _data_in_D14 <= _data_in_D13; end
-/*latency*/ logic[6:0] _data_in_D15; always_ff @(posedge clk) begin _data_in_D15 <= _data_in_D14; end
-/*latency*/ logic[6:0] _data_in_D16; always_ff @(posedge clk) begin _data_in_D16 <= _data_in_D15; end
-/*latency*/ logic[6:0] _data_in_D17; always_ff @(posedge clk) begin _data_in_D17 <= _data_in_D16; end
-/*latency*/ logic[6:0] _data_in_D18; always_ff @(posedge clk) begin _data_in_D18 <= _data_in_D17; end
-/*latency*/ logic[6:0] _data_in_D19; always_ff @(posedge clk) begin _data_in_D19 <= _data_in_D18; end
-/*latency*/ logic[6:0] _data_in_D20; always_ff @(posedge clk) begin _data_in_D20 <= _data_in_D19; end
-/*latency*/ logic[6:0] _data_in_D21; always_ff @(posedge clk) begin _data_in_D21 <= _data_in_D20; end
-/*latency*/ logic[6:0] _data_in_D22; always_ff @(posedge clk) begin _data_in_D22 <= _data_in_D21; end
-/*latency*/ logic[6:0] _data_in_D23; always_ff @(posedge clk) begin _data_in_D23 <= _data_in_D22; end
-/*latency*/ logic[6:0] _data_in_D24; always_ff @(posedge clk) begin _data_in_D24 <= _data_in_D23; end
-/*latency*/ logic[6:0] _data_in_D25; always_ff @(posedge clk) begin _data_in_D25 <= _data_in_D24; end
-/*latency*/ logic[6:0] _data_in_D26; always_ff @(posedge clk) begin _data_in_D26 <= _data_in_D25; end
-/*latency*/ logic[6:0] _data_in_D27; always_ff @(posedge clk) begin _data_in_D27 <= _data_in_D26; end
-/*latency*/ logic[6:0] _data_in_D28; always_ff @(posedge clk) begin _data_in_D28 <= _data_in_D27; end
-/*latency*/ logic[6:0] _data_in_D29; always_ff @(posedge clk) begin _data_in_D29 <= _data_in_D28; end
-/*latency*/ logic[6:0] _data_in_D30; always_ff @(posedge clk) begin _data_in_D30 <= _data_in_D29; end
-/*latency*/ logic[6:0] _data_in_D31; always_ff @(posedge clk) begin _data_in_D31 <= _data_in_D30; end
-/*latency*/ logic[6:0] _data_in_D32; always_ff @(posedge clk) begin _data_in_D32 <= _data_in_D31; end
-/*latency*/ logic[6:0] _data_in_D33; always_ff @(posedge clk) begin _data_in_D33 <= _data_in_D32; end
-/*latency*/ logic[6:0] _data_in_D34; always_ff @(posedge clk) begin _data_in_D34 <= _data_in_D33; end
-/*latency*/ logic[6:0] _data_in_D35; always_ff @(posedge clk) begin _data_in_D35 <= _data_in_D34; end
-/*latency*/ logic[6:0] _data_in_D36; always_ff @(posedge clk) begin _data_in_D36 <= _data_in_D35; end
-/*latency*/ logic[6:0] _data_in_D37; always_ff @(posedge clk) begin _data_in_D37 <= _data_in_D36; end
-/*latency*/ logic[6:0] _data_in_D38; always_ff @(posedge clk) begin _data_in_D38 <= _data_in_D37; end
-/*latency*/ logic[6:0] _data_in_D39; always_ff @(posedge clk) begin _data_in_D39 <= _data_in_D38; end
-/*latency*/ logic[6:0] _data_in_D40; always_ff @(posedge clk) begin _data_in_D40 <= _data_in_D39; end
-/*latency*/ logic[6:0] _data_in_D41; always_ff @(posedge clk) begin _data_in_D41 <= _data_in_D40; end
-/*latency*/ logic[6:0] _data_in_D42; always_ff @(posedge clk) begin _data_in_D42 <= _data_in_D41; end
-/*latency*/ logic[6:0] _data_in_D43; always_ff @(posedge clk) begin _data_in_D43 <= _data_in_D42; end
-/*latency*/ logic[6:0] _data_in_D44; always_ff @(posedge clk) begin _data_in_D44 <= _data_in_D43; end
-/*latency*/ logic[6:0] _data_in_D45; always_ff @(posedge clk) begin _data_in_D45 <= _data_in_D44; end
-/*latency*/ logic[6:0] _data_in_D46; always_ff @(posedge clk) begin _data_in_D46 <= _data_in_D45; end
-/*latency*/ logic[6:0] _data_in_D47; always_ff @(posedge clk) begin _data_in_D47 <= _data_in_D46; end
-/*latency*/ logic[6:0] _data_in_D48; always_ff @(posedge clk) begin _data_in_D48 <= _data_in_D47; end
-/*latency*/ logic[6:0] _data_in_D49; always_ff @(posedge clk) begin _data_in_D49 <= _data_in_D48; end
-/*latency*/ logic[6:0] _data_in_D50; always_ff @(posedge clk) begin _data_in_D50 <= _data_in_D49; end
-/*latency*/ logic[6:0] _data_in_D51; always_ff @(posedge clk) begin _data_in_D51 <= _data_in_D50; end
-/*latency*/ logic[6:0] _data_in_D52; always_ff @(posedge clk) begin _data_in_D52 <= _data_in_D51; end
-/*latency*/ logic[6:0] _data_in_D53; always_ff @(posedge clk) begin _data_in_D53 <= _data_in_D52; end
-/*latency*/ logic[6:0] _data_in_D54; always_ff @(posedge clk) begin _data_in_D54 <= _data_in_D53; end
-/*latency*/ logic[6:0] _data_in_D55; always_ff @(posedge clk) begin _data_in_D55 <= _data_in_D54; end
-/*latency*/ logic[6:0] _data_in_D56; always_ff @(posedge clk) begin _data_in_D56 <= _data_in_D55; end
-/*latency*/ logic[6:0] _data_in_D57; always_ff @(posedge clk) begin _data_in_D57 <= _data_in_D56; end
-/*latency*/ logic[6:0] _data_in_D58; always_ff @(posedge clk) begin _data_in_D58 <= _data_in_D57; end
-/*latency*/ logic[6:0] _data_in_D59; always_ff @(posedge clk) begin _data_in_D59 <= _data_in_D58; end
-/*latency*/ logic[6:0] _data_in_D60; always_ff @(posedge clk) begin _data_in_D60 <= _data_in_D59; end
-/*latency*/ logic[6:0] _data_in_D61; always_ff @(posedge clk) begin _data_in_D61 <= _data_in_D60; end
-/*latency*/ logic[6:0] _data_in_D62; always_ff @(posedge clk) begin _data_in_D62 <= _data_in_D61; end
-/*latency*/ logic[6:0] _data_in_D63; always_ff @(posedge clk) begin _data_in_D63 <= _data_in_D62; end
-/*latency*/ logic[6:0] _data_in_D64; always_ff @(posedge clk) begin _data_in_D64 <= _data_in_D63; end
-/*latency*/ logic[6:0] _data_in_D65; always_ff @(posedge clk) begin _data_in_D65 <= _data_in_D64; end
-/*latency*/ logic[6:0] _data_in_D66; always_ff @(posedge clk) begin _data_in_D66 <= _data_in_D65; end
-/*latency*/ logic[6:0] _data_in_D67; always_ff @(posedge clk) begin _data_in_D67 <= _data_in_D66; end
-/*latency*/ logic[6:0] _data_in_D68; always_ff @(posedge clk) begin _data_in_D68 <= _data_in_D67; end
-/*latency*/ logic[6:0] _data_in_D69; always_ff @(posedge clk) begin _data_in_D69 <= _data_in_D68; end
-/*latency*/ logic[6:0] _data_in_D70; always_ff @(posedge clk) begin _data_in_D70 <= _data_in_D69; end
-/*latency*/ logic[6:0] _data_in_D71; always_ff @(posedge clk) begin _data_in_D71 <= _data_in_D70; end
-/*latency*/ logic[6:0] _data_in_D72; always_ff @(posedge clk) begin _data_in_D72 <= _data_in_D71; end
-/*latency*/ logic[6:0] _data_in_D73; always_ff @(posedge clk) begin _data_in_D73 <= _data_in_D72; end
-/*latency*/ logic[6:0] _data_in_D74; always_ff @(posedge clk) begin _data_in_D74 <= _data_in_D73; end
-/*latency*/ logic[6:0] _data_in_D75; always_ff @(posedge clk) begin _data_in_D75 <= _data_in_D74; end
-/*latency*/ logic[6:0] _data_in_D76; always_ff @(posedge clk) begin _data_in_D76 <= _data_in_D75; end
-/*latency*/ logic[6:0] _data_in_D77; always_ff @(posedge clk) begin _data_in_D77 <= _data_in_D76; end
-/*latency*/ logic[6:0] _data_in_D78; always_ff @(posedge clk) begin _data_in_D78 <= _data_in_D77; end
-/*latency*/ logic[6:0] _data_in_D79; always_ff @(posedge clk) begin _data_in_D79 <= _data_in_D78; end
-/*latency*/ logic[6:0] _data_in_D80; always_ff @(posedge clk) begin _data_in_D80 <= _data_in_D79; end
-/*latency*/ logic[6:0] _data_in_D81; always_ff @(posedge clk) begin _data_in_D81 <= _data_in_D80; end
-/*latency*/ logic[6:0] _data_in_D82; always_ff @(posedge clk) begin _data_in_D82 <= _data_in_D81; end
-/*latency*/ logic[6:0] _data_in_D83; always_ff @(posedge clk) begin _data_in_D83 <= _data_in_D82; end
-/*latency*/ logic[6:0] _data_in_D84; always_ff @(posedge clk) begin _data_in_D84 <= _data_in_D83; end
-/*latency*/ logic[6:0] _data_in_D85; always_ff @(posedge clk) begin _data_in_D85 <= _data_in_D84; end
-/*latency*/ logic[6:0] _data_in_D86; always_ff @(posedge clk) begin _data_in_D86 <= _data_in_D85; end
-/*latency*/ logic[6:0] _data_in_D87; always_ff @(posedge clk) begin _data_in_D87 <= _data_in_D86; end
-/*latency*/ logic[6:0] _data_in_D88; always_ff @(posedge clk) begin _data_in_D88 <= _data_in_D87; end
-/*latency*/ logic[6:0] _data_in_D89; always_ff @(posedge clk) begin _data_in_D89 <= _data_in_D88; end
-/*latency*/ logic[6:0] _data_in_D90; always_ff @(posedge clk) begin _data_in_D90 <= _data_in_D89; end
-/*latency*/ logic[6:0] _data_in_D91; always_ff @(posedge clk) begin _data_in_D91 <= _data_in_D90; end
-/*latency*/ logic[6:0] _data_in_D92; always_ff @(posedge clk) begin _data_in_D92 <= _data_in_D91; end
-/*latency*/ logic[6:0] _data_in_D93; always_ff @(posedge clk) begin _data_in_D93 <= _data_in_D92; end
-/*latency*/ logic[6:0] _data_in_D94; always_ff @(posedge clk) begin _data_in_D94 <= _data_in_D93; end
-/*latency*/ logic[6:0] _data_in_D95; always_ff @(posedge clk) begin _data_in_D95 <= _data_in_D94; end
-/*latency*/ logic[6:0] _data_in_D96; always_ff @(posedge clk) begin _data_in_D96 <= _data_in_D95; end
-/*latency*/ logic[6:0] _data_in_D97; always_ff @(posedge clk) begin _data_in_D97 <= _data_in_D96; end
-/*latency*/ logic[6:0] _data_in_D98; always_ff @(posedge clk) begin _data_in_D98 <= _data_in_D97; end
-/*latency*/ logic[6:0] _data_in_D99; always_ff @(posedge clk) begin _data_in_D99 <= _data_in_D98; end
-/*latency*/ logic[6:0] _data_in_D100; always_ff @(posedge clk) begin _data_in_D100 <= _data_in_D99; end
-/*latency*/ logic[6:0] _data_in_D101; always_ff @(posedge clk) begin _data_in_D101 <= _data_in_D100; end
-/*latency*/ logic[6:0] _data_in_D102; always_ff @(posedge clk) begin _data_in_D102 <= _data_in_D101; end
-/*latency*/ logic[6:0] _data_in_D103; always_ff @(posedge clk) begin _data_in_D103 <= _data_in_D102; end
-/*latency*/ logic[6:0] _data_in_D104; always_ff @(posedge clk) begin _data_in_D104 <= _data_in_D103; end
-/*latency*/ logic[6:0] _data_in_D105; always_ff @(posedge clk) begin _data_in_D105 <= _data_in_D104; end
-/*latency*/ logic[6:0] _data_in_D106; always_ff @(posedge clk) begin _data_in_D106 <= _data_in_D105; end
-/*latency*/ logic[6:0] _data_in_D107; always_ff @(posedge clk) begin _data_in_D107 <= _data_in_D106; end
-/*latency*/ logic[6:0] _data_in_D108; always_ff @(posedge clk) begin _data_in_D108 <= _data_in_D107; end
-/*latency*/ logic[6:0] _data_in_D109; always_ff @(posedge clk) begin _data_in_D109 <= _data_in_D108; end
-/*latency*/ logic[6:0] _data_in_D110; always_ff @(posedge clk) begin _data_in_D110 <= _data_in_D109; end
-/*latency*/ logic[6:0] _data_in_D111; always_ff @(posedge clk) begin _data_in_D111 <= _data_in_D110; end
-/*latency*/ logic[6:0] _data_in_D112; always_ff @(posedge clk) begin _data_in_D112 <= _data_in_D111; end
-/*latency*/ logic[6:0] _data_in_D113; always_ff @(posedge clk) begin _data_in_D113 <= _data_in_D112; end
-/*latency*/ logic[6:0] _data_in_D114; always_ff @(posedge clk) begin _data_in_D114 <= _data_in_D113; end
-/*latency*/ logic[6:0] _data_in_D115; always_ff @(posedge clk) begin _data_in_D115 <= _data_in_D114; end
-/*latency*/ logic[6:0] _data_in_D116; always_ff @(posedge clk) begin _data_in_D116 <= _data_in_D115; end
-/*latency*/ logic[6:0] _data_in_D117; always_ff @(posedge clk) begin _data_in_D117 <= _data_in_D116; end
-/*latency*/ logic[6:0] _data_in_D118; always_ff @(posedge clk) begin _data_in_D118 <= _data_in_D117; end
-/*latency*/ logic[6:0] _data_in_D119; always_ff @(posedge clk) begin _data_in_D119 <= _data_in_D118; end
-/*latency*/ logic[6:0] _data_in_D120; always_ff @(posedge clk) begin _data_in_D120 <= _data_in_D119; end
-/*latency*/ logic[6:0] _data_in_D121; always_ff @(posedge clk) begin _data_in_D121 <= _data_in_D120; end
-/*latency*/ logic[6:0] _data_in_D122; always_ff @(posedge clk) begin _data_in_D122 <= _data_in_D121; end
-/*latency*/ logic[6:0] _data_in_D123; always_ff @(posedge clk) begin _data_in_D123 <= _data_in_D122; end
-/*latency*/ logic[6:0] _data_in_D124; always_ff @(posedge clk) begin _data_in_D124 <= _data_in_D123; end
-/*latency*/ logic[6:0] _data_in_D125; always_ff @(posedge clk) begin _data_in_D125 <= _data_in_D124; end
-/*latency*/ logic[6:0] _data_in_D126; always_ff @(posedge clk) begin _data_in_D126 <= _data_in_D125; end
-/*latency*/ logic[6:0] _data_in_D127; always_ff @(posedge clk) begin _data_in_D127 <= _data_in_D126; end
-/*latency*/ logic[6:0] _data_in_D128; always_ff @(posedge clk) begin _data_in_D128 <= _data_in_D127; end
-/*latency*/ logic[6:0] _data_in_D129; always_ff @(posedge clk) begin _data_in_D129 <= _data_in_D128; end
-/*latency*/ logic[6:0] _data_in_D130; always_ff @(posedge clk) begin _data_in_D130 <= _data_in_D129; end
-/*latency*/ logic[6:0] _data_in_D131; always_ff @(posedge clk) begin _data_in_D131 <= _data_in_D130; end
-/*latency*/ logic[6:0] _data_in_D132; always_ff @(posedge clk) begin _data_in_D132 <= _data_in_D131; end
-/*latency*/ logic[6:0] _data_in_D133; always_ff @(posedge clk) begin _data_in_D133 <= _data_in_D132; end
-/*latency*/ logic[6:0] _data_in_D134; always_ff @(posedge clk) begin _data_in_D134 <= _data_in_D133; end
-/*latency*/ logic[6:0] _data_in_D135; always_ff @(posedge clk) begin _data_in_D135 <= _data_in_D134; end
-/*latency*/ logic[6:0] _data_in_D136; always_ff @(posedge clk) begin _data_in_D136 <= _data_in_D135; end
-/*latency*/ logic[6:0] _data_in_D137; always_ff @(posedge clk) begin _data_in_D137 <= _data_in_D136; end
-/*latency*/ logic[6:0] _data_in_D138; always_ff @(posedge clk) begin _data_in_D138 <= _data_in_D137; end
-/*latency*/ logic[6:0] _data_in_D139; always_ff @(posedge clk) begin _data_in_D139 <= _data_in_D138; end
-/*latency*/ logic[6:0] _data_in_D140; always_ff @(posedge clk) begin _data_in_D140 <= _data_in_D139; end
-/*latency*/ logic[6:0] _data_in_D141; always_ff @(posedge clk) begin _data_in_D141 <= _data_in_D140; end
-/*latency*/ logic[6:0] _data_in_D142; always_ff @(posedge clk) begin _data_in_D142 <= _data_in_D141; end
-/*latency*/ logic[6:0] _data_in_D143; always_ff @(posedge clk) begin _data_in_D143 <= _data_in_D142; end
-/*latency*/ logic[6:0] _data_in_D144; always_ff @(posedge clk) begin _data_in_D144 <= _data_in_D143; end
-/*latency*/ logic[6:0] _data_in_D145; always_ff @(posedge clk) begin _data_in_D145 <= _data_in_D144; end
-/*latency*/ logic[6:0] _data_in_D146; always_ff @(posedge clk) begin _data_in_D146 <= _data_in_D145; end
-/*latency*/ logic[6:0] _data_in_D147; always_ff @(posedge clk) begin _data_in_D147 <= _data_in_D146; end
-/*latency*/ logic[6:0] _data_in_D148; always_ff @(posedge clk) begin _data_in_D148 <= _data_in_D147; end
-/*latency*/ logic[6:0] _data_in_D149; always_ff @(posedge clk) begin _data_in_D149 <= _data_in_D148; end
-/*latency*/ logic[6:0] _data_in_D150; always_ff @(posedge clk) begin _data_in_D150 <= _data_in_D149; end
-/*latency*/ logic[6:0] _data_in_D151; always_ff @(posedge clk) begin _data_in_D151 <= _data_in_D150; end
-/*latency*/ logic[6:0] _data_in_D152; always_ff @(posedge clk) begin _data_in_D152 <= _data_in_D151; end
-/*latency*/ logic[6:0] _data_in_D153; always_ff @(posedge clk) begin _data_in_D153 <= _data_in_D152; end
-/*latency*/ logic[6:0] _data_in_D154; always_ff @(posedge clk) begin _data_in_D154 <= _data_in_D153; end
-/*latency*/ logic[6:0] _data_in_D155; always_ff @(posedge clk) begin _data_in_D155 <= _data_in_D154; end
-/*latency*/ logic[6:0] _data_in_D156; always_ff @(posedge clk) begin _data_in_D156 <= _data_in_D155; end
-/*latency*/ logic[6:0] _data_in_D157; always_ff @(posedge clk) begin _data_in_D157 <= _data_in_D156; end
-/*latency*/ logic[6:0] _data_in_D158; always_ff @(posedge clk) begin _data_in_D158 <= _data_in_D157; end
-/*latency*/ logic[6:0] _data_in_D159; always_ff @(posedge clk) begin _data_in_D159 <= _data_in_D158; end
-/*latency*/ logic[6:0] _data_in_D160; always_ff @(posedge clk) begin _data_in_D160 <= _data_in_D159; end
-/*latency*/ logic[6:0] _data_in_D161; always_ff @(posedge clk) begin _data_in_D161 <= _data_in_D160; end
-/*latency*/ logic[6:0] _data_in_D162; always_ff @(posedge clk) begin _data_in_D162 <= _data_in_D161; end
-/*latency*/ logic[6:0] _data_in_D163; always_ff @(posedge clk) begin _data_in_D163 <= _data_in_D162; end
-/*latency*/ logic[6:0] _data_in_D164; always_ff @(posedge clk) begin _data_in_D164 <= _data_in_D163; end
-/*latency*/ logic[6:0] _data_in_D165; always_ff @(posedge clk) begin _data_in_D165 <= _data_in_D164; end
-/*latency*/ logic[6:0] _data_in_D166; always_ff @(posedge clk) begin _data_in_D166 <= _data_in_D165; end
-/*latency*/ logic[6:0] _data_in_D167; always_ff @(posedge clk) begin _data_in_D167 <= _data_in_D166; end
-/*latency*/ logic[6:0] _data_in_D168; always_ff @(posedge clk) begin _data_in_D168 <= _data_in_D167; end
-/*latency*/ logic[6:0] _data_in_D169; always_ff @(posedge clk) begin _data_in_D169 <= _data_in_D168; end
-/*latency*/ logic[6:0] _data_in_D170; always_ff @(posedge clk) begin _data_in_D170 <= _data_in_D169; end
-/*latency*/ logic[6:0] _data_in_D171; always_ff @(posedge clk) begin _data_in_D171 <= _data_in_D170; end
-/*latency*/ logic[6:0] _data_in_D172; always_ff @(posedge clk) begin _data_in_D172 <= _data_in_D171; end
-/*latency*/ logic[6:0] _data_in_D173; always_ff @(posedge clk) begin _data_in_D173 <= _data_in_D172; end
-/*latency*/ logic[6:0] _data_in_D174; always_ff @(posedge clk) begin _data_in_D174 <= _data_in_D173; end
-/*latency*/ logic[6:0] _data_in_D175; always_ff @(posedge clk) begin _data_in_D175 <= _data_in_D174; end
-/*latency*/ logic[6:0] _data_in_D176; always_ff @(posedge clk) begin _data_in_D176 <= _data_in_D175; end
-/*latency*/ logic[6:0] _data_in_D177; always_ff @(posedge clk) begin _data_in_D177 <= _data_in_D176; end
-/*latency*/ logic[6:0] _data_in_D178; always_ff @(posedge clk) begin _data_in_D178 <= _data_in_D177; end
-/*latency*/ logic[6:0] _data_in_D179; always_ff @(posedge clk) begin _data_in_D179 <= _data_in_D178; end
-/*latency*/ logic[6:0] _data_in_D180; always_ff @(posedge clk) begin _data_in_D180 <= _data_in_D179; end
-/*latency*/ logic[6:0] _data_in_D181; always_ff @(posedge clk) begin _data_in_D181 <= _data_in_D180; end
-/*latency*/ logic[6:0] _data_in_D182; always_ff @(posedge clk) begin _data_in_D182 <= _data_in_D181; end
-/*latency*/ logic[6:0] _data_in_D183; always_ff @(posedge clk) begin _data_in_D183 <= _data_in_D182; end
-/*latency*/ logic[6:0] _data_in_D184; always_ff @(posedge clk) begin _data_in_D184 <= _data_in_D183; end
-/*latency*/ logic[6:0] _data_in_D185; always_ff @(posedge clk) begin _data_in_D185 <= _data_in_D184; end
-/*latency*/ logic[6:0] _data_in_D186; always_ff @(posedge clk) begin _data_in_D186 <= _data_in_D185; end
-/*latency*/ logic[6:0] _data_in_D187; always_ff @(posedge clk) begin _data_in_D187 <= _data_in_D186; end
-/*latency*/ logic[6:0] _data_in_D188; always_ff @(posedge clk) begin _data_in_D188 <= _data_in_D187; end
-/*latency*/ logic[6:0] _data_in_D189; always_ff @(posedge clk) begin _data_in_D189 <= _data_in_D188; end
-/*latency*/ logic[6:0] _data_in_D190; always_ff @(posedge clk) begin _data_in_D190 <= _data_in_D189; end
-/*latency*/ logic[6:0] _data_in_D191; always_ff @(posedge clk) begin _data_in_D191 <= _data_in_D190; end
-/*latency*/ logic[6:0] _data_in_D192; always_ff @(posedge clk) begin _data_in_D192 <= _data_in_D191; end
-/*latency*/ logic[6:0] _data_in_D193; always_ff @(posedge clk) begin _data_in_D193 <= _data_in_D192; end
-/*latency*/ logic[6:0] _data_in_D194; always_ff @(posedge clk) begin _data_in_D194 <= _data_in_D193; end
-/*latency*/ logic[6:0] _data_in_D195; always_ff @(posedge clk) begin _data_in_D195 <= _data_in_D194; end
-/*latency*/ logic[6:0] _data_in_D196; always_ff @(posedge clk) begin _data_in_D196 <= _data_in_D195; end
-/*latency*/ logic[6:0] _data_in_D197; always_ff @(posedge clk) begin _data_in_D197 <= _data_in_D196; end
-/*latency*/ logic[6:0] _data_in_D198; always_ff @(posedge clk) begin _data_in_D198 <= _data_in_D197; end
-/*latency*/ logic[6:0] _data_in_D199; always_ff @(posedge clk) begin _data_in_D199 <= _data_in_D198; end
-/*latency*/ logic[6:0] _data_in_D200; always_ff @(posedge clk) begin _data_in_D200 <= _data_in_D199; end
 always_comb begin // combinatorial data_out
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	data_out = 7'dx;
@@ -4712,11 +4472,6 @@ module module_taking_time(
 /*latency*/ logic[6:0] _i_D3; always_ff @(posedge clk) begin _i_D3 <= _i_D2; end
 /*latency*/ logic[6:0] _i_D4; always_ff @(posedge clk) begin _i_D4 <= _i_D3; end
 /*latency*/ logic[6:0] _i_D5; always_ff @(posedge clk) begin _i_D5 <= _i_D4; end
-/*latency*/ logic[6:0] _i_D1; always_ff @(posedge clk) begin _i_D1 <= i; end
-/*latency*/ logic[6:0] _i_D2; always_ff @(posedge clk) begin _i_D2 <= _i_D1; end
-/*latency*/ logic[6:0] _i_D3; always_ff @(posedge clk) begin _i_D3 <= _i_D2; end
-/*latency*/ logic[6:0] _i_D4; always_ff @(posedge clk) begin _i_D4 <= _i_D3; end
-/*latency*/ logic[6:0] _i_D5; always_ff @(posedge clk) begin _i_D5 <= _i_D4; end
 always_comb begin // combinatorial o
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	o = 7'dx;
@@ -4731,9 +4486,6 @@ module determinable_because_no_input_output_ports(
 	output /*mux_wire*/ logic[7:0] x
 );
 
-/*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
-/*latency*/ logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
-/*latency*/ logic[6:0] _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
 /*mux_wire*/ logic[6:0] a_d;
 /*mux_wire*/ logic[6:0] t;
 /*mux_wire*/ logic[6:0] a_dd;
@@ -4781,8 +4533,6 @@ module determinable_input_latency(
 	output /*mux_wire*/ logic[7:0] y
 );
 
-/*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
-/*latency*/ logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
 /*mux_wire*/ logic[6:0] a_d;
 /*mux_wire*/ logic[7:0] t;
 /*mux_wire*/ logic[6:0] a_dd;
@@ -4835,9 +4585,6 @@ module specified_input_latency(
 	output /*mux_wire*/ logic[7:0] y
 );
 
-/*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
-/*latency*/ logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
-/*latency*/ logic[6:0] _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
 /*mux_wire*/ logic[6:0] a_d;
 /*mux_wire*/ logic[7:0] t;
 /*mux_wire*/ logic[6:0] a_dd;
@@ -5135,7 +4882,6 @@ module Accumulator(
 	output /*mux_wire*/ logic[6:0] total
 );
 
-/*latency*/ logic _done_D1; always_ff @(posedge clk) begin _done_D1 <= done; end
 /*state*/ logic[6:0] tot = 7'd0;
 /*mux_wire*/ logic[6:0] new_tot;
 /*latency*/ logic _done_D1; always_ff @(posedge clk) begin _done_D1 <= done; end
@@ -5283,8 +5029,6 @@ module pow17(
 	output /*mux_wire*/ logic[112:0] o
 );
 
-/*latency*/ logic[6:0] _i_D1; always_ff @(posedge clk) begin _i_D1 <= i; end
-/*latency*/ logic[6:0] _i_D2; always_ff @(posedge clk) begin _i_D2 <= _i_D1; end
 /*mux_wire*/ logic[13:0] i2;
 /*mux_wire*/ logic[26:0] i4;
 /*mux_wire*/ logic[53:0] i8;
