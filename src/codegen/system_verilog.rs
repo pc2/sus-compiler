@@ -208,7 +208,9 @@ impl<'g> CodeGenerationContext<'g> {
         needed_until: i64,
         indent: &str,
     ) -> Result<(), std::fmt::Error> {
-        assert!(!w.typ.is_zero_sized());
+        if w.typ.is_zero_sized() {
+            return Ok(());
+        }
 
         // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it instantiates no registers
         for i in w.absolute_latency.unwrap()..needed_until {
@@ -443,260 +445,277 @@ impl<'g> CodeGenerationContext<'g> {
     }
 
     fn write_wire_declarations(&mut self) {
+        // Write out named wires first
+        for (_wire_id, w) in &self.instance.wires {
+            if !w.name.starts_with("_") {
+                self.write_wire_declaration(w);
+            }
+        }
+        // And only then temporaries
+        for (_wire_id, w) in &self.instance.wires {
+            if w.name.starts_with("_") {
+                self.write_wire_declaration(w);
+            }
+        }
+
+        // Finally add all latency registers
         for (wire_id, w) in &self.instance.wires {
-            w.get_span(&self.md.link_info).debug();
-            // For better readability of output Verilog
-            if can_inline(w) {
-                continue;
-            }
+            self.add_latency_registers(w, self.needed_untils[wire_id], "")
+                .unwrap();
+        }
+    }
 
-            if matches!(w.is_port, IsPort::Port(_, _)) {
-                continue;
-            }
-            if w.typ.is_zero_sized() {
-                writeln!(self.program_text, "// (zero sized) {}", w.name).unwrap();
-                continue;
-            }
-            let wire_or_reg = w.source.codegen_wire_or_reg();
-            let output_name = self.output_wire_name(w);
-            let output_decl = output_name.codegen_declaration();
+    fn write_wire_declaration(&mut self, w: &'g RealWire) {
+        w.get_span(&self.md.link_info).debug();
+        // For better readability of output Verilog
+        if can_inline(w) {
+            return;
+        }
 
-            match &w.source {
-                RealWireDataSource::Select { root, path } => {
-                    let root = &self.instance.wires[*root];
-                    let root_name = self.wire_name(root, w.absolute_latency);
+        if matches!(w.is_port, IsPort::Port(_, _)) {
+            return;
+        }
+        if w.typ.is_zero_sized() {
+            writeln!(self.program_text, "// (zero sized) {}", w.name).unwrap();
+            return;
+        }
+        let wire_or_reg = w.source.codegen_wire_or_reg();
+        let output_name = self.output_wire_name(w);
+        let output_decl = output_name.codegen_declaration();
 
-                    // Custom [Self::in_generate], to generate logic[31:0] my_val = 5 + other_val
-                    self.genvars.reuse();
-                    self.for_vars.reuse();
-                    let content = self.foreach_for_real_path(
-                        &root.typ,
-                        path,
-                        w.absolute_latency,
-                        false,
-                        |slf, source_path, target_path, result_typ| {
-                            slf.foreach_for_copy_unpacked(result_typ, false, |path, _| {
-                                let source = root_name.with_paths([source_path, path]);
-                                let target = output_name.with_paths([target_path, path]);
-                                format!("assign {target} = {source};\n")
-                            })
-                        },
-                    );
+        match &w.source {
+            RealWireDataSource::Select { root, path } => {
+                let root = &self.instance.wires[*root];
+                let root_name = self.wire_name(root, w.absolute_latency);
 
-                    if self.genvars.currently_used != 0 {
-                        write!(
-                            self.program_text,
-                            "{wire_or_reg}{output_decl};\ngenerate\n{content}endgenerate\n"
-                        )
-                        .unwrap();
-                    } else {
-                        // We're basically trimming "<assign wire_name>[...] = ..." off the string, so we can stitch it to the declaration
-                        let content = content.strip_prefix("assign ").unwrap();
-                        let out_name_string = output_name.to_string();
-                        let content = content.strip_prefix(&out_name_string).unwrap();
-                        write!(self.program_text, "{wire_or_reg}{output_decl}{content}").unwrap();
-                    }
-                }
-                RealWireDataSource::UnaryOp { op, right, .. } => {
-                    writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
-
-                    let right = &self.instance.wires[*right];
-                    let right_name = self.wire_name(right, w.absolute_latency);
-
-                    let for_var = match op {
-                        UnaryOperator::Sum | UnaryOperator::Product => Some(self.for_vars.alloc()),
-                        _ => None,
-                    };
-                    self.in_generate(|slf| {
-                        slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| {
-                            let output = output_name.with_path(path);
-
-                            let op_sv = match op {
-                                UnaryOperator::And => "&",
-                                UnaryOperator::Or => "|",
-                                UnaryOperator::Xor => "^",
-                                UnaryOperator::Not => "~",// SystemVerilog's '!' operator is like C's. !8b10101110 = 0
-                                UnaryOperator::Sum => "+",
-                                UnaryOperator::Product => "*",
-                                UnaryOperator::Negate => "-",
-                            };
-                            match op {
-                                UnaryOperator::And
-                                | UnaryOperator::Or
-                                | UnaryOperator::Xor
-                                | UnaryOperator::Not
-                                | UnaryOperator::Negate => {
-                                    let right_with_path = right_name.with_path(path);
-                                    format!("assign {output} = {op_sv}{right_with_path};\n")
-                                }
-                                UnaryOperator::Sum |
-                                UnaryOperator::Product => {
-                                    let start_at = match op {
-                                        UnaryOperator::Sum => "0",
-                                        UnaryOperator::Product => "1",
-                                        _ => unreachable!()
-                                    };
-                                    let list_len = right.typ.walk_path(path).unwrap_array().1.unwrap_integer();
-                                    let for_var = for_var.clone().unwrap();
-                                    let for_var_path = [PathElem::Array { idx: for_var.to_string() }];
-                                    let right_with_paths = right_name.with_paths([path, &for_var_path]);
-                                    format!("always_comb begin\n\t{output} = {start_at};\n\tfor(int {for_var} = 0; {for_var} < {list_len}; {for_var} += 1) {output} {op_sv}= {right_with_paths};\nend\n")
-                                }
-                            }
+                // Custom [Self::in_generate], to generate logic[31:0] my_val = 5 + other_val
+                self.genvars.reuse();
+                self.for_vars.reuse();
+                let content = self.foreach_for_real_path(
+                    &root.typ,
+                    path,
+                    w.absolute_latency,
+                    false,
+                    |slf, source_path, target_path, result_typ| {
+                        slf.foreach_for_copy_unpacked(result_typ, false, |path, _| {
+                            let source = root_name.with_paths([source_path, path]);
+                            let target = output_name.with_paths([target_path, path]);
+                            format!("assign {target} = {source};\n")
                         })
-                    })
+                    },
+                );
+
+                if self.genvars.currently_used != 0 {
+                    write!(
+                        self.program_text,
+                        "{wire_or_reg}{output_decl};\ngenerate\n{content}endgenerate\n"
+                    )
+                    .unwrap();
+                } else {
+                    // We're basically trimming "<assign wire_name>[...] = ..." off the string, so we can stitch it to the declaration
+                    let content = content.strip_prefix("assign ").unwrap();
+                    let out_name_string = output_name.to_string();
+                    let content = content.strip_prefix(&out_name_string).unwrap();
+                    write!(self.program_text, "{wire_or_reg}{output_decl}{content}").unwrap();
                 }
-                RealWireDataSource::BinaryOp {
-                    op, left, right, ..
-                } => {
-                    writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
+            }
+            RealWireDataSource::UnaryOp { op, right, .. } => {
+                writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
 
-                    let left = &self.instance.wires[*left];
-                    let right = &self.instance.wires[*right];
-                    let left_name = self.wire_name(left, w.absolute_latency);
-                    let right_name = self.wire_name(right, w.absolute_latency);
-                    self.in_generate(|slf| {
-                        slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| {
-                            let left_typ =  left.typ.walk_path(path);
-                            let right_typ = right.typ.walk_path(path);
+                let right = &self.instance.wires[*right];
+                let right_name = self.wire_name(right, w.absolute_latency);
 
-                            let output_with_path = output_name.with_path(path);
-                            let left_with_path = left_name.with_path(path);
-                            let right_with_path = right_name.with_path(path);
+                let for_var = match op {
+                    UnaryOperator::Sum | UnaryOperator::Product => Some(self.for_vars.alloc()),
+                    _ => None,
+                };
+                self.in_generate(|slf| {
+                    slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| {
+                        let output = output_name.with_path(path);
 
-                            match *op {
-                                BinaryOperator::ShiftLeft | BinaryOperator::ShiftRight => {
-                                    let left_int_range = left_typ.unwrap_int_bounds();
-                                    let right_int_range = right_typ.unwrap_int_bounds();
-
-                                    let shift_op = match (*op, left_int_range.is_signed()) {
-                                        (BinaryOperator::ShiftLeft, true) => "<<<",
-                                        (BinaryOperator::ShiftLeft, false) => "<<",
-                                        (BinaryOperator::ShiftRight, true) => ">>>",
-                                        (BinaryOperator::ShiftRight, false) => ">>",
-                                        _ => unreachable!()
-                                    };
-
-                                    assert!(!right_int_range.is_signed());
-
-                                    format!("assign {output_with_path} = {left_with_path} {shift_op} {right_with_path};\n")
-                                }
-                                BinaryOperator::And |
-                                BinaryOperator::Or |
-                                BinaryOperator::Xor => {
-                                    let op_sv = match op {
-                                        BinaryOperator::And => "&",
-                                        BinaryOperator::Or => "|",
-                                        BinaryOperator::Xor => "^",
-                                        _ => unreachable!()
-                                    };
-                                    format!("assign {output_with_path} = {left_with_path} {op_sv} {right_with_path};\n")
-                                }
-                                BinaryOperator::Add |
-                                BinaryOperator::Subtract |
-                                BinaryOperator::Multiply |
-                                BinaryOperator::Remainder |
-                                BinaryOperator::Equals |
-                                BinaryOperator::NotEquals |
-                                BinaryOperator::Greater |
-                                BinaryOperator::GreaterEq |
-                                BinaryOperator::Lesser |
-                                BinaryOperator::LesserEq => {
-                                    let op_sv = match op {
-                                        BinaryOperator::Add => "+",
-                                        BinaryOperator::Subtract => "-",
-                                        BinaryOperator::Multiply => "*",
-                                        BinaryOperator::Remainder => "%",
-                                        BinaryOperator::Equals => "==",
-                                        BinaryOperator::NotEquals => "!=",
-                                        BinaryOperator::Greater => ">",
-                                        BinaryOperator::GreaterEq => ">=",
-                                        BinaryOperator::Lesser => "<",
-                                        BinaryOperator::LesserEq => "<=",
-                                        _ => unreachable!()
-                                    };
-                                    let left_int_range = left_typ.unwrap_int_bounds();
-                                    let right_int_range = right_typ.unwrap_int_bounds();
-
-                                    let op_is_signed = left_int_range.is_signed() | right_int_range.is_signed();
-                                    let left_arg = wrap_in_signed_if_needed(left_with_path, op_is_signed, left_int_range);
-                                    let right_arg = wrap_in_signed_if_needed(right_with_path, op_is_signed, right_int_range);
-
-                                    format!("assign {output_with_path} = {left_arg} {op_sv} {right_arg};\n")
-                                }
-                                BinaryOperator::Modulo => {
-                                    let left_int_range =
-                                        left.typ.walk_path(path).unwrap_int_bounds();
-                                    let right_int_range =
-                                        right.typ.walk_path(path).unwrap_int_bounds();
-
-                                    let content = codegen_optimized_modulo(
-                                        left_int_range,
-                                        right_int_range,
-                                        &format!("{left_with_path}"),
-                                        &format!("{right_with_path}"),
-                                    );
-                                    format!("assign {output_with_path} = {content}\n")
-                                }
-                                BinaryOperator::Divide => {
-                                    let left_int_range =
-                                        left.typ.walk_path(path).unwrap_int_bounds();
-                                    let right_int_range =
-                                        right.typ.walk_path(path).unwrap_int_bounds();
-
-                                    let content = codegen_optimized_divide(
-                                        left_int_range,
-                                        right_int_range,
-                                        &format!("{left_with_path}"),
-                                        &format!("{right_with_path}"),
-                                    );
-                                    format!("assign {output_with_path} = {content}\n")
-                                }
+                        let op_sv = match op {
+                            UnaryOperator::And => "&",
+                            UnaryOperator::Or => "|",
+                            UnaryOperator::Xor => "^",
+                            UnaryOperator::Not => "~",// SystemVerilog's '!' operator is like C's. !8b10101110 = 0
+                            UnaryOperator::Sum => "+",
+                            UnaryOperator::Product => "*",
+                            UnaryOperator::Negate => "-",
+                        };
+                        match op {
+                            UnaryOperator::And
+                            | UnaryOperator::Or
+                            | UnaryOperator::Xor
+                            | UnaryOperator::Not
+                            | UnaryOperator::Negate => {
+                                let right_with_path = right_name.with_path(path);
+                                format!("assign {output} = {op_sv}{right_with_path};\n")
                             }
+                            UnaryOperator::Sum |
+                            UnaryOperator::Product => {
+                                let start_at = match op {
+                                    UnaryOperator::Sum => "0",
+                                    UnaryOperator::Product => "1",
+                                    _ => unreachable!()
+                                };
+                                let list_len = right.typ.walk_path(path).unwrap_array().1.unwrap_integer();
+                                let for_var = for_var.clone().unwrap();
+                                let for_var_path = [PathElem::Array { idx: for_var.to_string() }];
+                                let right_with_paths = right_name.with_paths([path, &for_var_path]);
+                                format!("always_comb begin\n\t{output} = {start_at};\n\tfor(int {for_var} = 0; {for_var} < {list_len}; {for_var} += 1) {output} {op_sv}= {right_with_paths};\nend\n")
+                            }
+                        }
+                    })
+                })
+            }
+            RealWireDataSource::BinaryOp {
+                op, left, right, ..
+            } => {
+                writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
+
+                let left = &self.instance.wires[*left];
+                let right = &self.instance.wires[*right];
+                let left_name = self.wire_name(left, w.absolute_latency);
+                let right_name = self.wire_name(right, w.absolute_latency);
+                self.in_generate(|slf| {
+                    slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| {
+                        let left_typ =  left.typ.walk_path(path);
+                        let right_typ = right.typ.walk_path(path);
+
+                        let output_with_path = output_name.with_path(path);
+                        let left_with_path = left_name.with_path(path);
+                        let right_with_path = right_name.with_path(path);
+
+                        match *op {
+                            BinaryOperator::ShiftLeft | BinaryOperator::ShiftRight => {
+                                let left_int_range = left_typ.unwrap_int_bounds();
+                                let right_int_range = right_typ.unwrap_int_bounds();
+
+                                let shift_op = match (*op, left_int_range.is_signed()) {
+                                    (BinaryOperator::ShiftLeft, true) => "<<<",
+                                    (BinaryOperator::ShiftLeft, false) => "<<",
+                                    (BinaryOperator::ShiftRight, true) => ">>>",
+                                    (BinaryOperator::ShiftRight, false) => ">>",
+                                    _ => unreachable!()
+                                };
+
+                                assert!(!right_int_range.is_signed());
+
+                                format!("assign {output_with_path} = {left_with_path} {shift_op} {right_with_path};\n")
+                            }
+                            BinaryOperator::And |
+                            BinaryOperator::Or |
+                            BinaryOperator::Xor => {
+                                let op_sv = match op {
+                                    BinaryOperator::And => "&",
+                                    BinaryOperator::Or => "|",
+                                    BinaryOperator::Xor => "^",
+                                    _ => unreachable!()
+                                };
+                                format!("assign {output_with_path} = {left_with_path} {op_sv} {right_with_path};\n")
+                            }
+                            BinaryOperator::Add |
+                            BinaryOperator::Subtract |
+                            BinaryOperator::Multiply |
+                            BinaryOperator::Remainder |
+                            BinaryOperator::Equals |
+                            BinaryOperator::NotEquals |
+                            BinaryOperator::Greater |
+                            BinaryOperator::GreaterEq |
+                            BinaryOperator::Lesser |
+                            BinaryOperator::LesserEq => {
+                                let op_sv = match op {
+                                    BinaryOperator::Add => "+",
+                                    BinaryOperator::Subtract => "-",
+                                    BinaryOperator::Multiply => "*",
+                                    BinaryOperator::Remainder => "%",
+                                    BinaryOperator::Equals => "==",
+                                    BinaryOperator::NotEquals => "!=",
+                                    BinaryOperator::Greater => ">",
+                                    BinaryOperator::GreaterEq => ">=",
+                                    BinaryOperator::Lesser => "<",
+                                    BinaryOperator::LesserEq => "<=",
+                                    _ => unreachable!()
+                                };
+                                let left_int_range = left_typ.unwrap_int_bounds();
+                                let right_int_range = right_typ.unwrap_int_bounds();
+
+                                let op_is_signed = left_int_range.is_signed() | right_int_range.is_signed();
+                                let left_arg = wrap_in_signed_if_needed(left_with_path, op_is_signed, left_int_range);
+                                let right_arg = wrap_in_signed_if_needed(right_with_path, op_is_signed, right_int_range);
+
+                                format!("assign {output_with_path} = {left_arg} {op_sv} {right_arg};\n")
+                            }
+                            BinaryOperator::Modulo => {
+                                let left_int_range =
+                                    left.typ.walk_path(path).unwrap_int_bounds();
+                                let right_int_range =
+                                    right.typ.walk_path(path).unwrap_int_bounds();
+
+                                let content = codegen_optimized_modulo(
+                                    left_int_range,
+                                    right_int_range,
+                                    &format!("{left_with_path}"),
+                                    &format!("{right_with_path}"),
+                                );
+                                format!("assign {output_with_path} = {content}\n")
+                            }
+                            BinaryOperator::Divide => {
+                                let left_int_range =
+                                    left.typ.walk_path(path).unwrap_int_bounds();
+                                let right_int_range =
+                                    right.typ.walk_path(path).unwrap_int_bounds();
+
+                                let content = codegen_optimized_divide(
+                                    left_int_range,
+                                    right_int_range,
+                                    &format!("{left_with_path}"),
+                                    &format!("{right_with_path}"),
+                                );
+                                format!("assign {output_with_path} = {content}\n")
+                            }
+                        }
+                    })
+                });
+            }
+            RealWireDataSource::Constant { value } => {
+                let const_str = codegen_constant(&w.typ, value);
+                writeln!(
+                    self.program_text,
+                    "{wire_or_reg}{output_decl} = {const_str};"
+                )
+                .unwrap();
+            }
+            RealWireDataSource::ReadOnly => {
+                writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
+            }
+            RealWireDataSource::ConstructArray { array_wires } => {
+                writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
+
+                for (arr_idx, elem) in array_wires.iter().enumerate() {
+                    let elem = &self.instance.wires[*elem];
+                    elem.get_span(&self.md.link_info).debug();
+                    let element_wire_name = self.wire_name(elem, w.absolute_latency);
+
+                    let idx_path = [PathElem::Array {
+                        idx: arr_idx.to_string(),
+                    }];
+                    self.in_generate(|slf| {
+                        slf.foreach_for_copy_unpacked(&elem.typ, false, |path, _| {
+                            let elem_with_path = element_wire_name.with_path(path);
+                            let output_with_path = output_name.with_paths([&idx_path, path]);
+                            format!("assign {output_with_path} = {elem_with_path};\n")
                         })
                     });
                 }
-                RealWireDataSource::Constant { value } => {
-                    let const_str = codegen_constant(&w.typ, value);
-                    writeln!(
-                        self.program_text,
-                        "{wire_or_reg}{output_decl} = {const_str};"
-                    )
-                    .unwrap();
-                }
-                RealWireDataSource::ReadOnly => {
-                    writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
-                }
-                RealWireDataSource::ConstructArray { array_wires } => {
-                    writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
-
-                    for (arr_idx, elem) in array_wires.iter().enumerate() {
-                        let elem = &self.instance.wires[*elem];
-                        elem.get_span(&self.md.link_info).debug();
-                        let element_wire_name = self.wire_name(elem, w.absolute_latency);
-
-                        let idx_path = [PathElem::Array {
-                            idx: arr_idx.to_string(),
-                        }];
-                        self.in_generate(|slf| {
-                            slf.foreach_for_copy_unpacked(&elem.typ, false, |path, _| {
-                                let elem_with_path = element_wire_name.with_path(path);
-                                let output_with_path = output_name.with_paths([&idx_path, path]);
-                                format!("assign {output_with_path} = {elem_with_path};\n")
-                            })
-                        });
-                    }
-                }
-                RealWireDataSource::Multiplexer {
-                    is_state,
-                    sources: _,
-                } => {
-                    let decl_stm = Self::codegen_declaration(w, wire_or_reg, output_decl, is_state);
-                    writeln!(self.program_text, "{decl_stm};").unwrap();
-                }
             }
-            self.add_latency_registers(w, self.needed_untils[wire_id], "")
-                .unwrap();
+            RealWireDataSource::Multiplexer {
+                is_state,
+                sources: _,
+            } => {
+                let decl_stm = Self::codegen_declaration(w, wire_or_reg, output_decl, is_state);
+                writeln!(self.program_text, "{decl_stm};").unwrap();
+            }
         }
     }
 

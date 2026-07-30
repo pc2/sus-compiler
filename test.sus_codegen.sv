@@ -31,6 +31,11 @@ module TestNexts(
 /*mux_wire*/ logic b;
 /*mux_wire*/ logic c;
 /*mux_wire*/ logic d;
+/*latency*/ logic _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
+/*latency*/ logic _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
+/*latency*/ logic _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
+/*latency*/ logic _a_D4; always_ff @(posedge clk) begin _a_D4 <= _a_D3; end
+/*latency*/ logic _a_D5; always_ff @(posedge clk) begin _a_D5 <= _a_D4; end
 always_comb begin // combinatorial y
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	y = 3'dx;
@@ -69,12 +74,12 @@ module ParametrizeableRegs(
 );
 
 /*mux_wire*/ logic[2:0] x;
+/*mux_wire*/ logic[2:0] y;
 /*latency*/ logic[2:0] _x_D1; always_ff @(posedge clk) begin _x_D1 <= x; end
 /*latency*/ logic[2:0] _x_D2; always_ff @(posedge clk) begin _x_D2 <= _x_D1; end
 /*latency*/ logic[2:0] _x_D3; always_ff @(posedge clk) begin _x_D3 <= _x_D2; end
 /*latency*/ logic[2:0] _x_D4; always_ff @(posedge clk) begin _x_D4 <= _x_D3; end
 /*latency*/ logic[2:0] _x_D5; always_ff @(posedge clk) begin _x_D5 <= _x_D4; end
-/*mux_wire*/ logic[2:0] y;
 always_comb begin // combinatorial x
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	x = 3'dx;
@@ -134,6 +139,17 @@ module TwoDomainsWithLatRegs(
 	output /*mux_wire*/ logic b_o
 );
 
+/*latency*/ logic _a_i_D10; always_ff @(posedge clk) begin _a_i_D10 <= a_i; end
+/*latency*/ logic _a_i_D11; always_ff @(posedge clk) begin _a_i_D11 <= _a_i_D10; end
+/*latency*/ logic _a_i_D12; always_ff @(posedge clk) begin _a_i_D12 <= _a_i_D11; end
+/*latency*/ logic _a_i_D13; always_ff @(posedge clk) begin _a_i_D13 <= _a_i_D12; end
+/*latency*/ logic _a_i_D14; always_ff @(posedge clk) begin _a_i_D14 <= _a_i_D13; end
+/*latency*/ logic _a_i_D15; always_ff @(posedge clk) begin _a_i_D15 <= _a_i_D14; end
+/*latency*/ logic _a_i_D16; always_ff @(posedge clk) begin _a_i_D16 <= _a_i_D15; end
+/*latency*/ logic _a_i_D17; always_ff @(posedge clk) begin _a_i_D17 <= _a_i_D16; end
+/*latency*/ logic _a_i_D18; always_ff @(posedge clk) begin _a_i_D18 <= _a_i_D17; end
+/*latency*/ logic _a_i_D19; always_ff @(posedge clk) begin _a_i_D19 <= _a_i_D18; end
+/*latency*/ logic _a_i_D20; always_ff @(posedge clk) begin _a_i_D20 <= _a_i_D19; end
 /*latency*/ logic _a_i_D10; always_ff @(posedge clk) begin _a_i_D10 <= a_i; end
 /*latency*/ logic _a_i_D11; always_ff @(posedge clk) begin _a_i_D11 <= _a_i_D10; end
 /*latency*/ logic _a_i_D12; always_ff @(posedge clk) begin _a_i_D12 <= _a_i_D11; end
@@ -300,9 +316,9 @@ module IntNarrowToZero(
 );
 
 // (zero sized) x
+/*mux_wire*/ logic signed[3:0] y;
 /*mux_wire*/ logic[2:0] _IntNarrow_din;
 // (zero sized) _IntNarrow_dout
-/*mux_wire*/ logic signed[3:0] y;
 // (zero sized) _IntNarrow_2_din
 wire signed[3:0] _IntNarrow_2_dout;
 IntNarrow_FROM_I_5_TO_I_6_FROM_0_TO_1 IntNarrow(
@@ -353,9 +369,9 @@ module UseModWithDomains(
 	/* clock */ input clk
 );
 
+/*mux_wire*/ logic d;
 wire _mwd_b_trig;
 wire _mwd_b_data;
-/*mux_wire*/ logic d;
 /*mux_wire*/ logic _mwd_a_act;
 /*mux_wire*/ logic _mwd_a_data;
 ModWithDomains mwd(
@@ -422,124 +438,124 @@ module CountBitsWithSplits(
 	output /*mux_wire*/ logic[4:0] total
 );
 
+/*mux_wire*/ logic[0:0] sums_split_0;
+/*mux_wire*/ logic[1:0] sums_split_1;
+/*mux_wire*/ logic[1:0] sums_split_2;
+/*mux_wire*/ logic[2:0] sums_split_3;
+/*mux_wire*/ logic[2:0] sums_split_4;
+/*mux_wire*/ logic[2:0] sums_split_5;
+/*mux_wire*/ logic[2:0] sums_split_6;
+/*mux_wire*/ logic[3:0] sums_split_7;
+/*mux_wire*/ logic[3:0] sums_split_8;
+/*mux_wire*/ logic[3:0] sums_split_9;
+/*mux_wire*/ logic[3:0] sums_split_10;
+/*mux_wire*/ logic[3:0] sums_split_11;
+/*mux_wire*/ logic[3:0] sums_split_12;
+/*mux_wire*/ logic[3:0] sums_split_13;
+/*mux_wire*/ logic[3:0] sums_split_14;
+/*mux_wire*/ logic[4:0] sums_split_15;
+/*mux_wire*/ logic[4:0] sums_split_16;
+/*mux_wire*/ logic[4:0] sums_split_17;
+/*mux_wire*/ logic[4:0] sums_split_18;
+/*mux_wire*/ logic[4:0] sums_split_19;
 wire _1 = bits[0];
 /*mux_wire*/ logic _BoolToInt_i;
 wire[0:0] _BoolToInt_o;
-/*mux_wire*/ logic[0:0] sums_split_0;
 wire _3 = bits[1];
 /*mux_wire*/ logic _BoolToInt_2_i;
 wire[0:0] _BoolToInt_2_o;
 wire[1:0] _4;
 assign _4 = sums_split_0 + _BoolToInt_2_o;
-/*mux_wire*/ logic[1:0] sums_split_1;
 wire _6 = bits[2];
 /*mux_wire*/ logic _BoolToInt_3_i;
 wire[0:0] _BoolToInt_3_o;
 wire[1:0] _7;
 assign _7 = sums_split_1 + _BoolToInt_3_o;
-/*mux_wire*/ logic[1:0] sums_split_2;
 wire _9 = bits[3];
 /*mux_wire*/ logic _BoolToInt_4_i;
 wire[0:0] _BoolToInt_4_o;
 wire[2:0] _10;
 assign _10 = sums_split_2 + _BoolToInt_4_o;
-/*mux_wire*/ logic[2:0] sums_split_3;
 wire _12 = bits[4];
 /*mux_wire*/ logic _BoolToInt_5_i;
 wire[0:0] _BoolToInt_5_o;
 wire[2:0] _13;
 assign _13 = sums_split_3 + _BoolToInt_5_o;
-/*mux_wire*/ logic[2:0] sums_split_4;
 wire _15 = bits[5];
 /*mux_wire*/ logic _BoolToInt_6_i;
 wire[0:0] _BoolToInt_6_o;
 wire[2:0] _16;
 assign _16 = sums_split_4 + _BoolToInt_6_o;
-/*mux_wire*/ logic[2:0] sums_split_5;
 wire _18 = bits[6];
 /*mux_wire*/ logic _BoolToInt_7_i;
 wire[0:0] _BoolToInt_7_o;
 wire[2:0] _19;
 assign _19 = sums_split_5 + _BoolToInt_7_o;
-/*mux_wire*/ logic[2:0] sums_split_6;
 wire _21 = bits[7];
 /*mux_wire*/ logic _BoolToInt_8_i;
 wire[0:0] _BoolToInt_8_o;
 wire[3:0] _22;
 assign _22 = sums_split_6 + _BoolToInt_8_o;
-/*mux_wire*/ logic[3:0] sums_split_7;
 wire _24 = bits[8];
 /*mux_wire*/ logic _BoolToInt_9_i;
 wire[0:0] _BoolToInt_9_o;
 wire[3:0] _25;
 assign _25 = sums_split_7 + _BoolToInt_9_o;
-/*mux_wire*/ logic[3:0] sums_split_8;
 wire _27 = bits[9];
 /*mux_wire*/ logic _BoolToInt_10_i;
 wire[0:0] _BoolToInt_10_o;
 wire[3:0] _28;
 assign _28 = sums_split_8 + _BoolToInt_10_o;
-/*mux_wire*/ logic[3:0] sums_split_9;
 wire _30 = bits[10];
 /*mux_wire*/ logic _BoolToInt_11_i;
 wire[0:0] _BoolToInt_11_o;
 wire[3:0] _31;
 assign _31 = sums_split_9 + _BoolToInt_11_o;
-/*mux_wire*/ logic[3:0] sums_split_10;
 wire _33 = bits[11];
 /*mux_wire*/ logic _BoolToInt_12_i;
 wire[0:0] _BoolToInt_12_o;
 wire[3:0] _34;
 assign _34 = sums_split_10 + _BoolToInt_12_o;
-/*mux_wire*/ logic[3:0] sums_split_11;
 wire _36 = bits[12];
 /*mux_wire*/ logic _BoolToInt_13_i;
 wire[0:0] _BoolToInt_13_o;
 wire[3:0] _37;
 assign _37 = sums_split_11 + _BoolToInt_13_o;
-/*mux_wire*/ logic[3:0] sums_split_12;
 wire _39 = bits[13];
 /*mux_wire*/ logic _BoolToInt_14_i;
 wire[0:0] _BoolToInt_14_o;
 wire[3:0] _40;
 assign _40 = sums_split_12 + _BoolToInt_14_o;
-/*mux_wire*/ logic[3:0] sums_split_13;
 wire _42 = bits[14];
 /*mux_wire*/ logic _BoolToInt_15_i;
 wire[0:0] _BoolToInt_15_o;
 wire[3:0] _43;
 assign _43 = sums_split_13 + _BoolToInt_15_o;
-/*mux_wire*/ logic[3:0] sums_split_14;
 wire _45 = bits[15];
 /*mux_wire*/ logic _BoolToInt_16_i;
 wire[0:0] _BoolToInt_16_o;
 wire[4:0] _46;
 assign _46 = sums_split_14 + _BoolToInt_16_o;
-/*mux_wire*/ logic[4:0] sums_split_15;
 wire _48 = bits[16];
 /*mux_wire*/ logic _BoolToInt_17_i;
 wire[0:0] _BoolToInt_17_o;
 wire[4:0] _49;
 assign _49 = sums_split_15 + _BoolToInt_17_o;
-/*mux_wire*/ logic[4:0] sums_split_16;
 wire _51 = bits[17];
 /*mux_wire*/ logic _BoolToInt_18_i;
 wire[0:0] _BoolToInt_18_o;
 wire[4:0] _52;
 assign _52 = sums_split_16 + _BoolToInt_18_o;
-/*mux_wire*/ logic[4:0] sums_split_17;
 wire _54 = bits[18];
 /*mux_wire*/ logic _BoolToInt_19_i;
 wire[0:0] _BoolToInt_19_o;
 wire[4:0] _55;
 assign _55 = sums_split_17 + _BoolToInt_19_o;
-/*mux_wire*/ logic[4:0] sums_split_18;
 wire _57 = bits[19];
 /*mux_wire*/ logic _BoolToInt_20_i;
 wire[0:0] _BoolToInt_20_o;
 wire[4:0] _58;
 assign _58 = sums_split_18 + _BoolToInt_20_o;
-/*mux_wire*/ logic[4:0] sums_split_19;
 BoolToInt BoolToInt(
 	.clk(clk),
 	.i(_BoolToInt_i),
@@ -896,28 +912,28 @@ module TestSplits(
 );
 
 /*mux_wire*/ logic x_split_0;
-/*latency*/ logic _x_split_0_D5; always_ff @(posedge clk) begin _x_split_0_D5 <= x_split_0; end
 /*mux_wire*/ logic x_unknowns_split_0;
-/*latency*/ logic _x_unknowns_split_0_D5; always_ff @(posedge clk) begin _x_unknowns_split_0_D5 <= x_unknowns_split_0; end
 /*mux_wire*/ logic x_with_latency_split_0;
 /*mux_wire*/ logic x_split_1;
-/*latency*/ logic _x_split_1_D6; always_ff @(posedge clk) begin _x_split_1_D6 <= x_split_1; end
 /*mux_wire*/ logic x_unknowns_split_1;
-/*latency*/ logic _x_unknowns_split_1_D6; always_ff @(posedge clk) begin _x_unknowns_split_1_D6 <= x_unknowns_split_1; end
 /*mux_wire*/ logic x_with_latency_split_1;
 /*mux_wire*/ logic x_split_2;
-/*latency*/ logic _x_split_2_D7; always_ff @(posedge clk) begin _x_split_2_D7 <= x_split_2; end
 /*mux_wire*/ logic x_unknowns_split_2;
-/*latency*/ logic _x_unknowns_split_2_D7; always_ff @(posedge clk) begin _x_unknowns_split_2_D7 <= x_unknowns_split_2; end
 /*mux_wire*/ logic x_with_latency_split_2;
 /*mux_wire*/ logic x_split_3;
-/*latency*/ logic _x_split_3_D8; always_ff @(posedge clk) begin _x_split_3_D8 <= x_split_3; end
 /*mux_wire*/ logic x_unknowns_split_3;
-/*latency*/ logic _x_unknowns_split_3_D8; always_ff @(posedge clk) begin _x_unknowns_split_3_D8 <= x_unknowns_split_3; end
 /*mux_wire*/ logic x_with_latency_split_3;
 /*mux_wire*/ logic x_split_4;
 /*mux_wire*/ logic x_unknowns_split_4;
 /*mux_wire*/ logic x_with_latency_split_4;
+/*latency*/ logic _x_split_0_D5; always_ff @(posedge clk) begin _x_split_0_D5 <= x_split_0; end
+/*latency*/ logic _x_unknowns_split_0_D5; always_ff @(posedge clk) begin _x_unknowns_split_0_D5 <= x_unknowns_split_0; end
+/*latency*/ logic _x_split_1_D6; always_ff @(posedge clk) begin _x_split_1_D6 <= x_split_1; end
+/*latency*/ logic _x_unknowns_split_1_D6; always_ff @(posedge clk) begin _x_unknowns_split_1_D6 <= x_unknowns_split_1; end
+/*latency*/ logic _x_split_2_D7; always_ff @(posedge clk) begin _x_split_2_D7 <= x_split_2; end
+/*latency*/ logic _x_unknowns_split_2_D7; always_ff @(posedge clk) begin _x_unknowns_split_2_D7 <= x_unknowns_split_2; end
+/*latency*/ logic _x_split_3_D8; always_ff @(posedge clk) begin _x_split_3_D8 <= x_split_3; end
+/*latency*/ logic _x_unknowns_split_3_D8; always_ff @(posedge clk) begin _x_unknowns_split_3_D8 <= x_unknowns_split_3; end
 always_comb begin // combinatorial x_split_0
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	x_split_0 = 1'bx;
@@ -1032,15 +1048,15 @@ module TestZerosArrays(
 
 genvar _g0;
 // (zero sized) zeros
-// (zero sized) _1
 /*mux_wire*/ logic signed[3:0] vs[0:1];
+// (zero sized) manyzeros
+/*mux_wire*/ logic[3:0] nums[0:1];
+/*mux_wire*/ logic[3:0] sums[0:1];
+// (zero sized) _1
 // (zero sized) _2
 // (zero sized) _ReceiveZerosArray_values
 // (zero sized) _3
-// (zero sized) manyzeros
-/*mux_wire*/ logic[3:0] nums[0:1];
 localparam[3:0] _5[0:1] = '{4'd5, 4'd9};
-/*mux_wire*/ logic[3:0] sums[0:1];
 // (zero sized) _7
 wire[3:0] _8[0:1];
 generate
@@ -1246,17 +1262,17 @@ module zero_sized_stuffs(
 
 // (zero sized) x
 // (zero sized) as_bits
-// (zero sized) _UIntToBits_value
-// (zero sized) _UIntToBits_bits
 // (zero sized) zero_sized_arr
-// (zero sized) _3
 // (zero sized) make_real
 // (zero sized) zero_sized_gen
 /*mux_wire*/ logic[2:0] addr;
 // (zero sized) a
 // (zero sized) zero_sized_gen_2
-// (zero sized) _6
 // (zero sized) b
+// (zero sized) _UIntToBits_value
+// (zero sized) _UIntToBits_bits
+// (zero sized) _3
+// (zero sized) _6
 // (zero sized) _8
 UIntToBits_NUM_BITS_0 UIntToBits(
 	.clk(clk)
@@ -1318,8 +1334,8 @@ module boolean_array_literals(
 );
 
 /*mux_wire*/ logic[49:0] b;
-localparam[49:0] _1 = 50'b00000000000000000000000000000000000000010100100110;
 /*mux_wire*/ logic[99:0] ob;
+localparam[49:0] _1 = 50'b00000000000000000000000000000000000000010100100110;
 localparam[99:0] _2 = 100'b0000000000000000000000000000000000000000000000000000000000000000000011101100011100000111100110100111;
 always_comb begin // combinatorial b
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -1340,23 +1356,23 @@ module test_vivado_bug(
 );
 
 /*mux_wire*/ logic[0:0] x;
-/*mux_wire*/ logic _Repeat_v;
-wire[0:0] _Repeat_result;
 /*mux_wire*/ logic[0:0] y;
 // (zero sized) u
 // (zero sized) v
 /*mux_wire*/ logic[1:0] x_2;
-/*mux_wire*/ logic _Repeat_2_v;
-wire[1:0] _Repeat_2_result;
 /*mux_wire*/ logic[1:0] y_2;
 /*mux_wire*/ logic[0:0] u_2;
 /*mux_wire*/ logic[0:0] v_2;
 /*mux_wire*/ logic[2:0] x_3;
-/*mux_wire*/ logic _Repeat_3_v;
-wire[2:0] _Repeat_3_result;
 /*mux_wire*/ logic[2:0] y_3;
 /*mux_wire*/ logic[1:0] u_3;
 /*mux_wire*/ logic[1:0] v_3;
+/*mux_wire*/ logic _Repeat_v;
+wire[0:0] _Repeat_result;
+/*mux_wire*/ logic _Repeat_2_v;
+wire[1:0] _Repeat_2_result;
+/*mux_wire*/ logic _Repeat_3_v;
+wire[2:0] _Repeat_3_result;
 Repeat_T_type_bool_SIZE_1 Repeat(
 	.clk(clk),
 	.v(_Repeat_v),
@@ -1679,11 +1695,11 @@ module use_use_trigger(
 );
 
 /*mux_wire*/ logic b;
+/*mux_wire*/ logic[2:0] x;
+/*mux_wire*/ logic[2:0] y;
 /*mux_wire*/ logic _submod_maybe_use_trigger;
 wire _submod_beep;
 wire[2:0] _submod_boop;
-/*mux_wire*/ logic[2:0] x;
-/*mux_wire*/ logic[2:0] y;
 use_trigger submod(
 	.clk(clk),
 	.beep(_submod_beep),
@@ -1774,6 +1790,8 @@ module use_infer_me_with_negative_delta(
 
 /*mux_wire*/ logic _inf_x;
 wire _inf_y;
+/*mux_wire*/ logic _inf_p;
+wire _inf_q;
 /*latency*/ logic __inf_y_N30; always_ff @(posedge clk) begin __inf_y_N30 <= _inf_y; end
 /*latency*/ logic __inf_y_N29; always_ff @(posedge clk) begin __inf_y_N29 <= __inf_y_N30; end
 /*latency*/ logic __inf_y_N28; always_ff @(posedge clk) begin __inf_y_N28 <= __inf_y_N29; end
@@ -1804,8 +1822,6 @@ wire _inf_y;
 /*latency*/ logic __inf_y_N3; always_ff @(posedge clk) begin __inf_y_N3 <= __inf_y_N4; end
 /*latency*/ logic __inf_y_N2; always_ff @(posedge clk) begin __inf_y_N2 <= __inf_y_N3; end
 /*latency*/ logic __inf_y_N1; always_ff @(posedge clk) begin __inf_y_N1 <= __inf_y_N2; end
-/*mux_wire*/ logic _inf_p;
-wire _inf_q;
 infer_me_with_negative_delta_V_31 inf(
 	.clk(clk),
 	.x(_inf_x),
@@ -1869,6 +1885,8 @@ module use_infer_me_with_delta(
 
 /*mux_wire*/ logic _inf_x;
 wire _inf_y;
+/*mux_wire*/ logic _inf_p;
+wire _inf_q;
 /*latency*/ logic __inf_y_N30; always_ff @(posedge clk) begin __inf_y_N30 <= _inf_y; end
 /*latency*/ logic __inf_y_N29; always_ff @(posedge clk) begin __inf_y_N29 <= __inf_y_N30; end
 /*latency*/ logic __inf_y_N28; always_ff @(posedge clk) begin __inf_y_N28 <= __inf_y_N29; end
@@ -1899,8 +1917,6 @@ wire _inf_y;
 /*latency*/ logic __inf_y_N3; always_ff @(posedge clk) begin __inf_y_N3 <= __inf_y_N4; end
 /*latency*/ logic __inf_y_N2; always_ff @(posedge clk) begin __inf_y_N2 <= __inf_y_N3; end
 /*latency*/ logic __inf_y_N1; always_ff @(posedge clk) begin __inf_y_N1 <= __inf_y_N2; end
-/*mux_wire*/ logic _inf_p;
-wire _inf_q;
 infer_me_with_delta_V_N31 inf(
 	.clk(clk),
 	.x(_inf_x),
@@ -2121,6 +2137,11 @@ module specified_latencies_not_ports_edge_case(
 /*mux_wire*/ logic out_spec;
 wire _4;
 assign _4 = out_spec | _in_port_D5;
+/*latency*/ logic _in_port_D1; always_ff @(posedge clk) begin _in_port_D1 <= in_port; end
+/*latency*/ logic _in_port_D2; always_ff @(posedge clk) begin _in_port_D2 <= _in_port_D1; end
+/*latency*/ logic _in_port_D3; always_ff @(posedge clk) begin _in_port_D3 <= _in_port_D2; end
+/*latency*/ logic _in_port_D4; always_ff @(posedge clk) begin _in_port_D4 <= _in_port_D3; end
+/*latency*/ logic _in_port_D5; always_ff @(posedge clk) begin _in_port_D5 <= _in_port_D4; end
 always_comb begin // combinatorial out_port
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	out_port = 1'bx;
@@ -2156,7 +2177,15 @@ module instantiate_fifo(
 /*latency*/ logic[2:0] _data_received_D6; always_ff @(posedge clk) begin _data_received_D6 <= _data_received_D5; end
 /*latency*/ logic[2:0] _data_received_D7; always_ff @(posedge clk) begin _data_received_D7 <= _data_received_D6; end
 /*latency*/ logic[2:0] _data_received_D8; always_ff @(posedge clk) begin _data_received_D8 <= _data_received_D7; end
+/*mux_wire*/ logic[2:0] heavy_computation;
 wire _fifo_may_push;
+/*mux_wire*/ logic _fifo_push;
+/*mux_wire*/ logic[2:0] _fifo_push_data;
+/*latency*/ logic[2:0] _data_received_D4; always_ff @(posedge clk) begin _data_received_D4 <= data_received; end
+/*latency*/ logic[2:0] _data_received_D5; always_ff @(posedge clk) begin _data_received_D5 <= _data_received_D4; end
+/*latency*/ logic[2:0] _data_received_D6; always_ff @(posedge clk) begin _data_received_D6 <= _data_received_D5; end
+/*latency*/ logic[2:0] _data_received_D7; always_ff @(posedge clk) begin _data_received_D7 <= _data_received_D6; end
+/*latency*/ logic[2:0] _data_received_D8; always_ff @(posedge clk) begin _data_received_D8 <= _data_received_D7; end
 /*latency*/ logic __fifo_may_push_D1; always_ff @(posedge clk) begin __fifo_may_push_D1 <= _fifo_may_push; end
 /*latency*/ logic __fifo_may_push_D2; always_ff @(posedge clk) begin __fifo_may_push_D2 <= __fifo_may_push_D1; end
 /*latency*/ logic __fifo_may_push_D3; always_ff @(posedge clk) begin __fifo_may_push_D3 <= __fifo_may_push_D2; end
@@ -2165,9 +2194,6 @@ wire _fifo_may_push;
 /*latency*/ logic __fifo_may_push_D6; always_ff @(posedge clk) begin __fifo_may_push_D6 <= __fifo_may_push_D5; end
 /*latency*/ logic __fifo_may_push_D7; always_ff @(posedge clk) begin __fifo_may_push_D7 <= __fifo_may_push_D6; end
 /*latency*/ logic __fifo_may_push_D8; always_ff @(posedge clk) begin __fifo_may_push_D8 <= __fifo_may_push_D7; end
-/*mux_wire*/ logic[2:0] heavy_computation;
-/*mux_wire*/ logic _fifo_push;
-/*mux_wire*/ logic[2:0] _fifo_push_data;
 FIFO_T_type_int_FROM_0_TO_6_DEPTH_30_MAY_PUSH_LATENCY_8 fifo(
 	.clk(clk),
 	.may_push(_fifo_may_push),
@@ -2223,6 +2249,7 @@ module FIFO_T_type_int_FROM_0_TO_6_DEPTH_30_MAY_PUSH_LATENCY_8(
 /*state*/ logic[4:0] read_addr;
 /*state*/ logic[4:0] write_addr;
 /*mux_wire*/ logic[4:0] space_remaining;
+/*mux_wire*/ logic[2:0] pop_out_reg;
 wire signed[5:0] _3;
 assign _3 = read_addr - write_addr;
 wire signed[5:0] _5;
@@ -2233,7 +2260,6 @@ wire _9;
 assign _9 = space_remaining > 4'd9;
 /*mux_wire*/ logic _LatencyOffset_din;
 wire _LatencyOffset_dout;
-/*latency*/ logic __LatencyOffset_dout_N8; always_ff @(posedge clk) begin __LatencyOffset_dout_N8 <= _LatencyOffset_dout; end
 /*mux_wire*/ logic[2:0] _ToBits_value;
 wire[2:0] _ToBits_bits;
 wire[4:0] _14;
@@ -2242,15 +2268,16 @@ wire[4:0] _15;
 assign _15 = (_14 == 30) ? 0 : _14; // == mod 30
 wire _18;
 assign _18 = read_addr != write_addr;
-/*mux_wire*/ logic[2:0] pop_out_reg;
 wire[2:0] _20 = mem[read_addr];
-/*latency*/ logic[2:0] __20_D1; always_ff @(posedge clk) begin __20_D1 <= _20; end
 /*mux_wire*/ logic[2:0] _FromBits_bits;
 wire[2:0] _FromBits_value;
 wire[4:0] _24;
 assign _24 = read_addr + 1'd1;
 wire[4:0] _25;
 assign _25 = (_24 == 30) ? 0 : _24; // == mod 30
+/*latency*/ logic __LatencyOffset_dout_N8; always_ff @(posedge clk) begin __LatencyOffset_dout_N8 <= _LatencyOffset_dout; end
+/*latency*/ logic _pop_D1; always_ff @(posedge clk) begin _pop_D1 <= pop; end
+/*latency*/ logic[2:0] __20_D1; always_ff @(posedge clk) begin __20_D1 <= _20; end
 LatencyOffset_T_type_bool_OFFSET_N9 LatencyOffset(
 	.clk(clk),
 	.din(_LatencyOffset_din),
@@ -2372,6 +2399,11 @@ module infer_from_local_context(
 wire _infer_me_y;
 wire _4;
 assign _4 = _infer_me_y | heavily_pipelined_computation;
+/*latency*/ logic _in_val_D1; always_ff @(posedge clk) begin _in_val_D1 <= in_val; end
+/*latency*/ logic _in_val_D2; always_ff @(posedge clk) begin _in_val_D2 <= _in_val_D1; end
+/*latency*/ logic _in_val_D3; always_ff @(posedge clk) begin _in_val_D3 <= _in_val_D2; end
+/*latency*/ logic _in_val_D4; always_ff @(posedge clk) begin _in_val_D4 <= _in_val_D3; end
+/*latency*/ logic _in_val_D5; always_ff @(posedge clk) begin _in_val_D5 <= _in_val_D4; end
 infer_me_A_5 infer_me(
 	.clk(clk),
 	.x(_infer_me_x),
@@ -2407,6 +2439,11 @@ module infer_me_A_5(
 	output /*mux_wire*/ logic y
 );
 
+/*latency*/ logic _x_D1; always_ff @(posedge clk) begin _x_D1 <= x; end
+/*latency*/ logic _x_D2; always_ff @(posedge clk) begin _x_D2 <= _x_D1; end
+/*latency*/ logic _x_D3; always_ff @(posedge clk) begin _x_D3 <= _x_D2; end
+/*latency*/ logic _x_D4; always_ff @(posedge clk) begin _x_D4 <= _x_D3; end
+/*latency*/ logic _x_D5; always_ff @(posedge clk) begin _x_D5 <= _x_D4; end
 /*latency*/ logic _x_D1; always_ff @(posedge clk) begin _x_D1 <= x; end
 /*latency*/ logic _x_D2; always_ff @(posedge clk) begin _x_D2 <= _x_D1; end
 /*latency*/ logic _x_D3; always_ff @(posedge clk) begin _x_D3 <= _x_D2; end
@@ -2561,39 +2598,42 @@ module TreeAdd_SIZE_5_FROM_3_TO_4(
 /*mux_wire*/ logic[1:0] inter_sums_split_0[0:4];
 /*mux_wire*/ logic[1:0] cur_sums[0:4];
 /*mux_wire*/ logic[2:0] next_sums[0:2];
+/*mux_wire*/ logic[2:0] inter_sums_split_1[0:2];
+/*mux_wire*/ logic[2:0] cur_sums_2[0:2];
+/*mux_wire*/ logic[3:0] next_sums_2[0:1];
+/*mux_wire*/ logic[3:0] inter_sums_split_2[0:1];
+/*mux_wire*/ logic[3:0] cur_sums_3[0:1];
+/*mux_wire*/ logic[4:0] next_sums_3[0:0];
+/*mux_wire*/ logic[4:0] inter_sums_split_3[0:0];
+/*mux_wire*/ logic[4:0] last[0:0];
 wire[1:0] _7 = cur_sums[0];
 wire[1:0] _8 = cur_sums[1];
 wire[2:0] _9;
 assign _9 = _7 + _8;
-/*latency*/ logic[2:0] __9_D1; always_ff @(posedge clk) begin __9_D1 <= _9; end
 wire[1:0] _10 = cur_sums[2];
 wire[1:0] _11 = cur_sums[3];
 wire[2:0] _12;
 assign _12 = _10 + _11;
-/*latency*/ logic[2:0] __12_D1; always_ff @(posedge clk) begin __12_D1 <= _12; end
 wire[1:0] _13 = cur_sums[4];
-/*latency*/ logic[1:0] __13_D1; always_ff @(posedge clk) begin __13_D1 <= _13; end
-/*mux_wire*/ logic[2:0] inter_sums_split_1[0:2];
-/*mux_wire*/ logic[2:0] cur_sums_2[0:2];
-/*mux_wire*/ logic[3:0] next_sums_2[0:1];
 wire[2:0] _16 = cur_sums_2[0];
 wire[2:0] _17 = cur_sums_2[1];
 wire[3:0] _18;
 assign _18 = _16 + _17;
-/*latency*/ logic[3:0] __18_D2; always_ff @(posedge clk) begin __18_D2 <= _18; end
 wire[2:0] _19 = cur_sums_2[2];
-/*latency*/ logic[2:0] __19_D2; always_ff @(posedge clk) begin __19_D2 <= _19; end
-/*mux_wire*/ logic[3:0] inter_sums_split_2[0:1];
-/*mux_wire*/ logic[3:0] cur_sums_3[0:1];
-/*mux_wire*/ logic[4:0] next_sums_3[0:0];
 wire[3:0] _22 = cur_sums_3[0];
 wire[3:0] _23 = cur_sums_3[1];
 wire[4:0] _24;
 assign _24 = _22 + _23;
-/*latency*/ logic[4:0] __24_D3; always_ff @(posedge clk) begin __24_D3 <= _24; end
-/*mux_wire*/ logic[4:0] inter_sums_split_3[0:0];
-/*mux_wire*/ logic[4:0] last[0:0];
 wire[4:0] _27 = last[0];
+/*latency*/ logic _TreeAdd_D1; always_ff @(posedge clk) begin _TreeAdd_D1 <= TreeAdd; end
+/*latency*/ logic _TreeAdd_D2; always_ff @(posedge clk) begin _TreeAdd_D2 <= _TreeAdd_D1; end
+/*latency*/ logic _TreeAdd_D3; always_ff @(posedge clk) begin _TreeAdd_D3 <= _TreeAdd_D2; end
+/*latency*/ logic[2:0] __9_D1; always_ff @(posedge clk) begin __9_D1 <= _9; end
+/*latency*/ logic[2:0] __12_D1; always_ff @(posedge clk) begin __12_D1 <= _12; end
+/*latency*/ logic[1:0] __13_D1; always_ff @(posedge clk) begin __13_D1 <= _13; end
+/*latency*/ logic[3:0] __18_D2; always_ff @(posedge clk) begin __18_D2 <= _18; end
+/*latency*/ logic[2:0] __19_D2; always_ff @(posedge clk) begin __19_D2 <= _19; end
+/*latency*/ logic[4:0] __24_D3; always_ff @(posedge clk) begin __24_D3 <= _24; end
 always_comb begin // combinatorial sum
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	sum = 5'dx;
@@ -2713,9 +2753,9 @@ module use_permute(
 
 /*mux_wire*/ logic[19:0] inArr[0:1];
 /*mux_wire*/ logic[2:0] beep[0:7];
+localparam[2:0] SOURCES[0:7] = '{3'd3, 3'd2, 3'd4, 3'd5, 3'd1, 3'd2, 3'd7, 3'd6};
 /*mux_wire*/ logic[2:0] _permut_d_in[0:7];
 wire[2:0] _permut_d_out[0:7];
-localparam[2:0] SOURCES[0:7] = '{3'd3, 3'd2, 3'd4, 3'd5, 3'd1, 3'd2, 3'd7, 3'd6};
 permute_t_T_type_int_FROM_1_TO_8_SIZE_8_SOURCES_3_2_4_5_1_2_7_6 permut(
 	.clk(clk),
 	.d_in(_permut_d_in),
@@ -3774,11 +3814,11 @@ module fizz_buzz(
 );
 
 /*mux_wire*/ logic fizz;
+/*mux_wire*/ logic buzz;
 wire[1:0] _3;
 assign _3 = v % 3; // == mod 3
 wire _5;
 assign _5 = _3 == 1'd0;
-/*mux_wire*/ logic buzz;
 wire[2:0] _8;
 assign _8 = v % 5; // == mod 5
 wire _10;
@@ -3856,15 +3896,15 @@ module xor(
 );
 
 /*mux_wire*/ logic w1;
+/*mux_wire*/ logic w2;
+/*mux_wire*/ logic w3;
+/*mux_wire*/ logic w4;
 wire _2;
 assign _2 = ~x1;
-/*mux_wire*/ logic w2;
 wire _4;
 assign _4 = ~x2;
-/*mux_wire*/ logic w3;
 wire _7;
 assign _7 = x1 & w2;
-/*mux_wire*/ logic w4;
 wire _10;
 assign _10 = x2 & w1;
 wire _13;
@@ -3940,10 +3980,10 @@ module multiple_outputs_only(
 );
 
 /*state*/ logic loop = 1'b0;
-/*latency*/ logic _loop_N1; always_ff @(posedge clk) begin _loop_N1 <= loop; end
-/*latency*/ logic _loop_D0; always_ff @(posedge clk) begin _loop_D0 <= _loop_N1; end
 wire _2;
 assign _2 = ~loop;
+/*latency*/ logic _loop_N1; always_ff @(posedge clk) begin _loop_N1 <= loop; end
+/*latency*/ logic _loop_D0; always_ff @(posedge clk) begin _loop_D0 <= _loop_N1; end
 always_comb begin // combinatorial o
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	o = 1'bx;
@@ -3970,9 +4010,9 @@ module output_only(
 );
 
 /*state*/ logic loop = 1'b0;
-/*latency*/ logic _loop_D0; always_ff @(posedge clk) begin _loop_D0 <= loop; end
 wire _2;
 assign _2 = ~loop;
+/*latency*/ logic _loop_D0; always_ff @(posedge clk) begin _loop_D0 <= loop; end
 always_comb begin // combinatorial o
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	o = 1'bx;
@@ -4253,6 +4293,206 @@ module module_taking_a_lot_of_time(
 /*latency*/ logic[6:0] _data_in_D198; always_ff @(posedge clk) begin _data_in_D198 <= _data_in_D197; end
 /*latency*/ logic[6:0] _data_in_D199; always_ff @(posedge clk) begin _data_in_D199 <= _data_in_D198; end
 /*latency*/ logic[6:0] _data_in_D200; always_ff @(posedge clk) begin _data_in_D200 <= _data_in_D199; end
+/*latency*/ logic[6:0] _data_in_D1; always_ff @(posedge clk) begin _data_in_D1 <= data_in; end
+/*latency*/ logic[6:0] _data_in_D2; always_ff @(posedge clk) begin _data_in_D2 <= _data_in_D1; end
+/*latency*/ logic[6:0] _data_in_D3; always_ff @(posedge clk) begin _data_in_D3 <= _data_in_D2; end
+/*latency*/ logic[6:0] _data_in_D4; always_ff @(posedge clk) begin _data_in_D4 <= _data_in_D3; end
+/*latency*/ logic[6:0] _data_in_D5; always_ff @(posedge clk) begin _data_in_D5 <= _data_in_D4; end
+/*latency*/ logic[6:0] _data_in_D6; always_ff @(posedge clk) begin _data_in_D6 <= _data_in_D5; end
+/*latency*/ logic[6:0] _data_in_D7; always_ff @(posedge clk) begin _data_in_D7 <= _data_in_D6; end
+/*latency*/ logic[6:0] _data_in_D8; always_ff @(posedge clk) begin _data_in_D8 <= _data_in_D7; end
+/*latency*/ logic[6:0] _data_in_D9; always_ff @(posedge clk) begin _data_in_D9 <= _data_in_D8; end
+/*latency*/ logic[6:0] _data_in_D10; always_ff @(posedge clk) begin _data_in_D10 <= _data_in_D9; end
+/*latency*/ logic[6:0] _data_in_D11; always_ff @(posedge clk) begin _data_in_D11 <= _data_in_D10; end
+/*latency*/ logic[6:0] _data_in_D12; always_ff @(posedge clk) begin _data_in_D12 <= _data_in_D11; end
+/*latency*/ logic[6:0] _data_in_D13; always_ff @(posedge clk) begin _data_in_D13 <= _data_in_D12; end
+/*latency*/ logic[6:0] _data_in_D14; always_ff @(posedge clk) begin _data_in_D14 <= _data_in_D13; end
+/*latency*/ logic[6:0] _data_in_D15; always_ff @(posedge clk) begin _data_in_D15 <= _data_in_D14; end
+/*latency*/ logic[6:0] _data_in_D16; always_ff @(posedge clk) begin _data_in_D16 <= _data_in_D15; end
+/*latency*/ logic[6:0] _data_in_D17; always_ff @(posedge clk) begin _data_in_D17 <= _data_in_D16; end
+/*latency*/ logic[6:0] _data_in_D18; always_ff @(posedge clk) begin _data_in_D18 <= _data_in_D17; end
+/*latency*/ logic[6:0] _data_in_D19; always_ff @(posedge clk) begin _data_in_D19 <= _data_in_D18; end
+/*latency*/ logic[6:0] _data_in_D20; always_ff @(posedge clk) begin _data_in_D20 <= _data_in_D19; end
+/*latency*/ logic[6:0] _data_in_D21; always_ff @(posedge clk) begin _data_in_D21 <= _data_in_D20; end
+/*latency*/ logic[6:0] _data_in_D22; always_ff @(posedge clk) begin _data_in_D22 <= _data_in_D21; end
+/*latency*/ logic[6:0] _data_in_D23; always_ff @(posedge clk) begin _data_in_D23 <= _data_in_D22; end
+/*latency*/ logic[6:0] _data_in_D24; always_ff @(posedge clk) begin _data_in_D24 <= _data_in_D23; end
+/*latency*/ logic[6:0] _data_in_D25; always_ff @(posedge clk) begin _data_in_D25 <= _data_in_D24; end
+/*latency*/ logic[6:0] _data_in_D26; always_ff @(posedge clk) begin _data_in_D26 <= _data_in_D25; end
+/*latency*/ logic[6:0] _data_in_D27; always_ff @(posedge clk) begin _data_in_D27 <= _data_in_D26; end
+/*latency*/ logic[6:0] _data_in_D28; always_ff @(posedge clk) begin _data_in_D28 <= _data_in_D27; end
+/*latency*/ logic[6:0] _data_in_D29; always_ff @(posedge clk) begin _data_in_D29 <= _data_in_D28; end
+/*latency*/ logic[6:0] _data_in_D30; always_ff @(posedge clk) begin _data_in_D30 <= _data_in_D29; end
+/*latency*/ logic[6:0] _data_in_D31; always_ff @(posedge clk) begin _data_in_D31 <= _data_in_D30; end
+/*latency*/ logic[6:0] _data_in_D32; always_ff @(posedge clk) begin _data_in_D32 <= _data_in_D31; end
+/*latency*/ logic[6:0] _data_in_D33; always_ff @(posedge clk) begin _data_in_D33 <= _data_in_D32; end
+/*latency*/ logic[6:0] _data_in_D34; always_ff @(posedge clk) begin _data_in_D34 <= _data_in_D33; end
+/*latency*/ logic[6:0] _data_in_D35; always_ff @(posedge clk) begin _data_in_D35 <= _data_in_D34; end
+/*latency*/ logic[6:0] _data_in_D36; always_ff @(posedge clk) begin _data_in_D36 <= _data_in_D35; end
+/*latency*/ logic[6:0] _data_in_D37; always_ff @(posedge clk) begin _data_in_D37 <= _data_in_D36; end
+/*latency*/ logic[6:0] _data_in_D38; always_ff @(posedge clk) begin _data_in_D38 <= _data_in_D37; end
+/*latency*/ logic[6:0] _data_in_D39; always_ff @(posedge clk) begin _data_in_D39 <= _data_in_D38; end
+/*latency*/ logic[6:0] _data_in_D40; always_ff @(posedge clk) begin _data_in_D40 <= _data_in_D39; end
+/*latency*/ logic[6:0] _data_in_D41; always_ff @(posedge clk) begin _data_in_D41 <= _data_in_D40; end
+/*latency*/ logic[6:0] _data_in_D42; always_ff @(posedge clk) begin _data_in_D42 <= _data_in_D41; end
+/*latency*/ logic[6:0] _data_in_D43; always_ff @(posedge clk) begin _data_in_D43 <= _data_in_D42; end
+/*latency*/ logic[6:0] _data_in_D44; always_ff @(posedge clk) begin _data_in_D44 <= _data_in_D43; end
+/*latency*/ logic[6:0] _data_in_D45; always_ff @(posedge clk) begin _data_in_D45 <= _data_in_D44; end
+/*latency*/ logic[6:0] _data_in_D46; always_ff @(posedge clk) begin _data_in_D46 <= _data_in_D45; end
+/*latency*/ logic[6:0] _data_in_D47; always_ff @(posedge clk) begin _data_in_D47 <= _data_in_D46; end
+/*latency*/ logic[6:0] _data_in_D48; always_ff @(posedge clk) begin _data_in_D48 <= _data_in_D47; end
+/*latency*/ logic[6:0] _data_in_D49; always_ff @(posedge clk) begin _data_in_D49 <= _data_in_D48; end
+/*latency*/ logic[6:0] _data_in_D50; always_ff @(posedge clk) begin _data_in_D50 <= _data_in_D49; end
+/*latency*/ logic[6:0] _data_in_D51; always_ff @(posedge clk) begin _data_in_D51 <= _data_in_D50; end
+/*latency*/ logic[6:0] _data_in_D52; always_ff @(posedge clk) begin _data_in_D52 <= _data_in_D51; end
+/*latency*/ logic[6:0] _data_in_D53; always_ff @(posedge clk) begin _data_in_D53 <= _data_in_D52; end
+/*latency*/ logic[6:0] _data_in_D54; always_ff @(posedge clk) begin _data_in_D54 <= _data_in_D53; end
+/*latency*/ logic[6:0] _data_in_D55; always_ff @(posedge clk) begin _data_in_D55 <= _data_in_D54; end
+/*latency*/ logic[6:0] _data_in_D56; always_ff @(posedge clk) begin _data_in_D56 <= _data_in_D55; end
+/*latency*/ logic[6:0] _data_in_D57; always_ff @(posedge clk) begin _data_in_D57 <= _data_in_D56; end
+/*latency*/ logic[6:0] _data_in_D58; always_ff @(posedge clk) begin _data_in_D58 <= _data_in_D57; end
+/*latency*/ logic[6:0] _data_in_D59; always_ff @(posedge clk) begin _data_in_D59 <= _data_in_D58; end
+/*latency*/ logic[6:0] _data_in_D60; always_ff @(posedge clk) begin _data_in_D60 <= _data_in_D59; end
+/*latency*/ logic[6:0] _data_in_D61; always_ff @(posedge clk) begin _data_in_D61 <= _data_in_D60; end
+/*latency*/ logic[6:0] _data_in_D62; always_ff @(posedge clk) begin _data_in_D62 <= _data_in_D61; end
+/*latency*/ logic[6:0] _data_in_D63; always_ff @(posedge clk) begin _data_in_D63 <= _data_in_D62; end
+/*latency*/ logic[6:0] _data_in_D64; always_ff @(posedge clk) begin _data_in_D64 <= _data_in_D63; end
+/*latency*/ logic[6:0] _data_in_D65; always_ff @(posedge clk) begin _data_in_D65 <= _data_in_D64; end
+/*latency*/ logic[6:0] _data_in_D66; always_ff @(posedge clk) begin _data_in_D66 <= _data_in_D65; end
+/*latency*/ logic[6:0] _data_in_D67; always_ff @(posedge clk) begin _data_in_D67 <= _data_in_D66; end
+/*latency*/ logic[6:0] _data_in_D68; always_ff @(posedge clk) begin _data_in_D68 <= _data_in_D67; end
+/*latency*/ logic[6:0] _data_in_D69; always_ff @(posedge clk) begin _data_in_D69 <= _data_in_D68; end
+/*latency*/ logic[6:0] _data_in_D70; always_ff @(posedge clk) begin _data_in_D70 <= _data_in_D69; end
+/*latency*/ logic[6:0] _data_in_D71; always_ff @(posedge clk) begin _data_in_D71 <= _data_in_D70; end
+/*latency*/ logic[6:0] _data_in_D72; always_ff @(posedge clk) begin _data_in_D72 <= _data_in_D71; end
+/*latency*/ logic[6:0] _data_in_D73; always_ff @(posedge clk) begin _data_in_D73 <= _data_in_D72; end
+/*latency*/ logic[6:0] _data_in_D74; always_ff @(posedge clk) begin _data_in_D74 <= _data_in_D73; end
+/*latency*/ logic[6:0] _data_in_D75; always_ff @(posedge clk) begin _data_in_D75 <= _data_in_D74; end
+/*latency*/ logic[6:0] _data_in_D76; always_ff @(posedge clk) begin _data_in_D76 <= _data_in_D75; end
+/*latency*/ logic[6:0] _data_in_D77; always_ff @(posedge clk) begin _data_in_D77 <= _data_in_D76; end
+/*latency*/ logic[6:0] _data_in_D78; always_ff @(posedge clk) begin _data_in_D78 <= _data_in_D77; end
+/*latency*/ logic[6:0] _data_in_D79; always_ff @(posedge clk) begin _data_in_D79 <= _data_in_D78; end
+/*latency*/ logic[6:0] _data_in_D80; always_ff @(posedge clk) begin _data_in_D80 <= _data_in_D79; end
+/*latency*/ logic[6:0] _data_in_D81; always_ff @(posedge clk) begin _data_in_D81 <= _data_in_D80; end
+/*latency*/ logic[6:0] _data_in_D82; always_ff @(posedge clk) begin _data_in_D82 <= _data_in_D81; end
+/*latency*/ logic[6:0] _data_in_D83; always_ff @(posedge clk) begin _data_in_D83 <= _data_in_D82; end
+/*latency*/ logic[6:0] _data_in_D84; always_ff @(posedge clk) begin _data_in_D84 <= _data_in_D83; end
+/*latency*/ logic[6:0] _data_in_D85; always_ff @(posedge clk) begin _data_in_D85 <= _data_in_D84; end
+/*latency*/ logic[6:0] _data_in_D86; always_ff @(posedge clk) begin _data_in_D86 <= _data_in_D85; end
+/*latency*/ logic[6:0] _data_in_D87; always_ff @(posedge clk) begin _data_in_D87 <= _data_in_D86; end
+/*latency*/ logic[6:0] _data_in_D88; always_ff @(posedge clk) begin _data_in_D88 <= _data_in_D87; end
+/*latency*/ logic[6:0] _data_in_D89; always_ff @(posedge clk) begin _data_in_D89 <= _data_in_D88; end
+/*latency*/ logic[6:0] _data_in_D90; always_ff @(posedge clk) begin _data_in_D90 <= _data_in_D89; end
+/*latency*/ logic[6:0] _data_in_D91; always_ff @(posedge clk) begin _data_in_D91 <= _data_in_D90; end
+/*latency*/ logic[6:0] _data_in_D92; always_ff @(posedge clk) begin _data_in_D92 <= _data_in_D91; end
+/*latency*/ logic[6:0] _data_in_D93; always_ff @(posedge clk) begin _data_in_D93 <= _data_in_D92; end
+/*latency*/ logic[6:0] _data_in_D94; always_ff @(posedge clk) begin _data_in_D94 <= _data_in_D93; end
+/*latency*/ logic[6:0] _data_in_D95; always_ff @(posedge clk) begin _data_in_D95 <= _data_in_D94; end
+/*latency*/ logic[6:0] _data_in_D96; always_ff @(posedge clk) begin _data_in_D96 <= _data_in_D95; end
+/*latency*/ logic[6:0] _data_in_D97; always_ff @(posedge clk) begin _data_in_D97 <= _data_in_D96; end
+/*latency*/ logic[6:0] _data_in_D98; always_ff @(posedge clk) begin _data_in_D98 <= _data_in_D97; end
+/*latency*/ logic[6:0] _data_in_D99; always_ff @(posedge clk) begin _data_in_D99 <= _data_in_D98; end
+/*latency*/ logic[6:0] _data_in_D100; always_ff @(posedge clk) begin _data_in_D100 <= _data_in_D99; end
+/*latency*/ logic[6:0] _data_in_D101; always_ff @(posedge clk) begin _data_in_D101 <= _data_in_D100; end
+/*latency*/ logic[6:0] _data_in_D102; always_ff @(posedge clk) begin _data_in_D102 <= _data_in_D101; end
+/*latency*/ logic[6:0] _data_in_D103; always_ff @(posedge clk) begin _data_in_D103 <= _data_in_D102; end
+/*latency*/ logic[6:0] _data_in_D104; always_ff @(posedge clk) begin _data_in_D104 <= _data_in_D103; end
+/*latency*/ logic[6:0] _data_in_D105; always_ff @(posedge clk) begin _data_in_D105 <= _data_in_D104; end
+/*latency*/ logic[6:0] _data_in_D106; always_ff @(posedge clk) begin _data_in_D106 <= _data_in_D105; end
+/*latency*/ logic[6:0] _data_in_D107; always_ff @(posedge clk) begin _data_in_D107 <= _data_in_D106; end
+/*latency*/ logic[6:0] _data_in_D108; always_ff @(posedge clk) begin _data_in_D108 <= _data_in_D107; end
+/*latency*/ logic[6:0] _data_in_D109; always_ff @(posedge clk) begin _data_in_D109 <= _data_in_D108; end
+/*latency*/ logic[6:0] _data_in_D110; always_ff @(posedge clk) begin _data_in_D110 <= _data_in_D109; end
+/*latency*/ logic[6:0] _data_in_D111; always_ff @(posedge clk) begin _data_in_D111 <= _data_in_D110; end
+/*latency*/ logic[6:0] _data_in_D112; always_ff @(posedge clk) begin _data_in_D112 <= _data_in_D111; end
+/*latency*/ logic[6:0] _data_in_D113; always_ff @(posedge clk) begin _data_in_D113 <= _data_in_D112; end
+/*latency*/ logic[6:0] _data_in_D114; always_ff @(posedge clk) begin _data_in_D114 <= _data_in_D113; end
+/*latency*/ logic[6:0] _data_in_D115; always_ff @(posedge clk) begin _data_in_D115 <= _data_in_D114; end
+/*latency*/ logic[6:0] _data_in_D116; always_ff @(posedge clk) begin _data_in_D116 <= _data_in_D115; end
+/*latency*/ logic[6:0] _data_in_D117; always_ff @(posedge clk) begin _data_in_D117 <= _data_in_D116; end
+/*latency*/ logic[6:0] _data_in_D118; always_ff @(posedge clk) begin _data_in_D118 <= _data_in_D117; end
+/*latency*/ logic[6:0] _data_in_D119; always_ff @(posedge clk) begin _data_in_D119 <= _data_in_D118; end
+/*latency*/ logic[6:0] _data_in_D120; always_ff @(posedge clk) begin _data_in_D120 <= _data_in_D119; end
+/*latency*/ logic[6:0] _data_in_D121; always_ff @(posedge clk) begin _data_in_D121 <= _data_in_D120; end
+/*latency*/ logic[6:0] _data_in_D122; always_ff @(posedge clk) begin _data_in_D122 <= _data_in_D121; end
+/*latency*/ logic[6:0] _data_in_D123; always_ff @(posedge clk) begin _data_in_D123 <= _data_in_D122; end
+/*latency*/ logic[6:0] _data_in_D124; always_ff @(posedge clk) begin _data_in_D124 <= _data_in_D123; end
+/*latency*/ logic[6:0] _data_in_D125; always_ff @(posedge clk) begin _data_in_D125 <= _data_in_D124; end
+/*latency*/ logic[6:0] _data_in_D126; always_ff @(posedge clk) begin _data_in_D126 <= _data_in_D125; end
+/*latency*/ logic[6:0] _data_in_D127; always_ff @(posedge clk) begin _data_in_D127 <= _data_in_D126; end
+/*latency*/ logic[6:0] _data_in_D128; always_ff @(posedge clk) begin _data_in_D128 <= _data_in_D127; end
+/*latency*/ logic[6:0] _data_in_D129; always_ff @(posedge clk) begin _data_in_D129 <= _data_in_D128; end
+/*latency*/ logic[6:0] _data_in_D130; always_ff @(posedge clk) begin _data_in_D130 <= _data_in_D129; end
+/*latency*/ logic[6:0] _data_in_D131; always_ff @(posedge clk) begin _data_in_D131 <= _data_in_D130; end
+/*latency*/ logic[6:0] _data_in_D132; always_ff @(posedge clk) begin _data_in_D132 <= _data_in_D131; end
+/*latency*/ logic[6:0] _data_in_D133; always_ff @(posedge clk) begin _data_in_D133 <= _data_in_D132; end
+/*latency*/ logic[6:0] _data_in_D134; always_ff @(posedge clk) begin _data_in_D134 <= _data_in_D133; end
+/*latency*/ logic[6:0] _data_in_D135; always_ff @(posedge clk) begin _data_in_D135 <= _data_in_D134; end
+/*latency*/ logic[6:0] _data_in_D136; always_ff @(posedge clk) begin _data_in_D136 <= _data_in_D135; end
+/*latency*/ logic[6:0] _data_in_D137; always_ff @(posedge clk) begin _data_in_D137 <= _data_in_D136; end
+/*latency*/ logic[6:0] _data_in_D138; always_ff @(posedge clk) begin _data_in_D138 <= _data_in_D137; end
+/*latency*/ logic[6:0] _data_in_D139; always_ff @(posedge clk) begin _data_in_D139 <= _data_in_D138; end
+/*latency*/ logic[6:0] _data_in_D140; always_ff @(posedge clk) begin _data_in_D140 <= _data_in_D139; end
+/*latency*/ logic[6:0] _data_in_D141; always_ff @(posedge clk) begin _data_in_D141 <= _data_in_D140; end
+/*latency*/ logic[6:0] _data_in_D142; always_ff @(posedge clk) begin _data_in_D142 <= _data_in_D141; end
+/*latency*/ logic[6:0] _data_in_D143; always_ff @(posedge clk) begin _data_in_D143 <= _data_in_D142; end
+/*latency*/ logic[6:0] _data_in_D144; always_ff @(posedge clk) begin _data_in_D144 <= _data_in_D143; end
+/*latency*/ logic[6:0] _data_in_D145; always_ff @(posedge clk) begin _data_in_D145 <= _data_in_D144; end
+/*latency*/ logic[6:0] _data_in_D146; always_ff @(posedge clk) begin _data_in_D146 <= _data_in_D145; end
+/*latency*/ logic[6:0] _data_in_D147; always_ff @(posedge clk) begin _data_in_D147 <= _data_in_D146; end
+/*latency*/ logic[6:0] _data_in_D148; always_ff @(posedge clk) begin _data_in_D148 <= _data_in_D147; end
+/*latency*/ logic[6:0] _data_in_D149; always_ff @(posedge clk) begin _data_in_D149 <= _data_in_D148; end
+/*latency*/ logic[6:0] _data_in_D150; always_ff @(posedge clk) begin _data_in_D150 <= _data_in_D149; end
+/*latency*/ logic[6:0] _data_in_D151; always_ff @(posedge clk) begin _data_in_D151 <= _data_in_D150; end
+/*latency*/ logic[6:0] _data_in_D152; always_ff @(posedge clk) begin _data_in_D152 <= _data_in_D151; end
+/*latency*/ logic[6:0] _data_in_D153; always_ff @(posedge clk) begin _data_in_D153 <= _data_in_D152; end
+/*latency*/ logic[6:0] _data_in_D154; always_ff @(posedge clk) begin _data_in_D154 <= _data_in_D153; end
+/*latency*/ logic[6:0] _data_in_D155; always_ff @(posedge clk) begin _data_in_D155 <= _data_in_D154; end
+/*latency*/ logic[6:0] _data_in_D156; always_ff @(posedge clk) begin _data_in_D156 <= _data_in_D155; end
+/*latency*/ logic[6:0] _data_in_D157; always_ff @(posedge clk) begin _data_in_D157 <= _data_in_D156; end
+/*latency*/ logic[6:0] _data_in_D158; always_ff @(posedge clk) begin _data_in_D158 <= _data_in_D157; end
+/*latency*/ logic[6:0] _data_in_D159; always_ff @(posedge clk) begin _data_in_D159 <= _data_in_D158; end
+/*latency*/ logic[6:0] _data_in_D160; always_ff @(posedge clk) begin _data_in_D160 <= _data_in_D159; end
+/*latency*/ logic[6:0] _data_in_D161; always_ff @(posedge clk) begin _data_in_D161 <= _data_in_D160; end
+/*latency*/ logic[6:0] _data_in_D162; always_ff @(posedge clk) begin _data_in_D162 <= _data_in_D161; end
+/*latency*/ logic[6:0] _data_in_D163; always_ff @(posedge clk) begin _data_in_D163 <= _data_in_D162; end
+/*latency*/ logic[6:0] _data_in_D164; always_ff @(posedge clk) begin _data_in_D164 <= _data_in_D163; end
+/*latency*/ logic[6:0] _data_in_D165; always_ff @(posedge clk) begin _data_in_D165 <= _data_in_D164; end
+/*latency*/ logic[6:0] _data_in_D166; always_ff @(posedge clk) begin _data_in_D166 <= _data_in_D165; end
+/*latency*/ logic[6:0] _data_in_D167; always_ff @(posedge clk) begin _data_in_D167 <= _data_in_D166; end
+/*latency*/ logic[6:0] _data_in_D168; always_ff @(posedge clk) begin _data_in_D168 <= _data_in_D167; end
+/*latency*/ logic[6:0] _data_in_D169; always_ff @(posedge clk) begin _data_in_D169 <= _data_in_D168; end
+/*latency*/ logic[6:0] _data_in_D170; always_ff @(posedge clk) begin _data_in_D170 <= _data_in_D169; end
+/*latency*/ logic[6:0] _data_in_D171; always_ff @(posedge clk) begin _data_in_D171 <= _data_in_D170; end
+/*latency*/ logic[6:0] _data_in_D172; always_ff @(posedge clk) begin _data_in_D172 <= _data_in_D171; end
+/*latency*/ logic[6:0] _data_in_D173; always_ff @(posedge clk) begin _data_in_D173 <= _data_in_D172; end
+/*latency*/ logic[6:0] _data_in_D174; always_ff @(posedge clk) begin _data_in_D174 <= _data_in_D173; end
+/*latency*/ logic[6:0] _data_in_D175; always_ff @(posedge clk) begin _data_in_D175 <= _data_in_D174; end
+/*latency*/ logic[6:0] _data_in_D176; always_ff @(posedge clk) begin _data_in_D176 <= _data_in_D175; end
+/*latency*/ logic[6:0] _data_in_D177; always_ff @(posedge clk) begin _data_in_D177 <= _data_in_D176; end
+/*latency*/ logic[6:0] _data_in_D178; always_ff @(posedge clk) begin _data_in_D178 <= _data_in_D177; end
+/*latency*/ logic[6:0] _data_in_D179; always_ff @(posedge clk) begin _data_in_D179 <= _data_in_D178; end
+/*latency*/ logic[6:0] _data_in_D180; always_ff @(posedge clk) begin _data_in_D180 <= _data_in_D179; end
+/*latency*/ logic[6:0] _data_in_D181; always_ff @(posedge clk) begin _data_in_D181 <= _data_in_D180; end
+/*latency*/ logic[6:0] _data_in_D182; always_ff @(posedge clk) begin _data_in_D182 <= _data_in_D181; end
+/*latency*/ logic[6:0] _data_in_D183; always_ff @(posedge clk) begin _data_in_D183 <= _data_in_D182; end
+/*latency*/ logic[6:0] _data_in_D184; always_ff @(posedge clk) begin _data_in_D184 <= _data_in_D183; end
+/*latency*/ logic[6:0] _data_in_D185; always_ff @(posedge clk) begin _data_in_D185 <= _data_in_D184; end
+/*latency*/ logic[6:0] _data_in_D186; always_ff @(posedge clk) begin _data_in_D186 <= _data_in_D185; end
+/*latency*/ logic[6:0] _data_in_D187; always_ff @(posedge clk) begin _data_in_D187 <= _data_in_D186; end
+/*latency*/ logic[6:0] _data_in_D188; always_ff @(posedge clk) begin _data_in_D188 <= _data_in_D187; end
+/*latency*/ logic[6:0] _data_in_D189; always_ff @(posedge clk) begin _data_in_D189 <= _data_in_D188; end
+/*latency*/ logic[6:0] _data_in_D190; always_ff @(posedge clk) begin _data_in_D190 <= _data_in_D189; end
+/*latency*/ logic[6:0] _data_in_D191; always_ff @(posedge clk) begin _data_in_D191 <= _data_in_D190; end
+/*latency*/ logic[6:0] _data_in_D192; always_ff @(posedge clk) begin _data_in_D192 <= _data_in_D191; end
+/*latency*/ logic[6:0] _data_in_D193; always_ff @(posedge clk) begin _data_in_D193 <= _data_in_D192; end
+/*latency*/ logic[6:0] _data_in_D194; always_ff @(posedge clk) begin _data_in_D194 <= _data_in_D193; end
+/*latency*/ logic[6:0] _data_in_D195; always_ff @(posedge clk) begin _data_in_D195 <= _data_in_D194; end
+/*latency*/ logic[6:0] _data_in_D196; always_ff @(posedge clk) begin _data_in_D196 <= _data_in_D195; end
+/*latency*/ logic[6:0] _data_in_D197; always_ff @(posedge clk) begin _data_in_D197 <= _data_in_D196; end
+/*latency*/ logic[6:0] _data_in_D198; always_ff @(posedge clk) begin _data_in_D198 <= _data_in_D197; end
+/*latency*/ logic[6:0] _data_in_D199; always_ff @(posedge clk) begin _data_in_D199 <= _data_in_D198; end
+/*latency*/ logic[6:0] _data_in_D200; always_ff @(posedge clk) begin _data_in_D200 <= _data_in_D199; end
 always_comb begin // combinatorial data_out
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	data_out = 7'dx;
@@ -4269,6 +4509,11 @@ module matrix_vector_mul(
 );
 
 /*mux_wire*/ logic[13:0] row_products[0:3];
+/*mux_wire*/ logic[13:0] row_products_2[0:3];
+/*mux_wire*/ logic[13:0] row_products_3[0:3];
+/*mux_wire*/ logic[13:0] row_products_4[0:3];
+/*mux_wire*/ logic[13:0] row_products_5[0:3];
+/*mux_wire*/ logic[13:0] row_products_6[0:3];
 wire[6:0] _1 = mat[0][0];
 wire[6:0] _2 = vec[0];
 wire[13:0] _3;
@@ -4290,7 +4535,6 @@ always_comb begin
 	_14 = 0;
 	for(int _v0 = 0; _v0 < 4; _v0 += 1) _14 += row_products[_v0];
 end
-/*mux_wire*/ logic[13:0] row_products_2[0:3];
 wire[6:0] _15 = mat[0][1];
 wire[6:0] _16 = vec[0];
 wire[13:0] _17;
@@ -4312,7 +4556,6 @@ always_comb begin
 	_28 = 0;
 	for(int _v0 = 0; _v0 < 4; _v0 += 1) _28 += row_products_2[_v0];
 end
-/*mux_wire*/ logic[13:0] row_products_3[0:3];
 wire[6:0] _29 = mat[0][2];
 wire[6:0] _30 = vec[0];
 wire[13:0] _31;
@@ -4334,7 +4577,6 @@ always_comb begin
 	_42 = 0;
 	for(int _v0 = 0; _v0 < 4; _v0 += 1) _42 += row_products_3[_v0];
 end
-/*mux_wire*/ logic[13:0] row_products_4[0:3];
 wire[6:0] _43 = mat[0][3];
 wire[6:0] _44 = vec[0];
 wire[13:0] _45;
@@ -4356,7 +4598,6 @@ always_comb begin
 	_56 = 0;
 	for(int _v0 = 0; _v0 < 4; _v0 += 1) _56 += row_products_4[_v0];
 end
-/*mux_wire*/ logic[13:0] row_products_5[0:3];
 wire[6:0] _57 = mat[0][4];
 wire[6:0] _58 = vec[0];
 wire[13:0] _59;
@@ -4378,7 +4619,6 @@ always_comb begin
 	_70 = 0;
 	for(int _v0 = 0; _v0 < 4; _v0 += 1) _70 += row_products_5[_v0];
 end
-/*mux_wire*/ logic[13:0] row_products_6[0:3];
 wire[6:0] _71 = mat[0][5];
 wire[6:0] _72 = vec[0];
 wire[13:0] _73;
@@ -4472,6 +4712,11 @@ module module_taking_time(
 /*latency*/ logic[6:0] _i_D3; always_ff @(posedge clk) begin _i_D3 <= _i_D2; end
 /*latency*/ logic[6:0] _i_D4; always_ff @(posedge clk) begin _i_D4 <= _i_D3; end
 /*latency*/ logic[6:0] _i_D5; always_ff @(posedge clk) begin _i_D5 <= _i_D4; end
+/*latency*/ logic[6:0] _i_D1; always_ff @(posedge clk) begin _i_D1 <= i; end
+/*latency*/ logic[6:0] _i_D2; always_ff @(posedge clk) begin _i_D2 <= _i_D1; end
+/*latency*/ logic[6:0] _i_D3; always_ff @(posedge clk) begin _i_D3 <= _i_D2; end
+/*latency*/ logic[6:0] _i_D4; always_ff @(posedge clk) begin _i_D4 <= _i_D3; end
+/*latency*/ logic[6:0] _i_D5; always_ff @(posedge clk) begin _i_D5 <= _i_D4; end
 always_comb begin // combinatorial o
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	o = 7'dx;
@@ -4491,12 +4736,15 @@ module determinable_because_no_input_output_ports(
 /*latency*/ logic[6:0] _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
 /*mux_wire*/ logic[6:0] a_d;
 /*mux_wire*/ logic[6:0] t;
-/*latency*/ logic[6:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
 /*mux_wire*/ logic[6:0] a_dd;
 /*mux_wire*/ logic[6:0] t_d;
-/*latency*/ logic[6:0] _t_d_D3; always_ff @(posedge clk) begin _t_d_D3 <= t_d; end
 wire[7:0] _7;
 assign _7 = _t_d_D3 + a_dd;
+/*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
+/*latency*/ logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
+/*latency*/ logic[6:0] _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
+/*latency*/ logic[6:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
+/*latency*/ logic[6:0] _t_d_D3; always_ff @(posedge clk) begin _t_d_D3 <= t_d; end
 always_comb begin // combinatorial x
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	x = 8'dx;
@@ -4537,13 +4785,15 @@ module determinable_input_latency(
 /*latency*/ logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
 /*mux_wire*/ logic[6:0] a_d;
 /*mux_wire*/ logic[7:0] t;
-/*latency*/ logic[7:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
-wire[7:0] _4;
-assign _4 = a_d + b;
 /*mux_wire*/ logic[6:0] a_dd;
 /*mux_wire*/ logic[7:0] t_d;
+wire[7:0] _4;
+assign _4 = a_d + b;
 wire[8:0] _9;
 assign _9 = t_d + a_dd;
+/*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
+/*latency*/ logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
+/*latency*/ logic[7:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
 always_comb begin // combinatorial x
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	x = 9'dx;
@@ -4590,14 +4840,17 @@ module specified_input_latency(
 /*latency*/ logic[6:0] _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
 /*mux_wire*/ logic[6:0] a_d;
 /*mux_wire*/ logic[7:0] t;
-/*latency*/ logic[7:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
-wire[7:0] _4;
-assign _4 = a_d + b;
 /*mux_wire*/ logic[6:0] a_dd;
 /*mux_wire*/ logic[7:0] t_d;
-/*latency*/ logic[7:0] _t_d_D3; always_ff @(posedge clk) begin _t_d_D3 <= t_d; end
+wire[7:0] _4;
+assign _4 = a_d + b;
 wire[8:0] _9;
 assign _9 = _t_d_D3 + a_dd;
+/*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
+/*latency*/ logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
+/*latency*/ logic[6:0] _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
+/*latency*/ logic[7:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
+/*latency*/ logic[7:0] _t_d_D3; always_ff @(posedge clk) begin _t_d_D3 <= t_d; end
 always_comb begin // combinatorial x
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	x = 9'dx;
@@ -4691,42 +4944,42 @@ module add_indices_to_array(
 );
 
 /*mux_wire*/ logic[6:0] t;
+/*mux_wire*/ logic[6:0] t_2;
+/*mux_wire*/ logic[6:0] t_3;
+/*mux_wire*/ logic[6:0] t_4;
+/*mux_wire*/ logic[6:0] t_5;
+/*mux_wire*/ logic[6:0] t_6;
+/*mux_wire*/ logic[6:0] t_7;
+/*mux_wire*/ logic[6:0] t_8;
+/*mux_wire*/ logic[6:0] t_9;
+/*mux_wire*/ logic[6:0] t_10;
 wire[6:0] _1 = values[0];
 wire[6:0] _3;
 assign _3 = t + 1'd0;
-/*mux_wire*/ logic[6:0] t_2;
 wire[6:0] _4 = values[1];
 wire[6:0] _6;
 assign _6 = t_2 + 1'd1;
-/*mux_wire*/ logic[6:0] t_3;
 wire[6:0] _7 = values[2];
 wire[6:0] _9;
 assign _9 = t_3 + 2'd2;
-/*mux_wire*/ logic[6:0] t_4;
 wire[6:0] _10 = values[3];
 wire[6:0] _12;
 assign _12 = t_4 + 2'd3;
-/*mux_wire*/ logic[6:0] t_5;
 wire[6:0] _13 = values[4];
 wire[6:0] _15;
 assign _15 = t_5 + 3'd4;
-/*mux_wire*/ logic[6:0] t_6;
 wire[6:0] _16 = values[5];
 wire[6:0] _18;
 assign _18 = t_6 + 3'd5;
-/*mux_wire*/ logic[6:0] t_7;
 wire[6:0] _19 = values[6];
 wire[6:0] _21;
 assign _21 = t_7 + 3'd6;
-/*mux_wire*/ logic[6:0] t_8;
 wire[6:0] _22 = values[7];
 wire[6:0] _24;
 assign _24 = t_8 + 3'd7;
-/*mux_wire*/ logic[6:0] t_9;
 wire[6:0] _25 = values[8];
 wire[6:0] _27;
 assign _27 = t_9 + 4'd8;
-/*mux_wire*/ logic[6:0] t_10;
 wire[6:0] _28 = values[9];
 wire[6:0] _30;
 assign _30 = t_10 + 4'd9;
@@ -4850,17 +5103,17 @@ module blur(
 );
 
 /*state*/ logic working = 1'b0;
-/*latency*/ logic _working_D1; always_ff @(posedge clk) begin _working_D1 <= working; end
-/*latency*/ logic _working_D2; always_ff @(posedge clk) begin _working_D2 <= _working_D1; end
-/*latency*/ logic _working_D3; always_ff @(posedge clk) begin _working_D3 <= _working_D2; end
 /*state*/ logic[6:0] prev;
 wire[7:0] _4;
 assign _4 = prev + a;
+wire _7;
+assign _7 = ~done;
+/*latency*/ logic _working_D1; always_ff @(posedge clk) begin _working_D1 <= working; end
+/*latency*/ logic _working_D2; always_ff @(posedge clk) begin _working_D2 <= _working_D1; end
+/*latency*/ logic _working_D3; always_ff @(posedge clk) begin _working_D3 <= _working_D2; end
 /*latency*/ logic[7:0] __4_D1; always_ff @(posedge clk) begin __4_D1 <= _4; end
 /*latency*/ logic[7:0] __4_D2; always_ff @(posedge clk) begin __4_D2 <= __4_D1; end
 /*latency*/ logic[7:0] __4_D3; always_ff @(posedge clk) begin __4_D3 <= __4_D2; end
-wire _7;
-assign _7 = ~done;
 always_comb begin // combinatorial result
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	result = 8'dx;
@@ -4885,11 +5138,12 @@ module Accumulator(
 /*latency*/ logic _done_D1; always_ff @(posedge clk) begin _done_D1 <= done; end
 /*state*/ logic[6:0] tot = 7'd0;
 /*mux_wire*/ logic[6:0] new_tot;
-/*latency*/ logic[6:0] _new_tot_D1; always_ff @(posedge clk) begin _new_tot_D1 <= new_tot; end
 wire[7:0] _3;
 assign _3 = tot + term;
 wire[6:0] _5;
 assign _5 = _3 - ((_3 >= 100) ? 100 : 0); // == mod 100
+/*latency*/ logic _done_D1; always_ff @(posedge clk) begin _done_D1 <= done; end
+/*latency*/ logic[6:0] _new_tot_D1; always_ff @(posedge clk) begin _new_tot_D1 <= new_tot; end
 always_comb begin // combinatorial total
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	total = 7'dx;
@@ -4914,19 +5168,19 @@ module Tree_Multiply(
 );
 
 /*mux_wire*/ logic[13:0] a;
+/*mux_wire*/ logic[13:0] b;
 wire[6:0] _1 = values[0];
 wire[6:0] _2 = values[1];
 wire[13:0] _3;
 assign _3 = _1 * _2;
-/*latency*/ logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
-/*mux_wire*/ logic[13:0] b;
 wire[6:0] _4 = values[2];
 wire[6:0] _5 = values[3];
 wire[13:0] _6;
 assign _6 = _4 * _5;
-/*latency*/ logic[13:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
 wire[26:0] _9;
 assign _9 = a * b;
+/*latency*/ logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
+/*latency*/ logic[13:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
 /*latency*/ logic[26:0] __9_D2; always_ff @(posedge clk) begin __9_D2 <= _9; end
 always_comb begin // combinatorial total
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -5032,21 +5286,23 @@ module pow17(
 /*latency*/ logic[6:0] _i_D1; always_ff @(posedge clk) begin _i_D1 <= i; end
 /*latency*/ logic[6:0] _i_D2; always_ff @(posedge clk) begin _i_D2 <= _i_D1; end
 /*mux_wire*/ logic[13:0] i2;
+/*mux_wire*/ logic[26:0] i4;
+/*mux_wire*/ logic[53:0] i8;
+/*mux_wire*/ logic[106:0] i16;
 wire[13:0] _3;
 assign _3 = i * i;
-/*mux_wire*/ logic[26:0] i4;
 wire[26:0] _6;
 assign _6 = i2 * i2;
-/*latency*/ logic[26:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
-/*mux_wire*/ logic[53:0] i8;
 wire[53:0] _9;
 assign _9 = i4 * i4;
-/*mux_wire*/ logic[106:0] i16;
 wire[106:0] _12;
 assign _12 = i8 * i8;
-/*latency*/ logic[106:0] __12_D2; always_ff @(posedge clk) begin __12_D2 <= _12; end
 wire[112:0] _15;
 assign _15 = i16 * _i_D2;
+/*latency*/ logic[6:0] _i_D1; always_ff @(posedge clk) begin _i_D1 <= i; end
+/*latency*/ logic[6:0] _i_D2; always_ff @(posedge clk) begin _i_D2 <= _i_D1; end
+/*latency*/ logic[26:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
+/*latency*/ logic[106:0] __12_D2; always_ff @(posedge clk) begin __12_D2 <= _12; end
 always_comb begin // combinatorial o
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	o = 113'dx;
@@ -5086,9 +5342,9 @@ module multiply_add(
 /*mux_wire*/ logic[13:0] tmp;
 wire[13:0] _3;
 assign _3 = a * b;
-/*latency*/ logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
 wire[13:0] _6;
 assign _6 = tmp + c;
+/*latency*/ logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
 always_comb begin // combinatorial total
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	total = 14'dx;
@@ -5111,22 +5367,22 @@ module example_md(
 );
 
 /*mux_wire*/ logic[13:0] mul0;
+/*mux_wire*/ logic[13:0] mul1;
 wire[6:0] _1 = factors[0];
 wire[6:0] _2 = factors[1];
 wire[13:0] _3;
 assign _3 = _1 * _2;
-/*latency*/ logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
-/*mux_wire*/ logic[13:0] mul1;
 wire[6:0] _4 = factors[2];
 wire[6:0] _5 = factors[3];
 wire[13:0] _6;
 assign _6 = _4 * _5;
-/*latency*/ logic[13:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
 wire[26:0] _9;
 assign _9 = mul0 * mul1;
-/*latency*/ logic[26:0] __9_D2; always_ff @(posedge clk) begin __9_D2 <= _9; end
 wire[26:0] _12;
 assign _12 = product + add_to;
+/*latency*/ logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
+/*latency*/ logic[13:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
+/*latency*/ logic[26:0] __9_D2; always_ff @(posedge clk) begin __9_D2 <= _9; end
 /*latency*/ logic[26:0] __12_D3; always_ff @(posedge clk) begin __12_D3 <= _12; end
 always_comb begin // combinatorial product
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
