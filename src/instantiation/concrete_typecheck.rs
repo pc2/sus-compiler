@@ -1260,9 +1260,10 @@ fn remove_unconditional_muxes(mux: &mut [MultiplexerSource]) {
                 match (range_a, range_b) {
                     (PathElemRange::All, _) | (_, PathElemRange::All) => {}
                     (PathElemRange::Range(range_a), PathElemRange::Range(range_b)) => {
-                        let bounds_intersect =
-                            range_a.start < range_a.end && range_b.start < range_a.end;
-                        if !bounds_intersect {
+                        let bounds_dont_intersect =
+                            range_a.start >= range_b.end || range_b.start >= range_a.end;
+
+                        if !bounds_dont_intersect {
                             paths_intersect = false;
                         }
                     }
