@@ -1927,3 +1927,17 @@ module UnknownSizeArraySynth {
 
 	int result = MY_INTS[idx]
 }
+
+module TestIntersectingValues {
+	output int[2] values_intersect
+	output int[2] values_nointersect
+	
+	action a {
+		values_intersect[0] = 0
+		values_nointersect[0] = 0
+	}
+	action b {
+		values_intersect[0] = 1
+		values_nointersect[1] = 1
+	}
+}

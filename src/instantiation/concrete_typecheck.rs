@@ -1243,38 +1243,43 @@ impl RealWirePathElem {
     }
 }
 
-/// Technically an N^2 algorithm over the assignments. Let's hope the user doens't use too many.
-fn remove_unconditional_muxes(mux: &mut [MultiplexerSource]) {
-    let mut any_paths_intersect = false;
+fn paths_intersect(a: &[RealWirePathElem], b: &[RealWirePathElem]) -> bool {
+    for (path_a, path_b) in a.iter().zip(b.iter()) {
+        let range_a = path_a.get_path_elem_range();
+        let range_b = path_b.get_path_elem_range();
+
+        match (range_a, range_b) {
+            (PathElemRange::All, _) | (_, PathElemRange::All) => {}
+            (PathElemRange::Range(range_a), PathElemRange::Range(range_b)) => {
+                let bounds_dont_intersect =
+                    range_a.start >= range_b.end || range_b.start >= range_a.end;
+
+                if bounds_dont_intersect {
+                    return false;
+                }
+            }
+        }
+    }
+    true
+}
+
+fn any_paths_intersect(mux: &[MultiplexerSource]) -> bool {
     for (a_idx, a) in mux.iter().enumerate() {
         for (b_idx, b) in mux.iter().enumerate() {
             if a_idx == b_idx {
                 continue;
             }
-
-            let mut paths_intersect = true;
-            for (path_a, path_b) in a.to_path.iter().zip(b.to_path.iter()) {
-                let range_a = path_a.get_path_elem_range();
-                let range_b = path_b.get_path_elem_range();
-
-                match (range_a, range_b) {
-                    (PathElemRange::All, _) | (_, PathElemRange::All) => {}
-                    (PathElemRange::Range(range_a), PathElemRange::Range(range_b)) => {
-                        let bounds_dont_intersect =
-                            range_a.start >= range_b.end || range_b.start >= range_a.end;
-
-                        if !bounds_dont_intersect {
-                            paths_intersect = false;
-                        }
-                    }
-                }
-            }
-            if paths_intersect {
-                any_paths_intersect = true;
+            if paths_intersect(&a.to_path, &b.to_path) {
+                return true;
             }
         }
     }
-    if any_paths_intersect {
+    false
+}
+
+/// Technically an N^2 algorithm over the assignments. Let's hope the user doens't use too many.
+fn remove_unconditional_muxes(mux: &mut [MultiplexerSource]) {
+    if !any_paths_intersect(mux) {
         for m in mux {
             m.condition = Box::new([]);
         }

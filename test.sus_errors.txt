@@ -190,6 +190,7 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestNexts #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestUnknownSizeArray #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated UnknownSizeArraySynth #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TestIntersectingValues #()
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test.sus:26:6 ]
     │
