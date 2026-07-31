@@ -1931,13 +1931,16 @@ module UnknownSizeArraySynth {
 module TestIntersectingValues {
 	output int[2] values_intersect
 	output int[2] values_nointersect
+	output state int[2] state_values_nointersect
 	
 	action a {
 		values_intersect[0] = 0
 		values_nointersect[0] = 0
+		state_values_nointersect[0] = 0
 	}
 	action b {
 		values_intersect[0] = 1
 		values_nointersect[1] = 1
+		state_values_nointersect[1] = 1
 	}
 }

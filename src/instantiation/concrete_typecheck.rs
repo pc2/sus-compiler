@@ -1176,13 +1176,13 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
     /// Remove effectively unconditional muxes. This could be made optional, if so desired at some point
     fn remove_unconditional_muxes(&mut self) {
         for (_, w) in &mut self.wires {
-            let RealWireDataSource::Multiplexer {
-                is_state: _,
-                sources,
-            } = &mut w.source
-            else {
+            let RealWireDataSource::Multiplexer { is_state, sources } = &mut w.source else {
                 continue;
             };
+
+            if is_state.is_some() {
+                continue; // Can't remove conditional assigns from state vars
+            }
 
             remove_unconditional_muxes(sources);
         }

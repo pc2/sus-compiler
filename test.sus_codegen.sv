@@ -3,6 +3,7 @@ module TestIntersectingValues(
 	/* clock */ input clk,
 	output /*mux_wire*/ logic[0:0] values_intersect[0:1],
 	output /*mux_wire*/ logic[0:0] values_nointersect[0:1],
+	output /*state*/ logic[0:0] state_values_nointersect[0:1],
 	input wire a,
 	input wire b
 );
@@ -18,6 +19,10 @@ always_comb begin // combinatorial values_nointersect
 	values_nointersect = '{1'dx, 1'dx};
 	values_nointersect[0] = 1'd0;
 	values_nointersect[1] = 1'd1;
+end
+always_ff @(posedge clk) begin // state state_values_nointersect
+	if(a) state_values_nointersect[0] <= 1'd0;
+	if(b) state_values_nointersect[1] <= 1'd1;
 end
 endmodule // TestIntersectingValues #()
 
@@ -2289,7 +2294,7 @@ FromBits_T_type_int_FROM_0_TO_6 FromBits(
 	.value(_FromBits_value)
 );
 always_ff @(posedge clk) begin // state mem
-	mem[write_addr] <= _ToBits_bits;
+	if(push) mem[write_addr] <= _ToBits_bits;
 end
 always_ff @(posedge clk) begin // state read_addr
 	if(pop) read_addr <= _25;
@@ -4854,9 +4859,9 @@ always_ff @(posedge clk) begin // state st
 	if(!_2) if(!_10) if(!_15) if(_20) st <= 1'd0;
 end
 always_ff @(posedge clk) begin // state stored_packed
-	stored_packed[0] <= _4;
-	stored_packed[1] <= _5;
-	stored_packed[2] <= _6;
+	if(_2) stored_packed[0] <= _4;
+	if(_2) stored_packed[1] <= _5;
+	if(_2) stored_packed[2] <= _6;
 end
 endmodule // Unpack4 #()
 
