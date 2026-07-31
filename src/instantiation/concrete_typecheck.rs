@@ -1,3 +1,5 @@
+use std::{collections::btree_map::Range, ops::RangeBounds};
+
 use super::*;
 
 use ibig::IBig;
@@ -1168,6 +1170,22 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 }
             }
         }
+        self.remove_unconditional_muxes();
+    }
+
+    /// Remove effectively unconditional muxes. This could be made optional, if so desired at some point
+    fn remove_unconditional_muxes(&mut self) {
+        for (_, w) in &mut self.wires {
+            let RealWireDataSource::Multiplexer {
+                is_state: _,
+                sources,
+            } = &mut w.source
+            else {
+                continue;
+            };
+
+            remove_unconditional_muxes(sources);
+        }
     }
 
     fn finalize_partial_bounds(path: &mut [RealWirePathElem], mut typ: &ConcreteType) {
@@ -1197,6 +1215,67 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     }
                 }
             }
+        }
+    }
+}
+
+enum PathElemRange {
+    All,
+    Range(std::ops::Range<IBig>),
+}
+
+impl RealWirePathElem {
+    fn get_path_elem_range(&self) -> PathElemRange {
+        match self {
+            RealWirePathElem::Index { .. } | RealWirePathElem::PartSelect { .. } => {
+                PathElemRange::All
+            }
+            RealWirePathElem::ConstIndex { span: _, idx } => {
+                PathElemRange::Range(idx.clone()..(idx + 1))
+            }
+            RealWirePathElem::Slice { span: _, bounds } => {
+                let PartialBound::Known(from, to) = bounds else {
+                    unreachable!("Bounds have been set to Known by finalize_partial_bounds");
+                };
+                PathElemRange::Range(from.clone()..to.clone())
+            }
+        }
+    }
+}
+
+/// Technically an N^2 algorithm over the assignments. Let's hope the user doens't use too many.
+fn remove_unconditional_muxes(mux: &mut [MultiplexerSource]) {
+    let mut any_paths_intersect = false;
+    for (a_idx, a) in mux.iter().enumerate() {
+        for (b_idx, b) in mux.iter().enumerate() {
+            if a_idx == b_idx {
+                continue;
+            }
+
+            let mut paths_intersect = true;
+            for (path_a, path_b) in a.to_path.iter().zip(b.to_path.iter()) {
+                let range_a = path_a.get_path_elem_range();
+                let range_b = path_b.get_path_elem_range();
+
+                match (range_a, range_b) {
+                    (PathElemRange::All, _) | (_, PathElemRange::All) => {}
+                    (PathElemRange::Range(range_a), PathElemRange::Range(range_b)) => {
+                        let bounds_intersect =
+                            range_a.start < range_a.end && range_b.start < range_a.end;
+                        if !bounds_intersect {
+                            paths_intersect = false;
+                        }
+                    }
+                }
+            }
+            if paths_intersect {
+                any_paths_intersect = true;
+            }
+        }
+    }
+    if any_paths_intersect {
+        for m in mux {
+            m.condition = Box::new([]);
         }
     }
 }
