@@ -8,6 +8,7 @@ mod concrete_typecheck;
 mod execute;
 mod final_checks;
 mod instantiator;
+mod post_processing;
 mod unique_names;
 
 pub use instantiator::Instantiator;

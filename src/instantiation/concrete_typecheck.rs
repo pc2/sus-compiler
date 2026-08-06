@@ -1,5 +1,3 @@
-use std::{collections::btree_map::Range, ops::RangeBounds};
-
 use super::*;
 
 use ibig::IBig;
@@ -133,10 +131,10 @@ pub struct MutableContext<'inst> {
 
 #[ouroboros::self_referencing]
 pub struct ModuleTypingSuperContext<'l> {
-    ctx: ModuleTypingContext<'l>,
+    pub ctx: ModuleTypingContext<'l>,
     #[borrows(ctx)]
     #[not_covariant]
-    mutable_state: MutableContext<'this>,
+    pub mutable_state: MutableContext<'this>,
 }
 
 impl<'l> ModuleTypingSuperContext<'l> {
@@ -204,6 +202,7 @@ impl<'l> ModuleTypingSuperContext<'l> {
 
         ctx.compute_latencies();
         ctx.finalize();
+        ctx.post_process();
         ctx
     }
 }
@@ -1126,31 +1125,6 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         }
     }
     fn finalize(&mut self) {
-        for w_id in self.wires.id_range() {
-            let w = &mut self.wires[w_id];
-            match &mut w.source {
-                RealWireDataSource::Multiplexer { sources, is_state } => {
-                    for s in sources {
-                        Self::finalize_partial_bounds(&mut s.to_path, &w.typ);
-                    }
-                    if let Some(is_state) = is_state {
-                        is_state.size_unsized_arrays(&w.typ);
-                    }
-                }
-                RealWireDataSource::Select { root, .. } => {
-                    let root_id = *root;
-                    let target_id = w_id;
-                    let [target, root] = self.wires.get_disjoint_mut([target_id, root_id]).unwrap();
-                    let_unwrap!(
-                        RealWireDataSource::Select { root: _, path },
-                        &mut target.source
-                    );
-                    Self::finalize_partial_bounds(path, &root.typ);
-                }
-                _ => {}
-            }
-        }
-
         for (_, sm) in &mut self.submodules {
             if let Some(instance) = sm.instance.get() {
                 for (_port_id, concrete_port, connecting_wire) in
@@ -1169,119 +1143,6 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     connecting_wire.typ.clone_from(&instance_wire.typ);
                 }
             }
-        }
-        self.remove_unconditional_muxes();
-    }
-
-    /// Remove effectively unconditional muxes. This could be made optional, if so desired at some point
-    fn remove_unconditional_muxes(&mut self) {
-        for (_, w) in &mut self.wires {
-            let RealWireDataSource::Multiplexer { is_state, sources } = &mut w.source else {
-                continue;
-            };
-
-            if is_state.is_some() {
-                continue; // Can't remove conditional assigns from state vars
-            }
-
-            remove_unconditional_muxes(sources);
-        }
-    }
-
-    fn finalize_partial_bounds(path: &mut [RealWirePathElem], mut typ: &ConcreteType) {
-        for pe in path {
-            match pe {
-                RealWirePathElem::Index { .. } | RealWirePathElem::ConstIndex { .. } => {
-                    typ = &typ.unwrap_array().0;
-                }
-                RealWirePathElem::PartSelect { .. } => {
-                    typ = &typ.unwrap_array().0;
-                }
-                RealWirePathElem::Slice { bounds, .. } => {
-                    // TODO: #88: Variable base arrays, that's why this is part here
-                    let (new_typ, sz) = typ.unwrap_array();
-                    typ = new_typ;
-
-                    if let Some(sz) = sz.get() {
-                        let sz = sz.unwrap_integer();
-                        *bounds = match std::mem::replace(bounds, PartialBound::WholeSlice) {
-                            PartialBound::Known(from, to) => PartialBound::Known(from, to),
-                            PartialBound::From(from) => PartialBound::Known(from, sz.clone()),
-                            PartialBound::To(to) => PartialBound::Known(IBig::from(0), to),
-                            PartialBound::WholeSlice => {
-                                PartialBound::Known(IBig::from(0), sz.clone())
-                            }
-                        };
-                    }
-                }
-            }
-        }
-    }
-}
-
-enum PathElemRange {
-    All,
-    Range(std::ops::Range<IBig>),
-}
-
-impl RealWirePathElem {
-    fn get_path_elem_range(&self) -> PathElemRange {
-        match self {
-            RealWirePathElem::Index { .. } | RealWirePathElem::PartSelect { .. } => {
-                PathElemRange::All
-            }
-            RealWirePathElem::ConstIndex { span: _, idx } => {
-                PathElemRange::Range(idx.clone()..(idx + 1))
-            }
-            RealWirePathElem::Slice { span: _, bounds } => {
-                let PartialBound::Known(from, to) = bounds else {
-                    unreachable!("Bounds have been set to Known by finalize_partial_bounds");
-                };
-                PathElemRange::Range(from.clone()..to.clone())
-            }
-        }
-    }
-}
-
-fn paths_intersect(a: &[RealWirePathElem], b: &[RealWirePathElem]) -> bool {
-    for (path_a, path_b) in a.iter().zip(b.iter()) {
-        let range_a = path_a.get_path_elem_range();
-        let range_b = path_b.get_path_elem_range();
-
-        match (range_a, range_b) {
-            (PathElemRange::All, _) | (_, PathElemRange::All) => {}
-            (PathElemRange::Range(range_a), PathElemRange::Range(range_b)) => {
-                let bounds_dont_intersect =
-                    range_a.start >= range_b.end || range_b.start >= range_a.end;
-
-                if bounds_dont_intersect {
-                    return false;
-                }
-            }
-        }
-    }
-    true
-}
-
-fn any_paths_intersect(mux: &[MultiplexerSource]) -> bool {
-    for (a_idx, a) in mux.iter().enumerate() {
-        for (b_idx, b) in mux.iter().enumerate() {
-            if a_idx == b_idx {
-                continue;
-            }
-            if paths_intersect(&a.to_path, &b.to_path) {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-/// Technically an N^2 algorithm over the assignments. Let's hope the user doens't use too many.
-fn remove_unconditional_muxes(mux: &mut [MultiplexerSource]) {
-    if !any_paths_intersect(mux) {
-        for m in mux {
-            m.condition = Box::new([]);
         }
     }
 }
