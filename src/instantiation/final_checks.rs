@@ -8,8 +8,10 @@ use ibig::IBig;
 
 use crate::{
     errors::DiagnosticBuilder,
-    instantiation::path_ranges::PathRange,
-    instantiation::{ModuleTypingContext, RealWire, RealWireDataSource, RealWirePathElem},
+    instantiation::{
+        IsPort, ModuleTypingContext, MultiplexerSource, RealWire, RealWireDataSource,
+        RealWirePathElem, paths::PathRange,
+    },
     linker::IsExtern,
     prelude::*,
     typing::{
@@ -287,6 +289,43 @@ impl<'l> ModuleTypingContext<'l> {
                 self.errors.warn(
                     w.get_span(self.link_info),
                     format!("{wire_name} is never written to."),
+                );
+            } else {
+                self.lint_wire_is_effectively_const(w, sources, slots_are_written_to);
+            }
+        }
+    }
+
+    /// Second line of defence after [Self::lint_wire_is_never_written_to]. Detects if a wire is only ever written to with a constant. Can help to
+    fn lint_wire_is_effectively_const(
+        &self,
+        w: &RealWire,
+        mux_inputs: &[MultiplexerSource],
+        slots_are_written_to: PathRange<usize>,
+    ) {
+        if matches!(&w.is_port, IsPort::SubmodulePort(..)) {
+            // It may be unavoidable to write a constant to a submodule port if that's what you need.
+            // This warning is more meant to catch local wires being effectively constant, as that has an obvious resolution. (Mark as 'gen')
+            return;
+        }
+        if slots_are_written_to.all(&mut |v| *v == 1)
+            && mux_inputs.iter().all(|input| {
+                let from_w = &self.wires[input.from];
+                matches!(&from_w.source, RealWireDataSource::Constant { .. })
+            })
+        {
+            // Produce error!
+            let wire_name = &w.name;
+            let mut error = self.errors.warn(
+                w.get_span(self.link_info),
+                format!("{wire_name} is effectively constant. Declare this wire as `gen` to make this explicit."),
+            );
+            for input in mux_inputs {
+                let from_w = &self.wires[input.from];
+                let_unwrap!(RealWireDataSource::Constant { value }, &from_w.source);
+                error.info(
+                    input.write_span,
+                    format!("{wire_name}{} = {value}", self.display_path(&input.to_path)),
                 );
             }
         }

@@ -1238,7 +1238,7 @@ impl ModuleTypingContext<'_> {
     fn name(&self, wire_id: WireID) -> impl Display {
         self.wires[wire_id].name.green()
     }
-    fn display_path(&self, path: &[RealWirePathElem]) -> impl Display {
+    pub fn display_path(&self, path: &[RealWirePathElem]) -> impl Display {
         FmtWrapper(move |f| {
             for p in path {
                 match p {

@@ -5,11 +5,11 @@
 //! As for typing, it only instantiates written types and leaves the rest for further typechecking.
 
 use std::borrow::Cow;
-use std::fmt::Display;
-use std::ops::{Deref, Index, IndexMut, Range};
+use std::ops::{Deref, Index, IndexMut};
 
 use crate::errors::CompileError;
-use crate::to_string::{display_join, display_maybe};
+use crate::instantiation::paths::{GenerativeWireRefPathElem, make_array_bounds};
+use crate::to_string::display_join;
 use crate::{
     flattening::*,
     instantiation::*,
@@ -86,94 +86,6 @@ macro_rules! caught_by_typecheck {
     };
 }
 
-enum GenerativeWireRefPathElem {
-    ArrayAccess {
-        idx: IBig,
-        span: Span,
-    },
-    Slice {
-        from: Option<IBig>,
-        to: Option<IBig>,
-        span: Span,
-    },
-}
-impl GenerativeWireRefPathElem {
-    pub fn display_path(path: &[GenerativeWireRefPathElem]) -> impl Display {
-        FmtWrapper(move |f| {
-            for p in path {
-                match p {
-                    GenerativeWireRefPathElem::ArrayAccess { idx, span: _ } => {
-                        write!(f, "[{idx}]")?
-                    }
-                    GenerativeWireRefPathElem::Slice { from, to, span: _ } => {
-                        let from = display_maybe(from.as_ref(), |f, from| from.fmt(f));
-                        let to = display_maybe(to.as_ref(), |f, to| to.fmt(f));
-                        write!(f, "[{from}:{to}]")?
-                    }
-                }
-            }
-            Ok(())
-        })
-    }
-}
-
-fn make_array_bounds<'v>(
-    from_maybe: Option<IBig>,
-    to_maybe: Option<IBig>,
-    mut values: impl Iterator<Item = &'v Value>,
-    span: Span,
-) -> ExecutionResult<Range<usize>> {
-    if let Some(first) = values.next() {
-        let_unwrap!(Value::Array(arr), first);
-
-        let arr_sz = arr.len();
-
-        let is_dynamic_range = from_maybe.is_none() || to_maybe.is_none();
-
-        let from = from_maybe.unwrap_or_else(|| IBig::from(0));
-        let to = to_maybe.unwrap_or_else(|| IBig::from(arr_sz));
-
-        if from > to {
-            return Err(CompileError::error(
-                span,
-                format!("Slice {from}:{to} has a negative length."),
-            ));
-        }
-
-        let (from_valid, to_valid) = match (usize::try_from(&from), usize::try_from(&to)) {
-            (Ok(from), Ok(to)) if to <= arr_sz => (from, to), // && from >= 0, but it's usize
-            _ => {
-                let e = format!(
-                    "Slice {from}:{to} is out of bounds. The size of this array is {arr_sz}"
-                );
-                return Err(CompileError::error(span, e));
-            }
-        };
-
-        for v in values {
-            let_unwrap!(Value::Array(arr), v);
-
-            let other_arr_sz = arr.len();
-
-            if is_dynamic_range && other_arr_sz != arr_sz {
-                let e = "Using a variable index on a jagged array".to_string();
-                return Err(CompileError::error(span, e));
-            }
-
-            if to_valid > other_arr_sz {
-                let e = format!(
-                    "Slice {from}:{to} is out of bounds. The size of this array is {other_arr_sz}"
-                );
-                return Err(CompileError::error(span, e));
-            }
-        }
-
-        Ok(from_valid..to_valid)
-    } else {
-        Ok(0..0)
-    }
-}
-
 pub enum WireOrInt<'i> {
     Wire(WireID),
     Int(&'i IBig),
@@ -208,90 +120,10 @@ impl GenerationState<'_> {
         conn_path: &[WireReferencePathElement],
         to_write: Value,
     ) -> ExecutionResult<()> {
-        fn array_access<'t>(
-            tgt_ref: &'t mut Value,
-            idx: &IBig,
-            span: Span,
-        ) -> (ExecutionResult<()>, &'t mut Value) {
-            let idx_as_usize = usize::try_from(idx).ok();
-
-            let Value::Array(tgt_arr) = tgt_ref else {
-                unreachable!()
-            };
-            let arr_sz = tgt_arr.len();
-
-            if idx_as_usize.and_then(|idx| tgt_arr.get_mut(idx)).is_some() {
-                // Once we know we're safe, we have to do the little dance again, such that this time we *consume* tgt_ref
-                let Value::Array(tgt_arr) = tgt_ref else {
-                    unreachable!()
-                };
-                (Ok(()), tgt_arr.get_mut(idx_as_usize.unwrap()).unwrap())
-            } else {
-                let err = Err(CompileError::error(
-                    span,
-                    format!("Index {idx} out of bounds for array of size {arr_sz}"),
-                ));
-                (err, tgt_ref)
-            }
-        }
-
         // must be an array, from earlier typechecking
-
-        let mut cur_targets: Vec<(&mut Value, Value)> = vec![(target, to_write)];
         let executed_path = self.execute_path(conn_path)?;
 
-        for path_elem in executed_path {
-            match path_elem {
-                GenerativeWireRefPathElem::ArrayAccess { idx, span } => {
-                    for target in &mut cur_targets {
-                        replace_with::replace_with_or_abort_and_return(&mut target.0, |tgt| {
-                            array_access(tgt, &idx, span)
-                        })?;
-                    }
-                }
-                GenerativeWireRefPathElem::Slice { from, to, span } => {
-                    let slice =
-                        make_array_bounds(from, to, cur_targets.iter().map(|t| &*t.0), span)?;
-
-                    let new_len = cur_targets.len() * slice.len();
-
-                    let mut new_targets = Vec::with_capacity(new_len);
-
-                    for (target, value) in cur_targets {
-                        let_unwrap!(Value::Array(target), target);
-                        let Value::Array(value) = value else {
-                            unreachable!()
-                        };
-
-                        let slice_len = slice.len();
-                        let from_len = value.len();
-                        if from_len != slice_len {
-                            let from = slice.start;
-                            let to = slice.end;
-                            return Err(CompileError::error(
-                                span,
-                                format!(
-                                    "Attempting to write to this slice {from}:{to} (length {slice_len}) with an array of length {from_len}."
-                                ),
-                            ));
-                        }
-                        for new_pair in zip_eq(
-                            target.get_slice_mut(slice.clone()).unwrap(),
-                            value.into_iter(),
-                        ) {
-                            new_targets.push(new_pair)
-                        }
-                    }
-
-                    cur_targets = new_targets;
-                }
-            }
-        }
-
-        for (t, f) in cur_targets {
-            *t = f;
-        }
-        Ok(())
+        target.write(executed_path, to_write)
     }
     fn read_from_path(
         &self,
@@ -462,7 +294,7 @@ impl GenerationState<'_> {
                     let from = self.get_generation_integer(*from);
                     let width = self.get_generation_integer(*width);
 
-                    let range = direction.range_from(from, width);
+                    let range = direction.range_from(from.clone(), width.clone());
                     GenerativeWireRefPathElem::Slice {
                         from: Some(range.from),
                         to: Some(range.to),

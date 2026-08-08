@@ -858,12 +858,32 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                         ┬  
      │                         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Warning: o is effectively constant. Declare this wire as `gen` to make this explicit.
+     ╭─[ test.sus:609:26 ]
+     │
+ 609 │     interface out : -> bool o'0
+     │                             ┬  
+     │                             ╰── o is effectively constant. Declare this wire as `gen` to make this explicit.
+ 610 │     o = true
+     │     ┬  
+     │     ╰── o = true
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:613:40 ]
      │
  613 │     interface in : int#(FROM: 0, TO: 100) i'0
      │                                           ┬  
      │                                           ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: o is effectively constant. Declare this wire as `gen` to make this explicit.
+     ╭─[ test.sus:614:25 ]
+     │
+ 614 │     interface out : -> int o'0
+     │                            ┬  
+     │                            ╰── o is effectively constant. Declare this wire as `gen` to make this explicit.
+ 615 │     o = 1
+     │     ┬  
+     │     ╰── o = 1
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:619:31 ]
@@ -878,6 +898,16 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  625 │     interface offset_backwards : bool i'0 -> bool o'-5
      │                                       ┬  
      │                                       ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: o is effectively constant. Declare this wire as `gen` to make this explicit.
+     ╭─[ test.sus:625:51 ]
+     │
+ 625 │     interface offset_backwards : bool i'0 -> bool o'-5
+     │                                                   ┬  
+     │                                                   ╰── o is effectively constant. Declare this wire as `gen` to make this explicit.
+ 626 │     o = true
+     │     ┬  
+     │     ╰── o = true
 ─────╯
 Warning: Not Instantiating dual_port_mem #() due to abstract typing errors
      ╭─[ test.sus:629:8 ]
@@ -1608,6 +1638,24 @@ Error: Could not fully figure out the type of parameter T. '?[...]'
      │     ─────────┬─────────  
      │              ╰─────────── Could not fully figure out the type of parameter T. '?[...]'
 ─────╯
+Warning: o is effectively constant. Declare this wire as `gen` to make this explicit.
+     ╭─[ test.sus:786:13 ]
+     │
+ 786 │     output int o = beep
+     │     ──────┬────┬  
+     │           ╰─────── o = 3
+     │                │  
+     │                ╰── o is effectively constant. Declare this wire as `gen` to make this explicit.
+─────╯
+Warning: o is effectively constant. Declare this wire as `gen` to make this explicit.
+     ╭─[ test.sus:786:13 ]
+     │
+ 786 │     output int o = beep
+     │     ──────┬────┬  
+     │           ╰─────── o = 4
+     │                │  
+     │                ╰── o is effectively constant. Declare this wire as `gen` to make this explicit.
+─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
      ╭─[ test.sus:791:25 ]
      │
@@ -1768,6 +1816,20 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  871 │     int[2] inArr
      │            ──┬──  
      │              ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: inArr is effectively constant. Declare this wire as `gen` to make this explicit.
+     ╭─[ test.sus:871:9 ]
+     │
+ 871 │     int[2] inArr
+     │            ──┬──  
+     │              ╰──── inArr is effectively constant. Declare this wire as `gen` to make this explicit.
+     │ 
+ 873 │     inArr[0] = 2387
+     │     ────┬───  
+     │         ╰───── inArr[0] = 2387
+ 874 │     inArr[1] = 786823
+     │     ────┬───  
+     │         ╰───── inArr[1] = 786823
 ─────╯
 Warning: Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
      ╭─[ test.sus:878:9 ]
@@ -2203,6 +2265,28 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │            ─┬─  
      │             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Warning: arr is effectively constant. Declare this wire as `gen` to make this explicit.
+     ╭─[ test.sus:965:9 ]
+     │
+ 965 │     int[5] arr
+     │            ─┬─  
+     │             ╰─── arr is effectively constant. Declare this wire as `gen` to make this explicit.
+ 966 │     arr[0] = 3
+     │     ───┬──  
+     │        ╰──── arr[0] = 3
+ 967 │     arr[1] = 3
+     │     ───┬──  
+     │        ╰──── arr[1] = 3
+ 968 │     arr[2] = 3
+     │     ───┬──  
+     │        ╰──── arr[2] = 3
+ 969 │     arr[3] = 3
+     │     ───┬──  
+     │        ╰──── arr[3] = 3
+ 970 │     arr[4] = 3
+     │     ───┬──  
+     │        ╰──── arr[4] = 3
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:974:6 ]
      │
@@ -2437,6 +2521,15 @@ Error: Used 'when' in a generative context, use 'if' instead
       │            ──┬─  
       │              ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
+Warning: shared is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1110:7 ]
+      │
+ 1110 │     bool shared = true
+      │     ─────┬──┬──  
+      │          ╰─────── shared = true
+      │             │    
+      │             ╰──── shared is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
 Error: There is no unique assignment for weakly connected ports. Starting from the strongly connected port group (c'1, d'1) via outputs to 
 (a'0, b'0) via inputs to 
 (c'0, d'0) 
@@ -2612,6 +2705,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1193 │     bool in_spec'0 = in_port
       │          ───┬───  
       │             ╰───── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: out_spec is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1195:7 ]
+      │
+ 1195 │     bool out_spec'5 = false
+      │     ───────┬─┬─────  
+      │            ╰───────── out_spec = false
+      │              │       
+      │              ╰─────── out_spec is effectively constant. Declare this wire as `gen` to make this explicit.
 ──────╯
 Error: Some submodule parameters of infer_me_with_poison_output were still unknown: infer_me_with_poison_output #(N: ?)
 N can be inferred as an integer value that is as high as possible, without violating any of the following constraints:
@@ -3079,6 +3181,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1363 │     int[5] vs = [1, 2, 3, 4, 5]
       │            ─┬  
       │             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: vs is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1363:9 ]
+      │
+ 1363 │     int[5] vs = [1, 2, 3, 4, 5]
+      │     ────┬───┬  
+      │         ╰────── vs = [1, 2, 3, 4, 5]
+      │             │  
+      │             ╰── vs is effectively constant. Declare this wire as `gen` to make this explicit.
 ──────╯
 Warning: Not Instantiating use_FIFO #() due to abstract typing errors
       ╭─[ test.sus:1367:8 ]
@@ -3614,6 +3725,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │           ─┬  
       │            ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: ff is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1526:11 ]
+      │
+ 1526 │     float ff = f
+      │     ────┬──┬  
+      │         ╰───── ff = 100000000.0
+      │            │  
+      │            ╰── ff is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
 Warning: Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
       ╭─[ test.sus:1527:11 ]
       │
@@ -3628,6 +3748,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │           ─┬─  
       │            ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: fff is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1527:11 ]
+      │
+ 1527 │     float fff = 0.0625
+      │     ────┬──┬─  
+      │         ╰────── fff = 0.0625
+      │            │   
+      │            ╰─── fff is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
 Warning: Clock 'Unconnected_clock_3' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
       ╭─[ test.sus:1529:14 ]
       │
@@ -3641,6 +3770,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1529 │     float[5] many_floats = [0.7, 0.9, -0.7, -0.9, 0.1]
       │              ─────┬─────  
       │                   ╰─────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: many_floats is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1529:14 ]
+      │
+ 1529 │     float[5] many_floats = [0.7, 0.9, -0.7, -0.9, 0.1]
+      │     ──────────┬───┬─────  
+      │               ╰─────────── many_floats = [0.7, 0.9, -0.7, -0.9, 0.1]
+      │                   │       
+      │                   ╰─────── many_floats is effectively constant. Declare this wire as `gen` to make this explicit.
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1533:18 ]
@@ -3663,6 +3801,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │              ─┬  
       │               ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: fs is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1536:14 ]
+      │
+ 1536 │     float[5] fs = floats
+      │     ─────┬────┬  
+      │          ╰─────── fs = [0.3, 0.4, 0.2, 0.3, 0.5]
+      │               │  
+      │               ╰── fs is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
 Warning: Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
       ╭─[ test.sus:1538:9 ]
       │
@@ -3676,6 +3823,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1538 │     int y = 3
       │         ┬  
       │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: y is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1538:9 ]
+      │
+ 1538 │     int y = 3
+      │     ──┬─┬  
+      │       ╰──── y = 3
+      │         │  
+      │         ╰── y is effectively constant. Declare this wire as `gen` to make this explicit.
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1539:11 ]
@@ -3790,6 +3946,33 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                                ┬  
       │                                ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: u is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1568:26 ]
+      │
+ 1568 │          int#(FROM: 0, TO: SZ) u = 0
+      │          ───────────┬──────────┬  
+      │                     ╰───────────── u = 0
+      │                                │  
+      │                                ╰── u is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: u_2 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1568:26 ]
+      │
+ 1568 │          int#(FROM: 0, TO: SZ) u = 0
+      │          ───────────┬──────────┬  
+      │                     ╰───────────── u_2 = 0
+      │                                │  
+      │                                ╰── u_2 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: u_3 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1568:26 ]
+      │
+ 1568 │          int#(FROM: 0, TO: SZ) u = 0
+      │          ───────────┬──────────┬  
+      │                     ╰───────────── u_3 = 0
+      │                                │  
+      │                                ╰── u_3 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1569:8 ]
       │
@@ -3810,6 +3993,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1575 │     bool[50] b = 50'b010100_100110
       │              ┬  
       │              ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: b is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1575:11 ]
+      │
+ 1575 │     bool[50] b = 50'b010100_100110
+      │     ─────┬───┬  
+      │          ╰────── b = 50'b00000000000000000000000000000000000000010100100110
+      │              │  
+      │              ╰── b is effectively constant. Declare this wire as `gen` to make this explicit.
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1576:16 ]
@@ -3846,6 +4038,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │               ─┬  
       │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: ob is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1581:12 ]
+      │
+ 1581 │     bool[100] ob = 100'o035434_074647
+      │     ──────┬────┬  
+      │           ╰─────── ob = 100'b0000000000000000000000000000000000000000000000000000000000000000000011101100011100000111100110100111
+      │                │  
+      │                ╰── ob is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
       ╭─[ test.sus:1585:8 ]
       │
@@ -3859,6 +4060,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1585 │     float x = 0.5
       │           ┬  
       │           ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: x is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1585:8 ]
+      │
+ 1585 │     float x = 0.5
+      │     ───┬──┬  
+      │        ╰───── x = 0.5
+      │           │  
+      │           ╰── x is effectively constant. Declare this wire as `gen` to make this explicit.
 ──────╯
 Warning: Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
       ╭─[ test.sus:1586:8 ]
@@ -3874,6 +4084,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │           ┬  
       │           ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: y is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1586:8 ]
+      │
+ 1586 │     float y = 0.5e9
+      │     ───┬──┬  
+      │        ╰───── y = 500000000.0
+      │           │  
+      │           ╰── y is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
 Warning: Clock 'Unconnected_clock_3' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
       ╭─[ test.sus:1587:9 ]
       │
@@ -3888,6 +4107,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │            ┬  
       │            ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: a is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1587:9 ]
+      │
+ 1587 │     double a = 0.5d
+      │     ────┬──┬  
+      │         ╰───── a = 0.5
+      │            │  
+      │            ╰── a is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
 Warning: Clock 'Unconnected_clock_4' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
       ╭─[ test.sus:1588:9 ]
       │
@@ -3901,6 +4129,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1588 │     double b = 0.5e9d
       │            ┬  
       │            ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: b is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1588:9 ]
+      │
+ 1588 │     double b = 0.5e9d
+      │     ────┬──┬  
+      │         ╰───── b = 500000000.0
+      │            │  
+      │            ╰── b is effectively constant. Declare this wire as `gen` to make this explicit.
 ──────╯
 Warning: Not Instantiating use_module_taking_strings #() due to abstract typing errors
       ╭─[ test.sus:1595:8 ]
@@ -3944,6 +4181,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │         ┬  
       │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: x is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1602:6 ]
+      │
+ 1602 │     int x = 0
+      │     ──┬─┬  
+      │       ╰──── x = 0
+      │         │  
+      │         ╰── x is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1603:10 ]
       │
@@ -3964,6 +4210,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1604 │     int[5] zero_sized_arr = [0, 0, 0, 0, 0]
       │            ───────┬──────  
       │                   ╰──────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: zero_sized_arr is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1604:9 ]
+      │
+ 1604 │     int[5] zero_sized_arr = [0, 0, 0, 0, 0]
+      │     ──────────┬───┬──────  
+      │               ╰──────────── zero_sized_arr = [0, 0, 0, 0, 0]
+      │                   │        
+      │                   ╰──────── zero_sized_arr is effectively constant. Declare this wire as `gen` to make this explicit.
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1605:13 ]
@@ -3986,12 +4241,30 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │            ────┬────  
       │                ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: make_real is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1606:9 ]
+      │
+ 1606 │     int[5] make_real = zero_sized_gen
+      │     ────────┬──┬────  
+      │             ╰───────── make_real = [0, 0, 0, 0, 0]
+      │                │      
+      │                ╰────── make_real is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1607:6 ]
       │
  1607 │     int addr = 4
       │         ──┬─  
       │           ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: addr is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1607:6 ]
+      │
+ 1607 │     int addr = 4
+      │     ────┬─┬─  
+      │         ╰───── addr = 4
+      │           │   
+      │           ╰─── addr is effectively constant. Declare this wire as `gen` to make this explicit.
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1608:6 ]
@@ -4203,12 +4476,30 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                            ┬  
       │                            ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: a is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1674:25 ]
+      │
+ 1674 │     int#(FROM: 10, TO: 11) a = 10
+      │     ────────────┬──────────┬  
+      │                 ╰───────────── a = 10
+      │                            │  
+      │                            ╰── a is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1675:23 ]
       │
  1675 │     int#(FROM: 3, TO: 4) b = 3
       │                          ┬  
       │                          ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: b is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1675:23 ]
+      │
+ 1675 │     int#(FROM: 3, TO: 4) b = 3
+      │     ───────────┬─────────┬  
+      │                ╰──────────── b = 3
+      │                          │  
+      │                          ╰── b is effectively constant. Declare this wire as `gen` to make this explicit.
 ──────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
       ╭─[ test.sus:1677:2 ]
@@ -4405,6 +4696,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │            ──┬──  
       │              ╰──── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: zeros is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1735:9 ]
+      │
+ 1735 │     int[2] zeros = [0, 0]
+      │     ──────┬──┬──  
+      │           ╰─────── zeros = [0, 0]
+      │              │    
+      │              ╰──── zeros is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
 Warning: Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
       ╭─[ test.sus:1736:30 ]
       │
@@ -4418,6 +4718,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1736 │     int#(FROM: -5, TO: 6)[2] vs = [0, 0]
       │                              ─┬  
       │                               ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: vs is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1736:30 ]
+      │
+ 1736 │     int#(FROM: -5, TO: 6)[2] vs = [0, 0]
+      │     ─────────────┬────────────┬  
+      │                  ╰─────────────── vs = [0, 0]
+      │                               │  
+      │                               ╰── vs is effectively constant. Declare this wire as `gen` to make this explicit.
 ──────╯
 Warning: Clock 'Unconnected_clock_3' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
       ╭─[ test.sus:1737:2 ]
@@ -4446,6 +4755,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1742 │     int[2] nums = [5, 9]
       │            ──┬─  
       │              ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: nums is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1742:9 ]
+      │
+ 1742 │     int[2] nums = [5, 9]
+      │     ─────┬───┬─  
+      │          ╰─────── nums = [5, 9]
+      │              │   
+      │              ╰─── nums is effectively constant. Declare this wire as `gen` to make this explicit.
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1743:9 ]
@@ -4721,6 +5039,186 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │            ┬  
       │            ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: j is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j = -10
+      │            │  
+      │            ╰── j is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_10 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_10 = -1
+      │            │  
+      │            ╰── j_10 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_11 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_11 = 0
+      │            │  
+      │            ╰── j_11 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_12 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_12 = 1
+      │            │  
+      │            ╰── j_12 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_13 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_13 = 2
+      │            │  
+      │            ╰── j_13 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_14 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_14 = 3
+      │            │  
+      │            ╰── j_14 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_15 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_15 = 4
+      │            │  
+      │            ╰── j_15 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_16 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_16 = 5
+      │            │  
+      │            ╰── j_16 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_17 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_17 = 6
+      │            │  
+      │            ╰── j_17 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_18 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_18 = 7
+      │            │  
+      │            ╰── j_18 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_19 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_19 = 8
+      │            │  
+      │            ╰── j_19 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_2 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_2 = -9
+      │            │  
+      │            ╰── j_2 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_20 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_20 = 9
+      │            │  
+      │            ╰── j_20 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_3 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_3 = -8
+      │            │  
+      │            ╰── j_3 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_4 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_4 = -7
+      │            │  
+      │            ╰── j_4 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_5 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_5 = -6
+      │            │  
+      │            ╰── j_5 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_6 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_6 = -5
+      │            │  
+      │            ╰── j_6 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_7 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_7 = -4
+      │            │  
+      │            ╰── j_7 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_8 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_8 = -3
+      │            │  
+      │            ╰── j_8 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: j_9 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1858:7 ]
+      │
+ 1858 │        int j = I
+      │        ──┬─┬  
+      │          ╰──── j_9 = -2
+      │            │  
+      │            ╰── j_9 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
 Error: Output clock 'this_clock_out' has no driver. output clocks require exactly one driving submodule.
       ╭─[ test.sus:1869:15 ]
       │
@@ -4832,6 +5330,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │         ┬  
       │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: x is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1893:6 ]
+      │
+ 1893 │     int x = 5
+      │     ──┬─┬  
+      │       ╰──── x = 5
+      │         │  
+      │         ╰── x is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1894:13 ]
       │
@@ -4922,6 +5429,36 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1928 │     int result = MY_INTS[idx]
       │         ───┬──  
       │            ╰──── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: values_nointersect is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1933:16 ]
+      │
+ 1933 │     output int[2] values_nointersect
+      │                   ─────────┬────────  
+      │                            ╰────────── values_nointersect is effectively constant. Declare this wire as `gen` to make this explicit.
+      │ 
+ 1938 │        values_nointersect[0] = 0
+      │        ──────────┬──────────  
+      │                  ╰──────────── values_nointersect[0] = 0
+      │ 
+ 1943 │        values_nointersect[1] = 1
+      │        ──────────┬──────────  
+      │                  ╰──────────── values_nointersect[1] = 1
+──────╯
+Warning: state_values_nointersect is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1934:22 ]
+      │
+ 1934 │     output state int[2] state_values_nointersect
+      │                         ────────────┬───────────  
+      │                                     ╰───────────── state_values_nointersect is effectively constant. Declare this wire as `gen` to make this explicit.
+      │ 
+ 1939 │        state_values_nointersect[0] = 0
+      │        ─────────────┬─────────────  
+      │                     ╰─────────────── state_values_nointersect[0] = 0
+      │ 
+ 1944 │        state_values_nointersect[1] = 1
+      │        ─────────────┬─────────────  
+      │                     ╰─────────────── state_values_nointersect[1] = 1
 ──────╯
 [ERROR sus_compiler::codegen] Cannot codegen generative #() due to errors!
 [ERROR sus_compiler::codegen] Cannot codegen assignment_producer #() due to errors!

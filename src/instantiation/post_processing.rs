@@ -1,7 +1,7 @@
 use super::*;
 
 use crate::{
-    instantiation::{ModuleTypingContext, path_ranges::PathRange},
+    instantiation::{ModuleTypingContext, paths::PathRange},
     util::zip_eq,
 };
 

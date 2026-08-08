@@ -8,7 +8,7 @@ mod concrete_typecheck;
 mod execute;
 mod final_checks;
 mod instantiator;
-mod path_ranges;
+mod paths;
 mod post_processing;
 mod unique_names;
 

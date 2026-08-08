@@ -19,6 +19,7 @@ use crate::{
 };
 
 use std::cell::OnceCell;
+use std::ops::{Add, Sub};
 
 pub use flatten::flatten_all_globals;
 use ibig::IBig;
@@ -513,14 +514,20 @@ pub enum PartSelectDirection {
 }
 
 impl PartSelectDirection {
-    pub fn range_from(&self, from: &IBig, width: &IBig) -> IntBounds<IBig> {
+    pub fn range_from<
+        IntT: Clone + Add<IntT, Output = IntT> + Sub<IntT, Output = IntT> + Add<usize, Output = IntT>,
+    >(
+        &self,
+        from: IntT,
+        width: IntT,
+    ) -> IntBounds<IntT> {
         match self {
             PartSelectDirection::Up => IntBounds {
                 from: from.clone(),
                 to: from + width,
             },
             PartSelectDirection::Down => IntBounds {
-                from: from - width + 1,
+                from: from.clone() - width + 1,
                 to: from + 1,
             },
         }
