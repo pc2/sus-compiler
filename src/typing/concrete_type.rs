@@ -367,6 +367,15 @@ impl IntBounds<&'_ IBig> {
     }
 }
 
+impl<T> IntBounds<T> {
+    pub fn as_ref(&self) -> IntBounds<&T> {
+        IntBounds {
+            from: &self.from,
+            to: &self.to,
+        }
+    }
+}
+
 impl std::fmt::Display for IntBounds<&'_ IBig> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let IntBounds { from, to } = self;

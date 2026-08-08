@@ -10,9 +10,7 @@ use ibig::IBig;
 
 use crate::{
     errors::DiagnosticBuilder,
-    instantiation::{
-        ModuleTypingContext, PartSelectDirection, RealWire, RealWireDataSource, RealWirePathElem,
-    },
+    instantiation::{ModuleTypingContext, RealWire, RealWireDataSource, RealWirePathElem},
     typing::{
         concrete_type::{ConcreteType, IntBounds},
         unifyable_cell::UniCell,
@@ -132,25 +130,14 @@ impl<'l> ModuleTypingContext<'l> {
 
                     let from_bounds = from_wire.typ.unwrap_int_bounds();
 
-                    let tmp: IBig; // For fixing the lifetime for access_bounds
-                    let access_bounds = match direction {
-                        PartSelectDirection::Up => {
-                            tmp = from_bounds.to + width - 1;
-                            IntBounds {
-                                from: from_bounds.from,
-                                to: &tmp,
-                            }
-                        }
-                        PartSelectDirection::Down => {
-                            tmp = from_bounds.from - width + 1;
-                            IntBounds {
-                                from: &tmp,
-                                to: from_bounds.to,
-                            }
-                        }
-                    };
+                    let access_bounds = direction.range_from_range(from_bounds, width);
                     let span = span.inner_span();
-                    self.boundscheck_array(access_bounds, arr_sz, span, "indexed part-select");
+                    self.boundscheck_array(
+                        access_bounds.as_ref(),
+                        arr_sz,
+                        span,
+                        "indexed part-select",
+                    );
                 }
             }
         }

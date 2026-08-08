@@ -1,6 +1,9 @@
 use super::*;
 
-use crate::instantiation::ModuleTypingContext;
+use crate::{
+    instantiation::{ModuleTypingContext, path_ranges::PathRange},
+    util::zip_eq,
+};
 
 impl<'l> ModuleTypingContext<'l> {
     pub fn post_process(&mut self) {
@@ -56,8 +59,9 @@ impl<'l> ModuleTypingContext<'l> {
     /// It's needed because it seems that sometimes vivado can't optimize out the mux in `result = cond ? value : 'x`.
     /// It turned out in one case that this was needed, so I have the compiler itself do it.
     fn remove_unconditional_muxes(&mut self) {
-        for (_, w) in &mut self.wires {
-            let RealWireDataSource::Multiplexer { is_state, sources } = &mut w.source else {
+        for wire_id in self.wires.id_range() {
+            let w = &self.wires[wire_id];
+            let RealWireDataSource::Multiplexer { is_state, sources } = &w.source else {
                 continue;
             };
 
@@ -65,7 +69,26 @@ impl<'l> ModuleTypingContext<'l> {
                 continue; // Can't remove conditional assigns from state vars
             }
 
-            remove_unconditional_muxes(sources);
+            let mut path_range: PathRange<usize> = PathRange::new();
+
+            for path in sources {
+                path_range.count_uses(&path.to_path, &self.wires, &w.typ);
+            }
+
+            let is_mux_unneededs: Vec<bool> = sources
+                .iter()
+                .map(|path| path_range.is_used_eactly_once(&path.to_path, &self.wires, &w.typ))
+                .collect();
+
+            let RealWireDataSource::Multiplexer { sources, .. } = &mut self.wires[wire_id].source
+            else {
+                unreachable!("Checking same mux again");
+            };
+            for (mux, unneeded) in zip_eq(sources, is_mux_unneededs) {
+                if unneeded {
+                    mux.condition = Box::new([]);
+                }
+            }
         }
     }
 }
@@ -94,73 +117,6 @@ fn finalize_partial_bounds(path: &mut [RealWirePathElem], mut typ: &ConcreteType
                     };
                 }
             }
-        }
-    }
-}
-
-enum PathElemRange {
-    All,
-    Range(std::ops::Range<IBig>),
-}
-
-impl RealWirePathElem {
-    fn get_path_elem_range(&self) -> PathElemRange {
-        match self {
-            RealWirePathElem::Index { .. } | RealWirePathElem::PartSelect { .. } => {
-                PathElemRange::All
-            }
-            RealWirePathElem::ConstIndex { span: _, idx } => {
-                PathElemRange::Range(idx.clone()..(idx + 1))
-            }
-            RealWirePathElem::Slice { span: _, bounds } => {
-                let PartialBound::Known(from, to) = bounds else {
-                    unreachable!("Bounds have been set to Known by finalize_partial_bounds");
-                };
-                PathElemRange::Range(from.clone()..to.clone())
-            }
-        }
-    }
-}
-
-fn paths_intersect(a: &[RealWirePathElem], b: &[RealWirePathElem]) -> bool {
-    for (path_a, path_b) in a.iter().zip(b.iter()) {
-        let range_a = path_a.get_path_elem_range();
-        let range_b = path_b.get_path_elem_range();
-
-        match (range_a, range_b) {
-            (PathElemRange::All, _) | (_, PathElemRange::All) => {}
-            (PathElemRange::Range(range_a), PathElemRange::Range(range_b)) => {
-                let bounds_dont_intersect =
-                    range_a.start >= range_b.end || range_b.start >= range_a.end;
-
-                if bounds_dont_intersect {
-                    return false;
-                }
-            }
-        }
-    }
-    true
-}
-
-fn any_paths_intersect(mux: &[MultiplexerSource]) -> bool {
-    for (a_idx, a) in mux.iter().enumerate() {
-        for (b_idx, b) in mux.iter().enumerate() {
-            if a_idx == b_idx {
-                continue;
-            }
-            if paths_intersect(&a.to_path, &b.to_path) {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-/// Technically an N^2 algorithm over the assignments. Let's hope the user doens't use too many.
-fn remove_unconditional_muxes(mux: &mut [MultiplexerSource]) {
-    if !any_paths_intersect(mux) {
-        for m in mux {
-            m.condition = Box::new([]);
         }
     }
 }

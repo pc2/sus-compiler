@@ -11,6 +11,7 @@ use crate::{
     latency::port_latency_inference::PortLatencyInferenceInfo,
     linker::{Documentation, LinkInfo},
     typing::abstract_type::{AbstractGlobalReference, AbstractRankedType, PeanoType},
+    typing::concrete_type::IntBounds,
     typing::domain_type::ClockDomain,
     typing::template::{TVec, TemplateKind},
     typing::unifyable_cell::UniCell,
@@ -20,6 +21,7 @@ use crate::{
 use std::cell::OnceCell;
 
 pub use flatten::flatten_all_globals;
+use ibig::IBig;
 pub use initialization::gather_initial_file_data;
 
 /// Modules are compiled in 4 stages. All modules must pass through each stage before advancing to the next stage.
@@ -508,6 +510,39 @@ pub enum BinaryOperator {
 pub enum PartSelectDirection {
     Up,
     Down,
+}
+
+impl PartSelectDirection {
+    pub fn range_from(&self, from: &IBig, width: &IBig) -> IntBounds<IBig> {
+        match self {
+            PartSelectDirection::Up => IntBounds {
+                from: from.clone(),
+                to: from + width,
+            },
+            PartSelectDirection::Down => IntBounds {
+                from: from - width + 1,
+                to: from + 1,
+            },
+        }
+    }
+    pub fn range_from_range(&self, from_range: IntBounds<&IBig>, width: &IBig) -> IntBounds<IBig> {
+        match self {
+            PartSelectDirection::Up => {
+                let to = from_range.to + width - 1;
+                IntBounds {
+                    from: from_range.from.clone(),
+                    to,
+                }
+            }
+            PartSelectDirection::Down => {
+                let from = from_range.from - width + 1;
+                IntBounds {
+                    from,
+                    to: from_range.to.clone(),
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

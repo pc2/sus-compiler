@@ -462,13 +462,10 @@ impl GenerationState<'_> {
                     let from = self.get_generation_integer(*from);
                     let width = self.get_generation_integer(*width);
 
-                    let (from, to) = match direction {
-                        PartSelectDirection::Up => (Some(from.clone()), Some(from + width - 1)),
-                        PartSelectDirection::Down => (Some(from - width + 1), Some(from.clone())),
-                    };
+                    let range = direction.range_from(from, width);
                     GenerativeWireRefPathElem::Slice {
-                        from,
-                        to,
+                        from: Some(range.from),
+                        to: Some(range.to),
                         span: bracket_span.inner_span(),
                     }
                 }
