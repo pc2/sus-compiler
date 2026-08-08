@@ -2,15 +2,16 @@
 //! - Check all subtype relations
 //! - Check array bounds
 
-use crate::prelude::*;
-
-use std::borrow::Cow;
+use std::{borrow::Cow, ops::Range};
 
 use ibig::IBig;
 
 use crate::{
     errors::DiagnosticBuilder,
+    instantiation::path_ranges::PathRange,
     instantiation::{ModuleTypingContext, RealWire, RealWireDataSource, RealWirePathElem},
+    linker::IsExtern,
+    prelude::*,
     typing::{
         concrete_type::{ConcreteType, IntBounds},
         unifyable_cell::UniCell,
@@ -49,6 +50,11 @@ fn make_output_typ<'c>(typ: &'c ConcreteType, path: &[RealWirePathElem]) -> Cow<
 }
 
 impl<'l> ModuleTypingContext<'l> {
+    pub fn final_checks(&self) {
+        self.check_subtypes();
+        self.lint_wire_is_never_written_to();
+    }
+
     fn wire_must_be_subtype(
         &self,
         context: &'static str,
@@ -243,7 +249,46 @@ impl<'l> ModuleTypingContext<'l> {
             }
         }
     }*/
-    pub fn check_subtypes(&self) {
+    fn check_subtypes(&self) {
         self.check_all_subtypes_in_wires();
+    }
+
+    // ==== Lints, these aren't necessarily critical ====
+
+    fn lint_wire_is_never_written_to(&self) {
+        match self.md.link_info.is_extern {
+            IsExtern::Normal => {}
+            IsExtern::Extern | IsExtern::Builtin => return, // Early exit, since the implementations of such modules are provided externally.
+        }
+        use std::fmt::Write as _;
+        for (_, w) in &self.wires {
+            let RealWireDataSource::Multiplexer { sources, .. } = &w.source else {
+                continue;
+            };
+
+            let mut slots_are_written_to = PathRange::new(0);
+
+            for source in sources {
+                slots_are_written_to.count_uses(&source.to_path, &self.wires, &w.typ);
+            }
+
+            if let Some(unused_path) = slots_are_written_to.find_unused_path(&w.typ) {
+                let mut wire_name = w.name.clone();
+                for e in unused_path {
+                    if e.len() == 1 {
+                        let idx = e.start;
+                        write!(wire_name, "[{idx}]").unwrap();
+                    } else {
+                        assert!(!e.is_empty());
+                        let Range { start, end } = e;
+                        write!(wire_name, "[{start}:{end}]").unwrap();
+                    }
+                }
+                self.errors.warn(
+                    w.get_span(self.link_info),
+                    format!("{wire_name} is never written to."),
+                );
+            }
+        }
     }
 }

@@ -2915,12 +2915,26 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                       ┬  
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: y is never written to.
+      ╭─[ test.sus:1303:32 ]
+      │
+ 1303 │     interface a: bool x'0 -> bool y'V
+      │                                   ┬  
+      │                                   ╰── y is never written to.
+──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1305:20 ]
       │
  1305 │     interface b: bool p'0 -> bool q'V+30
       │                       ┬  
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: q is never written to.
+      ╭─[ test.sus:1305:32 ]
+      │
+ 1305 │     interface b: bool p'0 -> bool q'V+30
+      │                                   ┬  
+      │                                   ╰── q is never written to.
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1317:43 ]
@@ -2936,12 +2950,26 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                       ┬  
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: y is never written to.
+      ╭─[ test.sus:1318:32 ]
+      │
+ 1318 │     interface a: bool x'V -> bool y'0
+      │                                   ┬  
+      │                                   ╰── y is never written to.
+──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1320:20 ]
       │
  1320 │     interface b: bool p'V -> bool q'0+30
       │                       ┬  
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: q is never written to.
+      ╭─[ test.sus:1320:32 ]
+      │
+ 1320 │     interface b: bool p'V -> bool q'0+30
+      │                                   ┬  
+      │                                   ╰── q is never written to.
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1332:35 ]
@@ -3291,6 +3319,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │          ┬  
       │          ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: b is never written to.
+      ╭─[ test.sus:1415:7 ]
+      │
+ 1415 │     bool b
+      │          ┬  
+      │          ╰── b is never written to.
+──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1423:25 ]
       │
@@ -3458,6 +3493,13 @@ Error: Slice 4:3 has a negative length.
  1479 │     int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4:3]
       │                                                     ─┬─  
       │                                                      ╰─── Slice 4:3 has a negative length.
+──────╯
+Warning: matrix[9:29][0] is never written to.
+      ╭─[ test.sus:1492:188 ]
+      │
+ 1492 │     interface multi_slice_reverse : int#(FROM: 0, TO: 27) a, int#(FROM: 2, TO: 19) b, bool[20][9] slice, bool[2][27] slice2, bool[5][9] gen_partselect, bool[2][3] partselect -> bool[20][30] matrix
+      │                                                                                                                                                                                               ───┬──  
+      │                                                                                                                                                                                                  ╰──── matrix[9:29][0] is never written to.
 ──────╯
 Warning: Not Instantiating duplicate_port_names #() due to abstract typing errors
       ╭─[ test.sus:1501:8 ]
@@ -3979,6 +4021,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                           ──────┬─────  
       │                                 ╰─────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: unsigned_val is never written to.
+      ╭─[ test.sus:1613:24 ]
+      │
+ 1613 │     int#(FROM: 0, TO: 13) unsigned_val
+      │                           ──────┬─────  
+      │                                 ╰─────── unsigned_val is never written to.
+──────╯
 Warning: Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
       ╭─[ test.sus:1614:26 ]
       │
@@ -3993,12 +4042,26 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                             ─────┬────  
       │                                  ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: signed_val is never written to.
+      ╭─[ test.sus:1614:26 ]
+      │
+ 1614 │     int#(FROM: -20, TO: 13) signed_val
+      │                             ─────┬────  
+      │                                  ╰────── signed_val is never written to.
+──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1616:23 ]
       │
  1616 │     int#(FROM: 5, TO: 8) dynamic_mod
       │                          ─────┬─────  
       │                               ╰─────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: dynamic_mod is never written to.
+      ╭─[ test.sus:1616:23 ]
+      │
+ 1616 │     int#(FROM: 5, TO: 8) dynamic_mod
+      │                          ─────┬─────  
+      │                               ╰─────── dynamic_mod is never written to.
 ──────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
       ╭─[ test.sus:1619:2 ]
@@ -4175,6 +4238,13 @@ Warning: The result of this expression is not used. Only function calls can retu
       │     ───┬───  
       │        ╰───── The result of this expression is not used. Only function calls can return nothing. 
 ──────╯
+Warning: A is never written to.
+      ╭─[ test.sus:1684:16 ]
+      │
+ 1684 │     state bool[5] A
+      │                   ┬  
+      │                   ╰── A is never written to.
+──────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
       ╭─[ test.sus:1684:16 ]
       │
@@ -4188,6 +4258,20 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1684 │     state bool[5] A
       │                   ┬  
       │                   ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: O is never written to.
+      ╭─[ test.sus:1688:23 ]
+      │
+ 1688 │     output state bool[5] O'0
+      │                          ┬  
+      │                          ╰── O is never written to.
+──────╯
+Warning: X is never written to.
+      ╭─[ test.sus:1693:39 ]
+      │
+ 1693 │     output state int#(FROM: 0, TO: 4)[2] X'0
+      │                                          ┬  
+      │                                          ╰── X is never written to.
 ──────╯
 Warning: Not Instantiating NonGenerativeSliceBoundsMustNotICE #() due to abstract typing errors
       ╭─[ test.sus:1706:8 ]
@@ -4348,6 +4432,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1739 │     int[4][6][7][20] manyzeros
       │                      ────┬────  
       │                          ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: manyzeros[0:16] is never written to.
+      ╭─[ test.sus:1739:19 ]
+      │
+ 1739 │     int[4][6][7][20] manyzeros
+      │                      ────┬────  
+      │                          ╰────── manyzeros[0:16] is never written to.
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1742:9 ]
@@ -4761,6 +4852,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1907 │     bool b'5
       │          ┬  
       │          ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: b is never written to.
+      ╭─[ test.sus:1907:10 ]
+      │
+ 1907 │     bool b'5
+      │          ┬  
+      │          ╰── b is never written to.
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1909:10 ]

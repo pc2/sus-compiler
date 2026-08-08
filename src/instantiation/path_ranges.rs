@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::ops::{Deref as _, Range};
 
 use ibig::error::OutOfBoundsError;
 
@@ -10,33 +10,22 @@ use super::*;
 /// For structs, this is each field of the struct
 pub enum PathRange<T: Clone> {
     Full(T),
-    Empty,
     Partial(Vec<PathRange<T>>),
 }
 
-impl<T: Clone> Default for PathRange<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 impl<T: Clone> PathRange<T> {
-    pub fn new() -> Self {
-        Self::Empty
+    pub fn new(default: T) -> Self {
+        Self::Full(default)
     }
 
-    pub fn apply_on_all_nested(&mut self, default: T, f: &mut impl FnMut(&mut T)) {
+    pub fn apply_on_all_nested(&mut self, f: &mut impl FnMut(&mut T)) {
         match self {
             PathRange::Full(existing_v) => {
                 f(existing_v);
             }
-            PathRange::Empty => {
-                let mut new_v = default;
-                f(&mut new_v);
-                *self = PathRange::Full(new_v);
-            }
             PathRange::Partial(path_ranges) => {
                 for p in path_ranges {
-                    p.apply_on_all_nested(default.clone(), f);
+                    p.apply_on_all_nested(f);
                 }
             }
         }
@@ -47,11 +36,10 @@ impl<T: Clone> PathRange<T> {
         path: &[RealWirePathElem],
         wires: &FlatAlloc<RealWire, WireIDMarker>,
         typ: &ConcreteType,
-        default: T,
         f: &mut impl FnMut(&mut T),
     ) -> Result<(), OutOfBoundsError> {
         let Some((first, rest)) = path.split_first() else {
-            self.apply_on_all_nested(default, f);
+            self.apply_on_all_nested(f);
             return Ok(());
         };
 
@@ -95,12 +83,9 @@ impl<T: Clone> PathRange<T> {
             }
         };
 
-        match std::mem::replace(self, PathRange::Empty) {
+        match std::mem::replace(self, PathRange::Partial(Vec::new())) {
             PathRange::Full(shared_v) => {
                 *self = PathRange::Partial(vec![PathRange::Full(shared_v); sz]);
-            }
-            PathRange::Empty => {
-                *self = PathRange::Partial(vec![PathRange::Full(default.clone()); sz]);
             }
             PathRange::Partial(path_ranges) => {
                 *self = PathRange::Partial(path_ranges);
@@ -111,9 +96,15 @@ impl<T: Clone> PathRange<T> {
             unreachable!()
         };
         for idx in requested_range {
-            nested_ranges[idx].apply(rest, wires, content, default.clone(), f)?;
+            nested_ranges[idx].apply(rest, wires, content, f)?;
         }
         Ok(())
+    }
+    pub fn all(&self, f: &mut impl FnMut(&T) -> bool) -> bool {
+        match self {
+            PathRange::Full(v) => f(v),
+            PathRange::Partial(path_ranges) => path_ranges.iter().all(|sub_range| sub_range.all(f)),
+        }
     }
 }
 
@@ -124,7 +115,7 @@ impl PathRange<usize> {
         wires: &FlatAlloc<RealWire, WireIDMarker>,
         typ: &ConcreteType,
     ) {
-        let _ = self.apply(path, wires, typ, 0, &mut |v| *v += 1);
+        let _ = self.apply(path, wires, typ, &mut |v| *v += 1);
     }
     pub fn is_used_eactly_once(
         &mut self,
@@ -133,12 +124,44 @@ impl PathRange<usize> {
         typ: &ConcreteType,
     ) -> bool {
         let mut used_exactly_once = true;
-        let _ = self.apply(path, wires, typ, 0, &mut |v| {
+        let _ = self.apply(path, wires, typ, &mut |v| {
             assert!(*v >= 1);
             if *v >= 2 {
                 used_exactly_once = false;
             }
         });
         used_exactly_once
+    }
+    pub fn find_unused_path(&self, typ: &ConcreteType) -> Option<Vec<Range<usize>>> {
+        match self {
+            PathRange::Full(0) => Some(Vec::new()),
+            PathRange::Full(_) => None,
+            PathRange::Partial(sub_ranges) => {
+                match typ {
+                    ConcreteType::Named(_) => todo!("Structs"),
+                    ConcreteType::Array(arr) => {
+                        let (content, sz) = arr.deref();
+                        let mut found_missing: Option<(usize, Vec<Range<usize>>)> = None;
+                        for (idx, p) in sub_ranges.iter().enumerate() {
+                            if let Some(found_missing) = &mut found_missing {
+                                if let Some(found_sub_path) = p.find_unused_path(content)
+                                    && found_sub_path == found_missing.1
+                                {
+                                } else {
+                                    // The end of the unused region.
+                                    let range_here = found_missing.0..idx;
+                                    let mut found_missing = std::mem::take(&mut found_missing.1);
+                                    found_missing.insert(0, range_here);
+                                    return Some(found_missing);
+                                }
+                            } else if let Some(found_sub_path) = p.find_unused_path(content) {
+                                found_missing = Some((idx, found_sub_path));
+                            }
+                        }
+                    }
+                }
+                None
+            }
+        }
     }
 }

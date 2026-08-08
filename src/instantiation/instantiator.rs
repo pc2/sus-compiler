@@ -402,7 +402,7 @@ fn finish_instantiation(context: ModuleTypingSuperContext) -> InstantiatedModule
     }
 
     debug!("Performing final checks for {name}");
-    typed.check_subtypes();
+    typed.final_checks();
 
     typed.into_instantiated_module()
 }

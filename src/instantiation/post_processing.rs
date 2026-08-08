@@ -69,7 +69,7 @@ impl<'l> ModuleTypingContext<'l> {
                 continue; // Can't remove conditional assigns from state vars
             }
 
-            let mut path_range: PathRange<usize> = PathRange::new();
+            let mut path_range: PathRange<usize> = PathRange::new(0);
 
             for path in sources {
                 path_range.count_uses(&path.to_path, &self.wires, &w.typ);
