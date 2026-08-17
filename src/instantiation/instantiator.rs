@@ -180,10 +180,13 @@ impl Instantiator {
                 }
             });
 
-            if result.errors.did_error {
-                error!("Failed to instantiate {}", result.name);
-            } else {
-                info!("Instantiated {}", result.name);
+            let md_file = globals.modules[global_ref.id].link_info.name_span.file;
+            if !linker_files[md_file].is_tops {
+                if result.errors.did_error {
+                    error!("Failed to instantiate {}", result.name);
+                } else {
+                    info!("Instantiated {}", result.name);
+                }
             }
 
             self.stack.pop(); // should pop the global_ref we pushed to earlier
