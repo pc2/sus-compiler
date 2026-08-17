@@ -120,6 +120,12 @@ pub fn codegen(linker: &Linker) {
             }
         }
     }
+
+    for top in &linker.instantiator.tops {
+        let inst_name = &linker.instantiator.get(top).mangled_name;
+        let top_name = top.display(&linker.globals);
+        info!("Code generated for {top_name} as \"{inst_name}\"")
+    }
 }
 
 pub fn maybe_gen_tb(linker: &Linker) {
