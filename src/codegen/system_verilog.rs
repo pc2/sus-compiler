@@ -1369,7 +1369,7 @@ fn codegen_optimized_divide(
     } else {
         let left = wrap_in_signed_if_needed(left, is_signed_div, left_int_range);
         let right = wrap_in_signed_if_needed(right, is_signed_div, right_int_range);
-        format!("{left} / {right}")
+        format!("{left} / {right};")
     }
 }
 
