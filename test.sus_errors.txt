@@ -1,59 +1,6 @@
 [INFO  sus_compiler::compiler_top] Selecting all parameter-less modules as --top
-[ERROR sus_compiler::compiler_top] Cannot instantiate LatencyOffset due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate LatencyCut due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate CrossDomain due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate LatencyOffsetAction due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate LatencyOffsetActionNoData due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate Repeat due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate Reverse due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate Concat due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate RotateLeft due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate RotateRight due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate Abs due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate TreeAdd due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate TreeMax due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate TreeMin due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate IntNarrow due to errors
 [INFO  sus_compiler::instantiation::instantiator] Instantiated IntToBool #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated BoolToInt #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate IntToBits due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate UIntToBits due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate BitsToInt due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate BitsToUInt due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate ToBits due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate FromBits due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate Transmute due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate SlowState due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate SlowStateAdvanced due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate SlowPipelineEnd due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate SlowPipelineBegin due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate SlowPut due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate ParallelWhile due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate ParallelState due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate ParallelStore due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate Semaphore due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate SharedAcquireSemaphore due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate Ternary due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate ResetLengthener due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate Tuple2 due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate Tuple3 due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate Tuple4 due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate Tuple5 due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate ToOneHot due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate FirstSetBit due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate PopCount due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate BitwiseIntSplit due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate BitwiseIntConcat due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate AlignToPow2 due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate ROM due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate RAM due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate DPRAM due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate RAM_Unbalanced due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate FIFO due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate FWFT due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate RippleFIFO due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate JoiningFIFO due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate ShiftReg due to errors
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -85,7 +32,6 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated matrix_vector_mul #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate bad_cycle2 #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated module_taking_a_lot_of_time #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate offset_latency due to errors
 [INFO  sus_compiler::instantiation::instantiator] Instantiated good_cycle #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated input_only #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiple_inputs_only #()
@@ -97,7 +43,6 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated xor #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated use_xor #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated fizz_buzz #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate fizz_buzz_gen due to errors
 [INFO  sus_compiler::instantiation::instantiator] Instantiated mbf_dual #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated monotonize_down #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated my_mod #()
@@ -119,13 +64,10 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_bad_interface #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate sequenceDownFrom #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate sumUpTo #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate test due to errors
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_test #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate tinyTestMod due to errors
 [INFO  sus_compiler::instantiation::instantiator] Instantiated tinyTestMod #(beep: 3)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated tinyTestMod #(beep: 4)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated testTinyTestMod #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate tree_add due to errors
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate tree_add #(WIDTH: 1)
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate tree_add #(WIDTH: 3)
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate tree_add #(WIDTH: 7)
@@ -135,10 +77,8 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate tree_add #(WIDTH: 127)
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate tree_add #(WIDTH: 255)
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate make_tree_add #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate replicate due to errors
 [INFO  sus_compiler::instantiation::instantiator] Instantiated replicate #(T: type int #(FROM: 3, TO: 4), NUM_REPLS: 30)
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_replicate #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate permute_t due to errors
 [INFO  sus_compiler::instantiation::instantiator] Instantiated permute_t #(T: type int #(FROM: 1, TO: 8), SIZE: 8, SOURCES: [3, 2, 4, 5, 1, 2, 7, 6])
 [INFO  sus_compiler::instantiation::instantiator] Instantiated use_permute #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated instruction_decoder #()
@@ -152,23 +92,19 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate xyz #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TreeAdd #(SIZE: 5, FROM: 3, TO: 4)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated numbersToAddUp #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate sized_int_add due to errors
 [INFO  sus_compiler::instantiation::instantiator] Instantiated sized_int_add #(LEFT_SIZE: 4, RIGHT_SIZE: 3, OUTPUT_SIZE: 5)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated use_sized_int_add #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate implicit_domain_forbidden #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate conflicting_domain_with_port_name #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate make_infinite_type_help due to errors
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate make_infinite_type #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate UseDualPortMem #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate example_FIFO #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_Iterator #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate UseBuiltinConstants #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate FailingAssert #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate IfTesting due to errors
 [INFO  sus_compiler::instantiation::instantiator] Instantiated latency_counting_disjoint_blocks #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate latency_counting_disjoint_blocks_merge_error #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_infer_me #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate infer_me due to errors
 [INFO  sus_compiler::instantiation::instantiator] Instantiated infer_me #(A: 5)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated infer_from_local_context #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated LatencyOffset #(T: type bool #(), OFFSET: -9)
@@ -180,30 +116,20 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate inference_edge_case #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated specified_latencies_not_ports_edge_case #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated testArrayWrite #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate infer_me_with_poison_output due to errors
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate instantiate_infer_me_with_poison_output #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate __add__ due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate ShiftRegTest due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate MultiStateLoop due to errors
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_MultiStateLoop #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate CombineArray #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate unknownLatency due to errors
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate useUnknownLatency #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate infer_me_conflicting_directions due to errors
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_infer_me_conflicting_directions #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate infer_me_with_delta due to errors
 [INFO  sus_compiler::instantiation::instantiator] Instantiated infer_me_with_delta #(V: -31)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated use_infer_me_with_delta #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate infer_me_with_negative_delta due to errors
 [INFO  sus_compiler::instantiation::instantiator] Instantiated infer_me_with_negative_delta #(V: 31)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated use_infer_me_with_negative_delta #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate infer_me_inputs_only due to errors
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_infer_me_inputs_only #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_ranks #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated testInts #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_FIFO #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate write_to_generative_through_when #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate SameNameAsType due to errors
 [INFO  sus_compiler::instantiation::instantiator] Instantiated ToBits #(T: type bool #()[60])
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate InstantiateTransmutes #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated ToBits #(T: type int #(FROM: 0, TO: 255)[2])
@@ -228,7 +154,6 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated test_vivado_bug #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated boolean_array_literals #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated floats_and_doubles #()
-[ERROR sus_compiler::compiler_top] Cannot instantiate module_taking_strings due to errors
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_module_taking_strings #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated UIntToBits #(NUM_BITS: 0)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated zero_sized_stuffs #()
@@ -266,6 +191,79 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestUnknownSizeArray #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated UnknownSizeArraySynth #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestIntersectingValues #()
+[ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate multiply_add_with_latencies due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate first_bit_idx_24 due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate permute due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate permute24 due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate disjoint_ports due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate undeteriminable_input_latency due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate conflicting_latency_declarations due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate bad_cycle due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate bad_cycle2 due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate contains_submodule_submodule due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_submodule_named_ports due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate contains_submodule_submodule due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate dual_port_mem due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_fifo due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate test_separated_domain due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_no_input_module due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate test_write_to_gen_var due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_bad_interface due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate sequenceDownFrom due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate sumUpTo due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_test due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate make_tree_add due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_replicate due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate run_instruction due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_no_main_interface due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate moduleWithBadDeclaration due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate moduleWithBadInterface due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate useModuleWithBadInterface due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate m due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate xyz due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate implicit_domain_forbidden due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate conflicting_domain_with_port_name due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate make_infinite_type due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate UseDualPortMem due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate example_FIFO due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_Iterator due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate UseBuiltinConstants due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate FailingAssert due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate latency_counting_disjoint_blocks_merge_error due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_infer_me due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate inference_edge_case due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate instantiate_infer_me_with_poison_output due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_MultiStateLoop due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate CombineArray due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate useUnknownLatency due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_infer_me_conflicting_directions due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_infer_me_inputs_only due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_ranks due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_FIFO due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate write_to_generative_through_when due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate InstantiateTransmutes due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate StraightTransmute due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate testSlicing due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate wrong_slice_length due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate negative_slice due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate duplicate_port_names due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate make_when due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_make_when due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate use_module_taking_strings due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate NonGenerativeSliceBoundsMustNotICE due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate InstantiatesItself due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TestUnknownArraySize due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TestNextPow2 due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate GenerativeCannotHaveLatencyDeclaration due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate try_conflicting_latencies due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate AssignUnset due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate ReadUnsetArrayElem due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate RegressionForBadPort due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate WeirdlyNamedClock due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TestUnknownSizeArray due to errors
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test.sus:26:6 ]
     │

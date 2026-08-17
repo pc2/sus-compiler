@@ -7,6 +7,7 @@ use std::ffi::OsStr;
 use std::io::Read;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
+use std::process::ExitCode;
 
 use crate::config::EarlyExitUpTo;
 use crate::linker::checkpoint::{
@@ -214,7 +215,7 @@ impl Linker {
             .find(|_id, f| &f.file_identifier == file_identifier)
     }
 
-    pub fn recompile_all(&mut self) {
+    pub fn recompile_all(&mut self) -> ExitCode {
         // Sanity check for the names the compiler knows internally.
         // They are defined in std/core.sus
         // Critically, std/core.sus MUST be the first file to be loaded into the linker. Otherwise the IDs don't point to the correct objects
@@ -269,14 +270,14 @@ impl Linker {
             link_info.instructions.clear();
         }
         if config.early_exit == EarlyExitUpTo::Initialize {
-            return;
+            return ExitCode::SUCCESS;
         }
 
         flatten_all_globals(self);
 
         self.globals.checkpoint(&global_ids, AFTER_FLATTEN_CP);
         if config.early_exit == EarlyExitUpTo::Flatten {
-            return;
+            return ExitCode::SUCCESS;
         }
 
         for global_id in &global_ids {
@@ -298,7 +299,7 @@ impl Linker {
         }
 
         if config.early_exit == EarlyExitUpTo::AbstractTypecheck {
-            return;
+            return ExitCode::SUCCESS;
         }
 
         for global_id in &global_ids {
@@ -309,11 +310,12 @@ impl Linker {
         self.globals.checkpoint(&global_ids, AFTER_LINTS_CP);
 
         if config.early_exit == EarlyExitUpTo::Lint {
-            return;
+            return ExitCode::SUCCESS;
         }
 
         let mut tops = Vec::with_capacity(config.top_modules.len());
 
+        let mut top_instantiation_errors = Vec::new();
         if config.top_modules.is_empty() {
             info!("Selecting all parameter-less modules as --top");
 
@@ -332,10 +334,11 @@ impl Linker {
                         },
                     ) {
                         tops.push(instantiated.global_ref.deref().clone());
+                    } else {
+                        let md_name = md.link_info.display_full_name();
+                        top_instantiation_errors
+                            .push(format!("Cannot instantiate {md_name} due to errors"));
                     }
-                } else {
-                    let md_name = md.link_info.display_full_name();
-                    error!("Cannot instantiate {md_name} due to errors");
                 }
             }
         } else {
@@ -358,13 +361,24 @@ impl Linker {
                 {
                     tops.push(submod.refers_to.clone());
                 } else {
-                    error!("Cannot instantiate --top \"{top_name}\" due to errors");
+                    top_instantiation_errors.push(format!(
+                        "Cannot instantiate --top \"{top_name}\" due to errors"
+                    ));
                 }
             }
         }
         self.instantiator.tops = tops;
 
         self.assert_no_duplicate_names();
+
+        if top_instantiation_errors.is_empty() {
+            ExitCode::SUCCESS
+        } else {
+            for e in top_instantiation_errors {
+                error!("{e}");
+            }
+            ExitCode::FAILURE
+        }
     }
 
     pub fn assert_no_duplicate_names(&self) {

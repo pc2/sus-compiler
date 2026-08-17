@@ -58,14 +58,14 @@ fn main() -> ExitCode {
 
     let mut linker = Linker::new();
     crate::debug::create_dump_on_panic(&mut linker, |linker| {
-        compile_all(linker, file_paths);
+        let exit_code = compile_all(linker, file_paths);
         print_all_errors(&*linker);
 
         if let Some(gen_docs) = &config.gen_docs {
             dev_aid::gen_docs::gen_docs(&*linker, gen_docs);
         }
 
-        let exit_code = crate::codegen::codegen(&*linker);
+        crate::codegen::codegen(&*linker);
 
         crate::codegen::maybe_gen_tb(linker);
 

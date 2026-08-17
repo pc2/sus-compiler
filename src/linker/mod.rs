@@ -612,6 +612,13 @@ impl Linker {
             let file_id = self.modules[inst.global_ref.id].link_info.span.file;
             all_errs[file_id].append(&inst.errors);
         }
+
+        // Remove the redundant warnings from the --top file.
+        for (top_file_id, file) in &self.files {
+            if file.is_tops {
+                all_errs[top_file_id].remove_warnings();
+            }
+        }
     }
 
     pub fn collect_all_errors(&self) -> ArenaAllocator<ErrorStore, FileUUIDMarker> {

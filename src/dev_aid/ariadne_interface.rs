@@ -3,7 +3,7 @@ use ariadne::*;
 // disambiguate Span - it's ours, from ariadne's
 use crate::prelude::Span;
 
-use std::path::PathBuf;
+use std::{path::PathBuf, process::ExitCode};
 
 use crate::{
     config::config,
@@ -49,7 +49,7 @@ impl ariadne::Span for Span {
     }
 }
 
-pub fn compile_all(linker: &mut Linker, file_paths: Vec<PathBuf>) {
+pub fn compile_all(linker: &mut Linker, file_paths: Vec<PathBuf>) -> ExitCode {
     linker.add_standard_library();
 
     for file_path in file_paths {
@@ -58,7 +58,7 @@ pub fn compile_all(linker: &mut Linker, file_paths: Vec<PathBuf>) {
 
     linker.add_tops_file();
 
-    linker.recompile_all();
+    linker.recompile_all()
 }
 
 fn ariadne_config() -> Config {

@@ -15,7 +15,6 @@ use crate::config::{TargetLanguage, VERSION_INFO, config};
 use std::collections::HashSet;
 use std::io::stdout;
 use std::path::Path;
-use std::process::ExitCode;
 use std::{fs::File, io::Write};
 
 fn make_output_file(path: &Path) -> File {
@@ -61,16 +60,15 @@ fn order_dependencies<'inst>(
     stack.push(md);
 }
 
-pub fn codegen(linker: &Linker) -> ExitCode {
+pub fn codegen(linker: &Linker) {
     let config = config();
     if config.codegen_file.is_none() && config.codegen_separate_folder.is_none() {
-        return ExitCode::SUCCESS; // early exit, to save work
+        return; // early exit, to save work
     }
     assert_eq!(config.target_language, TargetLanguage::SystemVerilog);
 
     let mut all_instances = HashSet::new();
     let mut dependency_stack = Vec::new();
-    let mut any_error = false;
     for top in &linker.instantiator.tops {
         let inst = linker.instantiator.get(top);
         assert!(
@@ -78,10 +76,6 @@ pub fn codegen(linker: &Linker) -> ExitCode {
             "Erroring modules are already filtered out at compiler_top.rs"
         );
         order_dependencies(&mut all_instances, &mut dependency_stack, inst);
-    }
-    if any_error && !config.ci {
-        // Do generate the output file in CI mode, because there will be failing modules in it.
-        return ExitCode::FAILURE;
     }
     if let Some(path) = &config.codegen_file {
         let mut out_file = make_output_file(path);
@@ -125,11 +119,6 @@ pub fn codegen(linker: &Linker) -> ExitCode {
                 }
             }
         }
-    }
-    if any_error {
-        ExitCode::FAILURE
-    } else {
-        ExitCode::SUCCESS
     }
 }
 

@@ -149,6 +149,10 @@ impl ErrorStore {
                 .then_with(|| a.reason.cmp(&b.reason))
         });
     }
+
+    pub fn remove_warnings(&mut self) {
+        self.errors.retain(|e| e.level == ErrorLevel::Error);
+    }
 }
 
 impl IntoIterator for ErrorStore {
