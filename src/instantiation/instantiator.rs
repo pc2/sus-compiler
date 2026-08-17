@@ -109,7 +109,7 @@ impl Instantiator {
         })
     }
 
-    fn instantiate(
+    pub fn instantiate(
         &mut self,
         globals: &LinkerGlobals,
         linker_files: &LinkerFiles,
@@ -201,17 +201,6 @@ impl Instantiator {
         } else {
             Err(InstantiateError::ErrorInModule)
         }
-    }
-    pub fn instantiate_tops(
-        &mut self,
-        globals: &LinkerGlobals,
-        linker_files: &LinkerFiles,
-        tops: Vec<ConcreteGlobalReference<ModuleUUID>>,
-    ) {
-        for t in &tops {
-            let _ = self.instantiate(globals, linker_files, t.clone());
-        }
-        self.tops = tops;
     }
 
     // Also passes over invalid instances. Instance validity should not be assumed!

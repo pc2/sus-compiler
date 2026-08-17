@@ -56,6 +56,8 @@ pub fn compile_all(linker: &mut Linker, file_paths: Vec<PathBuf>) {
         linker.add_file_or_directory(&file_path);
     }
 
+    linker.add_tops_file();
+
     linker.recompile_all();
 }
 

@@ -73,12 +73,11 @@ pub fn codegen(linker: &Linker) -> ExitCode {
     let mut any_error = false;
     for top in &linker.instantiator.tops {
         let inst = linker.instantiator.get(top);
-        if !inst.errors.did_error {
-            order_dependencies(&mut all_instances, &mut dependency_stack, inst);
-        } else {
-            any_error = true;
-            error!("Cannot codegen {} due to errors!", inst.name);
-        }
+        assert!(
+            !inst.errors.did_error,
+            "Erroring modules are already filtered out at compiler_top.rs"
+        );
+        order_dependencies(&mut all_instances, &mut dependency_stack, inst);
     }
     if any_error && !config.ci {
         // Do generate the output file in CI mode, because there will be failing modules in it.

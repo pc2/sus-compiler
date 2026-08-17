@@ -237,6 +237,7 @@ pub struct FileData {
     pub associated_values: Vec<GlobalUUID>,
     pub tree: Tree,
     pub is_std: bool,
+    pub is_tops: bool,
     /// Cached Source for ariadne. Initialized when [ariadne::Cache::fetch] is called
     pub ariadne_source: OnceCell<ariadne::Source<String>>,
 }
@@ -714,6 +715,9 @@ pub struct FileBuilder<'linker> {
 
 impl FileBuilder<'_> {
     fn add_name(&mut self, name: String, new_obj_id: GlobalUUID) {
+        if self.file_data.is_tops {
+            return; // "tops" should not be added to the namespace list. 
+        }
         match self.global_namespace.entry(name) {
             std::collections::hash_map::Entry::Occupied(mut occ) => {
                 let new_val = match occ.get_mut() {

@@ -1,9 +1,11 @@
 use crate::prelude::*;
+use crate::util::zip_eq;
 
 use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::io::Read;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use crate::config::EarlyExitUpTo;
@@ -51,7 +53,27 @@ const STL_FILES_FEATURE_XPM: &[&str] = &[
     "fifo.sus",
 ];
 
+pub const TOPS_FILE_ID: &str = "__top_modules";
+
 impl Linker {
+    /// Add a file with all custom --top modules the user specifies, such that they can be synthesized with parameters
+    pub fn add_tops_file(&mut self) {
+        use std::fmt::Write;
+        let mut top_modules_builtin_file = String::new();
+        for top in &config().top_modules {
+            // Create a module with a single declaration: the top specified.
+            writeln!(top_modules_builtin_file, "module _top {{{top} _}}").unwrap();
+        }
+
+        self.add_or_update_file_text(
+            UniqueFileID {
+                inode: None,
+                name: TOPS_FILE_ID.to_string(),
+            },
+            top_modules_builtin_file,
+            true,
+        );
+    }
     pub fn add_standard_library(&mut self) {
         assert!(self.modules.is_empty());
         assert!(self.types.is_empty());
@@ -124,12 +146,11 @@ impl Linker {
         }
     }
 
-    // When --feature lsp is not used, this gives a warning
-    #[allow(dead_code)]
     pub fn add_or_update_file_text(
         &mut self,
         file_identifier: UniqueFileID,
         text: String,
+        is_tops: bool,
     ) -> FileUUID {
         let mut parser = Parser::new();
         parser.set_language(&tree_sitter_sus::language()).unwrap();
@@ -154,6 +175,7 @@ impl Linker {
                 associated_values: Vec::new(),
                 parsing_errors: ErrorStore::new(),
                 is_std: false,
+                is_tops,
                 ariadne_source: OnceCell::new(),
             })
         };
@@ -184,7 +206,7 @@ impl Linker {
             )
         };
 
-        self.add_or_update_file_text(file_identifier, file_content)
+        self.add_or_update_file_text(file_identifier, file_content, false)
     }
 
     pub fn find_file(&self, file_identifier: &UniqueFileID) -> Option<FileUUID> {
@@ -301,41 +323,46 @@ impl Linker {
                 // Already instantiate any modules without parameters
                 // Can immediately instantiate modules that have no template args
                 if md.link_info.parameters.is_empty() {
-                    tops.push(ConcreteGlobalReference {
-                        id,
-                        template_args: FlatAlloc::new(),
-                    });
+                    if let Ok(instantiated) = self.instantiator.instantiate(
+                        &self.globals,
+                        &self.files,
+                        ConcreteGlobalReference {
+                            id,
+                            template_args: FlatAlloc::new(),
+                        },
+                    ) {
+                        tops.push(instantiated.global_ref.deref().clone());
+                    }
+                } else {
+                    let md_name = md.link_info.display_full_name();
+                    error!("Cannot instantiate {md_name} due to errors");
                 }
             }
         } else {
-            for top in &config.top_modules {
-                match self.get_by_name(top) {
-                    Ok(GlobalObj::Module(id)) => {
-                        let md = &self.modules[id];
-                        if md.link_info.parameters.is_empty() {
-                            tops.push(ConcreteGlobalReference {
-                                id,
-                                template_args: FlatAlloc::new(),
-                            });
-                        } else {
-                            let md_with_args = md.link_info.display_full_name_and_args::<false>(
-                                &self.files[md.link_info.span.file].file_text,
-                            );
-                            fatal_exit!(
-                                "Can't instantiate module {md_with_args} as top-level module, because it has parameters"
-                            )
-                        }
-                    }
-                    Ok(obj) => {
-                        let kind = obj.get_kind_name();
-                        fatal_exit!("{kind} {top} is not a module! It can't be a --top");
-                    }
-                    Err(e) => fatal_exit!("{}", e.get_main_message()),
+            let tops_file = self.files.find(|_, file| file.is_tops).unwrap();
+            let tops_file = &self.files[tops_file];
+            for (top_name, md_id) in zip_eq(&config.top_modules, &tops_file.associated_values) {
+                // Weird parsing formulations may invalidate the parsing of the module
+                let GlobalObj::Module(md_id) = *md_id else {
+                    continue;
+                };
+
+                if let Ok(instantiated) = self.instantiator.instantiate(
+                    &self.globals,
+                    &self.files,
+                    ConcreteGlobalReference {
+                        id: md_id,
+                        template_args: FlatAlloc::new(),
+                    },
+                ) && let Some((_, submod)) = instantiated.submodules.iter().next()
+                {
+                    tops.push(submod.refers_to.clone());
+                } else {
+                    error!("Cannot instantiate --top \"{top_name}\" due to errors");
                 }
             }
         }
-        self.instantiator
-            .instantiate_tops(&self.globals, &self.files, tops);
+        self.instantiator.tops = tops;
 
         self.assert_no_duplicate_names();
     }

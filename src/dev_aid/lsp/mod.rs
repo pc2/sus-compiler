@@ -402,6 +402,8 @@ fn initialize_all_files(linker: &mut Linker, init_params: &InitializeParams) {
                 .expect(&f.file_identifier.name)
                 .to_string();
     }
+
+    linker.add_tops_file();
 }
 
 fn goto_definition(linker: &mut Linker, file_id: FileUUID, pos: usize) -> Vec<Span> {
@@ -645,7 +647,7 @@ fn handle_notification(
             let Ok(file_identifier) = UniqueFileID::from_uri(&params.text_document.uri) else {
                 return;
             };
-            linker.add_or_update_file_text(file_identifier, only_change.text);
+            linker.add_or_update_file_text(file_identifier, only_change.text, false);
 
             *should_recompile = ShouldRecompile::Dirty;
         }
@@ -715,7 +717,7 @@ fn handle_notification(
                 // We should however make sure the identifier is whatever the client sent us.
                 linker.files[file_id].file_identifier = unique_file_id;
             } else {
-                linker.add_or_update_file_text(unique_file_id, params.text_document.text);
+                linker.add_or_update_file_text(unique_file_id, params.text_document.text, false);
 
                 *should_recompile = ShouldRecompile::Dirty;
             }
