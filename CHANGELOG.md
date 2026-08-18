@@ -1,4 +1,32 @@
 # Changelog
+## 0.5.0: `reg(N)`, `next(N)`, various small fixes
+- Add parameter to the `reg(N)` keyword
+- Add the `next(N)` keyword (#103)
+- Add port latency inference for "weak" (input/input, output/output) port connections
+- Fix unsized generative arrays caused ICE (#159)
+- Group all named wires at the top for easier waveforming
+- Optimization: Remove muxes that only have one input. In some cases Vivado wasn't properly optimizing them out itself. 
+- Lint: Add "wire is never written to"
+- Lint: Add "wire is effectively constant"
+- Implement `--top` with arguments (#163)
+- Fix non-optimized divides didn't codegen a semicolon. 
+- Improve hover info slightly
+
+### Standard Library
+- Separate out `fifo.sus` from `memory.sus`
+- Refine `--feature xpm` not to use `xpm`'s FIFOs, because they're terrible. 
+- Add `DPRAM`
+- Add `Semaphore`
+- Add `SharedAcquireSemaphore`
+- Add `LatencyCut`
+- Add `JoiningFIFO`
+- Add `Revamp TreeAdd`
+- Add `TreeMin`
+- Add `TreeMax`
+- Add `ResetLengthener`
+- Add `SlowPut`
+- `RippleFIFO` now has a `DATA_LATENCY` parameter, for more flexibility
+
 ## 0.4.0: Standard Library Changes, Clock Domains and more Documentation!
 SUS 0.4.0 brings with it clock domains as a language feature, a major rework of the standard library, as well as much-improved documentation generation and automatic testbench stub generation. 
 
