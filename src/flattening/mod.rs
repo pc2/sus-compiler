@@ -342,8 +342,8 @@ pub enum WireReferenceRoot {
     /// }
     /// ```
     ///
-    /// [FlatID] points to [Instruction::Interface]
-    LocalInterface(FlatID),
+    /// [FlatID] points to [Instruction::Interface] which is a trigger.
+    LocalTrigger(FlatID),
     /// ```sus
     /// bool b = true // root is global constant `true`
     /// ```
@@ -361,7 +361,7 @@ impl WireReferenceRoot {
         match self {
             WireReferenceRoot::LocalDecl(f) => Some(*f),
             WireReferenceRoot::LocalSubmodule(f) => Some(*f),
-            WireReferenceRoot::LocalInterface(f) => Some(*f),
+            WireReferenceRoot::LocalTrigger(f) => Some(*f),
             WireReferenceRoot::NamedConstant(_) => None,
             WireReferenceRoot::NamedModule(_) => None,
             WireReferenceRoot::Error => None,

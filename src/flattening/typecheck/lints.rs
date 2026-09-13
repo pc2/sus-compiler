@@ -51,7 +51,7 @@ impl LintContext<'_> {
                         .info_obj(decl);
                 }
             }
-            WireReferenceRoot::LocalInterface(interface_decl_id) => {
+            WireReferenceRoot::LocalTrigger(interface_decl_id) => {
                 let _ = self.working_on.instructions[*interface_decl_id].unwrap_interface();
             }
             WireReferenceRoot::LocalSubmodule(submod_decl_id) => {
@@ -413,11 +413,11 @@ impl LintContext<'_> {
                         instruction_fanins[instr_id].push(id);
                     });
                 }
-                Instruction::Interface(stm) => {
-                    if let Some(lat_spec) = stm.latency_specifier {
+                Instruction::Interface(act) => {
+                    if let Some(lat_spec) = act.latency_specifier {
                         instruction_fanins[instr_id].push(lat_spec);
                     }
-                    for id in FlatIDRange::new(stm.then_block.0, stm.else_block.1) {
+                    for id in FlatIDRange::new(act.then_block.0, act.else_block.1) {
                         if let Instruction::Expression(Expression {
                             output: ExpressionOutput::MultiWrite(writes),
                             ..
@@ -441,9 +441,22 @@ impl LintContext<'_> {
                             self.working_on.instructions[fc.func_wire_ref].unwrap_expression();
                         if let ExpressionSource::WireRef(fc_wr) = &wr_expr.source {
                             match &fc_wr.root {
-                                WireReferenceRoot::LocalSubmodule(fc_target)
-                                | WireReferenceRoot::LocalInterface(fc_target) => {
+                                WireReferenceRoot::LocalSubmodule(fc_target) => {
                                     instruction_fanins[*fc_target].push(instr_id);
+                                }
+                                WireReferenceRoot::LocalTrigger(trig_id) => {
+                                    instruction_fanins[*trig_id].push(instr_id);
+
+                                    let trig_decl =
+                                        self.working_on.instructions[*trig_id].unwrap_interface();
+
+                                    // User might have targeted an action, in that case just ignore their error.
+                                    if matches!(trig_decl.interface_kind, InterfaceKind::Trigger(_))
+                                    {
+                                        for o in &trig_decl.outputs {
+                                            instruction_fanins[instr_id].push(*o);
+                                        }
+                                    }
                                 }
                                 WireReferenceRoot::LocalDecl(_)
                                 | WireReferenceRoot::NamedConstant(_)
@@ -469,6 +482,18 @@ impl LintContext<'_> {
                 Instruction::IfStatement(stm) => {
                     for id in FlatIDRange::new(stm.then_block.0, stm.else_block.1) {
                         instruction_fanins[id].push(stm.condition);
+                    }
+
+                    let condition = &self.working_on.instructions[stm.condition];
+                    if let Instruction::Expression(cond_expr) = &condition
+                        && let ExpressionSource::WireRef(cond_ref) = &cond_expr.source
+                        && let Some(local_submod) = cond_ref.root.get_root_flat()
+                        && let Instruction::SubModule(_) =
+                            &self.working_on.instructions[local_submod]
+                    {
+                        for o in &stm.bindings_writable {
+                            instruction_fanins[local_submod].push(*o);
+                        }
                     }
                 }
                 Instruction::ForStatement(stm) => {
@@ -583,7 +608,7 @@ impl LintContext<'_> {
                 continue;
             };
 
-            let WireReferenceRoot::LocalInterface(interf) = &fc_func_wireref.root else {
+            let WireReferenceRoot::LocalTrigger(interf) = &fc_func_wireref.root else {
                 continue;
             };
 
@@ -618,7 +643,7 @@ impl LintContext<'_> {
                 self.working_on.instructions[*decl_id].unwrap_declaration()
             }
             WireReferenceRoot::LocalSubmodule(_)
-            | WireReferenceRoot::LocalInterface(_)
+            | WireReferenceRoot::LocalTrigger(_)
             | WireReferenceRoot::NamedConstant(_)
             | WireReferenceRoot::NamedModule(_)
             | WireReferenceRoot::Error => return,

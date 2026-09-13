@@ -1944,3 +1944,23 @@ module TestIntersectingValues {
 		state_values_nointersect[1] = 1
 	}
 }
+
+module CallTrigger {
+	trigger request_dependency : bool din -> bool dout
+
+	action do_req : bool ind -> bool outd {
+		outd = request_dependency(ind)
+	}
+}
+
+module BindTrigger {
+	CallTrigger my_submod
+
+	when my_submod.request_dependency : bool bind_din -> bool bind_dout {
+		bind_dout = !bind_din
+	}
+
+    action do_req : bool ind -> bool outd {
+        outd = my_submod.do_req(ind)
+    }
+}

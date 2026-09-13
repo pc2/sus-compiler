@@ -243,7 +243,7 @@ impl WireReference {
             match &self.root {
                 WireReferenceRoot::LocalDecl(decl_id)
                 | WireReferenceRoot::LocalSubmodule(decl_id)
-                | WireReferenceRoot::LocalInterface(decl_id) => {
+                | WireReferenceRoot::LocalTrigger(decl_id) => {
                     let decl_name = link_info.debug_name(globals, *decl_id);
                     write!(f, "{decl_name}")?
                 }

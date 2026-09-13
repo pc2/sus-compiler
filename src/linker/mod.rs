@@ -139,7 +139,7 @@ impl LinkInfo {
                     WireReferenceRoot::LocalSubmodule(submod_id) => {
                         &self.instructions[*submod_id].unwrap_submodule().name
                     }
-                    WireReferenceRoot::LocalInterface(interface_id) => {
+                    WireReferenceRoot::LocalTrigger(interface_id) => {
                         &self.instructions[*interface_id].unwrap_interface().name
                     }
                     WireReferenceRoot::NamedConstant(global_reference) => {

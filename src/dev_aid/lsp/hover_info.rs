@@ -280,7 +280,7 @@ pub fn hover(info: LocationInfo, linker: &Linker) -> Vec<MarkedString> {
             let all_instances = linker.get_all_instances_for_module(in_global);
             hover.hover_decl(linker, in_global, *decl_id, &all_instances);
         }
-        LocationKind::WireRefRoot(WireReferenceRoot::LocalInterface(interface_id)) => {
+        LocationKind::WireRefRoot(WireReferenceRoot::LocalTrigger(interface_id)) => {
             let in_global = info.in_global.unwrap();
             let all_instances = linker.get_all_instances_for_module(in_global);
             hover.hover_interface(linker, in_global, *interface_id, &all_instances);

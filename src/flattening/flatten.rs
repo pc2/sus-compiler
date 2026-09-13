@@ -1128,7 +1128,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             }
                         }
                         NamedLocal::LocalInterface(instr) => {
-                            let root = WireReferenceRoot::LocalInterface(instr);
+                            let root = WireReferenceRoot::LocalTrigger(instr);
                             WireReference {
                                 root,
                                 output_typ: AbstractRankedType::UNKNOWN,

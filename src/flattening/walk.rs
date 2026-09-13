@@ -51,7 +51,7 @@ impl WireReference {
         match &self.root {
             WireReferenceRoot::LocalDecl(decl_id) => collect(*decl_id),
             WireReferenceRoot::LocalSubmodule(submod_decl) => collect(*submod_decl),
-            WireReferenceRoot::LocalInterface(interface_decl) => collect(*interface_decl),
+            WireReferenceRoot::LocalTrigger(interface_decl) => collect(*interface_decl),
             WireReferenceRoot::NamedConstant(cst) => {
                 cst.for_each_generative_input(collect);
             }

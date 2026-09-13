@@ -167,7 +167,7 @@ impl<'linker> LocationInfo<'linker> {
                         link_info.instructions[*id].unwrap_submodule(),
                         *id,
                     )),
-                    WireReferenceRoot::LocalInterface(id) => {
+                    WireReferenceRoot::LocalTrigger(id) => {
                         Some(Self::refer_to_interface(linker, in_global, *id))
                     }
                     WireReferenceRoot::NamedConstant(_) | WireReferenceRoot::NamedModule(_) => {

@@ -650,7 +650,7 @@ impl<'l> ExecutionContext<'l> {
                     wire_ref.root_span,
                 )?
             }
-            WireReferenceRoot::LocalInterface(_) | WireReferenceRoot::NamedModule(_) => {
+            WireReferenceRoot::LocalTrigger(_) | WireReferenceRoot::NamedModule(_) => {
                 caught_by_typecheck!("Can't turn an inline module into a wire")
             }
             WireReferenceRoot::Error => caught_by_typecheck!(),
@@ -1040,7 +1040,7 @@ impl<'l> ExecutionContext<'l> {
                     parent_clock,
                 ))
             }
-            WireReferenceRoot::LocalInterface(interface_decl) => {
+            WireReferenceRoot::LocalTrigger(interface_decl) => {
                 let interface = self.link_info.instructions[*interface_decl].unwrap_interface();
                 if !interface_ref.path.is_empty() {
                     todo!("Can't yet work with sub-interfaces");
@@ -1297,7 +1297,7 @@ impl<'l> ExecutionContext<'l> {
             }
             WireReferenceRoot::LocalSubmodule(_)
             | WireReferenceRoot::NamedModule(_)
-            | WireReferenceRoot::LocalInterface(_) => {
+            | WireReferenceRoot::LocalTrigger(_) => {
                 todo!("Don't yet support compile time functions")
             }
             WireReferenceRoot::Error => {

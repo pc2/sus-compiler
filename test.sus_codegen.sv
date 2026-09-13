@@ -1,3 +1,110 @@
+// BindTrigger #()
+module BindTrigger(
+	/* clock */ input clk,
+	input wire do_req,
+	input wire ind,
+	output /*mux_wire*/ logic outd
+);
+
+/*mux_wire*/ logic bind_din;
+/*mux_wire*/ logic bind_dout;
+wire _my_submod_request_dependency;
+wire _my_submod_din;
+/*mux_wire*/ logic _my_submod_dout;
+wire _2;
+assign _2 = ~bind_din;
+/*mux_wire*/ logic _my_submod_do_req;
+/*mux_wire*/ logic _my_submod_ind;
+wire _my_submod_outd;
+CallTrigger my_submod(
+	.clk(clk),
+	.request_dependency(_my_submod_request_dependency),
+	.din(_my_submod_din),
+	.dout(_my_submod_dout),
+	.do_req(_my_submod_do_req),
+	.ind(_my_submod_ind),
+	.outd(_my_submod_outd)
+);
+always_comb begin // combinatorial _my_submod_dout
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_my_submod_dout = 1'bx;
+	_my_submod_dout = bind_dout;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_my_submod_dout = _my_submod_dout;
+end
+always_comb begin // combinatorial bind_din
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	bind_din = 1'bx;
+	bind_din = _my_submod_din;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	bind_din = bind_din;
+end
+always_comb begin // combinatorial bind_dout
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	bind_dout = 1'bx;
+	bind_dout = _2;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	bind_dout = bind_dout;
+end
+always_comb begin // combinatorial outd
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	outd = 1'bx;
+	outd = _my_submod_outd;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	outd = outd;
+end
+always_comb begin // combinatorial _my_submod_do_req
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_my_submod_do_req = 1'bx;
+	_my_submod_do_req = 1'b0;
+	if(do_req) _my_submod_do_req = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_my_submod_do_req = _my_submod_do_req;
+end
+always_comb begin // combinatorial _my_submod_ind
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_my_submod_ind = 1'bx;
+	_my_submod_ind = ind;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_my_submod_ind = _my_submod_ind;
+end
+endmodule // BindTrigger #()
+
+// CallTrigger #()
+module CallTrigger(
+	/* clock */ input clk,
+	output /*mux_wire*/ logic request_dependency,
+	output /*mux_wire*/ logic din,
+	input wire dout,
+	input wire do_req,
+	input wire ind,
+	output /*mux_wire*/ logic outd
+);
+
+always_comb begin // combinatorial request_dependency
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	request_dependency = 1'bx;
+	request_dependency = 1'b0;
+	if(do_req) request_dependency = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	request_dependency = request_dependency;
+end
+always_comb begin // combinatorial din
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	din = 1'bx;
+	din = ind;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	din = din;
+end
+always_comb begin // combinatorial outd
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	outd = 1'bx;
+	outd = dout;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	outd = outd;
+end
+endmodule // CallTrigger #()
+
 // TestIntersectingValues #()
 module TestIntersectingValues(
 	/* clock */ input clk,

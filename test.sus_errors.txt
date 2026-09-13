@@ -191,6 +191,8 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestUnknownSizeArray #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated UnknownSizeArraySynth #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestIntersectingValues #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated CallTrigger #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated BindTrigger #()
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -2659,13 +2661,6 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
  1139 │     interface infer_me : bool x'0 -> bool y'A
       │               ────┬───  
       │                   ╰───── Interface 'infer_me' defined here
-──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1153:51 ]
-      │
- 1153 │     trigger request_data'0 : -> int#(FROM: 0, TO: 6) data_received'3
-      │                                                      ──────┬──────  
-      │                                                            ╰──────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused port 'may_pop'
       ╭─[ test.sus:1155:20 ]
@@ -5618,3 +5613,5 @@ Warning: state_values_nointersect is effectively constant. Declare this wire as 
 [INFO  sus_compiler::codegen] Code generated for TestNexts #() as "TestNexts"
 [INFO  sus_compiler::codegen] Code generated for UnknownSizeArraySynth #() as "UnknownSizeArraySynth"
 [INFO  sus_compiler::codegen] Code generated for TestIntersectingValues #() as "TestIntersectingValues"
+[INFO  sus_compiler::codegen] Code generated for CallTrigger #() as "CallTrigger"
+[INFO  sus_compiler::codegen] Code generated for BindTrigger #() as "BindTrigger"

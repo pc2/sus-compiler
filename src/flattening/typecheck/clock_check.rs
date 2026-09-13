@@ -275,7 +275,7 @@ impl<'l> TypeCheckingContext<'l> {
                 self.unifier
                     .clone_known(&self.instructions[*id].unwrap_declaration().clock_domain),
             ),
-            WireReferenceRoot::LocalInterface(id) => {
+            WireReferenceRoot::LocalTrigger(id) => {
                 let interface = self.instructions[*id].unwrap_interface();
 
                 Some(Physical(self.unifier.clone_unify(&interface.clock_domain)))

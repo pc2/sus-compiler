@@ -75,7 +75,7 @@ impl<'l> TypeCheckingContext<'l> {
         match &wr.root {
             WireReferenceRoot::LocalDecl(_)
             | WireReferenceRoot::LocalSubmodule(_)
-            | WireReferenceRoot::LocalInterface(_)
+            | WireReferenceRoot::LocalTrigger(_)
             | WireReferenceRoot::Error => {}
             WireReferenceRoot::NamedConstant(global_ref) => {
                 self.initialize_global_ref(global_ref);
@@ -117,7 +117,7 @@ impl<'l> TypeCheckingContext<'l> {
                 let submod = self.instructions[*submod_decl].unwrap_submodule();
                 self.unifier.clone_known(&submod.typ)
             }
-            WireReferenceRoot::LocalInterface(interface_decl) => {
+            WireReferenceRoot::LocalTrigger(interface_decl) => {
                 let _ = self.instructions[*interface_decl].unwrap_interface();
                 AbstractInnerType::LocalInterface(*interface_decl).scalar()
             }
