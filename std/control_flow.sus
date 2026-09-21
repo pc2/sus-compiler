@@ -469,3 +469,133 @@ module SharedAcquireSemaphore#(int MAX, int INITIAL_PERMITS, int NUM_SEMAPHORES)
         }
     }
 }
+
+
+/// MultiReduction processes multiple concurrent reductions through a single shared `reduction_operator`. 
+/// 
+/// New to-be-reduced data is fed in through the `push()` interface. To accomodate the fact that it
+/// usually takes a few cycles to produce the input data, a latency-inferred parameter `DATA_IN_LATENCY` 
+/// is provided that separates the control flow (`may_push`/`push()`/`finish_reduction`), from the data.
+///
+/// A reduction operator is supplied by binding the `reduction_operator` trigger. It takes two arguments 
+/// and produces a single output after exactly `OPERATOR_LATENCY` cycles.
+///
+/// In this module we use the term "wave" to describe all independent elements coming in together.
+/// There can be between 1 and `MAX_DATAS` elements in a wave, the size of which is determined by
+/// measuring how long the first wave is until `last_in_wave` is asserted. Elements in subsequent
+/// waves are assumed to correspond to the elements in the first wave. 
+///
+/// Through the `may_push` backpressure interface, the module ensures that the prior reductions for the
+/// current element have finished, before allowing the next wave for this element to begin. This prevents
+/// operation on stale data. This backpressure only affects the throughput of the module in cases where
+/// the current wave is smaller than `OPERATOR_LATENCY + 2`. When the current wave is larger 100% throughput
+/// is possible.
+///
+/// To simplify implementation of the internal memory, the very first element is added on to `NEUTRAL_ELEMENT`. 
+///
+/// Usage example:
+/// ```sus
+/// module MultiplyReductions {
+///     MultiReduction#(NEUTRAL_ELEMENT: 1.0, MAX_DATAS: 16) mr
+/// 
+///     when mr.reduction_operator : float op_left, float op_right -> float op_result {
+///         op_result = fp32_mul(op_left, op_right)
+///     }
+/// 
+///     domain main
+///     input bool values_to_mul_valid
+///     input float[16] values_to_mul
+///     input bool values_to_mul_last
+///     trigger take_next_values
+///     state int#(FROM: 0, TO: 16) cur_idx
+///     state float[16] multiplied_results_store
+///     trigger push_multiplied_results : float[16] multiplied_results
+///     when values_to_mul_valid & mr.may_push {
+///         float input_val = fp32_add(3.14, values_to_mul[cur_idx])
+/// 
+///         bool is_last_in_wave = cur_idx == 15
+///         mr.push(input_val, is_last_in_wave)
+///         when is_last_in_wave {
+///             take_next_values()
+///         }
+///         when values_to_mul_last {
+///             multiplied_results_store[cur_idx] = mr.finish_reduction()
+/// 
+///             when is_last_in_wave {
+///                 push_multiplied_results(multiplied_results_store)
+///             }
+///         }
+///         cur_idx = cur_idx + 1 mod 16
+///     }
+/// 
+///     domain reset
+///     action rst {
+///         mr.rst()
+///     }
+/// }
+/// ```
+module MultiReduction#(T, T NEUTRAL_ELEMENT, int OPERATOR_LATENCY, int DATA_IN_LATENCY, int MAX_DATAS) {
+    gen int TOTAL_OPERATOR_LATENCY = OPERATOR_LATENCY + 2
+    state int#(FROM: 0, TO: MAX_DATAS) cur_data_idx
+    state int#(FROM: 0, TO: TOTAL_OPERATOR_LATENCY+1) num_datas_in_wave
+    state int#(FROM: 0, TO: TOTAL_OPERATOR_LATENCY) num_reductions_in_flight
+    int increment_num_reductions_in_flight = 0
+    int decrement_num_reductions_in_flight = 0
+    num_reductions_in_flight = IntNarrow#(FROM: 0, TO: TOTAL_OPERATOR_LATENCY)(num_reductions_in_flight + increment_num_reductions_in_flight - decrement_num_reductions_in_flight)
+
+
+    state bool is_initial_wave
+    state T[MAX_DATAS] store'DATA_IN_LATENCY-1
+
+    domain operator_dom
+    trigger reduction_operator'DATA_IN_LATENCY : T op_left'DATA_IN_LATENCY, T op_right'DATA_IN_LATENCY -> T op_result'DATA_IN_LATENCY+OPERATOR_LATENCY
+
+    domain push_dom
+    output bool may_push'0 = num_reductions_in_flight <= num_datas_in_wave | is_initial_wave
+    action push'0: T value_to_reduce'DATA_IN_LATENCY, bool last_in_wave'0 {
+        T existing_data
+        when is_initial_wave {
+            reg existing_data = NEUTRAL_ELEMENT
+        } else {
+            reg existing_data = store[cur_data_idx]
+        }
+
+        T combined = reduction_operator(existing_data, value_to_reduce)
+        next(OPERATOR_LATENCY+1) store[cur_data_idx] = combined
+        
+        increment_num_reductions_in_flight = 1
+        next(OPERATOR_LATENCY+2) decrement_num_reductions_in_flight = 1
+
+        action finish_reduction'0 : -> T reduced_data'noinfer#(V: DATA_IN_LATENCY+OPERATOR_LATENCY) {
+            reduced_data = combined
+            when last_in_wave {
+                is_initial_wave = true
+            }
+        } else {
+            when last_in_wave {
+                is_initial_wave = false
+            }
+        }
+
+        when last_in_wave {
+            when is_initial_wave {
+                when cur_data_idx > TOTAL_OPERATOR_LATENCY {
+                    num_datas_in_wave = TOTAL_OPERATOR_LATENCY
+                } else {
+                    num_datas_in_wave = IntNarrow#(FROM: 0, TO: TOTAL_OPERATOR_LATENCY+1)(cur_data_idx)
+                }
+            }
+            
+            cur_data_idx = 0
+        } else {
+            cur_data_idx = IntNarrow#(FROM: 0, TO: MAX_DATAS)(cur_data_idx + 1)
+        }
+    }
+
+    domain reset
+    action rst {
+        cur_data_idx = 0
+        num_reductions_in_flight = 0
+        is_initial_wave = true
+    }
+}

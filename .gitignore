@@ -9,6 +9,7 @@
 **/*.tmp
 **/*.log
 **/*.jou
+**/*.str
 verilog_output/
 crash_dumps/
 dot_output/
