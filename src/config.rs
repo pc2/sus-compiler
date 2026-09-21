@@ -71,6 +71,7 @@ pub struct ConfigStruct {
     pub sus_home: PathBuf,
     pub codegen_file: Option<PathBuf>,
     pub codegen_separate_folder: Option<PathBuf>,
+    pub codegen_optimization: bool,
     pub gen_tb: bool,
     pub gen_docs: Option<GenDocs>,
     /// When no top modules specified, then codegen all
@@ -155,6 +156,10 @@ fn command_builder() -> Command {
             .help("Sets the target HDL")
             .requires("codegen-enabled")
             .value_parser(clap::builder::EnumValueParser::<TargetLanguage>::new()))
+        .arg(Arg::new("no-optimization")
+            .long("no-optimization")
+            .help("Disable X Optimization, which makes testbenches a bit easier to read")
+            .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("gen-tb")
             .long("gen-tb")
             .help("Generate testbench stubs for all --top modules to stdout")
@@ -381,6 +386,8 @@ pub fn parse_args() {
             }
         });
 
+    let codegen_optimization = !matches.get_flag("no-optimization");
+
     if target_language == TargetLanguage::Vhdl {
         fatal_exit!(
             "VHDL as a target code generation language is not yet supported. Use SystemVerilog instead"
@@ -417,6 +424,7 @@ pub fn parse_args() {
         files,
         codegen_file,
         codegen_separate_folder,
+        codegen_optimization,
         gen_tb,
         gen_docs,
         top_modules,
@@ -443,6 +451,7 @@ pub fn init_cfg_for_test() {
         files: Vec::new(),
         codegen_file: None,
         codegen_separate_folder: None,
+        codegen_optimization: true,
         gen_tb: false,
         gen_docs: None,
         top_modules: Vec::new(),

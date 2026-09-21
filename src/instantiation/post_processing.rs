@@ -1,6 +1,7 @@
 use super::*;
 
 use crate::{
+    config::config,
     instantiation::{ModuleTypingContext, paths::PathRange},
     util::zip_eq,
 };
@@ -59,6 +60,9 @@ impl<'l> ModuleTypingContext<'l> {
     /// It's needed because it seems that sometimes vivado can't optimize out the mux in `result = cond ? value : 'x`.
     /// It turned out in one case that this was needed, so I have the compiler itself do it.
     fn remove_unconditional_muxes(&mut self) {
+        if !config().codegen_optimization {
+            return;
+        }
         for wire_id in self.wires.id_range() {
             let w = &self.wires[wire_id];
             let RealWireDataSource::Multiplexer { is_state, sources } = &w.source else {
