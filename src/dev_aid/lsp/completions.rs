@@ -288,7 +288,10 @@ where
                     // If there's a declaration by that name, we don't need the colon, we can simply insert the name and it'll map immediately.
                     param_decl.name.clone()
                 } else {
-                    format!("{}: ", param_decl.name)
+                    match param_decl.kind {
+                        TemplateKind::Type(_) => format!("{}: type ", param_decl.name),
+                        TemplateKind::Value(_) => format!("{}: ", param_decl.name),
+                    }
                 },
             );
             completions.push(CompletionItem {
