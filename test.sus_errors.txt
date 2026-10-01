@@ -107,7 +107,6 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_infer_me #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated infer_me #(A: 5)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated infer_from_local_context #()
-[INFO  sus_compiler::instantiation::instantiator] Instantiated LatencyOffset #(T: type bool #(), OFFSET: -9)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated ToBits #(T: type int #(FROM: 0, TO: 6))
 [INFO  sus_compiler::instantiation::instantiator] Instantiated FromBits #(T: type int #(FROM: 0, TO: 6))
 [INFO  sus_compiler::instantiation::instantiator] Instantiated FIFO #(T: type int #(FROM: 0, TO: 6), DEPTH: 30, MAY_PUSH_LATENCY: 8)

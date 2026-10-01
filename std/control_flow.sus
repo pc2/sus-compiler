@@ -49,7 +49,7 @@ module SlowState #(T, int DELAY) {
     state bool[DELAY] wait_for_slow
 
     T new_value_slow_d'DELAY
-    T new_value_slow_0'0 = LatencyOffset#(OFFSET: -DELAY)(new_value_slow_d)   
+    next(DELAY) T new_value_slow_0'0 = new_value_slow_d   
     if DELAY != 0 { 
         when wait_for_slow[DELAY-1] {
             old_is_stable = true
@@ -103,8 +103,8 @@ module SlowStateAdvanced #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
     T new_s'NEW_DELAY
     bool update_s'0
 
-    bool update_old'-OLD_DELAY = LatencyOffset#(OFFSET: -UPDATE_TOTAL_DEPTH)(update_s) // Despite their differing absolute latency, they of course need to be set back by the same amount, potentially introducing a pipeline stage
-    T new_old'-OLD_DELAY = LatencyOffset#(OFFSET: -UPDATE_TOTAL_DEPTH)(new_s)
+    next(UPDATE_TOTAL_DEPTH) bool update_old'-OLD_DELAY = update_s // Despite their differing absolute latency, they of course need to be set back by the same amount, potentially introducing a pipeline stage
+    next(UPDATE_TOTAL_DEPTH) T new_old'-OLD_DELAY = new_s
     when do_rst {
         old = RESET_TO
     } else when update_old {
@@ -168,7 +168,7 @@ module SlowPipelineEnd#(T, int PIPELINE_DEPTH) {
     if PIPELINE_DEPTH == 0 {
         pipeline_stable(din)
     } else {
-        T pipe_out = LatencyOffset#(OFFSET: -PIPELINE_DEPTH)(din)
+        next(PIPELINE_DEPTH) T pipe_out = din
         when cooldown[0] {
             pipeline_stable(pipe_out)
         }
@@ -217,7 +217,7 @@ module SlowPipelineBegin#(T, int PIPELINE_DEPTH) {
         dout = din
         pipeline_stable()
     } else {
-        dout = LatencyOffset#(OFFSET: -PIPELINE_DEPTH)(din)
+        next(PIPELINE_DEPTH) dout = din
         when cooldown[0] {
             pipeline_stable()
         }
@@ -322,7 +322,7 @@ module ParallelWhile #(int COMPUTATION_LATENCY, int REQUEST_DATA_LATENCY) {
     initial cur_iter_st = 0
 
     bool should_continue'COMPUTATION_LATENCY
-    bool do_continue'-REQUEST_DATA_LATENCY = LatencyOffset#(OFFSET: -TOTAL_CYCLES)(should_continue)
+    next(TOTAL_CYCLES) bool do_continue'-REQUEST_DATA_LATENCY = should_continue
 
     // Increment by one every cycle, no matter if we're processing or not
     cur_iter_st = (cur_iter_st + 1) % TOTAL_CYCLES

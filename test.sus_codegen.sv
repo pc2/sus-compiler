@@ -2366,9 +2366,7 @@ wire[4:0] _6;
 assign _6 = _5 + ((_5 < 0) ? 30 : 0); // == mod 30
 wire _9;
 assign _9 = space_remaining > 4'd9;
-/*mux_wire*/ logic _LatencyOffset_din;
-wire _LatencyOffset_dout;
-/*latency*/ logic __LatencyOffset_dout_N8; always_ff @(posedge clk) begin __LatencyOffset_dout_N8 <= _LatencyOffset_dout; end
+/*latency*/ logic __9_D1; always_ff @(posedge clk) begin __9_D1 <= _9; end
 /*mux_wire*/ logic[2:0] _ToBits_value;
 wire[2:0] _ToBits_bits;
 wire[4:0] _14;
@@ -2385,11 +2383,6 @@ wire[4:0] _24;
 assign _24 = read_addr + 1'd1;
 wire[4:0] _25;
 assign _25 = (_24 == 30) ? 0 : _24; // == mod 30
-LatencyOffset_T_type_bool_OFFSET_N9 LatencyOffset(
-	.clk(clk),
-	.din(_LatencyOffset_din),
-	.dout(_LatencyOffset_dout)
-);
 ToBits_T_type_int_FROM_0_TO_6 ToBits(
 	.clk(clk),
 	.value(_ToBits_value),
@@ -2419,16 +2412,9 @@ end
 always_comb begin // combinatorial may_push
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	may_push = 1'bx;
-	may_push = __LatencyOffset_dout_N8;
+	may_push = __9_D1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	may_push = may_push;
-end
-always_comb begin // combinatorial _LatencyOffset_din
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_LatencyOffset_din = 1'bx;
-	_LatencyOffset_din = _9;
-	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
-	_LatencyOffset_din = _LatencyOffset_din;
 end
 always_comb begin // combinatorial _ToBits_value
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -2478,16 +2464,6 @@ module ToBits_T_type_int_FROM_0_TO_6(
 
 assign bits = value;
 endmodule // ToBits #(T: type int #(FROM: 0, TO: 6))
-
-// LatencyOffset #(T: type bool #(), OFFSET: -9)
-module LatencyOffset_T_type_bool_OFFSET_N9(
-	/* clock */ input clk,
-	input wire din,
-	output /*mux_wire*/ logic dout
-);
-
-	assign dout = din;
-endmodule // LatencyOffset #(T: type bool #(), OFFSET: -9)
 
 // infer_from_local_context #()
 module infer_from_local_context(

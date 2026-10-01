@@ -38,7 +38,7 @@ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
 
     domain push_dom
     // Add in-built pipeline stage for may_push, since its computation is fairly complex, and it's in a latency tolerant path
-    reg output bool may_push'-MAY_PUSH_LATENCY = LatencyOffset #(OFFSET: -MAY_PUSH_LATENCY-1)(space_remaining > MAY_PUSH_LATENCY+1)
+    next(MAY_PUSH_LATENCY+1) reg output bool may_push'-MAY_PUSH_LATENCY = space_remaining > MAY_PUSH_LATENCY+1
     action push'0 : T push_data'0 {
         mem[write_addr] = ToBits(push_data)
         write_addr = write_addr + 1 mod DEPTH
@@ -139,7 +139,7 @@ module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {
 
     domain push_dom
     // Add in-built pipeline stage for may_push, since its computation is fairly complex, and it's in a latency tolerant path
-    reg output bool may_push'-MAY_PUSH_LATENCY = LatencyOffset #(OFFSET: -MAY_PUSH_LATENCY-1)(space_remaining > MAY_PUSH_LATENCY+1)
+    next(MAY_PUSH_LATENCY+1) reg output bool may_push'-MAY_PUSH_LATENCY = space_remaining > MAY_PUSH_LATENCY+1
     action push'0 : T push_data'0 {
         mem[write_addr] = ToBits(push_data)
         write_addr = write_addr + 1 mod DEPTH
@@ -231,12 +231,9 @@ module JoiningFIFO#(T, int NUM_FIFOS, int DEPTH, int MAY_PUSH_LATENCY) {
     input bool[NUM_FIFOS] pushes'0
     input T[NUM_FIFOS] datas'0
 
-    bool[NUM_FIFOS] internal_may_pushes
-    may_pushes = LatencyOffset #(OFFSET: -MAY_PUSH_LATENCY-1)(internal_may_pushes)
-
     for int I in 0..NUM_FIFOS {
 	    int space_remaining = (read_addr mod DEPTH) - (write_addrs[I] mod DEPTH) - 1 mod DEPTH
-        reg internal_may_pushes[I] = space_remaining > MAY_PUSH_LATENCY + 1
+        next(MAY_PUSH_LATENCY+1) reg may_pushes[I] = space_remaining > MAY_PUSH_LATENCY + 1
 
         when pushes[I] {
             memory[I][write_addrs[I] mod DEPTH] = ToBits(datas[I])
@@ -300,8 +297,7 @@ module ShiftReg#(T, int LATENCY) {
         initial cur_idx = 0
         cur_idx = cur_idx + 1 mod LATENCY-2
 
-        reg bool[T_WIDTH] bits_out = mem[cur_idx]
         mem[cur_idx] = bits_in
-        dout = FromBits(LatencyOffset#(OFFSET: LATENCY - 2)(bits_out))
+        next(LATENCY + 2) reg dout = FromBits(mem[cur_idx])
     }
 }
