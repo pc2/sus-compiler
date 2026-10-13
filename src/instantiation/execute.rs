@@ -798,7 +798,12 @@ impl<'l> ExecutionContext<'l> {
 
         Ok(self.wires.alloc(RealWire {
             typ: value
-                .concretize_type(self.globals, abs_typ, self.working_on_template_args)
+                .concretize_type(
+                    self.globals,
+                    name_hint,
+                    abs_typ,
+                    self.working_on_template_args,
+                )
                 .map_err(|msg| CompileError::error(const_span, msg))?,
             source: RealWireDataSource::Constant { value },
             original_instruction,

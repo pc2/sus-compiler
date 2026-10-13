@@ -236,6 +236,7 @@ impl Value {
     pub fn concretize_type(
         &self,
         _linker: &LinkerGlobals,
+        name: &str,
         abs_typ: &AbstractRankedType,
         template_args: &TVec<ConcreteTemplateArg>,
     ) -> Result<ConcreteType, String> {
@@ -244,14 +245,14 @@ impl Value {
 
         let content_typ = match abs_typ.inner.unwrap() {
             AbstractInnerType::Template(template_id) => {
-                self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |_| Ok(()))?;
+                self.get_tensor_size(name, array_depth, &mut tensor_sizes, &mut |_| Ok(()))?;
                 template_args[*template_id].unwrap_type().clone()
             }
             AbstractInnerType::Named(AbstractGlobalReference {
                 id: get_builtin_type!("bool"),
                 ..
             }) => {
-                self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |v| {
+                self.get_tensor_size(name, array_depth, &mut tensor_sizes, &mut |v| {
                     match v {
                         Value::Bool(_) => {}
                         Value::Integer(_)
@@ -278,7 +279,7 @@ impl Value {
                 id: get_builtin_type!("float"),
                 ..
             }) => {
-                self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |v| {
+                self.get_tensor_size(name, array_depth, &mut tensor_sizes, &mut |v| {
                     match v {
                         Value::Float(_) => {}
                         Value::Integer(_)
@@ -305,7 +306,7 @@ impl Value {
                 id: get_builtin_type!("double"),
                 ..
             }) => {
-                self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |v| {
+                self.get_tensor_size(name, array_depth, &mut tensor_sizes, &mut |v| {
                     match v {
                         Value::Double(_) => {}
                         Value::Integer(_) | Value::Bool(_) | Value::Float(_) | Value::String(_) => {
@@ -329,7 +330,7 @@ impl Value {
                 id: get_builtin_type!("string"),
                 ..
             }) => {
-                self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |v| {
+                self.get_tensor_size(name, array_depth, &mut tensor_sizes, &mut |v| {
                     match v {
                         Value::String(_) => {}
                         Value::Integer(_) | Value::Bool(_) | Value::Float(_) | Value::Double(_) => {
@@ -355,7 +356,7 @@ impl Value {
             }) => {
                 let mut min_max: Option<(&IBig, &IBig)> = None;
 
-                self.get_tensor_size_recursive(0, array_depth, &mut tensor_sizes, &mut |v| {
+                self.get_tensor_size(name, array_depth, &mut tensor_sizes, &mut |v| {
                     match v {
                         Value::Integer(v) => {
                             if let Some((min, max)) = &mut min_max {
@@ -421,13 +422,34 @@ impl Value {
         }
         Ok(content_typ.stack_arrays(array_size_vars))
     }
-    fn get_tensor_size_recursive<'v>(
+    /// Walks all arrays of `self` down to `max_depth`, filling in `tensor_sizes`, and calls `elem_fn` on each leaf.
+    /// Errors if the arrays are jagged.
+    fn get_tensor_size<'v>(
         &'v self,
-        depth: usize,
+        name: &str,
         max_depth: usize,
         tensor_sizes: &mut Vec<usize>,
         elem_fn: &mut impl FnMut(&'v Value) -> Result<(), String>,
     ) -> Result<(), String> {
+        self.get_tensor_size_recursive(
+            name,
+            max_depth,
+            tensor_sizes,
+            &mut Vec::with_capacity(max_depth),
+            elem_fn,
+        )
+    }
+    /// `index_path` is the list of indices that lead to `self` from the root value. Its length is the current depth.
+    /// On a size mismatch it is used to report which sub-array has the wrong size.
+    fn get_tensor_size_recursive<'v>(
+        &'v self,
+        name: &str,
+        max_depth: usize,
+        tensor_sizes: &mut Vec<usize>,
+        index_path: &mut Vec<usize>,
+        elem_fn: &mut impl FnMut(&'v Value) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let depth = index_path.len();
         if depth == max_depth {
             elem_fn(self)
         } else {
@@ -436,14 +458,26 @@ impl Value {
             };
             if let Some(sz) = tensor_sizes.get(depth) {
                 if *sz != values.len() {
-                    return Err("Value is a Jagged Tensor. This is not allowed!".into());
+                    let fmt_path = |path: &[usize]| -> String {
+                        let idxs: String = path.iter().map(|i| format!("[{i}]")).collect();
+                        format!("{name}{idxs}")
+                    };
+                    let this_path = fmt_path(index_path);
+                    // The expected size at this depth was taken from the first array encountered at this depth, which is at [0][0]...[0]
+                    let first_path = fmt_path(&vec![0; depth]);
+                    return Err(format!(
+                        "This array contains multiple arrays of different sizes. This is not allowed! {this_path} has size {}, but {first_path} has size {sz}",
+                        values.len()
+                    ));
                 }
             } else {
                 assert!(tensor_sizes.len() == depth);
                 tensor_sizes.push(values.len());
             }
-            for v in values {
-                v.get_tensor_size_recursive(depth + 1, max_depth, tensor_sizes, elem_fn)?;
+            for (idx, v) in values.iter().enumerate() {
+                index_path.push(idx);
+                v.get_tensor_size_recursive(name, max_depth, tensor_sizes, index_path, elem_fn)?;
+                index_path.pop();
             }
             Ok(())
         }
