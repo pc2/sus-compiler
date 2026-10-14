@@ -1989,3 +1989,23 @@ module OutOfBoundsSliceWrite {
 	output bool[4] b'0
 	b[i +: 2] = [true, true]
 }
+
+// Split wire bounds checking. Execute exits on the first error, so one module per case
+module SplitIndexTooLarge {
+	input bool y
+	split bool[3] x
+	x[0] = y
+	x[3] = y
+}
+module SplitIndexNegative {
+	input bool y
+	split bool[3] x
+	x[0] = y
+	x[-1] = y
+}
+module SplitIndexNegativeUnknownSize {
+	input bool y
+	split bool[] x
+	x[0] = y
+	x[-1] = y
+}

@@ -576,17 +576,36 @@ impl<'l> ExecutionContext<'l> {
                 let decl = self.link_info.instructions[decl_id].unwrap_declaration();
                 let num_splits = decl.decl_kind.num_splits();
                 if num_splits != 0 {
-                    let split_index: Vec<IBig> = path
-                        .drain(0..num_splits)
-                        .map(|idx| {
-                            let_unwrap!(RealWirePathElem::ConstIndex { span: _, idx }, idx);
-                            idx
-                        })
-                        .collect();
                     let_unwrap!(
                         SubModuleOrWire::SplitWire(split),
                         &mut self.generation_state[decl_id]
                     );
+                    let mut split_index: Vec<IBig> = Vec::with_capacity(num_splits);
+                    for (bound, path_elem) in split.bounds.iter().zip(path.drain(0..num_splits)) {
+                        let_unwrap!(RealWirePathElem::ConstIndex { span, idx }, path_elem);
+                        match bound {
+                            PartialBound::Known(from, to) => {
+                                if &idx < from || &idx >= to {
+                                    return Err(CompileError::error(
+                                        span.inner_span(),
+                                        format!("Index {idx} out of bounds for array of size {to}"),
+                                    ));
+                                }
+                            }
+                            PartialBound::From(from) => {
+                                if &idx < from {
+                                    return Err(CompileError::error(
+                                        span.inner_span(),
+                                        format!(
+                                            "Index {idx} is below the lower bound {from} of this array"
+                                        ),
+                                    ));
+                                }
+                            }
+                            PartialBound::To(_) | PartialBound::WholeSlice => unreachable!(),
+                        }
+                        split_index.push(idx);
+                    }
                     let wire_id = split
                         .contained_wires
                         .entry(split_index.into_boxed_slice())

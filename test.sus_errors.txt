@@ -196,6 +196,9 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate JaggedArray3 #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate OutOfBoundsWrite204 #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate OutOfBoundsSliceWrite #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate SplitIndexTooLarge #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate SplitIndexNegative #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate SplitIndexNegativeUnknownSize #()
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -273,6 +276,9 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate JaggedArray3 due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate OutOfBoundsWrite204 due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate OutOfBoundsSliceWrite due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate SplitIndexTooLarge due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate SplitIndexNegative due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate SplitIndexNegativeUnknownSize due to errors
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test.sus:26:6 ]
     │
@@ -5569,6 +5575,69 @@ Error: Out of bounds! The array is of size 4, but the indexed part-select has bo
  1990 │     b[i +: 2] = [true, true]
       │       ───┬──  
       │          ╰──── Out of bounds! The array is of size 4, but the indexed part-select has bounds 0:5
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1995:13 ]
+      │
+ 1995 │     input bool y
+      │                ┬  
+      │                ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1996:16 ]
+      │
+ 1996 │     split bool[3] x
+      │                   ┬  
+      │                   ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Index 3 out of bounds for array of size 3
+      ╭─[ test.sus:1998:4 ]
+      │
+ 1998 │     x[3] = y
+      │       ┬  
+      │       ╰── Index 3 out of bounds for array of size 3
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:2001:13 ]
+      │
+ 2001 │     input bool y
+      │                ┬  
+      │                ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:2002:16 ]
+      │
+ 2002 │     split bool[3] x
+      │                   ┬  
+      │                   ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Index -1 out of bounds for array of size 3
+      ╭─[ test.sus:2004:4 ]
+      │
+ 2004 │     x[-1] = y
+      │       ─┬  
+      │        ╰── Index -1 out of bounds for array of size 3
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:2007:13 ]
+      │
+ 2007 │     input bool y
+      │                ┬  
+      │                ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:2008:15 ]
+      │
+ 2008 │     split bool[] x
+      │                  ┬  
+      │                  ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Index -1 is below the lower bound 0 of this array
+      ╭─[ test.sus:2010:4 ]
+      │
+ 2010 │     x[-1] = y
+      │       ─┬  
+      │        ╰── Index -1 is below the lower bound 0 of this array
 ──────╯
 [INFO  sus_compiler::codegen] Code generated for IntToBool #() as "IntToBool"
 [INFO  sus_compiler::codegen] Code generated for BoolToInt #() as "BoolToInt"

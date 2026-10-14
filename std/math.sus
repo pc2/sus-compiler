@@ -64,7 +64,7 @@ module TreeAdd #(int SIZE, int FROM, int TO) {
         } else if SIZE == 1 {
             sum = values[0]
         } else {
-            split int[][clog2#(V: SIZE)] inter_sums
+            split int[][clog2#(V: SIZE) + 1] inter_sums
 
             for int I in 0..SIZE {
                 inter_sums[0] = values
