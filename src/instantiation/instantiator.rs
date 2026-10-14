@@ -381,7 +381,7 @@ fn start_instantiation<'l>(
     Ok(ModuleTypingSuperContext::start_typechecking(typed))
 }
 fn finish_instantiation(context: ModuleTypingSuperContext) -> InstantiatedModule {
-    let typed = context.finish();
+    let mut typed = context.finish();
     let name = &typed.name;
 
     if crate::debug::is_enabled("print-concrete") {
@@ -395,6 +395,13 @@ fn finish_instantiation(context: ModuleTypingSuperContext) -> InstantiatedModule
 
     debug!("Performing final checks for {name}");
     typed.final_checks();
+
+    if typed.errors.did_error() {
+        return typed.into_instantiated_module();
+    }
+
+    typed.final_lints();
+    typed.optimize();
 
     typed.into_instantiated_module()
 }

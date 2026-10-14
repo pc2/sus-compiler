@@ -194,6 +194,8 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated BindTrigger #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate JaggedArray2 #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate JaggedArray3 #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate OutOfBoundsWrite204 #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate OutOfBoundsSliceWrite #()
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -269,6 +271,8 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate TestUnknownSizeArray due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate JaggedArray2 due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate JaggedArray3 due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate OutOfBoundsWrite204 due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate OutOfBoundsSliceWrite due to errors
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test.sus:26:6 ]
     │
@@ -5544,6 +5548,27 @@ Error: This array contains multiple arrays of different sizes. This is not allow
  1975 │     output int[][][] wire_b = gen_b
       │                               ──┬──  
       │                                 ╰──── This array contains multiple arrays of different sizes. This is not allowed! gen_b[1][1] has size 3, but gen_b[0][0] has size 2
+──────╯
+Error: Out of bounds! The array is of size 4, but the index is 4
+      ╭─[ test.sus:1982:7 ]
+      │
+ 1982 │        var[I+1] = false
+      │            ─┬─  
+      │             ╰─── Out of bounds! The array is of size 4, but the index is 4
+──────╯
+Error: Out of bounds! The array is of size 4, but the slice bound has bounds 2:6
+      ╭─[ test.sus:1988:4 ]
+      │
+ 1988 │     a[2:6] = [true, true, true, true]
+      │       ─┬─  
+      │        ╰─── Out of bounds! The array is of size 4, but the slice bound has bounds 2:6
+──────╯
+Error: Out of bounds! The array is of size 4, but the indexed part-select has bounds 0:5
+      ╭─[ test.sus:1990:4 ]
+      │
+ 1990 │     b[i +: 2] = [true, true]
+      │       ───┬──  
+      │          ╰──── Out of bounds! The array is of size 4, but the indexed part-select has bounds 0:5
 ──────╯
 [INFO  sus_compiler::codegen] Code generated for IntToBool #() as "IntToBool"
 [INFO  sus_compiler::codegen] Code generated for BoolToInt #() as "BoolToInt"

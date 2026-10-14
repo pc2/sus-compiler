@@ -10,7 +10,6 @@ impl<'l> ModuleTypingContext<'l> {
     pub fn post_process(&mut self) {
         self.finalize_all_partial_bounds();
         self.finalize_generative_vars();
-        self.remove_unconditional_muxes();
     }
     fn finalize_all_partial_bounds(&mut self) {
         for w_id in self.wires.id_range() {
@@ -54,6 +53,15 @@ impl<'l> ModuleTypingContext<'l> {
                 _ => {}
             }
         }
+    }
+
+    /// Optimizations that assume the module is valid. In particular, they index into wires along
+    /// their paths, so all array bounds must have been checked by [Self::final_checks].
+    ///
+    /// Must only be called if no errors have been reported for this module.
+    pub fn optimize(&mut self) {
+        assert!(!self.errors.did_error());
+        self.remove_unconditional_muxes();
     }
 
     /// Remove effectively unconditional muxes. This could be made optional, if so desired at some point.

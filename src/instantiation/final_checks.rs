@@ -1,6 +1,8 @@
 //! After instantiation, we preform a few final checks of each module.
 //! - Check all subtype relations
 //! - Check array bounds
+//!
+//! Only if these pass, we run the lints that rely on the module being valid.
 
 use std::{borrow::Cow, ops::Range};
 
@@ -54,6 +56,14 @@ fn make_output_typ<'c>(typ: &'c ConcreteType, path: &[RealWirePathElem]) -> Cow<
 impl<'l> ModuleTypingContext<'l> {
     pub fn final_checks(&self) {
         self.check_subtypes();
+    }
+
+    /// Lints that assume the module is valid. In particular, they index into wires along
+    /// their paths, so all array bounds must have been checked by [Self::final_checks].
+    ///
+    /// Must only be called if no errors have been reported for this module.
+    pub fn final_lints(&self) {
+        assert!(!self.errors.did_error());
         self.lint_wire_is_never_written_to();
     }
 
