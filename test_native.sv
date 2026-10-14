@@ -1,4 +1,4 @@
-// Extern module for test.sus:sized_int_add
+// Extern module for test_old.sus:sized_int_add
 
 module sized_int_add #(
 	parameter int LEFT_SIZE,

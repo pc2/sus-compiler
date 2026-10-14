@@ -7,7 +7,9 @@
     // Tracking down slow compilations
     "--kill-timeout", "2.0",
     "--feature", "xpm",
-    "test.sus"
+    "test.sus",
+    "test_old.sus",
+    "test_latencies.sus"
     //, "--upto", "typecheck"
   ],
   "sus_lsp.env": {

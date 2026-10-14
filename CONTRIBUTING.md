@@ -35,7 +35,7 @@ Add the following to your `.vscode/settings.json`
 ```
 
 ## Behavior-altering changes
-To better defend against regressions during development, we require that any change that alters the _behavior_ of the compiler (IE, adding or changing diagnostics, or altering the test file [test.sus](test.sus)) also commits the changed effects. 
+To better defend against regressions during development, we require that any change that alters the _behavior_ of the compiler (IE, adding or changing diagnostics, or altering the test files [test.sus](test.sus), [test_old.sus](test_old.sus) and [test_latencies.sus](test_latencies.sus)) also commits the changed effects. 
 This can be done by simply re-running 
 ```sh
 ./test.sus_regression.sh

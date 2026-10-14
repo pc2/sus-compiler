@@ -1,0 +1,929 @@
+// Old tests using the deprecated `interface` port syntax, and tests that produce a lot of diagnostics.
+// Part of the regression test together with test.sus and test_latencies.sus
+
+module example_md {
+	interface example_md : int#(FROM: 0, TO: 100)[4] factors,
+		int#(FROM: 0, TO: 100) add_to ->
+		int product,
+		int total
+
+	reg int mul0 = factors[0] * factors[1]
+	reg int mul1 = factors[2] * factors[3]
+
+	reg product = mul0 * mul1
+	reg total = product + add_to
+}
+
+
+// (a*b) + c
+module multiply_add {
+	interface multiply_add : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b, int#(FROM: 0, TO: 100) c -> int total
+
+	reg int tmp = a * b
+	total = tmp + c
+}
+
+
+module test_pow17 {
+	int a = pow17(2)
+}
+
+module pow17 {
+    interface pow17 : int#(FROM: 0, TO: 100) i -> int o
+	    int i2  = i   * i
+	reg int i4  = i2  * i2
+	    int i8  = i4  * i4
+	reg int i16 = i8  * i8
+	        o   = i16 * i
+}
+
+
+module fibonnaci {
+    interface fibonnaci : -> int num
+	state int #(FROM: 0, TO: 100) cur = 1
+	state int #(FROM: 0, TO: 100) prev = 0
+
+
+	num = cur + prev mod 100
+	prev = cur
+	cur = num
+}
+
+module blur2 {
+	interface blur2 : int#(FROM: 0, TO: 100) data, bool first -> int blurred
+
+	state int prev
+
+	when !first {
+		blurred = data + prev mod 100
+	}
+	prev = data
+
+	gen int a
+
+	gen bool b = true
+	gen bool bb = false
+
+	if bb {
+		a = 5
+	} else {
+		a = 3
+	}
+}
+
+
+module Tree_Multiply {
+    interface Tree_Multiply : int#(FROM: 0, TO: 100)[4] values -> int total
+	reg int a = values[0] * values[1]
+	reg int b = values[2] * values[3]
+	reg total = a * b
+}
+
+module Accumulator {
+    interface Accumulator : int#(FROM: 0, TO: 100) term, bool done -> int total
+    state int tot
+	initial tot = 0
+
+    int new_tot = tot + term mod 100
+    when done {
+        reg total = new_tot
+        tot = 0
+    } else {
+        tot = new_tot
+    }
+}
+
+
+//timeline (a, true -> /) | (a, false -> /) .. (a, false -> r)* .. (a, true -> r)
+module blur {
+    interface blur : int#(FROM: 0, TO: 100) a, bool done -> int result
+	state bool working
+	initial working = false
+	state int prev
+
+	when working {
+		reg reg reg result = prev + a // Add a pipeline stage for shits and giggles
+	}
+	prev = a
+	working = !done
+}
+
+
+
+//timeline (X -> X) .. (/ -> X) .. (/ -> X) .. (/ -> X)
+module Unpack4 {
+    interface Unpack4 : int#(FROM: 0, TO: 100)[4] packed -> int out_stream
+	gen int INITIAL = 0
+	gen int A = 1
+
+
+    state int st
+	initial st = 0
+    state int[3] stored_packed
+
+    when st == INITIAL {
+        out_stream = packed[0]
+        stored_packed[0] = packed[1] // Shorthand notation is possible here "stored_packed[0:2] = packed[1:3]"
+        stored_packed[1] = packed[2]
+        stored_packed[2] = packed[3]
+        st = 1
+    } else when st == 1 {
+        out_stream = stored_packed[0]
+        st = 2
+    } else when st == 2 {
+        out_stream = stored_packed[1]
+        st = 3
+    } else when st == 3 {
+        out_stream = stored_packed[2]
+        st = INITIAL // Must restore initial conditions
+        //finish // packet is hereby finished.
+    }
+}
+
+module generative {
+    interface generative : int#(FROM: 0, TO: 100) i -> int o, int o2
+	gen int x = 5
+	gen int[x] ys
+
+	//gen int[ys] zs
+
+	gen int[3] ps
+
+	gen int[x] a
+
+	a[2] = 5
+	a[1] = 2
+	a[0] = 10
+	gen int[3] xx = a
+
+	gen bool test = true
+
+	if test {i = 5}
+
+	o = a[i]
+	o2 = a[a[0]]
+}
+
+module add_indices_to_array {
+	interface add_indices_to_array : int#(FROM: 0, TO: 100)[10] values -> int[10] added_values
+
+	for int i in 0..10 {
+		int t = values[i]
+		added_values[i] = t + i
+	}
+}
+
+module assignment_producer {
+    interface assignment_producer : -> int v'0, int o'0, bool j'0 }
+
+module test_various_assignments {
+	state int[3] st
+	bool b
+	reg int a, st[2], reg reg b = assignment_producer()
+}
+
+//timeline (bs -> /, true) | (bs -> v, false)
+module first_bit_idx_6 {
+    interface first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros
+	when bits[0] {
+		first = 0
+		all_zeros = false
+	} else when bits[1] {
+		first = 1
+		all_zeros = false
+	} else when bits[2] {
+		first = 2
+		all_zeros = false
+	} else when bits[3] {
+		first = 3
+		all_zeros = false
+	} else when bits[4] {
+		first = 4
+		all_zeros = false
+	} else when bits[5] {
+		first = 5
+		all_zeros = false
+	} else {
+		all_zeros = true
+	}
+
+	/*first int i in 0..6 where bits[i] {
+		first = i
+		all_zeros = false
+	} else {
+		all_zeros = true
+	}*/
+
+}
+
+module first_bit_idx_24 {
+    interface first_bit_idx_24 : bool[24] bits -> int first
+	int[4] offsets
+	bool[4] was_nonzeros
+
+	for int i in 0..4 {
+		bool[6] these_bits
+		for int j in 0..6 {
+			these_bits[j] = bits[i * 6 + j]
+		}
+
+		int offset, bool was_nonzero = first_bit_idx_6(these_bits)
+		offsets[i] = offset
+		was_nonzeros[i] = was_nonzero
+	}
+}
+
+module permute {
+    interface permute : bool[128] mbf, int#(FROM: 0, TO: 100) selected_permutation -> bool[128] permuted_mbf
+	// cvt_to_double
+	permuted_mbf = mbf
+}
+
+//timeline (X, [false24], true -> /, false) | (X, vs, true -> X, true) .. (/, /, false -> X, true)*
+module permute24 {
+    interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
+	state bool[128] stored_mbf
+	state bool[24] stored_valid_permutes = 000000000000000000000000
+
+	gen int aaaaa = 5
+
+
+	bool[24] permutes_to_keep
+	permutes_to_keep[0] = false
+	for int i in 1..24 {
+		permutes_to_keep[i] = permutes_to_keep[i-1] | stored_valid_permutes[i-1]
+	}
+
+	int current_permutation_idx = first_bit_idx_24(permutes_to_keep)
+
+	stored_valid_permutes = stored_valid_permutes & permutes_to_keep
+
+	permuted_out = permute(stored_mbf, current_permutation_idx)
+
+	aaaaa()
+}
+
+
+
+module test_single_wire {
+    interface test_single_wire : int#(FROM: 0, TO: 100) a -> int o
+	o = a
+}
+
+module matrix_vector_mul {
+	interface matrix_vector_mul :
+		int#(FROM: 0, TO: 100)[6][4] mat, int#(FROM: 0, TO: 100)[4] vec -> int[6] result
+
+	for int row in 0..6 {
+		int[4] row_products
+		for int col in 0..4 {
+			row_products[col] = mat[col][row] * vec[col]
+		}
+		result[row] = +row_products
+	}
+}
+
+
+// Test submodule comment
+module submodule {
+    interface submodule : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b -> int r
+	r = a * b
+}
+
+// module doing nothing
+module doNothing {}
+
+/*
+Multiline
+
+comment
+
+# Test Title
+
+*/
+module contains_submodule_submodule {
+    interface contains_submodule_submodule : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b, int#(FROM: 0, TO: 100) c -> int r
+	// Temp val
+    int tmp = submodule(a, b)
+	doNothing()
+	reg r = tmp + c
+}
+
+
+module xor {
+    interface xor : bool x1, bool x2 -> bool y
+	bool w1 = !x1
+	bool w2 = !x2
+
+	bool w3 = x1 & w2
+	bool w4 = x2 & w1
+
+	y = w3 | w4
+}
+
+module use_xor {
+	bool b = xor(true, false)
+}
+
+module fizz_buzz {
+    interface fizz_buzz : int#(FROM: 0, TO: 99) v -> int fb
+	gen int FIZZ = 888
+	gen int BUZZ = 555
+	gen int FIZZ_BUZZ = 888555
+
+	bool fizz = v mod 3 == 0
+	bool buzz = v mod 5 == 0
+
+	when fizz & buzz {
+		fb = FIZZ_BUZZ
+	} else when fizz {
+		fb = FIZZ
+	} else when buzz {
+		fb = BUZZ
+	} else {
+		fb = v
+	}
+}
+
+module fizz_buzz_gen #(int TABLE_SIZE) {
+    interface fizz_buzz_gen : int#(FROM: 0, TO: TABLE_SIZE) v -> int fb
+	gen int FIZZ = 888
+	gen int BUZZ = 555
+	gen int FIZZ_BUZZ = 888555
+
+
+	gen int[TABLE_SIZE] lut
+
+	for int i in 0..TABLE_SIZE {
+		gen bool fizz = i mod 3 == 0
+		gen bool buzz = i mod 5 == 0
+
+		gen int tbl_fb
+		if fizz & buzz {
+			tbl_fb = FIZZ_BUZZ
+		} else if fizz {
+			tbl_fb = FIZZ
+		} else if buzz {
+			tbl_fb = BUZZ
+		} else {
+			tbl_fb = i
+		}
+
+		lut[i] = tbl_fb
+	}
+
+	fb = lut[v]
+}
+
+module mbf_dual {
+    interface mbf_dual : bool[128] mbf -> bool[128] dual
+	for int i in 0..128 {
+		dual[i] = !mbf[127-i]
+	}
+}
+
+
+module monotonize_down {
+    interface monotonize_down : bool[16] mbf -> bool[16] mtDown
+	bool[16] mbf2
+	bool[16] mbf4
+	bool[16] mbf8
+
+	for int i in 0..16 {
+		if i mod 2 == 0 {
+			mbf2[i] = mbf[i] | mbf[i+1]
+		} else {
+			mbf2[i] = mbf[i]
+		}
+	}
+
+	for int i in 0..16 {
+		if i mod 4 < 2 {
+			mbf4[i] = mbf2[i] | mbf2[i+2]
+		} else {
+			mbf4[i] = mbf2[i]
+		}
+	}
+
+	for int i in 0..16 {
+		if i mod 8 < 4 {
+			mbf8[i] = mbf4[i] | mbf4[i+4]
+		} else {
+			mbf8[i] = mbf4[i]
+		}
+	}
+
+	for int i in 0..16 {
+		if i mod 16 < 8 {
+			mtDown[i] = mbf8[i] | mbf8[i+8]
+		} else {
+			mtDown[i] = mbf8[i]
+		}
+	}
+}
+
+module my_mod {
+    interface my_mod : int#(FROM: 0, TO: 100) i -> bool a, bool b
+	a = i == 3
+	b = i == 5
+}
+
+module use_my_mod {
+    interface use_my_mod : -> bool either
+	bool x, bool y = my_mod(3)
+
+	either = x | y
+}
+
+// Main module documentation
+module submodule_named_ports {
+    interface submodule_named_ports : int#(FROM: 0, TO: 100) port_a, int#(FROM: 0, TO: 100) port_b -> int port_c
+	port_c = port_a + port_b
+
+
+}
+
+module use_submodule_named_ports {
+    interface use_submodule_named_ports : int#(FROM: 0, TO: 100) i -> int o
+// Test submodule documentation
+	submodule_named_ports sm
+
+	o = sm(i, i)
+
+	sm.port_a = i
+
+	sm.port_b = i
+
+	o = sm.port_c
+}
+
+module contains_submodule_submodule {
+    interface contains_submodule_submodule : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b, int#(FROM: 0, TO: 100) c -> int r
+	// Temp val
+    int tmp = submodule(a, b)
+	doNothing()
+	reg r = tmp + c
+}
+
+
+
+module cross_bool {
+	interface in : bool i'0
+	interface out : -> bool o'0
+	o = true
+}
+module cross_int {
+	interface in : int#(FROM: 0, TO: 100) i'0
+	interface out : -> int o'0
+	o = 1
+}
+
+module cross_memory {
+	interface in : bool[20][512] i'0
+	interface out : -> bool[20][512] o'0
+	o[0][0] = true
+}
+
+module offset_backwards {
+    interface offset_backwards : bool i'0 -> bool o'-5
+	o = true
+}
+
+module dual_port_mem {
+	state bool[20][512] mem
+
+	interface write : bool write, bool[20] wr_data, int#(FROM:0, TO: 511) wr_addr
+
+	interface read : bool read, int#(FROM:0, TO: 511) rd_addr -> bool[20] rd_data
+
+	when write {
+		mem[wr_addr] = wr_data
+	}
+
+	cross_memory cr_m
+	cr_m.i = mem
+	when read {
+		rd_data = cr_m.o[rd_addr]
+	}
+}
+
+module use_fifo {
+    interface use_fifo : -> int o
+	FIFO fiii
+
+	bool[20] data
+
+	bool valid, bool[20] data2 = fiii.pop(true)
+
+	//bool ready = fiii.push(valid, data2)
+}
+
+module test_separated_domain {
+    interface test_separated_domain : bool main
+	bool domain2
+
+	bool domain3
+
+	bool domain4
+
+	cross_bool ci
+	ci.i = domain3
+	domain4 = ci.o
+
+	bool domain5
+
+	int #(FROM: 0, TO: 199) my_int
+}
+
+module mod_with_unused_interface {
+	if false {
+		interface v : int#(FROM: 0, TO: 100) a -> int b
+	}
+}
+
+module use_bad_interface {
+	mod_with_unused_interface mm
+
+	mm.a
+
+	// ICE(not yet implemented: Type Unification Unknown Named(type_1)): mm.a = 5
+}
+
+/*
+	interface
+	action
+	query
+	trigger
+*/
+
+// TODO valid and index should be part of a separate 'interface'
+module sequenceDownFrom {
+	//interface sequence : ->
+
+	interface start : bool start'0, int#(FROM: 0, TO: 100) upTo'0
+
+	output bool ready'0
+
+	interface iter : -> bool valid, state int index
+
+	cross_bool start_cr
+	start_cr.i = start
+
+	cross_int upTo_cr
+	upTo_cr.i = upTo
+
+	cross_bool ready_cr
+	ready = ready_cr.o
+
+	valid = index != 0
+	ready_cr.i = !valid
+	when valid {
+		index = index - 1
+	}
+
+	when start_cr.o {
+		index = upTo_cr.o
+	}
+}
+
+module sumUpTo {
+    interface sumUpTo : bool start
+
+	sequenceDownFrom sdf
+
+	sdf.start(start, 20)
+
+	bool re = sdf.ready
+
+	bool iter_valid, int iter_index = sdf.iter()
+	when iter_valid {
+		int idx = iter_index
+	}
+
+	int beep
+}
+
+module test #(T, int MY_INPUT) {
+    interface test : ::int #(beep: 20 > 3, BEEP: int) ab
+
+	MY_INPUT = 3
+
+	input int beep
+
+	beep = 3
+
+	FIFO #(BITWIDTH: 4) badoop
+}
+
+module use_test {
+	test #(MY_INPUT: 3) test_mod
+
+
+}
+
+module permute_t #(T, int SIZE, int[SIZE] SOURCES) {
+	interface permute : T[SIZE] d_in -> T[SIZE] d_out
+
+	for int i in 0..SIZE {
+		d_out[i] = d_in[SOURCES[i]]
+	}
+}
+
+module use_permute {
+	gen int[8] SOURCES = [3, 2, 4, 5, 1, 2, 7, 6]
+
+	int[2] inArr
+
+	inArr[0] = 2387
+	inArr[1] = 786823
+
+	permute_t #(SIZE: 8, SOURCES, T: type int) permut
+
+	int[8] beep = permut.permute(SOURCES)
+}
+
+module instruction_decoder {
+	interface from : bool[32] instr
+	interface is_jump
+	interface is_load
+	interface is_arith
+
+}
+
+module run_instruction {
+    interface run_instruction : bool[32] instr
+	instruction_decoder decoder
+	decoder.from(instr)
+
+	when decoder.is_jump() : int target_addr {
+		// ...
+	}
+	when decoder.is_load() : int reg_to, int addr {
+		// ...
+	}
+	when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+		// ...
+	}
+}
+
+// Test no main interface error
+module no_main_interface {
+	//interface no_main_interface
+}
+
+module use_no_main_interface {
+
+	no_main_interface no_interface_named
+	int x = no_interface_named()
+	int y = no_main_interface()
+}
+
+module moduleWithBadDeclaration {
+	int[true] a
+}
+
+module moduleWithBadInterface {
+	interface moduleWithBadInterface : int[true] a
+}
+
+module useModuleWithBadInterface {
+	int[3] xyz
+	moduleWithBadInterface(xyz)
+
+	xyz[3] = true
+}
+
+module xyz {
+	int[5] a
+
+	CrossDomain cr
+
+	cr.din = a
+	int[5] b = cr.dout
+}
+
+
+/// Test parametrized extern modules
+// Expects a SV module of the form:
+/*
+```sv
+module sized_int_add #(
+	parameter int LEFT_SIZE,
+	parameter int RIGHT_SIZE,
+	parameter int OUTPUT_SIZE
+) (
+	input clk,
+	input[LEFT_SIZE-1:0] a,
+	input[RIGHT_SIZE-1:0] b,
+    // c is output 1 cycle after a and b are provided
+	output[OUTPUT_SIZE-1:0] c
+);
+```
+*/
+extern module sized_int_add #(int LEFT_SIZE, int RIGHT_SIZE, int OUTPUT_SIZE) {
+	interface sized_int_add : bool[LEFT_SIZE] a'0, bool[RIGHT_SIZE] b'0 -> bool[OUTPUT_SIZE] c'1
+}
+
+module use_sized_int_add {
+	interface use_sized_int_add : bool[4] a, bool[3] b -> bool[5] c
+
+	c = sized_int_add(a, b)
+}
+
+// Examples that used to be in util.sus
+
+module UseDualPortMem {
+	interface UseDualPortMem :
+		bool do_write'0,
+		int addr'0,
+		bool[500] data'0 ->
+		bool[500] read_data'0
+
+	DualPortMem #(SIZE: 128, T: type bool[500]) mem
+
+	mem.write(do_write, addr, data)
+
+	read_data = mem.read(addr)
+}
+
+module use_Iterator {
+	interface start_iteration : bool do_start
+	input int[10] myArr
+	output int outVal
+
+	Iterator arrayStream
+
+	// if do_start {arrayStream.start(10)}
+	arrayStream.start(do_start, 10)
+
+	// if arrayIter.iter() : int value {...}
+	bool iter_valid, int value = arrayStream.iter()
+	if iter_valid {
+		outVal = myArr[value]
+	}
+}
+
+/// Test if when seperation
+module IfTesting #(int WIDTH) {
+	// Should be chosen based on what's most efficient for the target architecture
+	gen int BASE_CASE_SIZE = 5
+
+	interface PopCount : bool[WIDTH] bits -> int popcount
+
+
+	when WIDTH <= BASE_CASE_SIZE {
+		int[WIDTH] cvt
+		for int I in 0..WIDTH {
+			if bits[I] {
+				cvt[I] = 1
+			} else if !bits[I] {
+				cvt[I] = 0
+			}
+		}
+		reg popcount = +cvt
+	} else when WIDTH > BASE_CASE_SIZE {
+	}
+}
+module testArrayWrite {
+	interface testArrayWrite : int#(FROM: -3, TO: 6)[10][6][2] in_arr -> int[10][6] out_arr
+
+	out_arr = in_arr[0]
+
+	out_arr[5][9] = in_arr[0][5][9]
+
+	for int i in 0..10 {
+		for int j in 0..6 {
+			out_arr[j][i] = in_arr[0][j][i]
+		}
+	}
+}
+
+module MultiStateLoop #(T, int II) {
+	trigger may_process'0 : T cur_state {
+		action next_state'II : T next_state_value
+	}
+
+	action request_output : -> trigger output_valid : T result
+}
+
+module use_MultiStateLoop {
+	MultiStateLoop loop
+
+	trigger request_input
+		action input_valid : float new_input
+
+	action request_result : -> trigger result_valid : {
+
+	}
+
+	when loop.process : float cur_state {
+		float next_state = cur_state * cur_state
+		when cur_state >= 2.0 {
+
+		}
+	}
+}
+
+module multi_slice {
+	interface multi_slice : bool[20][30] matrix, int#(FROM: 0, TO: 27) a, int#(FROM: 2, TO: 19) b -> bool[20][9] slice, bool[2][27] slice2, bool[5][9] gen_partselect, bool[2][3] partselect
+
+	slice = matrix[:9][:]
+	slice2 = matrix[3:][4:6]
+	gen_partselect = matrix[3 +: 9][7 -: 5]
+	partselect = matrix[a +: 3][b -: 2]
+}
+
+module multi_slice_reverse {
+	interface multi_slice_reverse : int#(FROM: 0, TO: 27) a, int#(FROM: 2, TO: 19) b, bool[20][9] slice, bool[2][27] slice2, bool[5][9] gen_partselect, bool[2][3] partselect -> bool[20][30] matrix
+
+	matrix[:9][:] = slice
+	matrix[3:][4:6] = slice2
+	matrix[3 +: 9][7 -: 5] = gen_partselect
+	matrix[a +: 3][b -: 2] = partselect
+}
+
+module zero_sized_stuffs {
+	int x = 0
+	bool[0] as_bits = UIntToBits(x)
+	int[5] zero_sized_arr = [0, 0, 0, 0, 0]
+	gen int[5] zero_sized_gen = [0, 0, 0, 0, 0]
+	int[5] make_real = zero_sized_gen
+	int addr = 4
+	int a = zero_sized_gen[addr]
+	int b = zero_sized_arr[addr]
+}
+
+module test_all_modulos {
+	int#(FROM: 0, TO: 13) unsigned_val
+	int#(FROM: -20, TO: 13) signed_val
+
+	int#(FROM: 5, TO: 8) dynamic_mod
+
+	// Power of two optimization
+	unsigned_val mod 8
+	unsigned_val mod 4
+	unsigned_val mod 2
+	signed_val mod 8
+	signed_val mod 4
+	signed_val mod 2
+	// mod 1 optimization
+	unsigned_val mod 1
+	signed_val mod 1
+
+	// Unsigneds
+	// No mod needed
+	unsigned_val mod 13
+	// To conditional assign 0
+	unsigned_val + 1 mod 13
+	// To conditional subtract 13
+	unsigned_val + 2 mod 13
+	unsigned_val + 13 mod 13
+	// To remainder
+	unsigned_val + 14 mod 13
+
+	// Signeds
+	// To conditional assign 12
+	unsigned_val - 1 mod 13
+	// To conditional add 13
+	unsigned_val - 2 mod 13
+	unsigned_val - 13 mod 13
+	// To double remainder
+	unsigned_val - 14 mod 13
+
+	// dynamic modulo
+	unsigned_val mod dynamic_mod
+}
+
+module NonGenerativeSliceBoundsMustNotICE {
+    bool[20] arr
+
+    int x = 3
+    arr[3 +: x]
+    arr[x:5]
+    arr[5:x]
+    arr[x:]
+    arr[:x]
+}
+
+
+module ReceiveZerosArray {
+	interface ReceiveZerosArray : int#(FROM: 0, TO: 1)[2] values
+}
+module TestZerosArrays {
+
+	int[2] zeros = [0, 0]
+    int#(FROM: -5, TO: 6)[2] vs = [0, 0]
+	ReceiveZerosArray([0, 0])
+
+	int[4][6][7][20] manyzeros
+	manyzeros[16][3][2][3] = 0
+
+	int[2] nums = [5, 9]
+	int[2] sums = nums + [0, 0] + zeros + manyzeros[1][5:7][4][3]
+}
+
+module NegativeIntLiterals {
+	for int I in -10..10 {
+		int j = I
+	}
+}

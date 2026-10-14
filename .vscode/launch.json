@@ -71,6 +71,8 @@
             "sourceLanguages": ["rust"],
             "args": [
                 "test.sus",
+                "test_old.sus",
+                "test_latencies.sus",
                 "-o", "/dev/null",
                 "--no-redump",
             ],

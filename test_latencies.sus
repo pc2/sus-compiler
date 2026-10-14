@@ -1,0 +1,430 @@
+// Latency counting tests
+// Part of the regression test together with test.sus and test_old.sus
+
+module multiply_add_with_latencies {
+    interface multiply_add_with_latencies : int#(FROM: 0, TO: 100) a'0, int#(FROM: 0, TO: 100) b'0, int#(FROM: 0, TO: 100) c'0 -> int r'0
+    int tmp'1 = multiply(a, b)
+	reg r = tmp + c
+}
+
+module disjoint_ports {
+    interface disjoint_ports : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b, int#(FROM: 0, TO: 100) c -> int result
+	reg result = a + b
+	// don't touch c
+}
+
+module undeteriminable_input_latency {
+    interface undeteriminable_input_latency : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b -> int x, int y
+	reg int a_d = a
+	int t = a_d + b
+    reg reg reg int a_dd = a
+	reg int t_d = t
+    x = t_d + a_dd
+    y = t
+}
+
+module specified_input_latency {
+    interface specified_input_latency : int#(FROM: 0, TO: 100) a'0, int#(FROM: 0, TO: 100) b'1 -> int x, int y
+	reg int a_d = a
+    int t = a_d + b
+    reg reg reg int a_dd = a
+	reg int t_d = t
+    x = t_d + a_dd
+    y = t
+}
+
+module determinable_input_latency {
+    interface determinable_input_latency : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b -> int x, int y
+	reg int a_d = a
+    int t = a_d + b
+    reg reg int a_dd = a
+	reg int t_d = t
+    x = t_d + a_dd
+    y = t
+}
+
+// This module is a copy of ::undeteriminable_input_latency, but it doesn't have an error, because we just assume the latency of the inner nodes to be the earliest possible.
+module determinable_because_no_input_output_ports {
+    interface determinable_because_no_input_output_ports : int#(FROM: 0, TO: 100) a -> int x
+	reg int a_d = a
+    int t = a_d
+    reg reg reg int a_dd = a
+	reg int t_d = t
+    x = t_d + a_dd
+}
+
+// This module is a copy of ::undeteriminable_input_latency, but it doesn't have an error, because we just assume the latency of the inner nodes to be the earliest possible.
+module conflicting_latency_declarations {
+    interface conflicting_latency_declarations : int#(FROM: 0, TO: 100) a'0 -> int x'1
+	reg int nio = a
+	reg x = nio
+}
+
+module bad_cycle {
+    interface bad_cycle : int#(FROM: 0, TO: 100) a -> int r
+	state int state_reg
+	initial state_reg = 0
+
+	r = state_reg
+
+	reg state_reg = state_reg + a
+}
+
+module module_taking_time {
+	interface module_taking_time : int#(FROM: 0, TO: 100) i'0 -> int o'5
+	o = i
+}
+
+module bad_cycle2 {
+    interface bad_cycle2 : int#(FROM: 0, TO: 100) a -> int r
+	state int#(FROM: 0, TO: 7) test
+	initial test = 0
+
+	test = module_taking_time(test+a)
+
+	r = test
+}
+
+module module_taking_a_lot_of_time {
+    interface module_taking_a_lot_of_time : int#(FROM: 0, TO: 100) data_in'0 -> int data_out'200
+	data_out = data_in
+}
+
+
+/*extern*/ module offset_latency #(T) {
+    interface offset_latency : T i'0 -> T o'-5
+
+}
+
+
+
+module good_cycle {
+    interface good_cycle : bool a -> bool r
+	state bool test
+	initial test = false
+
+	bool new_test = test ^ a
+	test = new_test
+
+	r = new_test
+}
+
+module input_only {
+    interface input_only : bool i
+	state bool loop
+	initial loop = false
+	loop = loop ^ i
+}
+
+module multiple_inputs_only {
+    interface multiple_inputs_only : bool i'0, bool i2'0
+	state bool loop
+	initial loop = false
+	loop = loop ^ i ^ i2
+}
+
+module output_only {
+    interface output_only : -> bool o
+	state bool loop
+	initial loop = false
+	loop = !loop
+	reg o = loop
+}
+
+module multiple_outputs_only {
+    interface multiple_outputs_only : -> bool o'0, bool o2'0
+	state bool loop
+	initial loop = false
+	loop = !loop
+	reg o = loop
+	reg reg o2 = loop
+}
+
+module latency_counting_disjoint_blocks {
+	interface x : bool a -> bool b
+	interface y : bool c -> bool d
+
+	bool shared = true
+
+	b = a ^ shared
+	d = c ^ shared
+}
+
+module latency_counting_disjoint_blocks_merge_error {
+	interface x : bool a -> bool b
+	interface y : bool c -> bool d
+
+	bool shared = true
+
+	reg bool a_delayed = a
+
+	bool out_shared = a_delayed ^ c
+
+	b = a ^ shared
+	d = c ^ shared
+}
+
+
+module use_infer_me {
+	interface use_infer_me : bool in_val'0, int in_val_2 -> bool out_val'3
+
+	out_val = infer_me(in_val | (in_val_2 == 0), in_val_2)
+
+}
+
+module infer_me #(int A) {
+	interface infer_me : bool x'0 -> bool y'A
+
+	y = x
+}
+
+module infer_from_local_context {
+	interface infer_from_local_context : bool in_val -> bool out_val
+
+	reg reg reg reg reg bool heavily_pipelined_computation = in_val
+
+	out_val = infer_me(in_val) | heavily_pipelined_computation
+}
+
+module instantiate_fifo {
+	trigger request_data'0 : -> int#(FROM: 0, TO: 6) data_received'3
+
+	FIFO #(DEPTH: 30) fifo
+
+	when fifo.may_push {
+		reg reg reg reg reg int heavy_computation = request_data()
+
+		fifo.push(heavy_computation)
+	}
+}
+
+
+
+// This produces a graph much like this:
+// a'0-.     .- b'3
+//  \  1\  1/   /
+//   x?-- i --y?
+//
+// Annoyingly, with the current inference implementation, it will infer x *and* y to get A: 2, conflicting b'4 with the specified b'3
+// There is no good inference here, so we must forbid inferring
+//
+// IDEA: Do real ports first, then use the found port values as "specified latencies" and infer submodules using ports method in a *second* run.
+module inference_edge_case {
+	interface inference_edge_case: bool a'0 -> bool b'3
+
+	reg bool a_d = a
+
+	// infer_me #(A: 2) x
+	infer_me x
+	infer_me y
+	bool loose_inbetween = x(a)
+	loose_inbetween = a_d
+	reg b = loose_inbetween
+
+	b = y(loose_inbetween)
+}
+
+module specified_latencies_not_ports_edge_case {
+	interface specified_latencies_not_ports_edge_case: bool in_port -> bool out_port
+
+	bool in_spec'0 = in_port
+
+	bool out_spec'5 = false
+
+	out_port = out_spec | in_port
+}
+
+
+module infer_me_with_poison_output #(int N) {
+	interface infer_me_with_poison_output : bool i'0 -> bool o'N, bool p
+	o = i
+	reg reg reg reg p = i
+}
+// The poison output of infer_me_with_poison_output should make it impossible to infer it
+module instantiate_infer_me_with_poison_output {
+	interface instantiate_infer_me_with_poison_output : bool i -> bool o
+	reg reg reg reg reg reg reg o = i
+	bool x, bool y = infer_me_with_poison_output(i)
+	o = x
+	o = y
+}
+module __add__ #(int A, int B) {
+	interface __add__ : int#(TO: A) a'0, int #(TO:B) b'0 -> int #(TO: A+B) o'clog2 #(V: 5)
+}
+module ShiftRegTest #(int DEPTH) {
+	interface ShiftRegTest : bool i'0 -> bool o'DEPTH
+	if DEPTH > 3 {
+		// Impl as BRAM
+	} else {
+		o = i
+	}
+}
+
+module unknownLatency #(int V) {
+	interface unknownLatency : bool a'0 -> bool b'5
+
+	b = a
+}
+
+module useUnknownLatency {
+	input bool x'0
+	output bool y
+
+	unknownLatency ulat
+
+	y = ulat(x)
+}
+
+module infer_me_conflicting_directions #(int V) {
+	interface a: bool x'0 -> bool y'V
+
+	interface b: bool p'0 -> bool q'-V
+}
+
+module use_infer_me_conflicting_directions {
+	interface use_infer_me_conflicting_directions: bool x'0 -> bool y'-1
+
+	infer_me_conflicting_directions inf
+
+	y = inf.a(x)
+	y = inf.b(x)
+}
+
+module infer_me_with_delta #(int V) {
+	interface a: bool x'0 -> bool y'V
+
+	interface b: bool p'0 -> bool q'V+30
+}
+
+module use_infer_me_with_delta {
+	interface use_infer_me_with_delta: bool x'0 -> bool y'-1
+
+	infer_me_with_delta inf
+
+	y = inf.a(x)
+	y = inf.b(x)
+}
+
+module infer_me_with_negative_delta #(int V) {
+	interface a: bool x'V -> bool y'0
+
+	interface b: bool p'V -> bool q'0+30
+}
+
+module use_infer_me_with_negative_delta {
+	interface use_infer_me_with_negative_delta: bool x'0 -> bool y'-1
+
+	infer_me_with_negative_delta inf
+
+	y = inf.a(x)
+	y = inf.b(x)
+}
+
+module infer_me_inputs_only #(int V) {
+	interface infer_me_inputs_only : bool a'0, bool b'V
+}
+
+module use_infer_me_inputs_only {
+	interface use_infer_me_inputs_only : bool x'0
+
+
+	reg reg reg bool y = x
+
+	infer_me_inputs_only(x, y)
+}
+
+module TestSplits {
+	input bool y
+	split bool[5] x
+	split bool[] x_unknowns
+	split bool[] x_with_latency'4
+
+	x[0] = y
+	x_unknowns[0] = y
+	x_with_latency[0] = y
+	for int i in 1..5 {
+		reg x[i] = x[i-1]
+		reg x_unknowns[i] = x_unknowns[i-1]
+		x_with_latency[i] = x_with_latency[i-1]
+	}
+}
+
+module CountBitsWithSplits{
+	input bool[20] bits
+
+	split int[] sums
+
+
+	sums[0] = BoolToInt(bits[0])
+	for int i in 1..20 {
+		sums[i] = sums[i - 1] + BoolToInt(bits[i])
+	}
+
+	output int total = sums[19]
+}
+/*
+module TestGenUnknownSizeArray {
+	gen int[] values
+}
+*/
+
+module GenerativeCannotHaveLatencyDeclaration {
+	gen int beep'4
+}
+
+module try_conflicting_latencies {
+	input bool x
+	input bool y
+	output bool a'100
+	output bool b // error should be on 'b'
+
+	reg a = x
+	reg b = x
+	reg a = y
+	reg reg b = y
+}
+
+module RegressionForBadPort {
+	trigger my_trig'-
+}
+
+module TwoDomainsWithLatRegs {
+	domain a
+	input bool a_i'9
+	reg reg reg output bool a_o = a_i
+	output bool a_o2'20 = a_i
+
+	domain b
+	input bool b_i'-20
+	output bool b_o = b_i
+}
+
+module PositiveAndNegativeLatencyOffset {
+	LatencyOffset#(T: type bool, OFFSET: 3) pos
+	LatencyOffset#(T: type bool, OFFSET: -3) neg
+}
+
+module ParametrizeableRegs {
+	int x = 5
+	reg(5) int y = x
+}
+
+module TestNexts {
+    input int#(FROM: 0, TO: 6) x'0
+    output int y
+    output int z
+
+    next y = x
+    next(-1) z = x
+
+
+    input bool a'0
+    bool b'5
+
+    bool c
+    bool d
+    when b {
+        next c = a
+        next d = a
+    }
+}
