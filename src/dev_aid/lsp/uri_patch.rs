@@ -8,11 +8,11 @@ use std::{
 use lsp_types::Uri;
 
 pub trait UriExt {
-    fn to_file_path(&self) -> Option<Cow<Path>>;
+    fn to_file_path(&self) -> Option<Cow<'_, Path>>;
 }
 
 impl UriExt for lsp_types::Uri {
-    fn to_file_path(&self) -> Option<Cow<Path>> {
+    fn to_file_path(&self) -> Option<Cow<'_, Path>> {
         let path = match self.path().as_estr().decode().into_string_lossy() {
             Cow::Borrowed(ref_) => Cow::Borrowed(Path::new(ref_)),
             Cow::Owned(owned) => Cow::Owned(PathBuf::from(owned)),

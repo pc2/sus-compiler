@@ -66,16 +66,15 @@ impl<'l> TypeCheckingContext<'l> {
                     if !call_expr.domain.unwrap().is_generative() {
                         if let Some(condition_domain) =
                             self.get_condition_domain(expr.parent_condition)
+                            && let Physical(phys_total) = &mut resulting_domain
                         {
-                            if let Physical(phys_total) = &mut resulting_domain {
-                                self.set_physicals(
-                                    phys_total,
-                                    resulting_domain_span,
-                                    condition_domain.0,
-                                    condition_domain.1,
-                                    "the runtime condition for function calls",
-                                );
-                            }
+                            self.set_physicals(
+                                phys_total,
+                                resulting_domain_span,
+                                condition_domain.0,
+                                condition_domain.1,
+                                "the runtime condition for function calls",
+                            );
                         }
                     } else {
                         // TODO generative function calls

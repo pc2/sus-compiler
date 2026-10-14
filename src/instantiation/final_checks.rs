@@ -185,7 +185,7 @@ impl<'l> ModuleTypingContext<'l> {
                                 root_wire.get_span(self.link_info),
                                 format!(
                                     "{} declared here of type {}",
-                                    &root_wire.name,
+                                    root_wire.name,
                                     root_wire.typ.display(self.globals),
                                 ),
                             );

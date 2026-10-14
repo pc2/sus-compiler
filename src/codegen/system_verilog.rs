@@ -1270,7 +1270,7 @@ impl RealWire {
                     write!(f, "_{}_D{}", self.name, target_abs_lat)
                 }
             } else {
-                write!(f, "{}", &self.name)
+                write!(f, "{}", self.name)
             }
         })
     }

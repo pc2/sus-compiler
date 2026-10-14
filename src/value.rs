@@ -19,10 +19,10 @@ pub struct ArrayValue {
 }
 impl PartialEq for ArrayValue {
     fn eq(&self, other: &Self) -> bool {
-        if let (Some(a), Some(b)) = (&self.default, &other.default) {
-            if *a != *b {
-                return false;
-            }
+        if let (Some(a), Some(b)) = (&self.default, &other.default)
+            && *a != *b
+        {
+            return false;
         }
         match self.values.len().cmp(&other.values.len()) {
             Ordering::Equal => self.values.eq(&other.values),

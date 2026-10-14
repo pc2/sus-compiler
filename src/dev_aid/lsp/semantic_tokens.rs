@@ -75,7 +75,7 @@ fn convert_to_semantic_tokens(
     file_data: &FileData,
     ide_tokens: &mut [(Span, IDEIdentifierType)],
 ) -> Vec<SemanticToken> {
-    ide_tokens.sort_by(|a, b| a.0.cmp(&b.0));
+    ide_tokens.sort_by_key(|a| a.0);
 
     let mut cursor = Position {
         line: 0,

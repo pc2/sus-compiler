@@ -293,10 +293,10 @@ fn gather_all_references_in_global(
 ) -> Vec<Span> {
     let mut ref_locations = Vec::new();
     visit_all_in_module(linker, obj_id, &mut |info| {
-        if let Some(info_refers_to) = info.refers_to(linker) {
-            if info_refers_to == refers_to {
-                ref_locations.push(info.span);
-            }
+        if let Some(info_refers_to) = info.refers_to(linker)
+            && info_refers_to == refers_to
+        {
+            ref_locations.push(info.span);
         }
     });
     check_for_duplicate_spans(&linker.files, &ref_locations);

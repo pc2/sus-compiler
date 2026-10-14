@@ -52,14 +52,7 @@ impl AbstractRankedType {
         globals: &'a LinkerGlobals,
         link_info: &'a LinkInfo,
     ) -> impl Display + 'a {
-        FmtWrapper(move |f| {
-            write!(
-                f,
-                "{}{}",
-                self.inner.display(globals, link_info),
-                &self.rank
-            )
-        })
+        FmtWrapper(move |f| write!(f, "{}{}", self.inner.display(globals, link_info), self.rank))
     }
 }
 impl UniCell<AbstractInnerType> {
@@ -173,7 +166,7 @@ impl<ID: Into<GlobalUUID> + Copy> GlobalReference<ID> {
              }| {
                 write!(f, "{name} -> ")?;
                 if let Some(found) = refers_to.get() {
-                    write!(f, "{}: ", &target_link_info.parameters[*found].name)?;
+                    write!(f, "{}: ", target_link_info.parameters[*found].name)?;
                 } else {
                     write!(f, "?: ")?;
                 }
@@ -199,7 +192,7 @@ impl<ID: Into<GlobalUUID> + Copy> AbstractGlobalReference<ID> {
         target_link_info.display_with_template_args(
             zip_eq(&self.template_arg_types, &target_link_info.parameters),
             |f, (_, typ, param)| {
-                write!(f, "{}: ", &param.name)?;
+                write!(f, "{}: ", param.name)?;
                 match typ {
                     TemplateKind::Type(typ) => {
                         write!(f, "type {}", typ.display(globals, link_info))
@@ -218,7 +211,7 @@ impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
         target_link_info.display_with_template_args(
             zip_eq(&self.template_args, &target_link_info.parameters),
             |f, (_id, arg, arg_in_target)| {
-                write!(f, "{}: ", &arg_in_target.name)?;
+                write!(f, "{}: ", arg_in_target.name)?;
                 match arg {
                     TemplateKind::Type(typ_arg) => {
                         write!(f, "type {}", typ_arg.display(globals))
@@ -603,7 +596,7 @@ impl InferenceTargetPath {
             }
 
             recurse_print(f, globals, &md.link_info, &port_decl.typ_expr, &self.path)?;
-            write!(f, " {}", &port_decl.name)
+            write!(f, " {}", port_decl.name)
         })
     }
 }
@@ -835,7 +828,6 @@ impl LinkInfo {
                     module_ref,
                     name,
                     submodule_clock_map: local_domain_map,
-                    typ: _,
                     ..
                 }) => {
                     let disp_md_ref = module_ref.display(globals, &self.parameters);

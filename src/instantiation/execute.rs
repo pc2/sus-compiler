@@ -987,7 +987,7 @@ impl<'l> ExecutionContext<'l> {
             .inputs
             .iter()
             .map(|decl_id| {
-                let (port, direction) = md.get_port_for_decl(*decl_id);
+                let (port, _direction) = md.get_port_for_decl(*decl_id);
                 // Triggers have Outputs as their "function input"
                 // assert_eq!(direction, Direction::Input);
                 self.get_submodule_port(submod_id, port, None, domain)
@@ -997,7 +997,7 @@ impl<'l> ExecutionContext<'l> {
             .outputs
             .iter()
             .map(|decl_id| {
-                let (port, direction) = md.get_port_for_decl(*decl_id);
+                let (port, _direction) = md.get_port_for_decl(*decl_id);
                 // Triggers have Inputs as their "function output"
                 // assert_eq!(direction, Direction::Output);
                 self.get_submodule_port(submod_id, port, None, domain)
@@ -1022,7 +1022,7 @@ impl<'l> ExecutionContext<'l> {
             WireReferenceRoot::LocalSubmodule(submod_decl_id) => {
                 let submod_id = self.generation_state[*submod_decl_id].unwrap_submodule_instance();
 
-                let (interface, name_span, path) = self.execute_wire_ref_path(interface_ref)?;
+                let (interface, name_span, _path) = self.execute_wire_ref_path(interface_ref)?;
 
                 Ok(self.get_submodule_interface(submod_id, interface, name_span, parent_clock))
             }
@@ -1353,6 +1353,7 @@ impl<'l> ExecutionContext<'l> {
                     ));
                 }
                 let mut results = Vec::with_capacity(len);
+                #[allow(clippy::needless_range_loop)]
                 for j in 0..len {
                     let values_parts: [_; SZ] = std::array::from_fn(|i| &all_arrs[i][j]);
                     results.push(duplicate_for_all_array_ranks(&values_parts, rank - 1, f)?);

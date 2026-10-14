@@ -64,26 +64,26 @@ fn check_clocks_have_one_driver(
         for (submod_clk_id, parent_clk_id) in &sm.clock_map {
             let clock_in_self = &mut clocks[*parent_clk_id];
             clock_in_self.used = true;
-            if let Some(instance) = sm.instance.get() {
-                if instance.clocks[submod_clk_id].visibility == ClockVisibility::Output {
-                    let clock_in_submod = &instance.clocks[submod_clk_id].name;
+            if let Some(instance) = sm.instance.get()
+                && instance.clocks[submod_clk_id].visibility == ClockVisibility::Output
+            {
+                let clock_in_submod = &instance.clocks[submod_clk_id].name;
 
-                    assert!(clock_in_self.visibility != ClockVisibility::Input);
-                    if let Some((existing_submodule, existing_clock)) = clock_in_self.driver {
-                        let clock_name = &clock_in_self.name;
-                        let existing_submodule = &submodules[existing_submodule];
+                assert!(clock_in_self.visibility != ClockVisibility::Input);
+                if let Some((existing_submodule, existing_clock)) = clock_in_self.driver {
+                    let clock_name = &clock_in_self.name;
+                    let existing_submodule = &submodules[existing_submodule];
 
-                        let existing_module_name = &existing_submodule.name;
-                        let existing_module_clock = &existing_submodule.instance.get().expect("Since this submodule was registered as a valid driver to this clock, it must have a avalid instance").clocks[existing_clock].name;
-                        let error_text = format!(
-                            "output clock '{sm_name}.{clock_in_submod}' tries to drive '{clock_name}', but this clock is already being driven by '{existing_module_name}.{existing_module_clock}'"
-                        );
-                        errors
-                            .error(sm.get_span(&md.link_info), error_text)
-                            .info_obj((existing_submodule, &md.link_info));
-                    } else {
-                        clock_in_self.driver = Some((submod_id, submod_clk_id));
-                    }
+                    let existing_module_name = &existing_submodule.name;
+                    let existing_module_clock = &existing_submodule.instance.get().expect("Since this submodule was registered as a valid driver to this clock, it must have a avalid instance").clocks[existing_clock].name;
+                    let error_text = format!(
+                        "output clock '{sm_name}.{clock_in_submod}' tries to drive '{clock_name}', but this clock is already being driven by '{existing_module_name}.{existing_module_clock}'"
+                    );
+                    errors
+                        .error(sm.get_span(&md.link_info), error_text)
+                        .info_obj((existing_submodule, &md.link_info));
+                } else {
+                    clock_in_self.driver = Some((submod_id, submod_clk_id));
                 }
             }
         }

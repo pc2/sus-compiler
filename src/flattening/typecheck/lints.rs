@@ -365,11 +365,9 @@ impl LintContext<'_> {
                         wire_to_explore_queue.push(instr_id);
                     }
                 }
-                Instruction::Declaration(decl) => {
-                    if decl.name.starts_with('_') {
-                        is_instance_used_map[instr_id] = true;
-                        wire_to_explore_queue.push(instr_id);
-                    }
+                Instruction::Declaration(decl) if decl.name.starts_with('_') => {
+                    is_instance_used_map[instr_id] = true;
+                    wire_to_explore_queue.push(instr_id);
                 }
                 _ => {}
             }

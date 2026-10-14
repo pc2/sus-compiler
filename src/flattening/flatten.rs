@@ -1664,13 +1664,13 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             ClockVisibility::Input
         };
         let (clock_name_span, clock_name) = cursor.field_span(field!("name"), kind!("identifier"));
-        if self.clocks.is_empty() {
-            if let Some(existing_port) = self.ports.iter().next() {
-                // Sad Path: Having ports on the implicit clk domain is not allowed.
-                self.errors
+        if self.clocks.is_empty()
+            && let Some(existing_port) = self.ports.iter().next()
+        {
+            // Sad Path: Having ports on the implicit clk domain is not allowed.
+            self.errors
                     .error(clock_name_span, "When using explicit clocks, no port is allowed to be declared on the implicit 'clk' clock.")
                     .info(existing_port.1.decl_span, "A clock should be explicitly defined before this port");
-            }
         }
         let clock_id = self.clocks.alloc(ClockInfo {
             name: clock_name.to_owned(),

@@ -291,10 +291,8 @@ impl Value {
                                 ),
                             ));
                         }
-                        for new_pair in zip_eq(
-                            target.get_slice_mut(slice.clone()).unwrap(),
-                            value.into_iter(),
-                        ) {
+                        for new_pair in zip_eq(target.get_slice_mut(slice.clone()).unwrap(), value)
+                        {
                             new_targets.push(new_pair)
                         }
                     }

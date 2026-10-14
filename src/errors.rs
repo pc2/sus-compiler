@@ -377,7 +377,7 @@ impl ErrorInfoObject for &Declaration {
     fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
             span: self.name_span,
-            info: format!("'{}' declared here", &self.name),
+            info: format!("'{}' declared here", self.name),
         })
     }
 }
@@ -395,7 +395,7 @@ impl ErrorInfoObject for &InterfaceDeclaration {
     fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
             span: self.name_span,
-            info: format!("'{}' declared here", &self.name),
+            info: format!("'{}' declared here", self.name),
         })
     }
 }
@@ -445,7 +445,7 @@ impl ErrorInfoObject for &Port {
     fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
             span: self.name_span,
-            info: format!("Port '{}' declared here", &self.name),
+            info: format!("Port '{}' declared here", self.name),
         })
     }
 }
@@ -453,7 +453,7 @@ impl ErrorInfoObject for &Field {
     fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
             span: self.name_span,
-            info: format!("Field '{}' declared here", &self.name),
+            info: format!("Field '{}' declared here", self.name),
         })
     }
 }
@@ -462,7 +462,7 @@ impl ErrorInfoObject for &LinkInfo {
     fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
             span: self.name_span,
-            info: format!("'{}' defined here", &self.name),
+            info: format!("'{}' defined here", self.name),
         })
     }
 }
@@ -471,7 +471,7 @@ impl ErrorInfoObject for (&SubModule, &LinkInfo) {
     fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
             span: self.0.get_span(self.1),
-            info: format!("'{}' instantiated here", &self.0.name),
+            info: format!("'{}' instantiated here", self.0.name),
         })
     }
 }
@@ -483,10 +483,7 @@ impl ErrorInfoObject for (&Module, &LinkerFiles) {
 
         Some(ErrorInfo {
             span: md.link_info.name_span,
-            info: format!(
-                "Module '{}' defined here. {}",
-                &md.link_info.name, ports_str
-            ),
+            info: format!("Module '{}' defined here. {}", md.link_info.name, ports_str),
         })
     }
 }

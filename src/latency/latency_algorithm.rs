@@ -1430,7 +1430,7 @@ mod tests {
 
     fn normalize_specified_latency_lists(list: &mut [Vec<SpecifiedLatency>]) {
         for l in list.iter_mut() {
-            l.sort_by(|a, b| a.node.cmp(&b.node));
+            l.sort_by_key(|a| a.node);
             let offset = l[0].latency;
             for v in l {
                 v.latency -= offset;

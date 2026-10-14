@@ -163,7 +163,7 @@ fn push_all_errors(
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
     let errs = linker.collect_all_errors();
 
-    for (_file_id, file_data, errs_for_file) in zip_eq(linker.files.iter(), errs.into_iter()) {
+    for (_file_id, file_data, errs_for_file) in zip_eq(linker.files.iter(), errs) {
         let diag_vec: Vec<Diagnostic> = errs_for_file
             .into_iter()
             .map(|e| convert_diagnostic(e, &file_data.file_text, linker))
@@ -345,7 +345,7 @@ impl Linker {
             ShouldRecompile::Dirty => {
                 info!("Recompiling files:");
                 for (_id, file) in &self.files {
-                    info!("    {}", &file.file_identifier);
+                    info!("    {}", file.file_identifier);
                 }
                 log::set_max_level(log::LevelFilter::Off);
                 self.recompile_all();

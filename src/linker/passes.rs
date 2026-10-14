@@ -35,7 +35,7 @@ impl Linker {
         let errors = ErrorCollector::from_storage(error_store, working_on_mut.span, &self.files);
         let resolved_globals = std::mem::take(&mut working_on_mut.resolved_globals);
 
-        debug!("{pass_name} {}", &working_on_mut.name);
+        debug!("{pass_name} {}", working_on_mut.name);
         crate::debug::debug_context(pass_name, working_on_mut.name.clone(), || {
             let mut linker_pass = LinkerPass {
                 resolved_globals,
@@ -299,7 +299,7 @@ impl<TemplateT> ErrorInfoObject for &RemoteFn<'_, TemplateT> {
     fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
             span: self.fn_decl.name_span,
-            info: format!("Interface '{}' defined here", &self.fn_decl.name),
+            info: format!("Interface '{}' defined here", self.fn_decl.name),
         })
     }
 }
