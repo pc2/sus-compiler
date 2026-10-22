@@ -82,6 +82,9 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate SplitIndexTooLarge #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate SplitIndexNegative #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate SplitIndexNegativeUnknownSize #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated newlines_helper #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated newlines_lenient #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated newlines_interface_body #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -5663,6 +5666,9 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for TestIntersectingValues #() as "TestIntersectingValues"
 [INFO  sus_compiler::codegen] Code generated for CallTrigger #() as "CallTrigger"
 [INFO  sus_compiler::codegen] Code generated for BindTrigger #() as "BindTrigger"
+[INFO  sus_compiler::codegen] Code generated for newlines_helper #() as "newlines_helper"
+[INFO  sus_compiler::codegen] Code generated for newlines_lenient #() as "newlines_lenient"
+[INFO  sus_compiler::codegen] Code generated for newlines_interface_body #() as "newlines_interface_body"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"

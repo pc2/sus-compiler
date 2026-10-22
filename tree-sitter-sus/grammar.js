@@ -25,18 +25,21 @@ function newlineSepSeq($, rule) {
     )
 }
 
-// Makes a list of "item" fields
+// Makes a list of "item" fields. Used within brackets, so newlines are allowed on both sides of the commas, and a trailing comma is allowed
 function commaSepSeq($, rule) {
+    const lenientComma = seq(optional($._linebreak), ',', optional($._linebreak));
     return seq(
         optional($._linebreak),
         optional(seq(
             field('item', rule),
             repeat(seq(
-                $._comma,
+                lenientComma,
                 field('item', rule)
             )),
-            optional($._linebreak),
-            optional($._comma),
+            optional(choice(
+                $._linebreak,
+                lenientComma
+            ))
         ))
     )
 }
@@ -73,6 +76,7 @@ module.exports = grammar({
             field('object_type', choice('module', 'struct', $.const_and_type)),
             field('name', $.identifier),
             optional(field('template_declaration_arguments', $.template_declaration_arguments)),
+            optional($._linebreak),
             field('block', $.block)
         ),
 
@@ -119,6 +123,7 @@ module.exports = grammar({
         decl_assign_statement: $ => seq(
             field('assign_left', $.assign_left_side),
             '=',
+            optional($._linebreak),
             field('assign_value', $._expression)
         ),
         assign_left_side: $ => sepSeq1($.assign_to, $._comma),
@@ -144,8 +149,12 @@ module.exports = grammar({
         ))),
 
         _then_else_block: $ => seq(
+            optional($._linebreak),
             field('then_block', $.block),
-            optional(field('else_block', $.else_block))
+            optional(seq(
+                optional($._linebreak),
+                field('else_block', $.else_block)
+            ))
         ),
 
         if_statement: $ => seq(
@@ -159,6 +168,7 @@ module.exports = grammar({
         ),
         else_block: $ => seq(
             'else',
+            optional($._linebreak),
             field('content', choice(
                 $.block,
                 $.if_statement
@@ -171,6 +181,7 @@ module.exports = grammar({
             field('from', $._expression),
             '..',
             field('to', $._expression),
+            optional($._linebreak),
             field('block', $.block)
         ),
 
@@ -193,8 +204,10 @@ module.exports = grammar({
             field('name', $.identifier),
             optional(field('latency_specifier', $.latency_specifier)),
             optional(field('interface_ports', $.interface_ports)),
-            optional($._then_else_block)
+            optional($._interface_body)
         ),
+        // `action x : int a\n{...}` is ambiguous: a body or a separate block statement. Prefer the body
+        _interface_body: $ => prec.dynamic(1, $._then_else_block),
 
         interface_ports: $ => seq(
             ':',
@@ -208,6 +221,7 @@ module.exports = grammar({
             ),
         ),
         _interface_ports_output: $ => seq(
+            optional($._linebreak),
             '->',
             optional($._linebreak),
             field('outputs', $.declaration_list)
@@ -285,6 +299,7 @@ module.exports = grammar({
             return choice(...TABLE.map(([precedence, operator]) => prec.left(precedence, seq(
                 field('left', $._expression),
                 field('operator', operator),
+                optional($._linebreak),
                 field('right', $._expression)
             ))));
         },
@@ -307,28 +322,36 @@ module.exports = grammar({
 
         parenthesis_expression_list: $ => seq(
             '(',
-            sepSeq($._expression, $._comma),
+            commaSepSeq($, $._expression),
             ')'
         ),
 
         parenthesis_expression: $ => seq(
             '(',
+            optional($._linebreak),
             field('content', $._expression),
+            optional($._linebreak),
             ')'
         ),
 
         array_type_bracket: $ => seq(
             '[',
-            optional(field('content', $._expression)),
+            optional(seq(
+                optional($._linebreak),
+                field('content', $._expression),
+                optional($._linebreak),
+            )),
             ']',
         ),
 
         array_access_bracket_expression: $ => seq(
             '[',
+            optional($._linebreak),
             choice(
                 field('slice', $.slice),
                 field('index', $._expression)
             ),
+            optional($._linebreak),
             ']'
         ),
         
@@ -406,6 +429,13 @@ module.exports = grammar({
 
     conflicts: $ => [
         [$._type, $._expression], // Just because LR(1) is too weak to resolve 'ident[] a' vs 'type_name[]'. Tree sitter resolves this itself with more expensive GLR. NOT a precedence relation. 
+
+        // These allow newlines before optional continuations of a statement ('else', '->', an interface body).
+        // On a newline LR(1) can't tell if the statement ends or continues, so GLR explores both until the next token.
+        [$._then_else_block], // `}` newline `else`
+        [$.interface_statement], // `action x : int a` newline `{`
+        [$.interface_ports], // `action x : int a` newline `->`
+        [$._interface_ports_output],
     ],
 
     word: $=> $.identifier,

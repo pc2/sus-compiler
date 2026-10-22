@@ -4304,6 +4304,193 @@ always_comb begin // combinatorial mul1
 end
 endmodule // example_md #()
 
+// newlines_interface_body #()
+module newlines_interface_body(
+	/* clock */ input clk,
+	output /*mux_wire*/ logic t,
+	output /*mux_wire*/ logic w,
+	input wire fire,
+	input wire f
+);
+
+always_comb begin // combinatorial t
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	t = 1'bx;
+	t = 1'b0;
+	if(fire) t = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	t = t;
+end
+always_comb begin // combinatorial w
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	w = 1'bx;
+	w = f;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	w = w;
+end
+endmodule // newlines_interface_body #()
+
+// newlines_lenient #()
+module newlines_lenient(
+	/* clock */ input clk,
+	input wire[3:0] x,
+	input wire[3:0] y,
+	input wire do_it,
+	output /*mux_wire*/ logic[4:0] result,
+	output /*mux_wire*/ logic[4:0] result2,
+	output /*mux_wire*/ logic[5:0] big,
+	output /*mux_wire*/ logic[4:0] s2,
+	output /*mux_wire*/ logic arr_el,
+	output /*mux_wire*/ logic[1:0] slice_out
+);
+
+genvar _g0;
+/*mux_wire*/ logic[4:0] sum;
+/*mux_wire*/ logic[3:0] arr;
+/*mux_wire*/ logic _my_mod_add;
+/*mux_wire*/ logic[3:0] _my_mod_a;
+/*mux_wire*/ logic[3:0] _my_mod_b;
+wire[4:0] _my_mod_out;
+/*mux_wire*/ logic _other_add;
+/*mux_wire*/ logic[3:0] _other_a;
+/*mux_wire*/ logic[3:0] _other_b;
+wire[4:0] _other_out;
+wire[4:0] _14;
+assign _14 = x + y;
+wire[4:0] _17;
+assign _17 = x + y;
+wire _21;
+assign _21 = do_it & 1'b0;
+wire _24;
+assign _24 = do_it & 1'b0;
+wire _27;
+assign _27 = do_it & 1'b1;
+wire _30;
+assign _30 = do_it & 1'b0;
+wire _31 = arr[1];
+wire[1:0] _32;
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+assign _32[_g0] = arr[1 + _g0];
+end
+endgenerate
+newlines_helper my_mod(
+	.clk(clk),
+	.add(_my_mod_add),
+	.a(_my_mod_a),
+	.b(_my_mod_b),
+	.out(_my_mod_out)
+);
+newlines_helper other(
+	.clk(clk),
+	.add(_other_add),
+	.a(_other_a),
+	.b(_other_b),
+	.out(_other_out)
+);
+always_comb begin // combinatorial result
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	result = 5'dx;
+	if(do_it) result = _my_mod_out;
+	if(!do_it) result = 1'd0;
+end
+always_comb begin // combinatorial result2
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	result2 = 5'dx;
+	if(do_it) result2 = _other_out;
+	if(!do_it) result2 = 1'd0;
+end
+always_comb begin // combinatorial big
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	big = 6'dx;
+	big = _14;
+end
+always_comb begin // combinatorial _my_mod_add
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_my_mod_add = 1'bx;
+	_my_mod_add = 1'b0;
+	if(do_it) _my_mod_add = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_my_mod_add = _my_mod_add;
+end
+always_comb begin // combinatorial _my_mod_a
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_my_mod_a = 4'dx;
+	_my_mod_a = x;
+end
+always_comb begin // combinatorial _my_mod_b
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_my_mod_b = 4'dx;
+	_my_mod_b = y;
+end
+always_comb begin // combinatorial _other_add
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_other_add = 1'bx;
+	_other_add = 1'b0;
+	if(do_it) _other_add = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_other_add = _other_add;
+end
+always_comb begin // combinatorial _other_a
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_other_a = 4'dx;
+	_other_a = y;
+end
+always_comb begin // combinatorial _other_b
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_other_b = 4'dx;
+	_other_b = x;
+end
+always_comb begin // combinatorial sum
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sum = 5'dx;
+	sum = _17;
+end
+always_comb begin // combinatorial s2
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	s2 = 5'dx;
+	s2 = sum;
+end
+always_comb begin // combinatorial arr
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	arr = 4'bxxxx;
+	arr[0] = _21;
+	arr[1] = _24;
+	arr[2] = _27;
+	arr[3] = _30;
+end
+always_comb begin // combinatorial arr_el
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	arr_el = 1'bx;
+	arr_el = _31;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	arr_el = arr_el;
+end
+always_comb begin // combinatorial slice_out
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	slice_out = 2'bxx;
+	slice_out = _32;
+end
+endmodule // newlines_lenient #()
+
+// newlines_helper #()
+module newlines_helper(
+	/* clock */ input clk,
+	input wire add,
+	input wire[3:0] a,
+	input wire[3:0] b,
+	output /*mux_wire*/ logic[4:0] out
+);
+
+wire[4:0] _3;
+assign _3 = a + b;
+always_comb begin // combinatorial out
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	out = 5'dx;
+	out = _3;
+end
+endmodule // newlines_helper #()
+
 // BindTrigger #()
 module BindTrigger(
 	/* clock */ input clk,

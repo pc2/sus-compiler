@@ -653,3 +653,91 @@ module SplitIndexNegativeUnknownSize {
 	x[0] = y
 	x[-1] = y
 }
+
+module newlines_helper
+{
+    action add :
+        int#(FROM: 0, TO: 16) a,
+        int#(FROM: 0, TO: 16) b
+        -> int#(FROM: 0, TO: 32) out
+    {
+        out = a + b
+    }
+}
+
+// Lenient newlines (#107): after open brackets and before close brackets, around commas in brackets,
+// before '{', before 'else', before '->', after '=' and after binary operators.
+// Newlines before a binary operator are NOT allowed, since `+ x` on its own line is a unary reduction.
+module newlines_lenient
+{
+    newlines_helper my_mod
+    newlines_helper other
+
+    input int#(FROM: 0, TO: 16) x
+    input int#(FROM: 0, TO: 16) y
+    input bool do_it
+    output int#(FROM: 0, TO: 32) result
+    output int#(FROM: 0, TO: 32) result2
+    output int#(FROM: 0, TO: 48) big
+
+    when do_it
+    {
+        result = my_mod.add(
+            x,
+            y
+        )
+        // Newlines before commas, and a trailing comma
+        result2 = other.add(
+            y
+            , x
+            ,
+        )
+    }
+    else
+    {
+        result = 0
+        result2 = 0
+    }
+
+    if true
+    {
+    }
+    else
+    if false {} else {}
+
+    big =
+        x +
+        y
+
+    int#(FROM: 0, TO: 32) sum = (
+        x + y
+    )
+    output int#(FROM: 0, TO: 32) s2 = sum
+
+    bool[
+        4
+    ] arr
+    for int I in 0..4
+    {
+        arr[
+            I
+        ] = do_it & (I == 2)
+    }
+    output bool arr_el = arr[
+        1
+    ]
+    output bool[2] slice_out = arr[
+        1 : 3
+    ]
+}
+
+// A block on the line after an action or trigger is its body, not a separate block statement
+module newlines_interface_body {
+    trigger t : bool w
+    {
+    }
+    action fire : bool f
+    {
+        t(f)
+    }
+}
