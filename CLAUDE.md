@@ -12,7 +12,7 @@ Read `../sus-website/book/src/docs/` (if checked out) or https://sus-lang.org/do
 
 - **Modules and ports.** `module Name#(T, int N) { ... }`. Continuous ports are `input T x` / `output T y`; a parent reads/writes them as fields (`inst.x = ...`). No semicolons. Statements are declarations, assignments, `when`/`if`/`for` blocks.
 - **Actions and triggers** are the preferred port style. `action name: T a, T b -> T out { body }` is sugar for a `bool` input called `name` (the "valid" wire) plus data inputs/outputs and a `when name { body }`. The parent calls it like a method: `out = inst.name(a, b)`. A `trigger name : T v` is the reverse: a `bool` output called `name` plus data outputs; the submodule fires `name(v)`, and the parent reacts with a **conditional binding** `when inst.name : T v { ... }`. Both represent physical wires, so they fire at most once per cycle. Convention: a `may_x` output gates whether `x()` may be called (see the `may_x then x` idiom).
-- **`interface name : inputs -> outputs`** still appears in `std/` and `test.sus` but is no longer really used; the author prefers `action`/`trigger`, so do not write new code with it.
+- **`interface name : inputs -> outputs`** still appears in `std/` and `test_old.sus` but is no longer really used; the author prefers `action`/`trigger`, so do not write new code with it.
 - **Generative (compile-time) code.** `gen int X = ...` variables, `if` (compile-time) and `for int I in 0..N` loops run during instantiation and leave no hardware. Runtime conditionals use `when`, which becomes guards on the assignments inside. Module parameters `#(T, int N)` are generative; type args are passed as `#(T: type bool[4], N: 5)` and may be inferred from port types, integer bounds (min/max constraints), or latency inference.
 - **Latency counting** is the core feature. `reg x = ...` requests a pipeline register; the compiler assigns every wire an absolute latency and inserts registers on parallel paths to keep them in sync. `'N` on a declaration (`input bool i'0`, `output bool o'5`) pins an absolute latency. Ports are placed so inputs are as late and outputs as early as possible, and the solution is unique up to a constant offset. `reg(N)` and `next(N)` are the counted variants. `state T x` declares a register that holds across cycles (`initial x = v` sets its reset value).
 - **Domains and clocks.** `domain name` (latency domain) and `clock name` (clock domain, implies a latency domain) apply to all ports declared lexically after them. Wires that connect must share a domain; crossing requires `CrossDomain` (unsafe plain connection) or vendor primitives. Latency domains stop unrelated interfaces (e.g. FIFO push vs pop) from being pipeline-balanced against each other.
@@ -37,7 +37,7 @@ CI pins Rust 1.88 (`rust-version` in Cargo.toml); edition is 2024 and `let ... &
 
 ### Regression test (required for behavior changes)
 
-`test.sus` is the big regression input. Its outputs `test.sus_errors.txt` (all diagnostics) and `test.sus_codegen.sv` are committed, and CI diffs against them. Any change that alters diagnostics, codegen, or `test.sus` itself must regenerate and commit them:
+The regression input is three files: `test.sus` (modern tests), `test_old.sus` (tests using the old `interface` syntax, and tests that produce a lot of diagnostics) and `test_latencies.sus` (latency counting tests). Their combined outputs `test.sus_errors.txt` (all diagnostics) and `test.sus_codegen.sv` are committed, and CI diffs against them. Any change that alters diagnostics, codegen, or these input files must regenerate and commit them:
 
 ```sh
 ./test.sus_regression.sh
@@ -52,7 +52,7 @@ CI also requires stdout to be empty during that run.
 
 ### Editing the grammar
 
-`tree-sitter-sus/grammar.js` is the source; `tree-sitter-sus/src/parser.c` is generated and committed. Regenerate with `tree-sitter-sus/tree.sh`, which requires `tree-sitter-cli` **exactly v0.26.6** (`cargo install tree-sitter-cli@0.26.6`). Node kinds, keywords and fields are referenced in Rust via the `kind!("...")`, `kw!("...")`, `field!("...")` proc macros, which validate the name against the grammar at compile time.
+`tree-sitter-sus/grammar.js` is the source; `tree-sitter-sus/src/parser.c` is generated and committed. Regenerate with `tree-sitter-sus/tree.sh`, which requires `tree-sitter-cli` **exactly v0.26.9** (`cargo install tree-sitter-cli@0.26.9`). Node kinds, keywords and fields are referenced in Rust via the `kind!("...")`, `kw!("...")`, `field!("...")` proc macros, which validate the name against the grammar at compile time.
 
 ### Other scripts
 
@@ -119,5 +119,11 @@ Nearly every collection is a `FlatAlloc<T, Marker>` indexed by a typed `UUID<Mar
 
 - `--debug <name>` enables a named debug path; names are the string literals passed to `crate::debug::is_enabled(...)` (e.g. `print-abstract`, `print-concrete`, `print-concrete-pre-typecheck`, `print-execution-state`, `dot-latency-problem`, `dot-latency-solution`, `dot-dependency-graph`, `dot-svg`/`dot-png`, `lsp-debug`). `--debug-whitelist <substr>` restricts them to stages/globals whose debug-context label contains the substring (e.g. `"Typechecking FIFO"`).
 - `__debug_span!`, `__debug_dbg!`, `__debug_breakpoint!` are available from the prelude; `--debug TEST` is the conventional ad-hoc flag to gate temporary prints.
-- On panic, the compiler writes a **crash dump** (inputs + `reproduce.sh`) to `<sus-home>/crash_dumps/` (falls back to `./sus_crash_dumps/`). Pass `--no-redump` when reproducing a dump so you don't create another. `.vscode/launch.json` has lldb configs for `tinyTestFile.sus`, `test.sus`, and crash dumps.
+- On panic, the compiler writes a **crash dump** (inputs + `reproduce.sh`) to `<sus-home>/crash_dumps/` (falls back to `./sus_crash_dumps/`). Pass `--no-redump` when reproducing a dump so you don't create another. `.vscode/launch.json` has lldb configs for `tinyTestFile.sus`, the three regression test files, and crash dumps.
 - `--kill-timeout <secs>` watchdog-kills a stage that hangs; useful for infinite-loop bugs.
+
+## Code style preferences (from the author)
+
+- **No defensive programming.**/**Validate in one place, then assume validity.** Do not add `Result`s, early returns or `let _ =` to tolerate states that should never occur. A panic on a violated invariant is a useful ICE that points at the real bug; silently skipping hides it. Use `unwrap`, `assert!`, `let_unwrap!`, `unreachable!`.
+- **Keep stages and abstraction levels separate.** Driver functions like `finish_instantiation` should read as a sequence of stage calls with an error gate between them. Put each stage's work in its own named function in the file where that work lives (`final_checks` / `final_lints` in `final_checks.rs`, `optimize` in `post_processing.rs`), and give functions that require a valid module an `assert!(!self.errors.did_error())` plus a doc comment stating the precondition.
+- **The main structure of the codebase is already finished. Fit your changes within the existing architecture, rather than changing the architecture.** Ask explicitly if you wish to change the architecture. 

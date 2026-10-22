@@ -85,6 +85,7 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated newlines_helper #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated newlines_lenient #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated newlines_interface_body #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate when_without_block #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -240,6 +241,7 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate SplitIndexTooLarge due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate SplitIndexNegative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate SplitIndexNegativeUnknownSize due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate when_without_block due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -2296,6 +2298,48 @@ Error: Index -1 is below the lower bound 0 of this array
  654 │     x[-1] = y
      │       ─┬  
      │        ╰── Index -1 is below the lower bound 0 of this array
+─────╯
+Warning: Not Instantiating when_without_block #() due to abstract typing errors
+     ╭─[ test.sus:745:8 ]
+     │
+ 745 │ module when_without_block {
+     │        ─────────┬────────  
+     │                 ╰────────── Not Instantiating when_without_block #() due to abstract typing errors
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:747:13 ]
+     │
+ 747 │     input bool b
+     │                ┬  
+     │                ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: This `when` statement is missing its body
+     ╭─[ test.sus:749:2 ]
+     │
+ 749 │     when submod.beep : int x
+     │     ──┬─  
+     │       ╰─── This `when` statement is missing its body
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:749:25 ]
+     │
+ 749 │     when submod.beep : int x
+     │                            ┬  
+     │                            ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: This `when` statement is missing its body
+     ╭─[ test.sus:750:2 ]
+     │
+ 750 │     when b
+     │     ──┬─  
+     │       ╰─── This `when` statement is missing its body
+─────╯
+Error: This `if` statement is missing its body
+     ╭─[ test.sus:751:2 ]
+     │
+ 751 │     if true
+     │     ─┬  
+     │      ╰── This `if` statement is missing its body
 ─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:28:6 ]

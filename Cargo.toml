@@ -41,7 +41,7 @@ same-file = "1.0.6"
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 
 # Tree sitter
-tree-sitter = "0.26.6"
+tree-sitter = "0.26.9"
 tree-sitter-sus = {version = "~0.6.0-dev", path = "./tree-sitter-sus"}
 
 sus-proc-macro = {version = "~0.6.0-dev", path = "./sus-proc-macro"}

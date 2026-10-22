@@ -732,29 +732,33 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "CHOICE",
-                  "members": [
-                    {
+              "type": "PREC_DYNAMIC",
+              "value": 1,
+              "content": {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "CHOICE",
+                    "members": [
+                      {
+                        "type": "SYMBOL",
+                        "name": "_linebreak"
+                      },
+                      {
+                        "type": "BLANK"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "FIELD",
+                    "name": "else_block",
+                    "content": {
                       "type": "SYMBOL",
-                      "name": "_linebreak"
-                    },
-                    {
-                      "type": "BLANK"
+                      "name": "else_block"
                     }
-                  ]
-                },
-                {
-                  "type": "FIELD",
-                  "name": "else_block",
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "else_block"
                   }
-                }
-              ]
+                ]
+              }
             },
             {
               "type": "BLANK"
@@ -808,8 +812,16 @@
           ]
         },
         {
-          "type": "SYMBOL",
-          "name": "_then_else_block"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_statement_body"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         }
       ]
     },
@@ -1051,7 +1063,7 @@
           "members": [
             {
               "type": "SYMBOL",
-              "name": "_interface_body"
+              "name": "_statement_body"
             },
             {
               "type": "BLANK"
@@ -1060,7 +1072,7 @@
         }
       ]
     },
-    "_interface_body": {
+    "_statement_body": {
       "type": "PREC_DYNAMIC",
       "value": 1,
       "content": {
@@ -2848,6 +2860,9 @@
     ],
     [
       "interface_statement"
+    ],
+    [
+      "if_statement"
     ],
     [
       "interface_ports"

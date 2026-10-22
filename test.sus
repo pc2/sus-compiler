@@ -741,3 +741,12 @@ module newlines_interface_body {
         t(f)
     }
 }
+
+module when_without_block {
+	use_trigger submod
+	input bool b
+
+	when submod.beep : int boop
+	when b
+	if true
+}

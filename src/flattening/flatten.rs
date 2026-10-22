@@ -1333,8 +1333,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     is_generative: expects_generative,
                     then_block: FlatIDRange::PLACEHOLDER,
                     else_block: FlatIDRange::PLACEHOLDER,
-                    then_span: Span::PLACEHOLDER,
-                    else_span: Some(Span::PLACEHOLDER),
+                    then_span: None,
+                    else_span: None,
                     bindings_read_only: Vec::new(),
                     bindings_writable: Vec::new(),
                     conditional_bindings_span: None,
@@ -1360,6 +1360,14 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     let (then_block, else_block, then_span, else_span) =
                         slf.flatten_then_else_blocks(cursor, !expects_generative);
 
+                    if then_span.is_none() {
+                        let kw = if expects_generative { "if" } else { "when" };
+                        slf.errors.error(
+                            if_keyword_span,
+                            format!("This `{kw}` statement is missing its body"),
+                        );
+                    }
+
                     let then_block = UUIDRange(bindings_start_at, then_block.1);
 
                     let_unwrap!(
@@ -1368,7 +1376,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     );
                     if_stmt.then_block = then_block;
                     if_stmt.else_block = else_block;
-                    if_stmt.then_span = then_span.unwrap();
+                    if_stmt.then_span = then_span;
                     if_stmt.else_span = else_span;
                     if_stmt.bindings_read_only = bindings_inputs;
                     if_stmt.bindings_writable = bindings_outputs;

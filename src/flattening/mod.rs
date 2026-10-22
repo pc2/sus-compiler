@@ -959,7 +959,8 @@ pub struct IfStatement {
     pub is_generative: bool,
     pub then_block: FlatIDRange,
     pub else_block: FlatIDRange,
-    pub then_span: Span,
+    /// None if the block is missing (which is a flattening error)
+    pub then_span: Option<Span>,
     pub else_span: Option<Span>,
     pub bindings_read_only: Vec<FlatID>,
     pub bindings_writable: Vec<FlatID>,

@@ -151,10 +151,11 @@ module.exports = grammar({
         _then_else_block: $ => seq(
             optional($._linebreak),
             field('then_block', $.block),
-            optional(seq(
+            // `}` newline `else` is ambiguous: an else branch, or an expression statement `else`. Prefer the else branch
+            optional(prec.dynamic(1, seq(
                 optional($._linebreak),
                 field('else_block', $.else_block)
-            ))
+            )))
         ),
 
         if_statement: $ => seq(
@@ -164,7 +165,8 @@ module.exports = grammar({
             )),
             field('condition', $._expression),
             optional(field('conditional_bindings', $.interface_ports)),
-            $._then_else_block
+            // The body is optional so that `when submod.` still parses while typing (for LSP completions). Flattening reports the missing block.
+            optional($._statement_body)
         ),
         else_block: $ => seq(
             'else',
@@ -204,10 +206,10 @@ module.exports = grammar({
             field('name', $.identifier),
             optional(field('latency_specifier', $.latency_specifier)),
             optional(field('interface_ports', $.interface_ports)),
-            optional($._interface_body)
+            optional($._statement_body)
         ),
-        // `action x : int a\n{...}` is ambiguous: a body or a separate block statement. Prefer the body
-        _interface_body: $ => prec.dynamic(1, $._then_else_block),
+        // `action x : int a\n{...}` or `when x\n{...}` is ambiguous: a body or a separate block statement. Prefer the body
+        _statement_body: $ => prec.dynamic(1, $._then_else_block),
 
         interface_ports: $ => seq(
             ':',
@@ -434,6 +436,7 @@ module.exports = grammar({
         // On a newline LR(1) can't tell if the statement ends or continues, so GLR explores both until the next token.
         [$._then_else_block], // `}` newline `else`
         [$.interface_statement], // `action x : int a` newline `{`
+        [$.if_statement], // `when x` newline `{`
         [$.interface_ports], // `action x : int a` newline `->`
         [$._interface_ports_output],
     ],
