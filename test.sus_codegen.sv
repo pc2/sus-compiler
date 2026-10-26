@@ -4304,6 +4304,72 @@ always_comb begin // combinatorial mul1
 end
 endmodule // example_md #()
 
+// UseIntBoundsShorthandInference #()
+module UseIntBoundsShorthandInference(
+	/* clock */ input clk,
+	input wire[3:0] x,
+	input wire signed[3:0] y,
+	output /*mux_wire*/ logic are_eq
+);
+
+/*mux_wire*/ logic _inst_equals;
+/*mux_wire*/ logic signed[4:0] _inst_a;
+/*mux_wire*/ logic signed[4:0] _inst_b;
+wire _inst_result;
+IntBoundsShorthandInference_FROM_N2_TO_9 inst(
+	.clk(clk),
+	.equals(_inst_equals),
+	.a(_inst_a),
+	.b(_inst_b),
+	.result(_inst_result)
+);
+always_comb begin // combinatorial are_eq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	are_eq = 1'bx;
+	are_eq = _inst_result;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	are_eq = are_eq;
+end
+always_comb begin // combinatorial _inst_equals
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_inst_equals = 1'bx;
+	_inst_equals = 1'b0;
+	_inst_equals = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_inst_equals = _inst_equals;
+end
+always_comb begin // combinatorial _inst_a
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_inst_a = 5'sdx;
+	_inst_a = x;
+end
+always_comb begin // combinatorial _inst_b
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_inst_b = 5'sdx;
+	_inst_b = y;
+end
+endmodule // UseIntBoundsShorthandInference #()
+
+// IntBoundsShorthandInference #(FROM: -2, TO: 9)
+module IntBoundsShorthandInference_FROM_N2_TO_9(
+	/* clock */ input clk,
+	input wire equals,
+	input wire signed[4:0] a,
+	input wire signed[4:0] b,
+	output /*mux_wire*/ logic result
+);
+
+wire _3;
+assign _3 = a == b;
+always_comb begin // combinatorial result
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	result = 1'bx;
+	result = _3;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	result = result;
+end
+endmodule // IntBoundsShorthandInference #(FROM: -2, TO: 9)
+
 // IntBoundsShorthand #()
 module IntBoundsShorthand(
 	/* clock */ input clk,

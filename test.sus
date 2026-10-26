@@ -824,3 +824,16 @@ module IntBoundsShorthandErrors {
 	int#(..5) missing_lower
 	int#(0..) missing_upper
 }
+
+// Integer bounds written with the shorthand are inferred exactly like the long form
+module IntBoundsShorthandInference#(int FROM, int TO) {
+	action equals'0 : int#(FROM..TO) a'0, int#(FROM..TO) b'0 -> bool result'0 {
+		result = a == b
+	}
+}
+module UseIntBoundsShorthandInference {
+	IntBoundsShorthandInference inst
+	input int#(3..9) x'0
+	input int#(-2..5) y'0
+	output bool are_eq'0 = inst.equals(x, y)
+}

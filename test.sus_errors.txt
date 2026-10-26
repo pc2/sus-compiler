@@ -91,6 +91,8 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate MissingInclusiveSliceEnd #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated IntBoundsShorthand #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate IntBoundsShorthandErrors #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated IntBoundsShorthandInference #(FROM: -2, TO: 9)
+[INFO  sus_compiler::instantiation::instantiator] Instantiated UseIntBoundsShorthandInference #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -5885,6 +5887,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for newlines_interface_body #() as "newlines_interface_body"
 [INFO  sus_compiler::codegen] Code generated for InclusiveAndMultipliedSlices #() as "InclusiveAndMultipliedSlices"
 [INFO  sus_compiler::codegen] Code generated for IntBoundsShorthand #() as "IntBoundsShorthand"
+[INFO  sus_compiler::codegen] Code generated for UseIntBoundsShorthandInference #() as "UseIntBoundsShorthandInference"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"
