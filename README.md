@@ -34,10 +34,10 @@ call plug#end()
 
 ## Useful Libraries
 Some libraries we maintain here at PC2 might be of use to you:
-- [sus-float](https://github.com/pc2/sus-float): Xilinx floating point IP wrappers
-- [sus-xrt](https://github.com/pc2/sus-xrt): AXI masters & slaves for working with [XRT](https://github.com/Xilinx/XRT)
-- [sus-xpm](https://github.com/pc2/sus-xpm): SUS wrappers for [Xilinx Parametrized Macros](https://docs.amd.com/r/en-US/ug974-vivado-ultrascale-libraries/Xilinx-Parameterized-Macros). (RAMs, FIFOs, etc)
-
+- [sus-float](https://github.com/pc2/sus-float): Xilinx floating point IP wrappers.
+- [sus-xrt](https://github.com/pc2/sus-xrt): AXI masters & slaves for working with [XRT](https://github.com/Xilinx/XRT).
+- [sus-tapasco](https://github.com/sus-hdl/sus-tapasco): AXI interfaces for [Tapasco](https://github.com/esa-tu-darmstadt/tapasco).
+- [aie_reflasher](https://github.com/pc2/aie_reflasher): Dynamic Reflashing of [Versal AI Engines](https://docs.amd.com/p/ai-engine-development) from the FPGA fabric.
 
 ## Learning SUS
 
