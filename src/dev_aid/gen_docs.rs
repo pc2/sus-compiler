@@ -1,3 +1,4 @@
+use crate::compiler_top::TOPS_FILE_ID;
 use crate::config::GenDocs;
 use crate::dev_aid::port_diagram;
 use crate::file_position::FileText;
@@ -19,15 +20,21 @@ pub fn gen_docs(linker: &Linker, settings: &GenDocs) {
         fatal_exit!("Could not create docs/ directory: {e}");
     }
 
+    // The synthetic `--top` file is not user code, so it gets no docs page
+    let documented_files = || {
+        linker
+            .files
+            .iter()
+            .filter(|(_, f)| f.file_identifier.name != TOPS_FILE_ID)
+    };
+
     // First pass: gather all files
-    let all_file_stems: Vec<String> = linker
-        .files
-        .iter()
+    let all_file_stems: Vec<String> = documented_files()
         .map(|(_, f)| file_stem_of(&f.file_identifier.name))
         .collect();
 
     // Second pass: generate one HTML file per .sus file.
-    for (_, file_data) in &linker.files {
+    for (_, file_data) in documented_files() {
         let stem = file_stem_of(&file_data.file_identifier.name);
 
         let html = generate_file_html(&stem, linker, file_data, &all_file_stems, &settings.host);
