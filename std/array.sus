@@ -41,7 +41,7 @@ module Concat #(T, int SIZE_A, int SIZE_B) {
 ///
 /// Example: `RotateLeft([1, 2, 3, 4], 1) == [2, 3, 4, 1]`
 module RotateLeft#(T, int ARRAY_LEN) {
-    interface RotateLeft : T[ARRAY_LEN] data'0, int#(FROM: 0, TO: ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0
+    interface RotateLeft : T[ARRAY_LEN] data'0, int#(0..ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0
 
     gen int NUM_STAGES = clog2#(V: ARRAY_LEN)
     bool[NUM_STAGES] offset_bits = UIntToBits(offset)
@@ -69,7 +69,7 @@ module RotateLeft#(T, int ARRAY_LEN) {
 /// Example:
 /// ```sus RotateRight([1, 2, 3, 4], 1) == [4, 1, 2, 3]```
 module RotateRight#(T, int ARRAY_LEN) {
-    interface RotateRight : T[ARRAY_LEN] data'0, int#(FROM: 0, TO: ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0
+    interface RotateRight : T[ARRAY_LEN] data'0, int#(0..ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0
 
     gen int NUM_STAGES = clog2#(V: ARRAY_LEN)
     bool[NUM_STAGES] offset_bits = UIntToBits(offset)

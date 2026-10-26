@@ -13,7 +13,7 @@ module Ternary #(T) {
 /// Lengthens the incoming reset signal for `MIN_RESET_CYCLES`. 
 /// It provides enough time for the many deep pipelines in your design to reset fully throughout. 
 module ResetLengthener#(int MIN_RESET_CYCLES) {
-    state int#(FROM: 0, TO: MIN_RESET_CYCLES) reset_countdown
+    state int#(0..MIN_RESET_CYCLES) reset_countdown
 
     domain reset_in
     action rst_in {

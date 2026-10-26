@@ -57,7 +57,7 @@ module for_loop {
 
 module fizz_buzz_gen {
     gen int TABLE_SIZE = 256
-    interface fizz_buzz_gen : int#(FROM: 0, TO: TABLE_SIZE) v -> int fb 
+    interface fizz_buzz_gen : int#(0..TABLE_SIZE) v -> int fb 
     gen int FIZZ = 15
     gen int BUZZ = 11
     gen int FIZZ_BUZZ = 1511
@@ -86,7 +86,7 @@ module fizz_buzz_gen {
 }
 
 module bounded_ints {
-    input int#(FROM: 0, TO: 5) v
+    input int#(0..5) v
     int v_2
 
     when v == 3 {
@@ -101,10 +101,10 @@ module bounded_ints {
 module memory#(T, int DEPTH) {
     T[DEPTH] mem
 
-    action write: int#(FROM: 0, TO: DEPTH) addr, T data {
+    action write: int#(0..DEPTH) addr, T data {
         mem[addr] = data
     }
-    action read: int#(FROM: 0, TO: DEPTH) addrb -> T datab {
+    action read: int#(0..DEPTH) addrb -> T datab {
         datab = mem[addrb]
     }
 }
@@ -168,7 +168,7 @@ module fibonnaci {
 }
 
 module pow17 {
-    interface pow17 : int#(FROM: 0, TO: 100) i -> int o 
+    interface pow17 : int#(0..100) i -> int o 
         int i2  = i * i
     reg int i4  = i2 * i2
         int i8  = i4 * i4
@@ -178,8 +178,8 @@ module pow17 {
 
 module example_md {
     interface example_md :
-        int#(FROM: 0, TO: 5)[4] factors,
-        int#(FROM: 0, TO: 5) add_to ->
+        int#(0..5)[4] factors,
+        int#(0..5) add_to ->
         int product, 
         int total
 
@@ -370,7 +370,7 @@ module use_bram {
 
 module raw_ddr_memory #(T) {
     domain user_side
-    action read : int#(FROM: 0, TO: 1000) addr {
+    action read : int#(0..1000) addr {
         //...
     }
     trigger read_ready : -> T data {
@@ -386,18 +386,18 @@ module instruction_decode {
         //...
 
         trigger add : 
-            int#(FROM: 0, TO: 8) reg_a,
-            int#(FROM: 0, TO: 8) reg_b,
-            int#(FROM: 0, TO: 8) reg_tgt {
+            int#(0..8) reg_a,
+            int#(0..8) reg_b,
+            int#(0..8) reg_tgt {
             // ...
         }
         trigger load_imm8 : 
             bool[8] data,
-            int#(FROM: 0, TO: 8) reg_tgt {
+            int#(0..8) reg_tgt {
             // ...
         }
         trigger jump :
-            int#(FROM: 0, TO: 256) target {
+            int#(0..256) target {
             // ...
         }
 

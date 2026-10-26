@@ -2,7 +2,7 @@
 
 module TestVectorGenerator#(int SIZE, int[SIZE] LEFTS, int[SIZE] RIGHTS, int[SIZE] RESULTS) {
 
-    state int#(FROM: 0, TO: SIZE) cur = 0
+    state int#(0..SIZE) cur = 0
 
     trigger case'0 : int left'0, int right'0, int expected'0
 
@@ -14,20 +14,20 @@ module TestVectorGenerator#(int SIZE, int[SIZE] LEFTS, int[SIZE] RIGHTS, int[SIZ
 
 extern module assert_eq_int#(string ID) {
     action assert_eq_int'0 : 
-        int#(FROM: -pow2#(E: 31), TO: pow2#(E: 31)) found'0,
-        int#(FROM: -pow2#(E: 31), TO: pow2#(E: 31)) expected'0 {}
+        int#(-pow2#(E: 31)..pow2#(E: 31)) found'0,
+        int#(-pow2#(E: 31)..pow2#(E: 31)) expected'0 {}
 }
 
 extern module assert_eq_bools#(string ID, int BITWIDTH) {
     input bool activate'0
-    input int#(FROM: 0, TO: 1 << 32) idx'0
+    input int#(0..1 << 32) idx'0
     input bool[BITWIDTH] found'0
     input bool[BITWIDTH] expected'0
 }
 
 module assert_eq#(T, string ID) {
     assert_eq_bools#(ID) asserter
-    action assert_eq'0 : int#(FROM: 0, TO: 1 << 32) idx'0, T found'0, T expected'0 {
+    action assert_eq'0 : int#(0..1 << 32) idx'0, T found'0, T expected'0 {
         asserter.activate = true
         asserter.found = ToBits(found)
         asserter.idx = idx

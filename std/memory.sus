@@ -1,6 +1,6 @@
 
 module ROM #(T, int DEPTH, T[DEPTH] DATA) {
-    action read : int #(FROM: 0, TO: DEPTH) index'0 -> T output_data'1 {
+    action read : int#(0..DEPTH) index'0 -> T output_data'1 {
         reg output_data = DATA[index]
     }
 }
@@ -15,12 +15,12 @@ module RAM #(T, int DEPTH) {
     state bool[T_WIDTH][DEPTH] mem
 
     domain w_dom
-	action write'0 : int#(FROM: 0, TO: DEPTH) write_addr'0, T write_data'0 {
+	action write'0 : int#(0..DEPTH) write_addr'0, T write_data'0 {
 		mem[write_addr] = ToBits(write_data)
 	}
 
     domain r_dom
-	action read'0: int#(FROM: 0, TO: DEPTH) read_addr'0 -> T read_data'1 {
+	action read'0: int#(0..DEPTH) read_addr'0 -> T read_data'1 {
         reg bool[T_WIDTH] mem_read = mem[read_addr]
         read_data = FromBits(mem_read)
 	}
@@ -44,12 +44,12 @@ module DPRAM #(T, int DEPTH) {
     int addr_a
     bool[T_WIDTH] write_bits_a
     bool[T_WIDTH] read_bits_a
-	action write_a'0 : int#(FROM: 0, TO: DEPTH) write_addr_a'0, T write_data_a'0 {
+	action write_a'0 : int#(0..DEPTH) write_addr_a'0, T write_data_a'0 {
         addr_a = write_addr_a
 		do_write_a = true
         write_bits_a = ToBits(write_data_a)
 	}
-	action read_a'0: int#(FROM: 0, TO: DEPTH) read_addr_a'0 -> T read_data_a'1 {
+	action read_a'0: int#(0..DEPTH) read_addr_a'0 -> T read_data_a'1 {
         addr_a = read_addr_a
         do_read_a = true
         read_data_a = FromBits(read_bits_a)
@@ -66,12 +66,12 @@ module DPRAM #(T, int DEPTH) {
     int addr_b
     bool[T_WIDTH] write_bits_b
     bool[T_WIDTH] read_bits_b
-	action write_b'0 : int#(FROM: 0, TO: DEPTH) write_addr_b'0, T write_data_b'0 {
+	action write_b'0 : int#(0..DEPTH) write_addr_b'0, T write_data_b'0 {
         addr_b = write_addr_b
 		do_write_b = true
         write_bits_b = ToBits(write_data_b)
 	}
-	action read_b'0: int#(FROM: 0, TO: DEPTH) read_addr_b'0 -> T read_data_b'1 {
+	action read_b'0: int#(0..DEPTH) read_addr_b'0 -> T read_data_b'1 {
         addr_b = read_addr_b
         do_read_b = true
         read_data_b = FromBits(read_bits_b)
@@ -105,7 +105,7 @@ module RAM_Unbalanced #(ElemT, int DEPTH, int WRITE_SIZE, int READ_SIZE) {
 
     bool[NUM_WRITE_SEGMENTS] should_write_segment = RepeatGen#(T: type bool, SIZE: NUM_WRITE_SEGMENTS, V: false)
     bool[WRITE_WIDTH] wr_data
-    int#(FROM: 0, TO: MEMORY_DEPTH) write_row
+    int#(0..MEMORY_DEPTH) write_row
     for int WR_SEGMENT in 0..NUM_WRITE_SEGMENTS {
         when should_write_segment[WR_SEGMENT] {
             mem[write_row][WR_SEGMENT*..WRITE_WIDTH] = wr_data
@@ -113,7 +113,7 @@ module RAM_Unbalanced #(ElemT, int DEPTH, int WRITE_SIZE, int READ_SIZE) {
     }
 
     domain w_dom
-	action write'0 : int#(FROM: 0, TO: DEPTH / WRITE_SIZE) write_addr'0, ElemT[WRITE_SIZE] write_data'0 {
+	action write'0 : int#(0..DEPTH / WRITE_SIZE) write_addr'0, ElemT[WRITE_SIZE] write_data'0 {
 		wr_data = ToBits(write_data)
         int selected_write_segment = write_addr mod NUM_WRITE_SEGMENTS
         write_row = write_addr / NUM_WRITE_SEGMENTS
@@ -121,9 +121,9 @@ module RAM_Unbalanced #(ElemT, int DEPTH, int WRITE_SIZE, int READ_SIZE) {
 	}
 
     domain r_dom
-	action read'0: int#(FROM: 0, TO: DEPTH / READ_SIZE) read_addr'0 -> ElemT[READ_SIZE] read_data'1 {
+	action read'0: int#(0..DEPTH / READ_SIZE) read_addr'0 -> ElemT[READ_SIZE] read_data'1 {
         int selected_read_segment = read_addr mod NUM_READ_SEGMENTS
-        int#(FROM: 0, TO: MEMORY_DEPTH) read_row = read_addr / NUM_READ_SEGMENTS
+        int#(0..MEMORY_DEPTH) read_row = read_addr / NUM_READ_SEGMENTS
         reg bool[MEMORY_WIDTH] rd_data = mem[read_row]
         bool[READ_WIDTH][NUM_READ_SEGMENTS] segments
         for int RD_SEGMENT in 0..NUM_READ_SEGMENTS {

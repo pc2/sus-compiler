@@ -16,9 +16,9 @@
 /// In this example, the `SlowState` takes one pipeline stage for the `sizes_fifo.pop()`,
 /// and one for adding `(size * 8)` to the current address. This means it has a maximum rate of 1 update per 3 cycles. 
 /// ```sus
-/// SlowState#(T: type int#(FROM: 0, TO: 1 << 64)) current_addr
+/// SlowState#(T: type int#(0..1 << 64)) current_addr
 /// 
-/// action set_new_addr : int#(FROM: 0, TO: 1 << 64) new_addr {
+/// action set_new_addr : int#(0..1 << 64) new_addr {
 ///     current_addr.set_fast(new_addr)
 /// }
 /// 
@@ -318,7 +318,7 @@ module ParallelWhile #(int COMPUTATION_LATENCY, int REQUEST_DATA_LATENCY) {
     clock clk
     domain iter_domain
     gen int TOTAL_CYCLES = COMPUTATION_LATENCY + REQUEST_DATA_LATENCY
-    state int#(FROM: 0, TO: TOTAL_CYCLES) cur_iter_st
+    state int#(0..TOTAL_CYCLES) cur_iter_st
     initial cur_iter_st = 0
 
     bool should_continue'COMPUTATION_LATENCY
@@ -327,7 +327,7 @@ module ParallelWhile #(int COMPUTATION_LATENCY, int REQUEST_DATA_LATENCY) {
     // Increment by one every cycle, no matter if we're processing or not
     cur_iter_st = (cur_iter_st + 1) % TOTAL_CYCLES
 
-    trigger iter'0 : int #(FROM: 0, TO: TOTAL_CYCLES) cur_iter'0 {
+    trigger iter'0 : int#(0..TOTAL_CYCLES) cur_iter'0 {
         action continue'COMPUTATION_LATENCY {
             should_continue = true
         } else {
@@ -369,7 +369,7 @@ module ParallelState #(T, int NUM_PARALLEL_STATES, int LATENCY) {
 
     RAM #(DEPTH: NUM_PARALLEL_STATES) st
 
-    action link'0 : int#(FROM: 0, TO: NUM_PARALLEL_STATES) cur_iter_id'0 {
+    action link'0 : int#(0..NUM_PARALLEL_STATES) cur_iter_id'0 {
         output T old'2
 
         action init'0 : T initial_data'0 {
@@ -391,7 +391,7 @@ module ParallelState #(T, int NUM_PARALLEL_STATES, int LATENCY) {
 module ParallelStore #(T, int NUM_PARALLEL_STATES) {
     RAM #(DEPTH: NUM_PARALLEL_STATES) st
 
-    action link'0 : int#(FROM: 0, TO: NUM_PARALLEL_STATES) cur_iter_id'0 {
+    action link'0 : int#(0..NUM_PARALLEL_STATES) cur_iter_id'0 {
         // By being a few cycles later, we ensure that the initial data is written before we access it
         output T old'3 = st.read(cur_iter_id)
 
@@ -415,7 +415,7 @@ module ParallelStore #(T, int NUM_PARALLEL_STATES) {
 /// In this case, the Semaphore should be set to `INITIAL_PERMITS=0`, and then when a compute job becomes available `release()` first.
 module Semaphore#(int MAX, int INITIAL_PERMITS) {
     domain write
-    state int#(FROM: 0, TO: MAX+1) available_permits
+    state int#(0..MAX+1) available_permits
     output bool may_acquire'0 = available_permits != 0
     int do_acquire = 0
     action acquire'0 {
@@ -440,7 +440,7 @@ module Semaphore#(int MAX, int INITIAL_PERMITS) {
 /// The releases are independent, whereas `may_acquire` and `acquire_all` are shared among all. 
 module SharedAcquireSemaphore#(int MAX, int INITIAL_PERMITS, int NUM_SEMAPHORES) {
     domain tmp
-    output state int#(FROM: 0, TO: MAX+1)[NUM_SEMAPHORES] available_permits
+    output state int#(0..MAX+1)[NUM_SEMAPHORES] available_permits
 
     domain default
     input bool[NUM_SEMAPHORES] releases
@@ -507,7 +507,7 @@ module SharedAcquireSemaphore#(int MAX, int INITIAL_PERMITS, int NUM_SEMAPHORES)
 ///     input float[16] values_to_mul
 ///     input bool values_to_mul_last
 ///     trigger take_next_values
-///     state int#(FROM: 0, TO: 16) cur_idx
+///     state int#(0..16) cur_idx
 ///     state float[16] multiplied_results_store
 ///     trigger push_multiplied_results : float[16] multiplied_results
 ///     when values_to_mul_valid & mr.may_push {
@@ -536,9 +536,9 @@ module SharedAcquireSemaphore#(int MAX, int INITIAL_PERMITS, int NUM_SEMAPHORES)
 /// ```
 module MultiReduction#(T, T NEUTRAL_ELEMENT, int OPERATOR_LATENCY, int DATA_IN_LATENCY, int MAX_DATAS) {
     gen int TOTAL_OPERATOR_LATENCY = OPERATOR_LATENCY + 2
-    state int#(FROM: 0, TO: MAX_DATAS) cur_data_idx
-    state int#(FROM: 0, TO: TOTAL_OPERATOR_LATENCY+1) num_datas_in_wave
-    state int#(FROM: 0, TO: TOTAL_OPERATOR_LATENCY) num_reductions_in_flight
+    state int#(0..MAX_DATAS) cur_data_idx
+    state int#(0..TOTAL_OPERATOR_LATENCY+1) num_datas_in_wave
+    state int#(0..TOTAL_OPERATOR_LATENCY) num_reductions_in_flight
     int increment_num_reductions_in_flight = 0
     int decrement_num_reductions_in_flight = 0
     num_reductions_in_flight = IntNarrow#(FROM: 0, TO: TOTAL_OPERATOR_LATENCY)(num_reductions_in_flight + increment_num_reductions_in_flight - decrement_num_reductions_in_flight)

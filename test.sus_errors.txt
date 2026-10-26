@@ -89,6 +89,8 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated InclusiveAndMultipliedSlices #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate OutOfBoundsMultipliedSlice #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate MissingInclusiveSliceEnd #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated IntBoundsShorthand #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate IntBoundsShorthandErrors #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -247,6 +249,7 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate when_without_block due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate OutOfBoundsMultipliedSlice due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate MissingInclusiveSliceEnd due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate IntBoundsShorthandErrors due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -1061,53 +1064,53 @@ T can be inferred from:
 
 ─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
-     ╭─[ test.sus:238:28 ]
+     ╭─[ test.sus:238:18 ]
      │
- 238 │     int#(FROM: 0, TO: 255)[2] a
-     │                               ┬  
-     │                               ╰── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+ 238 │     int#(0..255)[2] a
+     │                     ┬  
+     │                     ╰── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:238:28 ]
+     ╭─[ test.sus:238:18 ]
      │
- 238 │     int#(FROM: 0, TO: 255)[2] a
-     │                               ┬  
-     │                               ╰── Unused Variable: This variable does not affect the output ports of this module
+ 238 │     int#(0..255)[2] a
+     │                     ┬  
+     │                     ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:240:10 ]
      │
- 240 │     gen int SZ = sizeof #(T: type int#(FROM: 0, TO: 256*256))
+ 240 │     gen int SZ = sizeof #(T: type int#(0..256*256))
      │             ─┬  
      │              ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:242:6 ]
      │
- 242 │     int b = Transmute#(T2: type int#(FROM: 0, TO: 256*256)) (a)
+ 242 │     int b = Transmute#(T2: type int#(0..256*256)) (a)
      │         ┬  
      │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
-     ╭─[ test.sus:244:24 ]
+     ╭─[ test.sus:244:13 ]
      │
- 244 │     int #(FROM: 5, TO: 3) v
-     │                           ┬  
-     │                           ╰── Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+ 244 │     int#(5..3) v
+     │                ┬  
+     │                ╰── Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
 ─────╯
 Error: The type of 'v' is invalid! int #(FROM: 5, TO: 3)
-     ╭─[ test.sus:244:24 ]
+     ╭─[ test.sus:244:13 ]
      │
- 244 │     int #(FROM: 5, TO: 3) v
-     │                           ┬  
-     │                           ╰── The type of 'v' is invalid! int #(FROM: 5, TO: 3)
+ 244 │     int#(5..3) v
+     │                ┬  
+     │                ╰── The type of 'v' is invalid! int #(FROM: 5, TO: 3)
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:244:24 ]
+     ╭─[ test.sus:244:13 ]
      │
- 244 │     int #(FROM: 5, TO: 3) v
-     │                           ┬  
-     │                           ╰── Unused Variable: This variable does not affect the output ports of this module
+ 244 │     int#(5..3) v
+     │                ┬  
+     │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
      ╭─[ test.sus:259:7 ]
@@ -1208,25 +1211,25 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │               ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
-     ╭─[ test.sus:297:25 ]
+     ╭─[ test.sus:297:16 ]
      │
- 297 │     int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4..4]
-     │                            ─────┬────  
-     │                                 ╰────── Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+ 297 │     int#(0..6)[0] zero_slice = INTS[5][4..4]
+     │                   ─────┬────  
+     │                        ╰────── Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:297:25 ]
+     ╭─[ test.sus:297:16 ]
      │
- 297 │     int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4..4]
-     │                            ─────┬────  
-     │                                 ╰────── Unused Variable: This variable does not affect the output ports of this module
+ 297 │     int#(0..6)[0] zero_slice = INTS[5][4..4]
+     │                   ─────┬────  
+     │                        ╰────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: Some parameters of 'INTS_3' were still unknown: int #(FROM: ?, TO: ?)[0]
-     ╭─[ test.sus:297:38 ]
+     ╭─[ test.sus:297:29 ]
      │
- 297 │     int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4..4]
-     │                                         ──────┬──────  
-     │                                               ╰──────── Some parameters of 'INTS_3' were still unknown: int #(FROM: ?, TO: ?)[0]
+ 297 │     int#(0..6)[0] zero_slice = INTS[5][4..4]
+     │                                ──────┬──────  
+     │                                      ╰──────── Some parameters of 'INTS_3' were still unknown: int #(FROM: ?, TO: ?)[0]
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:302:18 ]
@@ -1278,25 +1281,25 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
-     ╭─[ test.sus:323:25 ]
+     ╭─[ test.sus:323:16 ]
      │
- 323 │     int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4..3]
-     │                            ───────┬──────  
-     │                                   ╰──────── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+ 323 │     int#(0..6)[0] negative_slice = INTS[5][4..3]
+     │                   ───────┬──────  
+     │                          ╰──────── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:323:25 ]
+     ╭─[ test.sus:323:16 ]
      │
- 323 │     int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4..3]
-     │                            ───────┬──────  
-     │                                   ╰──────── Unused Variable: This variable does not affect the output ports of this module
+ 323 │     int#(0..6)[0] negative_slice = INTS[5][4..3]
+     │                   ───────┬──────  
+     │                          ╰──────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: Slice 4..3 has a negative length.
-     ╭─[ test.sus:323:50 ]
+     ╭─[ test.sus:323:41 ]
      │
- 323 │     int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4..3]
-     │                                                     ──┬─  
-     │                                                       ╰─── Slice 4..3 has a negative length.
+ 323 │     int#(0..6)[0] negative_slice = INTS[5][4..3]
+     │                                            ──┬─  
+     │                                              ╰─── Slice 4..3 has a negative length.
 ─────╯
 Warning: Not Instantiating duplicate_port_names #() due to abstract typing errors
      ╭─[ test.sus:327:8 ]
@@ -1626,38 +1629,38 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                   ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:394:26 ]
+     ╭─[ test.sus:394:16 ]
      │
- 394 │          int#(FROM: 0, TO: SZ) u = 0
-     │                                ┬  
-     │                                ╰── Unused Variable: This variable does not affect the output ports of this module
+ 394 │          int#(0..SZ) u = 0
+     │                      ┬  
+     │                      ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: u is effectively constant. Declare this wire as `gen` to make this explicit.
-     ╭─[ test.sus:394:26 ]
+     ╭─[ test.sus:394:16 ]
      │
- 394 │          int#(FROM: 0, TO: SZ) u = 0
-     │          ───────────┬──────────┬  
-     │                     ╰───────────── u = 0
-     │                                │  
-     │                                ╰── u is effectively constant. Declare this wire as `gen` to make this explicit.
+ 394 │          int#(0..SZ) u = 0
+     │          ──────┬─────┬  
+     │                ╰──────── u = 0
+     │                      │  
+     │                      ╰── u is effectively constant. Declare this wire as `gen` to make this explicit.
 ─────╯
 Warning: u_2 is effectively constant. Declare this wire as `gen` to make this explicit.
-     ╭─[ test.sus:394:26 ]
+     ╭─[ test.sus:394:16 ]
      │
- 394 │          int#(FROM: 0, TO: SZ) u = 0
-     │          ───────────┬──────────┬  
-     │                     ╰───────────── u_2 = 0
-     │                                │  
-     │                                ╰── u_2 is effectively constant. Declare this wire as `gen` to make this explicit.
+ 394 │          int#(0..SZ) u = 0
+     │          ──────┬─────┬  
+     │                ╰──────── u_2 = 0
+     │                      │  
+     │                      ╰── u_2 is effectively constant. Declare this wire as `gen` to make this explicit.
 ─────╯
 Warning: u_3 is effectively constant. Declare this wire as `gen` to make this explicit.
-     ╭─[ test.sus:394:26 ]
+     ╭─[ test.sus:394:16 ]
      │
- 394 │          int#(FROM: 0, TO: SZ) u = 0
-     │          ───────────┬──────────┬  
-     │                     ╰───────────── u_3 = 0
-     │                                │  
-     │                                ╰── u_3 is effectively constant. Declare this wire as `gen` to make this explicit.
+ 394 │          int#(0..SZ) u = 0
+     │          ──────┬─────┬  
+     │                ╰──────── u_3 = 0
+     │                      │  
+     │                      ╰── u_3 is effectively constant. Declare this wire as `gen` to make this explicit.
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:395:8 ]
@@ -1854,43 +1857,43 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
-     ╭─[ test.sus:448:25 ]
+     ╭─[ test.sus:448:15 ]
      │
- 448 │     int#(FROM: 10, TO: 11) a = 10
-     │                            ┬  
-     │                            ╰── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+ 448 │     int#(10..11) a = 10
+     │                  ┬  
+     │                  ╰── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:448:25 ]
+     ╭─[ test.sus:448:15 ]
      │
- 448 │     int#(FROM: 10, TO: 11) a = 10
-     │                            ┬  
-     │                            ╰── Unused Variable: This variable does not affect the output ports of this module
+ 448 │     int#(10..11) a = 10
+     │                  ┬  
+     │                  ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: a is effectively constant. Declare this wire as `gen` to make this explicit.
-     ╭─[ test.sus:448:25 ]
+     ╭─[ test.sus:448:15 ]
      │
- 448 │     int#(FROM: 10, TO: 11) a = 10
-     │     ────────────┬──────────┬  
-     │                 ╰───────────── a = 10
-     │                            │  
-     │                            ╰── a is effectively constant. Declare this wire as `gen` to make this explicit.
+ 448 │     int#(10..11) a = 10
+     │     ───────┬─────┬  
+     │            ╰──────── a = 10
+     │                  │  
+     │                  ╰── a is effectively constant. Declare this wire as `gen` to make this explicit.
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:449:23 ]
+     ╭─[ test.sus:449:13 ]
      │
- 449 │     int#(FROM: 3, TO: 4) b = 3
-     │                          ┬  
-     │                          ╰── Unused Variable: This variable does not affect the output ports of this module
+ 449 │     int#(3..4) b = 3
+     │                ┬  
+     │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: b is effectively constant. Declare this wire as `gen` to make this explicit.
-     ╭─[ test.sus:449:23 ]
+     ╭─[ test.sus:449:13 ]
      │
- 449 │     int#(FROM: 3, TO: 4) b = 3
-     │     ───────────┬─────────┬  
-     │                ╰──────────── b = 3
-     │                          │  
-     │                          ╰── b is effectively constant. Declare this wire as `gen` to make this explicit.
+ 449 │     int#(3..4) b = 3
+     │     ──────┬────┬  
+     │           ╰─────── b = 3
+     │                │  
+     │                ╰── b is effectively constant. Declare this wire as `gen` to make this explicit.
 ─────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
      ╭─[ test.sus:451:2 ]
@@ -1949,11 +1952,11 @@ Warning: O is never written to.
      │                          ╰── O is never written to.
 ─────╯
 Warning: X is never written to.
-     ╭─[ test.sus:467:39 ]
+     ╭─[ test.sus:467:29 ]
      │
- 467 │     output state int#(FROM: 0, TO: 4)[2] X'0
-     │                                          ┬  
-     │                                          ╰── X is never written to.
+ 467 │     output state int#(0..4)[2] X'0
+     │                                ┬  
+     │                                ╰── X is never written to.
 ─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
      ╭─[ test.sus:481:21 ]
@@ -2163,11 +2166,11 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:570:29 ]
+     ╭─[ test.sus:570:19 ]
      │
- 570 │     input int#(FROM: 0, TO: 5) idx
-     │                                ─┬─  
-     │                                 ╰─── Unused Variable: This variable does not affect the output ports of this module
+ 570 │     input int#(0..5) idx
+     │                      ─┬─  
+     │                       ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:572:6 ]
@@ -2381,6 +2384,147 @@ Error: Missing inclusive slice end index
      │                         │ 
      │                         ╰─ Missing inclusive slice end index
 ─────╯
+Warning: Not Instantiating IntBoundsShorthandErrors #() due to abstract typing errors
+     ╭─[ test.sus:807:8 ]
+     │
+ 807 │ module IntBoundsShorthandErrors {
+     │        ────────────┬───────────  
+     │                    ╰───────────── Not Instantiating IntBoundsShorthandErrors #() due to abstract typing errors
+─────╯
+Error: 'FROM' has already been defined previously
+     ╭─[ test.sus:808:13 ]
+     │
+ 808 │     int#(0..5, FROM: 3) duplicate_from
+     │          ──┬─  ──┬─  
+     │            ╰───────── 'FROM' specified here previously
+     │                  │   
+     │                  ╰─── 'FROM' has already been defined previously
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:808:22 ]
+     │
+ 808 │     int#(0..5, FROM: 3) duplicate_from
+     │                         ───────┬──────  
+     │                                ╰──────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: 'TO' has already been defined previously
+     ╭─[ test.sus:809:14 ]
+     │
+ 809 │     int#(TO: 3, 0..5) duplicate_to
+     │          ─┬     ──┬─  
+     │           ╰─────────── 'TO' specified here previously
+     │                   │   
+     │                   ╰─── 'TO' has already been defined previously
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:809:20 ]
+     │
+ 809 │     int#(TO: 3, 0..5) duplicate_to
+     │                       ──────┬─────  
+     │                             ╰─────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: 'FROM' has already been defined previously
+     ╭─[ test.sus:810:13 ]
+     │
+ 810 │     int#(0..5, 2..=3) duplicate_both
+     │          ──┬─  ──┬──  
+     │            ╰────────── 'FROM' specified here previously
+     │                  │    
+     │                  ╰──── 'FROM' has already been defined previously
+─────╯
+Error: 'TO' has already been defined previously
+     ╭─[ test.sus:810:13 ]
+     │
+ 810 │     int#(0..5, 2..=3) duplicate_both
+     │          ──┬─  ──┬──  
+     │            ╰────────── 'TO' specified here previously
+     │                  │    
+     │                  ╰──── 'TO' has already been defined previously
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:810:20 ]
+     │
+ 810 │     int#(0..5, 2..=3) duplicate_both
+     │                       ───────┬──────  
+     │                              ╰──────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: The `FROM..TO` bounds shorthand can only be used on `int`. Use named template arguments instead.
+     ╭─[ test.sus:811:8 ]
+     │
+ 811 │     bool#(0..5) not_an_int
+     │           ──┬─  
+     │             ╰─── The `FROM..TO` bounds shorthand can only be used on `int`. Use named template arguments instead.
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:811:14 ]
+     │
+ 811 │     bool#(0..5) not_an_int
+     │                 ─────┬────  
+     │                      ╰────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Typing Error: template argument expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
+     ╭─[ test.sus:812:7 ]
+     │
+ 812 │     int#(true..5) wrong_type
+     │          ──┬─  
+     │            ╰─── Typing Error: template argument expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:812:16 ]
+     │
+ 812 │     int#(true..5) wrong_type
+     │                   ─────┬────  
+     │                        ╰────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: The `FROM..TO` bounds shorthand can only be used on `int`. Use named template arguments instead.
+     ╭─[ test.sus:813:11 ]
+     │
+ 813 │     TreeMax#(0..5, SIZE: 3) not_an_int_module
+     │              ──┬─  
+     │                ╰─── The `FROM..TO` bounds shorthand can only be used on `int`. Use named template arguments instead.
+─────╯
+Error: Integer bounds can only use `..` or `..=`, not `+..`
+     ╭─[ test.sus:814:9 ]
+     │
+ 814 │     int#(0 +.. 5) part_select_bounds
+     │            ─┬─  
+     │             ╰─── Integer bounds can only use `..` or `..=`, not `+..`
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:814:16 ]
+     │
+ 814 │     int#(0 +.. 5) part_select_bounds
+     │                   ─────────┬────────  
+     │                            ╰────────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Integer bounds require both a lower and an upper bound: `int#(FROM..TO)`
+     ╭─[ test.sus:815:7 ]
+     │
+ 815 │     int#(..5) missing_lower
+     │          ─┬─  
+     │           ╰─── Integer bounds require both a lower and an upper bound: `int#(FROM..TO)`
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:815:12 ]
+     │
+ 815 │     int#(..5) missing_lower
+     │               ──────┬──────  
+     │                     ╰──────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Integer bounds require both a lower and an upper bound: `int#(FROM..TO)`
+     ╭─[ test.sus:816:7 ]
+     │
+ 816 │     int#(0..) missing_upper
+     │          ─┬─  
+     │           ╰─── Integer bounds require both a lower and an upper bound: `int#(FROM..TO)`
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:816:12 ]
+     │
+ 816 │     int#(0..) missing_upper
+     │               ──────┬──────  
+     │                     ╰──────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:28:6 ]
     │
@@ -2460,9 +2604,9 @@ Error: 'i' is read-only
      │
      ├─[ test_old.sus:161:11 ]
      │
- 144 │     interface generative : int#(FROM: 0, TO: 100) i -> int o, int o2
-     │                                                   ┬  
-     │                                                   ╰── 'i' declared here
+ 144 │     interface generative : int#(0..100) i -> int o, int o2
+     │                                         ┬  
+     │                                         ╰── 'i' declared here
 ─────╯
 Error: Some parameters of 'v' were still unknown: int #(FROM: ?, TO: ?)
      ╭─[ test_old.sus:177:44 ]
@@ -2588,25 +2732,25 @@ Error: This port is not strongly connected to the strongly connected port cluste
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-     ╭─[ test_old.sus:237:63 ]
+     ╭─[ test_old.sus:237:53 ]
      │
- 237 │     interface permute : bool[128] mbf, int#(FROM: 0, TO: 100) selected_permutation -> bool[128] permuted_mbf
-     │                                   ─┬─                         ──────────┬─────────              ──────┬─────  
-     │                                    ╰────────────────────────────────────────────────────────────────────────── 'mbf' declared here
-     │                                                                         │                             │       
-     │                                                                         ╰───────────────────────────────────── This port is not strongly connected to the strongly connected port cluster 'mbf', 'permuted_mbf'.
+ 237 │     interface permute : bool[128] mbf, int#(0..100) selected_permutation -> bool[128] permuted_mbf
+     │                                   ─┬─               ──────────┬─────────              ──────┬─────  
+     │                                    ╰──────────────────────────────────────────────────────────────── 'mbf' declared here
+     │                                                               │                             │       
+     │                                                               ╰───────────────────────────────────── This port is not strongly connected to the strongly connected port cluster 'mbf', 'permuted_mbf'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-     │                                                                                                       │       
-     │                                                                                                       ╰─────── 'permuted_mbf' declared here
+     │                                                                                             │       
+     │                                                                                             ╰─────── 'permuted_mbf' declared here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test_old.sus:237:63 ]
+     ╭─[ test_old.sus:237:53 ]
      │
- 237 │     interface permute : bool[128] mbf, int#(FROM: 0, TO: 100) selected_permutation -> bool[128] permuted_mbf
-     │                                                               ──────────┬─────────  
-     │                                                                         ╰─────────── Unused Variable: This variable does not affect the output ports of this module
+ 237 │     interface permute : bool[128] mbf, int#(0..100) selected_permutation -> bool[128] permuted_mbf
+     │                                                     ──────────┬─────────  
+     │                                                               ╰─────────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Not Instantiating permute24 #() due to abstract typing errors
      ╭─[ test_old.sus:243:8 ]
@@ -2723,8 +2867,8 @@ Error: No such field 'port_a' on submodule_named_ports #(). Available fields are
      │                  ╰──────────── Module 'submodule_named_ports' defined here. module submodule_named_ports #():
 domain default:
 interface submodule_named_ports:
-	input int#(FROM: 0, TO: 100) port_a
-	input int#(FROM: 0, TO: 100) port_b
+	input int#(0..100) port_a
+	input int#(0..100) port_b
 	->
 	output int port_c
 ─────╯
@@ -2742,8 +2886,8 @@ Error: No such field 'port_b' on submodule_named_ports #(). Available fields are
      │                  ╰──────────── Module 'submodule_named_ports' defined here. module submodule_named_ports #():
 domain default:
 interface submodule_named_ports:
-	input int#(FROM: 0, TO: 100) port_a
-	input int#(FROM: 0, TO: 100) port_b
+	input int#(0..100) port_a
+	input int#(0..100) port_b
 	->
 	output int port_c
 ─────╯
@@ -2761,8 +2905,8 @@ Error: No such field 'port_c' on submodule_named_ports #(). Available fields are
      │                  ╰──────────── Module 'submodule_named_ports' defined here. module submodule_named_ports #():
 domain default:
 interface submodule_named_ports:
-	input int#(FROM: 0, TO: 100) port_a
-	input int#(FROM: 0, TO: 100) port_b
+	input int#(0..100) port_a
+	input int#(0..100) port_b
 	->
 	output int port_c
 ─────╯
@@ -2817,11 +2961,11 @@ Warning: o is effectively constant. Declare this wire as `gen` to make this expl
      │     ╰── o = true
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test_old.sus:476:40 ]
+     ╭─[ test_old.sus:476:30 ]
      │
- 476 │     interface in : int#(FROM: 0, TO: 100) i'0
-     │                                           ┬  
-     │                                           ╰── Unused Variable: This variable does not affect the output ports of this module
+ 476 │     interface in : int#(0..100) i'0
+     │                                 ┬  
+     │                                 ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: o is effectively constant. Declare this wire as `gen` to make this explicit.
      ╭─[ test_old.sus:477:25 ]
@@ -2867,7 +3011,7 @@ Warning: Not Instantiating dual_port_mem #() due to abstract typing errors
 Error: Duplicate interface 'write' declaration
      ╭─[ test_old.sus:495:12 ]
      │
- 495 │     interface write : bool write, bool[20] wr_data, int#(FROM:0, TO: 511) wr_addr
+ 495 │     interface write : bool write, bool[20] wr_data, int#(0..511) wr_addr
      │               ──┬──        ──┬──  
      │                 ╰───────────────── Duplicate interface 'write' declaration
      │                              │    
@@ -2876,7 +3020,7 @@ Error: Duplicate interface 'write' declaration
 Error: This declaration conflicts with a previous declaration in the same scope, found interface 'write'
      ╭─[ test_old.sus:495:25 ]
      │
- 495 │     interface write : bool write, bool[20] wr_data, int#(FROM:0, TO: 511) wr_addr
+ 495 │     interface write : bool write, bool[20] wr_data, int#(0..511) wr_addr
      │               ──┬──        ──┬──  
      │                 ╰───────────────── 'write' declared here
      │                              │    
@@ -2885,14 +3029,14 @@ Error: This declaration conflicts with a previous declaration in the same scope,
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test_old.sus:495:25 ]
      │
- 495 │     interface write : bool write, bool[20] wr_data, int#(FROM:0, TO: 511) wr_addr
+ 495 │     interface write : bool write, bool[20] wr_data, int#(0..511) wr_addr
      │                            ──┬──  
      │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: Duplicate interface 'read' declaration
      ╭─[ test_old.sus:497:12 ]
      │
- 497 │     interface read : bool read, int#(FROM:0, TO: 511) rd_addr -> bool[20] rd_data
+ 497 │     interface read : bool read, int#(0..511) rd_addr -> bool[20] rd_data
      │               ──┬─        ──┬─  
      │                 ╰─────────────── Duplicate interface 'read' declaration
      │                             │   
@@ -2901,7 +3045,7 @@ Error: Duplicate interface 'read' declaration
 Error: This declaration conflicts with a previous declaration in the same scope, found interface 'read'
      ╭─[ test_old.sus:497:24 ]
      │
- 497 │     interface read : bool read, int#(FROM:0, TO: 511) rd_addr -> bool[20] rd_data
+ 497 │     interface read : bool read, int#(0..511) rd_addr -> bool[20] rd_data
      │               ──┬─        ──┬─  
      │                 ╰─────────────── 'read' declared here
      │                             │   
@@ -2910,7 +3054,7 @@ Error: This declaration conflicts with a previous declaration in the same scope,
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test_old.sus:497:24 ]
      │
- 497 │     interface read : bool read, int#(FROM:0, TO: 511) rd_addr -> bool[20] rd_data
+ 497 │     interface read : bool read, int#(0..511) rd_addr -> bool[20] rd_data
      │                           ──┬─  
      │                             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
@@ -2923,7 +3067,7 @@ Error: Can only use conditional bindings on triggers. 'write' is an interface
      │
      ├─[ test_old.sus:499:7 ]
      │
- 495 │     interface write : bool write, bool[20] wr_data, int#(FROM:0, TO: 511) wr_addr
+ 495 │     interface write : bool write, bool[20] wr_data, int#(0..511) wr_addr
      │               ──┬──  
      │                 ╰──── Interface 'write' defined here
 ─────╯
@@ -2936,7 +3080,7 @@ Error: Too few bindings. This interface provides 3 read-only bindings, but 0 wer
      │
      ├─[ test_old.sus:499:7 ]
      │
- 495 │     interface write : bool write, bool[20] wr_data, int#(FROM:0, TO: 511) wr_addr
+ 495 │     interface write : bool write, bool[20] wr_data, int#(0..511) wr_addr
      │               ──┬──  
      │                 ╰──── Interface 'write' defined here
 ─────╯
@@ -2968,7 +3112,7 @@ Error: Can only use conditional bindings on triggers. 'read' is an interface
      │
      ├─[ test_old.sus:505:7 ]
      │
- 497 │     interface read : bool read, int#(FROM:0, TO: 511) rd_addr -> bool[20] rd_data
+ 497 │     interface read : bool read, int#(0..511) rd_addr -> bool[20] rd_data
      │               ──┬─  
      │                 ╰─── Interface 'read' defined here
 ─────╯
@@ -2981,7 +3125,7 @@ Error: Too few bindings. This interface provides 1 writable bindings, but 0 were
      │
      ├─[ test_old.sus:505:7 ]
      │
- 497 │     interface read : bool read, int#(FROM:0, TO: 511) rd_addr -> bool[20] rd_data
+ 497 │     interface read : bool read, int#(0..511) rd_addr -> bool[20] rd_data
      │               ──┬─  
      │                 ╰─── Interface 'read' defined here
 ─────╯
@@ -2994,7 +3138,7 @@ Error: Too few bindings. This interface provides 2 read-only bindings, but 0 wer
      │
      ├─[ test_old.sus:505:7 ]
      │
- 497 │     interface read : bool read, int#(FROM:0, TO: 511) rd_addr -> bool[20] rd_data
+ 497 │     interface read : bool read, int#(0..511) rd_addr -> bool[20] rd_data
      │               ──┬─  
      │                 ╰─── Interface 'read' defined here
 ─────╯
@@ -3152,18 +3296,18 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │             ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test_old.sus:535:26 ]
+     ╭─[ test_old.sus:535:15 ]
      │
- 535 │     int #(FROM: 0, TO: 199) my_int
-     │                             ───┬──  
-     │                                ╰──── Unused Variable: This variable does not affect the output ports of this module
+ 535 │     int#(0..199) my_int
+     │                  ───┬──  
+     │                     ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test_old.sus:540:40 ]
+     ╭─[ test_old.sus:540:30 ]
      │
- 540 │        interface v : int#(FROM: 0, TO: 100) a -> int b
-     │                                             ┬  
-     │                                             ╰── Unused Variable: This variable does not affect the output ports of this module
+ 540 │        interface v : int#(0..100) a -> int b
+     │                                   ┬  
+     │                                   ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Not Instantiating use_bad_interface #() due to abstract typing errors
      ╭─[ test_old.sus:544:8 ]
@@ -3193,7 +3337,7 @@ Error: No such field 'a' on mod_with_unused_interface #(). Available fields are 
      │                    ╰────────────── Module 'mod_with_unused_interface' defined here. module mod_with_unused_interface #():
 domain default:
 interface v:
-	input int#(FROM: 0, TO: 100) a
+	input int#(0..100) a
 	->
 	output int b
 ─────╯
@@ -3207,7 +3351,7 @@ Warning: Not Instantiating sequenceDownFrom #() due to abstract typing errors
 Error: Duplicate interface 'start' declaration
      ╭─[ test_old.sus:563:12 ]
      │
- 563 │     interface start : bool start'0, int#(FROM: 0, TO: 100) upTo'0
+ 563 │     interface start : bool start'0, int#(0..100) upTo'0
      │               ──┬──        ──┬──  
      │                 ╰───────────────── Duplicate interface 'start' declaration
      │                              │    
@@ -3216,7 +3360,7 @@ Error: Duplicate interface 'start' declaration
 Error: This declaration conflicts with a previous declaration in the same scope, found interface 'start'
      ╭─[ test_old.sus:563:25 ]
      │
- 563 │     interface start : bool start'0, int#(FROM: 0, TO: 100) upTo'0
+ 563 │     interface start : bool start'0, int#(0..100) upTo'0
      │               ──┬──        ──┬──  
      │                 ╰───────────────── 'start' declared here
      │                              │    
@@ -3225,7 +3369,7 @@ Error: This declaration conflicts with a previous declaration in the same scope,
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test_old.sus:563:25 ]
      │
- 563 │     interface start : bool start'0, int#(FROM: 0, TO: 100) upTo'0
+ 563 │     interface start : bool start'0, int#(0..100) upTo'0
      │                            ──┬──  
      │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
@@ -3269,7 +3413,7 @@ Error: No such field 'i' on cross_int #(). Available fields are 'cross_int', 'in
      │            ╰────── Module 'cross_int' defined here. module cross_int #():
 domain default:
 interface in:
-	input int#(FROM: 0, TO: 100) i'0
+	input int#(0..100) i'0
 interface out:
 	->
 	output int o'0
@@ -3345,7 +3489,7 @@ Error: No such field 'o' on cross_int #(). Available fields are 'cross_int', 'in
      │            ╰────── Module 'cross_int' defined here. module cross_int #():
 domain default:
 interface in:
-	input int#(FROM: 0, TO: 100) i'0
+	input int#(0..100) i'0
 interface out:
 	->
 	output int o'0
@@ -4162,11 +4306,11 @@ Error: Typing Error: binop right side expects 'int #(FROM: _, TO: _)' but was gi
      │                           ╰─── Typing Error: binop right side expects 'int #(FROM: _, TO: _)' but was given 'float #()'
 ─────╯
 Warning: matrix[9:29][0] is never written to.
-     ╭─[ test_old.sus:837:188 ]
+     ╭─[ test_old.sus:837:168 ]
      │
- 837 │     interface multi_slice_reverse : int#(FROM: 0, TO: 27) a, int#(FROM: 2, TO: 19) b, bool[20][9] slice, bool[2][27] slice2, bool[5][9] gen_partselect, bool[2][3] partselect -> bool[20][30] matrix
-     │                                                                                                                                                                                               ───┬──  
-     │                                                                                                                                                                                                  ╰──── matrix[9:29][0] is never written to.
+ 837 │     interface multi_slice_reverse : int#(0..27) a, int#(2..19) b, bool[20][9] slice, bool[2][27] slice2, bool[5][9] gen_partselect, bool[2][3] partselect -> bool[20][30] matrix
+     │                                                                                                                                                                           ───┬──  
+     │                                                                                                                                                                              ╰──── matrix[9:29][0] is never written to.
 ─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
      ╭─[ test_old.sus:846:6 ]
@@ -4282,60 +4426,60 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
-     ╭─[ test_old.sus:857:24 ]
+     ╭─[ test_old.sus:857:14 ]
      │
- 857 │     int#(FROM: 0, TO: 13) unsigned_val
-     │                           ──────┬─────  
-     │                                 ╰─────── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+ 857 │     int#(0..13) unsigned_val
+     │                 ──────┬─────  
+     │                       ╰─────── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test_old.sus:857:24 ]
+     ╭─[ test_old.sus:857:14 ]
      │
- 857 │     int#(FROM: 0, TO: 13) unsigned_val
-     │                           ──────┬─────  
-     │                                 ╰─────── Unused Variable: This variable does not affect the output ports of this module
+ 857 │     int#(0..13) unsigned_val
+     │                 ──────┬─────  
+     │                       ╰─────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: unsigned_val is never written to.
-     ╭─[ test_old.sus:857:24 ]
+     ╭─[ test_old.sus:857:14 ]
      │
- 857 │     int#(FROM: 0, TO: 13) unsigned_val
-     │                           ──────┬─────  
-     │                                 ╰─────── unsigned_val is never written to.
+ 857 │     int#(0..13) unsigned_val
+     │                 ──────┬─────  
+     │                       ╰─────── unsigned_val is never written to.
 ─────╯
 Warning: Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
-     ╭─[ test_old.sus:858:26 ]
+     ╭─[ test_old.sus:858:16 ]
      │
- 858 │     int#(FROM: -20, TO: 13) signed_val
-     │                             ─────┬────  
-     │                                  ╰────── Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+ 858 │     int#(-20..13) signed_val
+     │                   ─────┬────  
+     │                        ╰────── Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test_old.sus:858:26 ]
+     ╭─[ test_old.sus:858:16 ]
      │
- 858 │     int#(FROM: -20, TO: 13) signed_val
-     │                             ─────┬────  
-     │                                  ╰────── Unused Variable: This variable does not affect the output ports of this module
+ 858 │     int#(-20..13) signed_val
+     │                   ─────┬────  
+     │                        ╰────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: signed_val is never written to.
-     ╭─[ test_old.sus:858:26 ]
+     ╭─[ test_old.sus:858:16 ]
      │
- 858 │     int#(FROM: -20, TO: 13) signed_val
-     │                             ─────┬────  
-     │                                  ╰────── signed_val is never written to.
+ 858 │     int#(-20..13) signed_val
+     │                   ─────┬────  
+     │                        ╰────── signed_val is never written to.
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test_old.sus:860:23 ]
+     ╭─[ test_old.sus:860:13 ]
      │
- 860 │     int#(FROM: 5, TO: 8) dynamic_mod
-     │                          ─────┬─────  
-     │                               ╰─────── Unused Variable: This variable does not affect the output ports of this module
+ 860 │     int#(5..8) dynamic_mod
+     │                ─────┬─────  
+     │                     ╰─────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: dynamic_mod is never written to.
-     ╭─[ test_old.sus:860:23 ]
+     ╭─[ test_old.sus:860:13 ]
      │
- 860 │     int#(FROM: 5, TO: 8) dynamic_mod
-     │                          ─────┬─────  
-     │                               ╰─────── dynamic_mod is never written to.
+ 860 │     int#(5..8) dynamic_mod
+     │                ─────┬─────  
+     │                     ╰─────── dynamic_mod is never written to.
 ─────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
      ╭─[ test_old.sus:863:2 ]
@@ -4555,11 +4699,11 @@ Error: A slice bound cannot be non-generative
      │           ╰── A slice bound cannot be non-generative
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test_old.sus:910:56 ]
+     ╭─[ test_old.sus:910:46 ]
      │
- 910 │     interface ReceiveZerosArray : int#(FROM: 0, TO: 1)[2] values
-     │                                                           ───┬──  
-     │                                                              ╰──── Unused Variable: This variable does not affect the output ports of this module
+ 910 │     interface ReceiveZerosArray : int#(0..1)[2] values
+     │                                                 ───┬──  
+     │                                                    ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
      ╭─[ test_old.sus:914:9 ]
@@ -4585,27 +4729,27 @@ Warning: zeros is effectively constant. Declare this wire as `gen` to make this 
      │              ╰──── zeros is effectively constant. Declare this wire as `gen` to make this explicit.
 ─────╯
 Warning: Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
-     ╭─[ test_old.sus:915:30 ]
+     ╭─[ test_old.sus:915:20 ]
      │
- 915 │     int#(FROM: -5, TO: 6)[2] vs = [0, 0]
-     │                              ─┬  
-     │                               ╰── Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+ 915 │     int#(-5..6)[2] vs = [0, 0]
+     │                    ─┬  
+     │                     ╰── Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test_old.sus:915:30 ]
+     ╭─[ test_old.sus:915:20 ]
      │
- 915 │     int#(FROM: -5, TO: 6)[2] vs = [0, 0]
-     │                              ─┬  
-     │                               ╰── Unused Variable: This variable does not affect the output ports of this module
+ 915 │     int#(-5..6)[2] vs = [0, 0]
+     │                    ─┬  
+     │                     ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: vs is effectively constant. Declare this wire as `gen` to make this explicit.
-     ╭─[ test_old.sus:915:30 ]
+     ╭─[ test_old.sus:915:20 ]
      │
- 915 │     int#(FROM: -5, TO: 6)[2] vs = [0, 0]
-     │     ─────────────┬────────────┬  
-     │                  ╰─────────────── vs = [0, 0]
-     │                               │  
-     │                               ╰── vs is effectively constant. Declare this wire as `gen` to make this explicit.
+ 915 │     int#(-5..6)[2] vs = [0, 0]
+     │     ────────┬───────┬  
+     │             ╰────────── vs = [0, 0]
+     │                     │  
+     │                     ╰── vs is effectively constant. Declare this wire as `gen` to make this explicit.
 ─────╯
 Warning: Clock 'Unconnected_clock_3' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
      ╭─[ test_old.sus:916:2 ]
@@ -4877,44 +5021,44 @@ Error: This port is not strongly connected to the strongly connected port cluste
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-    ╭─[ test_latencies.sus:11:107 ]
+    ╭─[ test_latencies.sus:11:77 ]
     │
- 11 │     interface disjoint_ports : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b, int#(FROM: 0, TO: 100) c -> int result
-    │                                                       ┬                         ┬                         ┬        ───┬──  
-    │                                                       ╰──────────────────────────────────────────────────────────────────── 'a' declared here
-    │                                                                                 │                         │           │    
-    │                                                                                 ╰────────────────────────────────────────── 'b' declared here
-    │                                                                                                           │           │    
-    │                                                                                                           ╰──────────────── This port is not strongly connected to the strongly connected port cluster 'a', 'b', 'result'.
+ 11 │     interface disjoint_ports : int#(0..100) a, int#(0..100) b, int#(0..100) c -> int result
+    │                                             ┬               ┬               ┬        ───┬──  
+    │                                             ╰──────────────────────────────────────────────── 'a' declared here
+    │                                                             │               │           │    
+    │                                                             ╰──────────────────────────────── 'b' declared here
+    │                                                                             │           │    
+    │                                                                             ╰──────────────── This port is not strongly connected to the strongly connected port cluster 'a', 'b', 'result'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-    │                                                                                                                       │    
-    │                                                                                                                       ╰──── 'result' declared here
+    │                                                                                         │    
+    │                                                                                         ╰──── 'result' declared here
 ────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-    ╭─[ test_latencies.sus:11:107 ]
+    ╭─[ test_latencies.sus:11:77 ]
     │
- 11 │     interface disjoint_ports : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b, int#(FROM: 0, TO: 100) c -> int result
-    │                                                                                                           ┬  
-    │                                                                                                           ╰── Unused Variable: This variable does not affect the output ports of this module
+ 11 │     interface disjoint_ports : int#(0..100) a, int#(0..100) b, int#(0..100) c -> int result
+    │                                                                             ┬  
+    │                                                                             ╰── Unused Variable: This variable does not affect the output ports of this module
 ────╯
 Error: No Unique assignment for Port Latency. Options are:
 - '2 from x'3
 - '1 from y'1
 Try specifying an explicit latency or rework the module to remove this ambiguity
-    ╭─[ test_latencies.sus:17:96 ]
+    ╭─[ test_latencies.sus:17:76 ]
     │
- 17 │     interface undeteriminable_input_latency : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b -> int x, int y
-    │                                                                                                ┬        ┬      ┬  
-    │                                                                                                ╰────────────────── No Unique assignment for Port Latency. Options are:
+ 17 │     interface undeteriminable_input_latency : int#(0..100) a, int#(0..100) b -> int x, int y
+    │                                                                            ┬        ┬      ┬  
+    │                                                                            ╰────────────────── No Unique assignment for Port Latency. Options are:
 - '2 from x'3
 - '1 from y'1
 Try specifying an explicit latency or rework the module to remove this ambiguity
-    │                                                                                                         │      │  
-    │                                                                                                         ╰───────── 'x' declared here
-    │                                                                                                                │  
-    │                                                                                                                ╰── 'y' declared here
+    │                                                                                     │      │  
+    │                                                                                     ╰───────── 'x' declared here
+    │                                                                                            │  
+    │                                                                                            ╰── 'y' declared here
 ────╯
 Error: Conflicting specified latency
 
@@ -4923,13 +5067,13 @@ a'0
 -> x'2 (+1)
 
 But this was specified as x'1
-    ╭─[ test_latencies.sus:58:86 ]
+    ╭─[ test_latencies.sus:58:76 ]
     │
- 58 │     interface conflicting_latency_declarations : int#(FROM: 0, TO: 100) a'0 -> int x'1
-    │                                                                         ┬            ┬  
-    │                                                                         ╰─────────────── 'a' declared here
-    │                                                                                      │  
-    │                                                                                      ╰── Conflicting specified latency
+ 58 │     interface conflicting_latency_declarations : int#(0..100) a'0 -> int x'1
+    │                                                               ┬            ┬  
+    │                                                               ╰─────────────── 'a' declared here
+    │                                                                            │  
+    │                                                                            ╰── Conflicting specified latency
 
 a'0
 -> nio'1 (+1)
@@ -4938,11 +5082,11 @@ a'0
 But this was specified as x'1
 ────╯
 Error: Some parameters of 'r' were still unknown: int #(FROM: ?, TO: ?)
-    ╭─[ test_latencies.sus:64:59 ]
+    ╭─[ test_latencies.sus:64:49 ]
     │
- 64 │     interface bad_cycle : int#(FROM: 0, TO: 100) a -> int r
-    │                                                           ┬  
-    │                                                           ╰── Some parameters of 'r' were still unknown: int #(FROM: ?, TO: ?)
+ 64 │     interface bad_cycle : int#(0..100) a -> int r
+    │                                                 ┬  
+    │                                                 ╰── Some parameters of 'r' were still unknown: int #(FROM: ?, TO: ?)
 ────╯
 Error: Some parameters of 'state_reg' were still unknown: int #(FROM: ?, TO: ?)
     ╭─[ test_latencies.sus:65:12 ]
@@ -4997,11 +5141,11 @@ test'0
 -> test'5 (+5)
 
 Which conflicts with the starting latency
-    ╭─[ test_latencies.sus:80:29 ]
+    ╭─[ test_latencies.sus:80:19 ]
     │
- 80 │     state int#(FROM: 0, TO: 7) test
-    │                                ──┬─  
-    │                                  ╰─── This instruction is part of a net-positive latency cycle of +5
+ 80 │     state int#(0..7) test
+    │                      ──┬─  
+    │                        ╰─── This instruction is part of a net-positive latency cycle of +5
 
 test'0
 -> _module_taking_time_i'-5 (-5)
@@ -5754,6 +5898,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for newlines_lenient #() as "newlines_lenient"
 [INFO  sus_compiler::codegen] Code generated for newlines_interface_body #() as "newlines_interface_body"
 [INFO  sus_compiler::codegen] Code generated for InclusiveAndMultipliedSlices #() as "InclusiveAndMultipliedSlices"
+[INFO  sus_compiler::codegen] Code generated for IntBoundsShorthand #() as "IntBoundsShorthand"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"

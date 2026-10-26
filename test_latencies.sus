@@ -2,19 +2,19 @@
 // Part of the regression test together with test.sus and test_old.sus
 
 module multiply_add_with_latencies {
-    interface multiply_add_with_latencies : int#(FROM: 0, TO: 100) a'0, int#(FROM: 0, TO: 100) b'0, int#(FROM: 0, TO: 100) c'0 -> int r'0
+    interface multiply_add_with_latencies : int#(0..100) a'0, int#(0..100) b'0, int#(0..100) c'0 -> int r'0
     int tmp'1 = multiply(a, b)
 	reg r = tmp + c
 }
 
 module disjoint_ports {
-    interface disjoint_ports : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b, int#(FROM: 0, TO: 100) c -> int result
+    interface disjoint_ports : int#(0..100) a, int#(0..100) b, int#(0..100) c -> int result
 	reg result = a + b
 	// don't touch c
 }
 
 module undeteriminable_input_latency {
-    interface undeteriminable_input_latency : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b -> int x, int y
+    interface undeteriminable_input_latency : int#(0..100) a, int#(0..100) b -> int x, int y
 	reg int a_d = a
 	int t = a_d + b
     reg reg reg int a_dd = a
@@ -24,7 +24,7 @@ module undeteriminable_input_latency {
 }
 
 module specified_input_latency {
-    interface specified_input_latency : int#(FROM: 0, TO: 100) a'0, int#(FROM: 0, TO: 100) b'1 -> int x, int y
+    interface specified_input_latency : int#(0..100) a'0, int#(0..100) b'1 -> int x, int y
 	reg int a_d = a
     int t = a_d + b
     reg reg reg int a_dd = a
@@ -34,7 +34,7 @@ module specified_input_latency {
 }
 
 module determinable_input_latency {
-    interface determinable_input_latency : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b -> int x, int y
+    interface determinable_input_latency : int#(0..100) a, int#(0..100) b -> int x, int y
 	reg int a_d = a
     int t = a_d + b
     reg reg int a_dd = a
@@ -45,7 +45,7 @@ module determinable_input_latency {
 
 // This module is a copy of ::undeteriminable_input_latency, but it doesn't have an error, because we just assume the latency of the inner nodes to be the earliest possible.
 module determinable_because_no_input_output_ports {
-    interface determinable_because_no_input_output_ports : int#(FROM: 0, TO: 100) a -> int x
+    interface determinable_because_no_input_output_ports : int#(0..100) a -> int x
 	reg int a_d = a
     int t = a_d
     reg reg reg int a_dd = a
@@ -55,13 +55,13 @@ module determinable_because_no_input_output_ports {
 
 // This module is a copy of ::undeteriminable_input_latency, but it doesn't have an error, because we just assume the latency of the inner nodes to be the earliest possible.
 module conflicting_latency_declarations {
-    interface conflicting_latency_declarations : int#(FROM: 0, TO: 100) a'0 -> int x'1
+    interface conflicting_latency_declarations : int#(0..100) a'0 -> int x'1
 	reg int nio = a
 	reg x = nio
 }
 
 module bad_cycle {
-    interface bad_cycle : int#(FROM: 0, TO: 100) a -> int r
+    interface bad_cycle : int#(0..100) a -> int r
 	state int state_reg
 	initial state_reg = 0
 
@@ -71,13 +71,13 @@ module bad_cycle {
 }
 
 module module_taking_time {
-	interface module_taking_time : int#(FROM: 0, TO: 100) i'0 -> int o'5
+	interface module_taking_time : int#(0..100) i'0 -> int o'5
 	o = i
 }
 
 module bad_cycle2 {
-    interface bad_cycle2 : int#(FROM: 0, TO: 100) a -> int r
-	state int#(FROM: 0, TO: 7) test
+    interface bad_cycle2 : int#(0..100) a -> int r
+	state int#(0..7) test
 	initial test = 0
 
 	test = module_taking_time(test+a)
@@ -86,7 +86,7 @@ module bad_cycle2 {
 }
 
 module module_taking_a_lot_of_time {
-    interface module_taking_a_lot_of_time : int#(FROM: 0, TO: 100) data_in'0 -> int data_out'200
+    interface module_taking_a_lot_of_time : int#(0..100) data_in'0 -> int data_out'200
 	data_out = data_in
 }
 
@@ -187,7 +187,7 @@ module infer_from_local_context {
 }
 
 module instantiate_fifo {
-	trigger request_data'0 : -> int#(FROM: 0, TO: 6) data_received'3
+	trigger request_data'0 : -> int#(0..6) data_received'3
 
 	FIFO #(DEPTH: 30) fifo
 
@@ -410,7 +410,7 @@ module ParametrizeableRegs {
 }
 
 module TestNexts {
-    input int#(FROM: 0, TO: 6) x'0
+    input int#(0..6) x'0
     output int y
     output int z
 

@@ -39,7 +39,7 @@ extern module xpm_memory_spram #(
 	input  bool                                        ena'0
 	input  bool                                        regcea'0
 	input  bool[WRITE_DATA_WIDTH_A/BYTE_WRITE_WIDTH_A] wea'0
-	input  int#(FROM: 0, TO: pow2#(E: ADDR_WIDTH_A))   addra'0
+	input  int#(0..pow2#(E: ADDR_WIDTH_A))   addra'0
 	input  bool[WRITE_DATA_WIDTH_A]                    dina'0
 	input  bool                                        injectsbiterra'0
 	input  bool                                        injectdbiterra'0
@@ -89,7 +89,7 @@ extern module xpm_memory_sdpram #(
 	clock clka
 	input bool                                        ena'0
 	input bool[WRITE_DATA_WIDTH_A/BYTE_WRITE_WIDTH_A] wea'0
-	input int#(FROM: 0, TO: pow2#(E: ADDR_WIDTH_A))   addra'0
+	input int#(0..pow2#(E: ADDR_WIDTH_A))   addra'0
 	input bool[WRITE_DATA_WIDTH_A]                    dina'0
 	input bool                                        injectsbiterra'0
 	input bool                                        injectdbiterra'0
@@ -102,7 +102,7 @@ extern module xpm_memory_sdpram #(
 	input  bool                                       rstb'0
 	input  bool                                       enb'0
 	input  bool                                       regceb'0
-	input  int#(FROM: 0, TO: pow2#(E: ADDR_WIDTH_B))  addrb'0
+	input  int#(0..pow2#(E: ADDR_WIDTH_B))  addrb'0
 	output bool[READ_DATA_WIDTH_B]                    doutb'0
 	output bool                                       sbiterrb'0
 	output bool                                       dbiterrb'0
@@ -157,7 +157,7 @@ extern module xpm_memory_tdpram #(
 	input  bool                                        ena'0
 	input  bool                                        regcea'0
 	input  bool[WRITE_DATA_WIDTH_A/BYTE_WRITE_WIDTH_A] wea'0
-	input  int#(FROM: 0, TO: pow2#(E: ADDR_WIDTH_A))   addra'0
+	input  int#(0..pow2#(E: ADDR_WIDTH_A))   addra'0
 	input  bool[WRITE_DATA_WIDTH_A]                    dina'0
 	input  bool                                        injectsbiterra'0
 	input  bool                                        injectdbiterra'0
@@ -174,7 +174,7 @@ extern module xpm_memory_tdpram #(
 	input  bool                                        enb'0
 	input  bool                                        regceb'0
 	input  bool[WRITE_DATA_WIDTH_B/BYTE_WRITE_WIDTH_B] web'0
-	input  int#(FROM: 0, TO: pow2#(E: ADDR_WIDTH_B))   addrb'0
+	input  int#(0..pow2#(E: ADDR_WIDTH_B))   addrb'0
 	input  bool[WRITE_DATA_WIDTH_B]                    dinb'0
 	input  bool                                        injectsbiterrb'0
 	input  bool                                        injectdbiterrb'0
@@ -219,7 +219,7 @@ extern module xpm_memory_dpdistram #(
 	input  bool                                        ena'0
 	input  bool                                        regcea'0
 	input  bool[WRITE_DATA_WIDTH_A/BYTE_WRITE_WIDTH_A] wea'0
-	input  int#(FROM: 0, TO: pow2#(E: ADDR_WIDTH_A))   addra'0
+	input  int#(0..pow2#(E: ADDR_WIDTH_A))   addra'0
 	input  bool[WRITE_DATA_WIDTH_A]                    dina'0
 	output bool[READ_DATA_WIDTH_A]                     douta'0
 
@@ -228,7 +228,7 @@ extern module xpm_memory_dpdistram #(
 	input  bool                                        rstb'0
 	input  bool                                        enb'0
 	input  bool                                        regceb'0
-	input  int#(FROM: 0, TO: pow2#(E: ADDR_WIDTH_B))   addrb'0
+	input  int#(0..pow2#(E: ADDR_WIDTH_B))   addrb'0
 	output bool[READ_DATA_WIDTH_B]                     doutb'0
 }
 
@@ -264,7 +264,7 @@ extern module xpm_memory_sprom #(
 	input  bool                                       rsta'0
 	input  bool                                       ena'0
 	input  bool                                       regcea'0
-	input  int#(FROM: 0, TO: pow2#(E: ADDR_WIDTH_A))  addra'0
+	input  int#(0..pow2#(E: ADDR_WIDTH_A))  addra'0
 	input  bool                                       injectsbiterra'0
 	input  bool                                       injectdbiterra'0
 	output bool[READ_DATA_WIDTH_A]                    douta'0
@@ -315,7 +315,7 @@ extern module xpm_memory_dprom #(
 	input  bool                                       rsta'0
 	input  bool                                       ena'0
 	input  bool                                       regcea'0
-	input  int#(FROM: 0, TO: pow2#(E: ADDR_WIDTH_A))  addra'0
+	input  int#(0..pow2#(E: ADDR_WIDTH_A))  addra'0
 	input  bool                                       injectsbiterra'0
 	input  bool                                       injectdbiterra'0
 	output bool[READ_DATA_WIDTH_A]                    douta'0
@@ -330,7 +330,7 @@ extern module xpm_memory_dprom #(
 	input  bool                                       rstb'0
 	input  bool                                       enb'0
 	input  bool                                       regceb'0
-	input  int#(FROM: 0, TO: pow2#(E: ADDR_WIDTH_B))  addrb'0
+	input  int#(0..pow2#(E: ADDR_WIDTH_B))  addrb'0
 	input  bool                                       injectsbiterrb'0
 	input  bool                                       injectdbiterrb'0
 	output bool[READ_DATA_WIDTH_B]                    doutb'0

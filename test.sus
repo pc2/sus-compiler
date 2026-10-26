@@ -235,13 +235,13 @@ module InstantiateTransmutes {
 }
 
 module StraightTransmute {
-	int#(FROM: 0, TO: 255)[2] a
+	int#(0..255)[2] a
 
-	gen int SZ = sizeof #(T: type int#(FROM: 0, TO: 256*256))
+	gen int SZ = sizeof #(T: type int#(0..256*256))
 
-	int b = Transmute#(T2: type int#(FROM: 0, TO: 256*256)) (a)
+	int b = Transmute#(T2: type int#(0..256*256)) (a)
 
-	int #(FROM: 5, TO: 3) v
+	int#(5..3) v
 }
 
 module use_trigger {
@@ -294,7 +294,7 @@ module testSlicing {
 
 	int[3][4] w = INTS[x+..4][y-..3]
 
-	int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4..4]
+	int#(0..6)[0] zero_slice = INTS[5][4..4]
 }
 
 module wrong_slice_length {
@@ -320,7 +320,7 @@ module negative_slice {
 		}
 	}
 
-	int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4..3]
+	int#(0..6)[0] negative_slice = INTS[5][4..3]
 }
 
 /// See Issue #94
@@ -391,7 +391,7 @@ module test_vivado_bug {
 			bool[SZ] x = Repeat(false)
 			bool[SZ] y = x
 
-			int#(FROM: 0, TO: SZ) u = 0
+			int#(0..SZ) u = 0
 			int v = u
 		}
 	}
@@ -445,8 +445,8 @@ module testRemainder {
 	//assert#(C: -10 mod -3 == 1)
 	//assert#(C: 10 mod -3 == -1)
 
-	int#(FROM: 10, TO: 11) a = 10
-	int#(FROM: 3, TO: 4) b = 3
+	int#(10..11) a = 10
+	int#(3..4) b = 3
 
 	a % b
 	-a % b
@@ -464,16 +464,16 @@ module ModuleWithInitialStates {
 	initial O[2] = false
 	initial O[3] = true
 
-	output state int#(FROM: 0, TO: 4)[2] X'0
+	output state int#(0..4)[2] X'0
 	initial X = [1, 2]
 }
 
 module TestGenArrayOps {
-	gen int[4] REPEATS = RepeatGen#(T: type int#(FROM: 0, TO: 10), SIZE: 4, V: 7)
+	gen int[4] REPEATS = RepeatGen#(T: type int#(0..10), SIZE: 4, V: 7)
 	assert#(C: &(REPEATS == [7, 7, 7, 7]))
-	gen int[4] REVERSE = ReverseGen#(T: type int#(FROM: 0, TO: 10), SIZE: 4, V: [1,2,3,4])
+	gen int[4] REVERSE = ReverseGen#(T: type int#(0..10), SIZE: 4, V: [1,2,3,4])
 	assert#(C: &(REVERSE == [4, 3, 2, 1]))
-	gen int[4] CONCAT = ConcatGen#(T: type int#(FROM: 0, TO: 10), SIZE_A: 4, SIZE_B: 3, V_A: [1,2,3,4], V_B: [7, 8, 9])
+	gen int[4] CONCAT = ConcatGen#(T: type int#(0..10), SIZE_A: 4, SIZE_B: 3, V_A: [1,2,3,4], V_B: [7, 8, 9])
 	assert#(C: &(CONCAT == [1, 2, 3, 4, 7, 8, 9]))
 }
 
@@ -567,7 +567,7 @@ module UnknownSizeArraySynth {
 	for int I in 0..5 {
 		MY_INTS[I] = I
 	}
-	input int#(FROM: 0, TO: 5) idx
+	input int#(0..5) idx
 
 	int result = MY_INTS[idx]
 }
@@ -627,7 +627,7 @@ module OutOfBoundsWrite204 {
 	}
 }
 module OutOfBoundsSliceWrite {
-	input int#(FROM: 0, TO: 4) i'0
+	input int#(0..4) i'0
 	output bool[4] a'0
 	a[2..6] = [true, true, true, true]
 	output bool[4] b'0
@@ -657,9 +657,9 @@ module SplitIndexNegativeUnknownSize {
 module newlines_helper
 {
     action add :
-        int#(FROM: 0, TO: 16) a,
-        int#(FROM: 0, TO: 16) b
-        -> int#(FROM: 0, TO: 32) out
+        int#(0..16) a,
+        int#(0..16) b
+        -> int#(0..32) out
     {
         out = a + b
     }
@@ -673,12 +673,12 @@ module newlines_lenient
     newlines_helper my_mod
     newlines_helper other
 
-    input int#(FROM: 0, TO: 16) x
-    input int#(FROM: 0, TO: 16) y
+    input int#(0..16) x
+    input int#(0..16) y
     input bool do_it
-    output int#(FROM: 0, TO: 32) result
-    output int#(FROM: 0, TO: 32) result2
-    output int#(FROM: 0, TO: 48) big
+    output int#(0..32) result
+    output int#(0..32) result2
+    output int#(0..48) big
 
     when do_it
     {
@@ -709,10 +709,10 @@ module newlines_lenient
         x +
         y
 
-    int#(FROM: 0, TO: 32) sum = (
+    int#(0..32) sum = (
         x + y
     )
-    output int#(FROM: 0, TO: 32) s2 = sum
+    output int#(0..32) s2 = sum
 
     bool[
         4
@@ -772,7 +772,7 @@ module InclusiveAndMultipliedSlices {
 	assert#(C: INTS[15] == 103)
 
 	input bool[32] data'0
-	input int#(FROM: 0, TO: 4) i'0
+	input int#(0..4) i'0
 	output bool[8] byte_sel'0 = data[i*..8]
 	output bool[4] incl'0 = data[4..=7]
 	output bool[32] written'0
@@ -782,11 +782,36 @@ module InclusiveAndMultipliedSlices {
 
 module OutOfBoundsMultipliedSlice {
 	input bool[32] data'0
-	input int#(FROM: 0, TO: 5) i'0
+	input int#(0..5) i'0
 	output bool[8] o'0 = data[i*..8]
 }
 
 module MissingInclusiveSliceEnd {
 	bool[8] arr
 	bool[4] s = arr[3..=]
+}
+
+module IntBoundsShorthand {
+	input int#(0..16) a'0
+	input int#(0..=15) b'0
+	output int#(FROM: 0, TO: 31) sum'0 = a + b
+	output int#(0..=30) sum2'0 = a + b
+	output int#(TO: 31, FROM: 0) sum3'0 = a + b
+	output int#(-16..=-1) neg'0 = -a - 1
+	assert#(C: sizeof#(T: type int#(0..=255)) == 8)
+	assert#(C: sizeof#(T: type int#(0..256)) == 8)
+	assert#(C: sizeof#(T: type int#(0..257)) == 9)
+	assert#(C: sizeof#(T: type int#(-3*2..=2+1)) == 4)
+}
+
+module IntBoundsShorthandErrors {
+	int#(0..5, FROM: 3) duplicate_from
+	int#(TO: 3, 0..5) duplicate_to
+	int#(0..5, 2..=3) duplicate_both
+	bool#(0..5) not_an_int
+	int#(true..5) wrong_type
+	TreeMax#(0..5, SIZE: 3) not_an_int_module
+	int#(0 +.. 5) part_select_bounds
+	int#(..5) missing_lower
+	int#(0..) missing_upper
 }

@@ -382,9 +382,10 @@ module.exports = grammar({
             optional(field('template_args', $.template_args))
         ),
 
+        // A slice as template argument is the integer bounds shorthand: int#(0..256), int#(0..=255)
         template_args: $ => seq(
             '#(',
-            commaSepSeq($, $.template_arg),
+            commaSepSeq($, choice($.template_arg, $.slice)),
             ')'
         ),
 

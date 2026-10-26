@@ -1,13 +1,13 @@
 
 /// Converts a '0' or '1' into the equivalent boolean 'false' or 'true' respectively
 module IntToBool {
-    interface IntToBool : int#(FROM: 0, TO: 2) i'0 -> bool o'0
+    interface IntToBool : int#(0..2) i'0 -> bool o'0
 
     o = i == 1
 }
 /// Converts a 'false' or 'true' into the equivalent integer '0' or '1' respectively
 module BoolToInt {
-    interface BoolToInt : bool i'0 -> int#(FROM: 0, TO: 2) o'0
+    interface BoolToInt : bool i'0 -> int#(0..2) o'0
 
     when i {
         o = 1
@@ -22,7 +22,7 @@ module BoolToInt {
 ///
 /// Runtime equivalent of [IntToBitsGen]
 __builtin__ module IntToBits #(int NUM_BITS) {
-    interface IntToBits : int #(FROM: -pow2 #(E: NUM_BITS - 1), TO: pow2 #(E: NUM_BITS - 1)) value'0 -> bool[NUM_BITS] bits'0
+    interface IntToBits : int#(-pow2 #(E: NUM_BITS - 1)..pow2 #(E: NUM_BITS - 1)) value'0 -> bool[NUM_BITS] bits'0
 }
 /// Convert int to unsigned bits. (`bits[0]` is `value`'s Least Significant Bit)
 ///
@@ -30,7 +30,7 @@ __builtin__ module IntToBits #(int NUM_BITS) {
 ///
 /// Runtime equivalent of [UIntToBitsGen]
 __builtin__ module UIntToBits #(int NUM_BITS) {
-    interface UIntToBits : int #(FROM: 0, TO: pow2 #(E: NUM_BITS)) value'0 -> bool[NUM_BITS] bits'0
+    interface UIntToBits : int#(0..pow2 #(E: NUM_BITS)) value'0 -> bool[NUM_BITS] bits'0
 }
 /// Convert 2s complement bits to a signed int. (`bits[0]` is `value`'s Least Significant Bit)
 ///
@@ -38,7 +38,7 @@ __builtin__ module UIntToBits #(int NUM_BITS) {
 ///
 /// Runtime equivalent of [BitsToIntGen]
 __builtin__ module BitsToInt #(int NUM_BITS) {
-    interface BitsToInt : bool[NUM_BITS] bits'0 -> int #(FROM: -pow2 #(E: NUM_BITS - 1), TO: pow2 #(E: NUM_BITS - 1)) value'0
+    interface BitsToInt : bool[NUM_BITS] bits'0 -> int#(-pow2 #(E: NUM_BITS - 1)..pow2 #(E: NUM_BITS - 1)) value'0
 }
 /// Convert unsigned bits to an unsigned int. (`bits[0]` is `value`'s Least Significant Bit)
 ///
@@ -46,7 +46,7 @@ __builtin__ module BitsToInt #(int NUM_BITS) {
 ///
 /// Runtime equivalent of [BitsToUIntGen]
 __builtin__ module BitsToUInt #(int NUM_BITS) {
-    interface BitsToUInt : bool[NUM_BITS] bits'0 -> int #(FROM: 0, TO: pow2 #(E: NUM_BITS)) value'0
+    interface BitsToUInt : bool[NUM_BITS] bits'0 -> int#(0..pow2 #(E: NUM_BITS)) value'0
 }
 
 /// Convert gen int to 2s complement bits. (`RESULT[0]` is `V`'s Least Significant Bit)

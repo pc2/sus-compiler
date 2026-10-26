@@ -1905,6 +1905,10 @@
         "required": false,
         "types": [
           {
+            "type": "slice",
+            "named": true
+          },
+          {
             "type": "template_arg",
             "named": true
           }

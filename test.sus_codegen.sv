@@ -4304,6 +4304,49 @@ always_comb begin // combinatorial mul1
 end
 endmodule // example_md #()
 
+// IntBoundsShorthand #()
+module IntBoundsShorthand(
+	/* clock */ input clk,
+	input wire[3:0] a,
+	input wire[3:0] b,
+	output /*mux_wire*/ logic[4:0] sum,
+	output /*mux_wire*/ logic[4:0] sum2,
+	output /*mux_wire*/ logic[4:0] sum3,
+	output /*mux_wire*/ logic signed[4:0] neg
+);
+
+wire[4:0] _3;
+assign _3 = a + b;
+wire[4:0] _6;
+assign _6 = a + b;
+wire[4:0] _9;
+assign _9 = a + b;
+wire signed[4:0] _11;
+assign _11 = -a;
+wire signed[4:0] _13;
+assign _13 = _11 - $signed({1'b0, 1'd1});
+always_comb begin // combinatorial sum
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sum = 5'dx;
+	sum = _3;
+end
+always_comb begin // combinatorial sum2
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sum2 = 5'dx;
+	sum2 = _6;
+end
+always_comb begin // combinatorial sum3
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sum3 = 5'dx;
+	sum3 = _9;
+end
+always_comb begin // combinatorial neg
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	neg = 5'sdx;
+	neg = _13;
+end
+endmodule // IntBoundsShorthand #()
+
 // InclusiveAndMultipliedSlices #()
 module InclusiveAndMultipliedSlices(
 	/* clock */ input clk,

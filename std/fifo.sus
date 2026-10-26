@@ -13,8 +13,8 @@
 /// Example where we're moving data from `from_fifo`, adding one to it with wrap around, and pushing to `to_fifo`:
 /// ```sus
 /// module TwoFIFOs {
-///     FIFO#(T: type int#(FROM: 0, TO: 256), DEPTH: 128) from_fifo
-///     FIFO#(T: type int#(FROM: 0, TO: 256), DEPTH: 128) to_fifo
+///     FIFO#(T: type int#(0..256), DEPTH: 128) from_fifo
+///     FIFO#(T: type int#(0..256), DEPTH: 128) to_fifo
 /// 
 ///     when from_fifo.may_pop & to_fifo.may_push {
 ///         int pop_data = from_fifo.pop()
@@ -31,8 +31,8 @@ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
     gen int T_WIDTH = sizeof#(T)
 
 	state bool[T_WIDTH][DEPTH] mem
-	state int#(FROM: 0, TO: DEPTH) read_addr
-	state int#(FROM: 0, TO: DEPTH) write_addr
+	state int#(0..DEPTH) read_addr
+	state int#(0..DEPTH) write_addr
 
 	int space_remaining = read_addr - write_addr - 1 mod DEPTH
 
@@ -77,9 +77,9 @@ module FIFO #(T, int DEPTH, int MAY_PUSH_LATENCY) {
 /// Let's say it will not happen that `data_stream` is called when no segment is in the fifo for it. 
 /// ```sus
 /// module SplitIntoSegments {
-///     FWFT#(T: type int#(FROM: 1, TO: 256), DEPTH: 128) segment_sizes_fifo
+///     FWFT#(T: type int#(1..256), DEPTH: 128) segment_sizes_fifo
 /// 
-///     state int#(FROM: 0, TO: 256) num_left
+///     state int#(0..256) num_left
 ///     bool need_new_num_left = false
 ///     when num_left == 0 {
 ///         need_new_num_left = true
@@ -109,8 +109,8 @@ module FWFT #(T, int DEPTH, int MAY_PUSH_LATENCY) {
 	gen int OUTFLOW_REGS = 2
     
     state bool[T_WIDTH][DEPTH] mem
-	state int#(FROM: 0, TO: DEPTH) read_addr
-	state int#(FROM: 0, TO: DEPTH) write_addr
+	state int#(0..DEPTH) read_addr
+	state int#(0..DEPTH) write_addr
 
     /// Data travels from OUTFLOW_REGS down to 0
     state bool[OUTFLOW_REGS] outflow_path_valids_reg
@@ -221,8 +221,8 @@ module RippleFIFO#(T, int DEPTH, int DATA_LATENCY) {
 /// Due to the fact that the addresses increment monotically this is safe,
 /// and only adds a bit of latency between when an element is `push`-ed, and it becomes visible to be `pop`-ed. 
 module JoiningFIFO#(T, int NUM_FIFOS, int DEPTH, int MAY_PUSH_LATENCY) {
-    state int#(FROM: 0, TO: DEPTH * 2)[NUM_FIFOS] write_addrs'0
-    state int#(FROM: 0, TO: DEPTH * 2) read_addr'0
+    state int#(0..DEPTH * 2)[NUM_FIFOS] write_addrs'0
+    state int#(0..DEPTH * 2) read_addr'0
     
     state bool[sizeof#(T)][DEPTH][NUM_FIFOS] memory
 
@@ -241,7 +241,7 @@ module JoiningFIFO#(T, int NUM_FIFOS, int DEPTH, int MAY_PUSH_LATENCY) {
         }
     }
 
-    int#(FROM: 0, TO: DEPTH * 2)[NUM_FIFOS] relative_write_addrs
+    int#(0..DEPTH * 2)[NUM_FIFOS] relative_write_addrs
     reg bool read_addr_in_second_half = read_addr >= DEPTH
     for int I in 0..NUM_FIFOS {
         when read_addr_in_second_half {
@@ -293,7 +293,7 @@ module ShiftReg#(T, int LATENCY) {
         reg bool[T_WIDTH] bits_in = ToBits(din)
         
         state bool[T_WIDTH][LATENCY-2] mem
-        state int#(FROM: 0, TO: LATENCY-2) cur_idx
+        state int#(0..LATENCY-2) cur_idx
         initial cur_idx = 0
         cur_idx = cur_idx + 1 mod LATENCY-2
 

@@ -9,7 +9,7 @@ use crate::linker::passes::{GlobalResolver, LinkerPass};
 
 use ibig::{IBig, UBig};
 use ordered_float::NotNan;
-use sus_proc_macro::{field, get_builtin_const, kind, kw};
+use sus_proc_macro::{field, get_builtin_const, get_builtin_type, kind, kw};
 
 use crate::linker::{GlobalObj, GlobalUUID, LinkerFiles};
 use crate::value::Value;
@@ -156,68 +156,173 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         })
     }
 
-    fn flatten_template_args(&mut self, cursor: &mut Cursor<'c>) -> Vec<WrittenTemplateArg> {
-        cursor.collect_list(kind!("template_args"), |cursor| {
-            cursor.go_down(kind!("template_arg"), |cursor| {
-                let (name_span, name) = cursor.field_span(field!("name"), kind!("identifier"));
-
-                let (kind, value_span) = if cursor.optional_field(field!("val_arg")) {
-                    let value_span = cursor.span();
-                    let expr = self.flatten_subexpr(cursor);
-                    (Some(TemplateKind::Value(expr)), value_span)
-                } else if cursor.optional_field(field!("type_arg")) {
-                    let value_span = cursor.span();
-                    let typ = self.flatten_type(cursor);
-                    (Some(TemplateKind::Type(typ)), value_span)
+    /// `target` is the global these arguments are given to, if it could be resolved.
+    fn flatten_template_args(
+        &mut self,
+        cursor: &mut Cursor<'c>,
+        target: Option<GlobalUUID>,
+    ) -> Vec<WrittenTemplateArg> {
+        let target_is_int = target == Some(GlobalUUID::Type(get_builtin_type!("int")));
+        let mut result = Vec::new();
+        cursor.collect_list(kind!("template_args"), |cursor| match cursor.kind() {
+            kind!("template_arg") => {
+                let arg = self.flatten_named_template_arg(cursor);
+                result.push(arg);
+            }
+            kind!("slice") => {
+                if target_is_int {
+                    self.flatten_int_bounds_template_arg(cursor, &mut result);
                 } else {
-                    (
-                        match self.local_variable_context.get_declaration_for(name) {
-                            Some(NamedLocal::TemplateType(t)) => Some(TemplateKind::Type(
-                                WrittenType::TemplateVariable(name_span, t),
-                            )),
-                            Some(NamedLocal::Declaration(decl_id)) => {
-                                let wire_read_id =
-                                    self.instructions.alloc(Instruction::Expression(Expression {
-                                        parent_condition: self.current_parent_condition,
-                                        output: ExpressionOutput::SubExpression(
-                                            AbstractRankedType::UNKNOWN,
-                                        ),
-                                        span: name_span,
-                                        clock_domain: ClockDomain::UNKNOWN,
-                                        source: ExpressionSource::WireRef(WireReference {
-                                            root: WireReferenceRoot::LocalDecl(decl_id),
-                                            root_span: name_span,
-                                            output_typ: AbstractRankedType::UNKNOWN,
-                                            path: Vec::new(),
-                                        }),
-                                    }));
-                                Some(TemplateKind::Value(wire_read_id))
-                            }
-                            Some(other) => {
-                                let error_text = format!("{name} does not name a Type or a Value");
-                                self.report_conflict(name_span, &error_text, other);
-                                None
-                            }
-                            None => {
-                                self.errors.error(
-                                    name_span,
-                                    format!("{name} does not name a Type or a Value."),
-                                );
-                                None
-                            }
-                        },
-                        name_span,
-                    )
-                };
-
-                WrittenTemplateArg {
-                    name: name.to_owned(),
-                    name_span,
-                    value_span,
-                    kind,
-                    refers_to: OnceCell::new(),
+                    self.errors.error(
+                        cursor.span(),
+                        "The `FROM..TO` bounds shorthand can only be used on `int`. Use named template arguments instead.",
+                    );
                 }
-            })
+            }
+            _ => unreachable!(),
+        });
+        result
+    }
+
+    /// `int#(FROM..TO)` and `int#(FROM..=TO)` are sugar for `int#(FROM: FROM, TO: TO)` and `int#(FROM: FROM, TO: TO + 1)`
+    ///
+    /// Reuses the `slice` grammar node, so the part-select operators and missing bounds are rejected here.
+    fn flatten_int_bounds_template_arg(
+        &mut self,
+        cursor: &mut Cursor<'c>,
+        result: &mut Vec<WrittenTemplateArg>,
+    ) {
+        let bounds_span = cursor.span();
+        cursor.go_down(kind!("slice"), |cursor| {
+            let from = if cursor.optional_field(field!("index_a")) {
+                Some((self.flatten_subexpr(cursor), cursor.span()))
+            } else {
+                None
+            };
+
+            cursor.field(field!("type"));
+            let (op_kind, op_span) = cursor.kind_span();
+            let slice_kind = SliceType::from_kind_id(op_kind);
+
+            let to = if cursor.optional_field(field!("index_b")) {
+                Some((self.flatten_subexpr(cursor), cursor.span()))
+            } else {
+                None
+            };
+
+            let (Some((from, from_span)), Some((to, to_span))) = (from, to) else {
+                self.errors.error(
+                    bounds_span,
+                    "Integer bounds require both a lower and an upper bound: `int#(FROM..TO)`",
+                );
+                return;
+            };
+
+            let (to, to_span) = match slice_kind {
+                SliceType::Exclusive => (to, to_span),
+                SliceType::PartSelect(_) => {
+                    self.errors.error(
+                        op_span,
+                        format!("Integer bounds can only use `..` or `..=`, not `{slice_kind}`"),
+                    );
+                    (to, to_span)
+                }
+                SliceType::Inclusive => {
+                    let one = self.alloc_subexpr(
+                        ExpressionSource::Literal(Value::Integer(IBig::from(1))),
+                        op_span,
+                    );
+                    let inclusive_span = Span::new_overarching(op_span, to_span);
+                    let to_plus_one = self.alloc_subexpr(
+                        ExpressionSource::BinaryOp {
+                            op: BinaryOperator::Add,
+                            rank: PeanoType::UNKNOWN,
+                            left: to,
+                            right: one,
+                        },
+                        inclusive_span,
+                    );
+                    (to_plus_one, inclusive_span)
+                }
+            };
+
+            result.push(WrittenTemplateArg {
+                name: "FROM".to_owned(),
+                name_span: bounds_span,
+                value_span: from_span,
+                kind: Some(TemplateKind::Value(from)),
+                refers_to: OnceCell::new(),
+            });
+            result.push(WrittenTemplateArg {
+                name: "TO".to_owned(),
+                name_span: bounds_span,
+                value_span: to_span,
+                kind: Some(TemplateKind::Value(to)),
+                refers_to: OnceCell::new(),
+            });
+        })
+    }
+
+    fn flatten_named_template_arg(&mut self, cursor: &mut Cursor<'c>) -> WrittenTemplateArg {
+        cursor.go_down(kind!("template_arg"), |cursor| {
+            let (name_span, name) = cursor.field_span(field!("name"), kind!("identifier"));
+
+            let (kind, value_span) = if cursor.optional_field(field!("val_arg")) {
+                let value_span = cursor.span();
+                let expr = self.flatten_subexpr(cursor);
+                (Some(TemplateKind::Value(expr)), value_span)
+            } else if cursor.optional_field(field!("type_arg")) {
+                let value_span = cursor.span();
+                let typ = self.flatten_type(cursor);
+                (Some(TemplateKind::Type(typ)), value_span)
+            } else {
+                (
+                    match self.local_variable_context.get_declaration_for(name) {
+                        Some(NamedLocal::TemplateType(t)) => Some(TemplateKind::Type(
+                            WrittenType::TemplateVariable(name_span, t),
+                        )),
+                        Some(NamedLocal::Declaration(decl_id)) => {
+                            let wire_read_id =
+                                self.instructions.alloc(Instruction::Expression(Expression {
+                                    parent_condition: self.current_parent_condition,
+                                    output: ExpressionOutput::SubExpression(
+                                        AbstractRankedType::UNKNOWN,
+                                    ),
+                                    span: name_span,
+                                    clock_domain: ClockDomain::UNKNOWN,
+                                    source: ExpressionSource::WireRef(WireReference {
+                                        root: WireReferenceRoot::LocalDecl(decl_id),
+                                        root_span: name_span,
+                                        output_typ: AbstractRankedType::UNKNOWN,
+                                        path: Vec::new(),
+                                    }),
+                                }));
+                            Some(TemplateKind::Value(wire_read_id))
+                        }
+                        Some(other) => {
+                            let error_text = format!("{name} does not name a Type or a Value");
+                            self.report_conflict(name_span, &error_text, other);
+                            None
+                        }
+                        None => {
+                            self.errors.error(
+                                name_span,
+                                format!("{name} does not name a Type or a Value."),
+                            );
+                            None
+                        }
+                    },
+                    name_span,
+                )
+            };
+
+            WrittenTemplateArg {
+                name: name.to_owned(),
+                name_span,
+                value_span,
+                kind,
+                refers_to: OnceCell::new(),
+            }
         })
     }
 
@@ -236,16 +341,10 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 must_be_global = true;
             }
 
-            let (template_args, template_span) = if cursor.optional_field(field!("template_args")) {
+            let has_template_args = cursor.optional_field(field!("template_args"));
+            if has_template_args {
                 must_be_global = true;
-                let bracket_span = cursor.span();
-
-                let args = self.flatten_template_args(cursor);
-
-                (args, Some(bracket_span))
-            } else {
-                (Vec::new(), None)
-            };
+            }
 
             // Possibly local
             if !must_be_global {
@@ -258,16 +357,33 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 }
             }
 
-            // Global identifier
-            let [name_span] = *name_path.as_slice() else {
-                self.errors.todo(name_path[1], "Namespaces");
-                return LocalOrGlobal::NotFound(name_path[0]);
+            // Global identifier. Resolved before flattening the template args, because the args may depend on the target
+            let (global_id, name_span) = match *name_path.as_slice() {
+                [name_span] => {
+                    let global_id = self.globals.resolve_global(
+                        name_span,
+                        &cursor.file_data.file_text[name_span],
+                        self.errors,
+                    );
+                    (global_id, name_span)
+                }
+                _ => {
+                    self.errors.todo(name_path[1], "Namespaces");
+                    (None, name_path[0])
+                }
             };
-            if let Some(global_id) = self.globals.resolve_global(
-                name_span,
-                &cursor.file_data.file_text[name_span],
-                self.errors,
-            ) {
+
+            let (template_args, template_span) = if has_template_args {
+                let bracket_span = cursor.span();
+
+                let args = self.flatten_template_args(cursor, global_id);
+
+                (args, Some(bracket_span))
+            } else {
+                (Vec::new(), None)
+            };
+
+            if let Some(global_id) = global_id {
                 match global_id {
                     GlobalUUID::Module(id) => LocalOrGlobal::Module(GlobalReference {
                         id,
@@ -824,16 +940,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
     fn flatten_subexpr(&mut self, cursor: &mut Cursor<'c>) -> FlatID {
         let (source, span) = self.flatten_expr_source(cursor);
-        let wire_instance = Expression {
+        self.alloc_subexpr(source, span)
+    }
+
+    fn alloc_subexpr(&mut self, source: ExpressionSource, span: Span) -> FlatID {
+        self.instructions.alloc(Instruction::Expression(Expression {
             parent_condition: self.current_parent_condition,
             clock_domain: ClockDomain::UNKNOWN,
             span,
             source,
             output: ExpressionOutput::SubExpression(AbstractRankedType::UNKNOWN),
-        };
-
-        self.instructions
-            .alloc(Instruction::Expression(wire_instance))
+        }))
     }
 
     fn flatten_assign_to_expr(&mut self, writes: Vec<WriteTo>, cursor: &mut Cursor<'c>) {
@@ -880,14 +997,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
     fn new_error_subexpr(&mut self, root_span: Span) -> FlatID {
         let wire_ref = self.new_error(root_span);
-
-        self.instructions.alloc(Instruction::Expression(Expression {
-            span: root_span,
-            parent_condition: self.current_parent_condition,
-            source: ExpressionSource::WireRef(wire_ref),
-            clock_domain: ClockDomain::UNKNOWN,
-            output: ExpressionOutput::SubExpression(AbstractRankedType::UNKNOWN),
-        }))
+        self.alloc_subexpr(ExpressionSource::WireRef(wire_ref), root_span)
     }
 
     fn parse_bool_array_literal(

@@ -33,7 +33,7 @@ extern module xpm_fifo_sync #(
 	input  bool[WRITE_DATA_WIDTH]      din'0
 	output bool                        full'0
 	output bool                        prog_full'0
-	output int#(FROM: 0, TO: pow2#(E: WR_DATA_COUNT_WIDTH))   wr_data_count'0
+	output int#(0..pow2#(E: WR_DATA_COUNT_WIDTH))   wr_data_count'0
 	output bool                        overflow'0
 	output bool                        wr_rst_busy'0
 	output bool                        almost_full'0
@@ -45,7 +45,7 @@ extern module xpm_fifo_sync #(
 	output bool[READ_DATA_WIDTH]       dout'0
 	output bool                        empty'0
 	output bool                        prog_empty'0
-	output int#(FROM: 0, TO: pow2#(E: RD_DATA_COUNT_WIDTH))   rd_data_count'0
+	output int#(0..pow2#(E: RD_DATA_COUNT_WIDTH))   rd_data_count'0
 	output bool                        underflow'0
 	output bool                        rd_rst_busy'0
 	output bool                        almost_empty'0
@@ -94,7 +94,7 @@ extern module xpm_fifo_async #(
 	input  bool[WRITE_DATA_WIDTH]      din'0
 	output bool                        full'0
 	output bool                        prog_full'0
-	output int#(FROM: 0, TO: pow2#(E: WR_DATA_COUNT_WIDTH)) wr_data_count'0
+	output int#(0..pow2#(E: WR_DATA_COUNT_WIDTH)) wr_data_count'0
 	output bool                        overflow'0
 	output bool                        wr_rst_busy'0
 	output bool                        almost_full'0
@@ -106,7 +106,7 @@ extern module xpm_fifo_async #(
 	output bool[READ_DATA_WIDTH]       dout'0
 	output bool                        empty'0
 	output bool                        prog_empty'0
-	output int#(FROM: 0, TO: pow2#(E: RD_DATA_COUNT_WIDTH)) rd_data_count'0
+	output int#(0..pow2#(E: RD_DATA_COUNT_WIDTH)) rd_data_count'0
 	output bool                        underflow'0
 	output bool                        rd_rst_busy'0
 	output bool                        almost_empty'0

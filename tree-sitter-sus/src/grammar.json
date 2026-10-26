@@ -2601,8 +2601,17 @@
                       "type": "FIELD",
                       "name": "item",
                       "content": {
-                        "type": "SYMBOL",
-                        "name": "template_arg"
+                        "type": "CHOICE",
+                        "members": [
+                          {
+                            "type": "SYMBOL",
+                            "name": "template_arg"
+                          },
+                          {
+                            "type": "SYMBOL",
+                            "name": "slice"
+                          }
+                        ]
                       }
                     },
                     {
@@ -2647,8 +2656,17 @@
                             "type": "FIELD",
                             "name": "item",
                             "content": {
-                              "type": "SYMBOL",
-                              "name": "template_arg"
+                              "type": "CHOICE",
+                              "members": [
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "template_arg"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "slice"
+                                }
+                              ]
                             }
                           }
                         ]

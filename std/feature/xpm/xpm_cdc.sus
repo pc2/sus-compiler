@@ -36,9 +36,9 @@ extern module xpm_cdc_gray #(
 	int WIDTH,                  // 2
 ) {
 	clock src_clk
-	input  int#(FROM: 0, TO: pow2#(E: WIDTH)) src_in_bin'0
+	input  int#(0..pow2#(E: WIDTH)) src_in_bin'0
 	clock dest_clk
-	output int#(FROM: 0, TO: pow2#(E: WIDTH)) dest_out_bin'0
+	output int#(0..pow2#(E: WIDTH)) dest_out_bin'0
 }
 
 extern module xpm_cdc_pulse #(

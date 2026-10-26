@@ -2,8 +2,8 @@
 // Part of the regression test together with test.sus and test_latencies.sus
 
 module example_md {
-	interface example_md : int#(FROM: 0, TO: 100)[4] factors,
-		int#(FROM: 0, TO: 100) add_to ->
+	interface example_md : int#(0..100)[4] factors,
+		int#(0..100) add_to ->
 		int product,
 		int total
 
@@ -17,7 +17,7 @@ module example_md {
 
 // (a*b) + c
 module multiply_add {
-	interface multiply_add : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b, int#(FROM: 0, TO: 100) c -> int total
+	interface multiply_add : int#(0..100) a, int#(0..100) b, int#(0..100) c -> int total
 
 	reg int tmp = a * b
 	total = tmp + c
@@ -29,7 +29,7 @@ module test_pow17 {
 }
 
 module pow17 {
-    interface pow17 : int#(FROM: 0, TO: 100) i -> int o
+    interface pow17 : int#(0..100) i -> int o
 	    int i2  = i   * i
 	reg int i4  = i2  * i2
 	    int i8  = i4  * i4
@@ -40,8 +40,8 @@ module pow17 {
 
 module fibonnaci {
     interface fibonnaci : -> int num
-	state int #(FROM: 0, TO: 100) cur = 1
-	state int #(FROM: 0, TO: 100) prev = 0
+	state int#(0..100) cur = 1
+	state int#(0..100) prev = 0
 
 
 	num = cur + prev mod 100
@@ -50,7 +50,7 @@ module fibonnaci {
 }
 
 module blur2 {
-	interface blur2 : int#(FROM: 0, TO: 100) data, bool first -> int blurred
+	interface blur2 : int#(0..100) data, bool first -> int blurred
 
 	state int prev
 
@@ -73,14 +73,14 @@ module blur2 {
 
 
 module Tree_Multiply {
-    interface Tree_Multiply : int#(FROM: 0, TO: 100)[4] values -> int total
+    interface Tree_Multiply : int#(0..100)[4] values -> int total
 	reg int a = values[0] * values[1]
 	reg int b = values[2] * values[3]
 	reg total = a * b
 }
 
 module Accumulator {
-    interface Accumulator : int#(FROM: 0, TO: 100) term, bool done -> int total
+    interface Accumulator : int#(0..100) term, bool done -> int total
     state int tot
 	initial tot = 0
 
@@ -96,7 +96,7 @@ module Accumulator {
 
 //timeline (a, true -> /) | (a, false -> /) .. (a, false -> r)* .. (a, true -> r)
 module blur {
-    interface blur : int#(FROM: 0, TO: 100) a, bool done -> int result
+    interface blur : int#(0..100) a, bool done -> int result
 	state bool working
 	initial working = false
 	state int prev
@@ -112,7 +112,7 @@ module blur {
 
 //timeline (X -> X) .. (/ -> X) .. (/ -> X) .. (/ -> X)
 module Unpack4 {
-    interface Unpack4 : int#(FROM: 0, TO: 100)[4] packed -> int out_stream
+    interface Unpack4 : int#(0..100)[4] packed -> int out_stream
 	gen int INITIAL = 0
 	gen int A = 1
 
@@ -141,7 +141,7 @@ module Unpack4 {
 }
 
 module generative {
-    interface generative : int#(FROM: 0, TO: 100) i -> int o, int o2
+    interface generative : int#(0..100) i -> int o, int o2
 	gen int x = 5
 	gen int[x] ys
 
@@ -165,7 +165,7 @@ module generative {
 }
 
 module add_indices_to_array {
-	interface add_indices_to_array : int#(FROM: 0, TO: 100)[10] values -> int[10] added_values
+	interface add_indices_to_array : int#(0..100)[10] values -> int[10] added_values
 
 	for int i in 0..10 {
 		int t = values[i]
@@ -234,7 +234,7 @@ module first_bit_idx_24 {
 }
 
 module permute {
-    interface permute : bool[128] mbf, int#(FROM: 0, TO: 100) selected_permutation -> bool[128] permuted_mbf
+    interface permute : bool[128] mbf, int#(0..100) selected_permutation -> bool[128] permuted_mbf
 	// cvt_to_double
 	permuted_mbf = mbf
 }
@@ -266,13 +266,13 @@ module permute24 {
 
 
 module test_single_wire {
-    interface test_single_wire : int#(FROM: 0, TO: 100) a -> int o
+    interface test_single_wire : int#(0..100) a -> int o
 	o = a
 }
 
 module matrix_vector_mul {
 	interface matrix_vector_mul :
-		int#(FROM: 0, TO: 100)[6][4] mat, int#(FROM: 0, TO: 100)[4] vec -> int[6] result
+		int#(0..100)[6][4] mat, int#(0..100)[4] vec -> int[6] result
 
 	for int row in 0..6 {
 		int[4] row_products
@@ -286,7 +286,7 @@ module matrix_vector_mul {
 
 // Test submodule comment
 module submodule {
-    interface submodule : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b -> int r
+    interface submodule : int#(0..100) a, int#(0..100) b -> int r
 	r = a * b
 }
 
@@ -302,7 +302,7 @@ comment
 
 */
 module contains_submodule_submodule {
-    interface contains_submodule_submodule : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b, int#(FROM: 0, TO: 100) c -> int r
+    interface contains_submodule_submodule : int#(0..100) a, int#(0..100) b, int#(0..100) c -> int r
 	// Temp val
     int tmp = submodule(a, b)
 	doNothing()
@@ -326,7 +326,7 @@ module use_xor {
 }
 
 module fizz_buzz {
-    interface fizz_buzz : int#(FROM: 0, TO: 99) v -> int fb
+    interface fizz_buzz : int#(0..99) v -> int fb
 	gen int FIZZ = 888
 	gen int BUZZ = 555
 	gen int FIZZ_BUZZ = 888555
@@ -346,7 +346,7 @@ module fizz_buzz {
 }
 
 module fizz_buzz_gen #(int TABLE_SIZE) {
-    interface fizz_buzz_gen : int#(FROM: 0, TO: TABLE_SIZE) v -> int fb
+    interface fizz_buzz_gen : int#(0..TABLE_SIZE) v -> int fb
 	gen int FIZZ = 888
 	gen int BUZZ = 555
 	gen int FIZZ_BUZZ = 888555
@@ -423,7 +423,7 @@ module monotonize_down {
 }
 
 module my_mod {
-    interface my_mod : int#(FROM: 0, TO: 100) i -> bool a, bool b
+    interface my_mod : int#(0..100) i -> bool a, bool b
 	a = i == 3
 	b = i == 5
 }
@@ -437,14 +437,14 @@ module use_my_mod {
 
 // Main module documentation
 module submodule_named_ports {
-    interface submodule_named_ports : int#(FROM: 0, TO: 100) port_a, int#(FROM: 0, TO: 100) port_b -> int port_c
+    interface submodule_named_ports : int#(0..100) port_a, int#(0..100) port_b -> int port_c
 	port_c = port_a + port_b
 
 
 }
 
 module use_submodule_named_ports {
-    interface use_submodule_named_ports : int#(FROM: 0, TO: 100) i -> int o
+    interface use_submodule_named_ports : int#(0..100) i -> int o
 // Test submodule documentation
 	submodule_named_ports sm
 
@@ -458,7 +458,7 @@ module use_submodule_named_ports {
 }
 
 module contains_submodule_submodule {
-    interface contains_submodule_submodule : int#(FROM: 0, TO: 100) a, int#(FROM: 0, TO: 100) b, int#(FROM: 0, TO: 100) c -> int r
+    interface contains_submodule_submodule : int#(0..100) a, int#(0..100) b, int#(0..100) c -> int r
 	// Temp val
     int tmp = submodule(a, b)
 	doNothing()
@@ -473,7 +473,7 @@ module cross_bool {
 	o = true
 }
 module cross_int {
-	interface in : int#(FROM: 0, TO: 100) i'0
+	interface in : int#(0..100) i'0
 	interface out : -> int o'0
 	o = 1
 }
@@ -492,9 +492,9 @@ module offset_backwards {
 module dual_port_mem {
 	state bool[20][512] mem
 
-	interface write : bool write, bool[20] wr_data, int#(FROM:0, TO: 511) wr_addr
+	interface write : bool write, bool[20] wr_data, int#(0..511) wr_addr
 
-	interface read : bool read, int#(FROM:0, TO: 511) rd_addr -> bool[20] rd_data
+	interface read : bool read, int#(0..511) rd_addr -> bool[20] rd_data
 
 	when write {
 		mem[wr_addr] = wr_data
@@ -532,12 +532,12 @@ module test_separated_domain {
 
 	bool domain5
 
-	int #(FROM: 0, TO: 199) my_int
+	int#(0..199) my_int
 }
 
 module mod_with_unused_interface {
 	if false {
-		interface v : int#(FROM: 0, TO: 100) a -> int b
+		interface v : int#(0..100) a -> int b
 	}
 }
 
@@ -560,7 +560,7 @@ module use_bad_interface {
 module sequenceDownFrom {
 	//interface sequence : ->
 
-	interface start : bool start'0, int#(FROM: 0, TO: 100) upTo'0
+	interface start : bool start'0, int#(0..100) upTo'0
 
 	output bool ready'0
 
@@ -785,7 +785,7 @@ module IfTesting #(int WIDTH) {
 	}
 }
 module testArrayWrite {
-	interface testArrayWrite : int#(FROM: -3, TO: 6)[10][6][2] in_arr -> int[10][6] out_arr
+	interface testArrayWrite : int#(-3..6)[10][6][2] in_arr -> int[10][6] out_arr
 
 	out_arr = in_arr[0]
 
@@ -825,7 +825,7 @@ module use_MultiStateLoop {
 }
 
 module multi_slice {
-	interface multi_slice : bool[20][30] matrix, int#(FROM: 0, TO: 27) a, int#(FROM: 2, TO: 19) b -> bool[20][9] slice, bool[2][27] slice2, bool[5][9] gen_partselect, bool[2][3] partselect
+	interface multi_slice : bool[20][30] matrix, int#(0..27) a, int#(2..19) b -> bool[20][9] slice, bool[2][27] slice2, bool[5][9] gen_partselect, bool[2][3] partselect
 
 	slice = matrix[..9][..]
 	slice2 = matrix[3..][4..6]
@@ -834,7 +834,7 @@ module multi_slice {
 }
 
 module multi_slice_reverse {
-	interface multi_slice_reverse : int#(FROM: 0, TO: 27) a, int#(FROM: 2, TO: 19) b, bool[20][9] slice, bool[2][27] slice2, bool[5][9] gen_partselect, bool[2][3] partselect -> bool[20][30] matrix
+	interface multi_slice_reverse : int#(0..27) a, int#(2..19) b, bool[20][9] slice, bool[2][27] slice2, bool[5][9] gen_partselect, bool[2][3] partselect -> bool[20][30] matrix
 
 	matrix[..9][..] = slice
 	matrix[3..][4..6] = slice2
@@ -854,10 +854,10 @@ module zero_sized_stuffs {
 }
 
 module test_all_modulos {
-	int#(FROM: 0, TO: 13) unsigned_val
-	int#(FROM: -20, TO: 13) signed_val
+	int#(0..13) unsigned_val
+	int#(-20..13) signed_val
 
-	int#(FROM: 5, TO: 8) dynamic_mod
+	int#(5..8) dynamic_mod
 
 	// Power of two optimization
 	unsigned_val mod 8
@@ -907,12 +907,12 @@ module NonGenerativeSliceBoundsMustNotICE {
 
 
 module ReceiveZerosArray {
-	interface ReceiveZerosArray : int#(FROM: 0, TO: 1)[2] values
+	interface ReceiveZerosArray : int#(0..1)[2] values
 }
 module TestZerosArrays {
 
 	int[2] zeros = [0, 0]
-    int#(FROM: -5, TO: 6)[2] vs = [0, 0]
+    int#(-5..6)[2] vs = [0, 0]
 	ReceiveZerosArray([0, 0])
 
 	int[4][6][7][20] manyzeros
