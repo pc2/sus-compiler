@@ -802,6 +802,16 @@ module IntBoundsShorthand {
 	assert#(C: sizeof#(T: type int#(0..256)) == 8)
 	assert#(C: sizeof#(T: type int#(0..257)) == 9)
 	assert#(C: sizeof#(T: type int#(-3*2..=2+1)) == 4)
+	// Part-select forms: 5+..10 is 5..15, 14-..10 is 5..15, 1*..8 is 8..16
+	assert#(C: sizeof#(T: type int#(5+..10)) == 4)
+	assert#(C: sizeof#(T: type int#(14-..10)) == 4)
+	assert#(C: sizeof#(T: type int#(1*..8)) == 4)
+	assert#(C: sizeof#(T: type int#(0+..16)) == 4)
+	assert#(C: sizeof#(T: type int#(0+..17)) == 5)
+	assert#(C: sizeof#(T: type int#(-1-..1)) == 1)
+	output int#(0+..31) part_select_sum'0 = a + b
+	output int#(0*..31) multiplied_sum'0 = a + b
+	output int#(-1-..16) neg2'0 = -a - 1
 }
 
 module IntBoundsShorthandErrors {
@@ -811,7 +821,6 @@ module IntBoundsShorthandErrors {
 	bool#(0..5) not_an_int
 	int#(true..5) wrong_type
 	TreeMax#(0..5, SIZE: 3) not_an_int_module
-	int#(0 +.. 5) part_select_bounds
 	int#(..5) missing_lower
 	int#(0..) missing_upper
 }

@@ -184,9 +184,14 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         result
     }
 
-    /// `int#(FROM..TO)` and `int#(FROM..=TO)` are sugar for `int#(FROM: FROM, TO: TO)` and `int#(FROM: FROM, TO: TO + 1)`
+    /// A slice as template argument of `int` is sugar for its `FROM` and `TO` arguments, with the same meaning as for array slices:
+    /// - `int#(A..B)` is `int#(FROM: A, TO: B)`
+    /// - `int#(A..=B)` is `int#(FROM: A, TO: B + 1)`
+    /// - `int#(A +.. W)` is `int#(FROM: A, TO: A + W)`
+    /// - `int#(A -.. W)` is `int#(FROM: A - W + 1, TO: A + 1)`
+    /// - `int#(A *.. W)` is `int#(FROM: A * W, TO: A * W + W)`
     ///
-    /// Reuses the `slice` grammar node, so the part-select operators and missing bounds are rejected here.
+    /// Reuses the `slice` grammar node, so missing bounds are rejected here.
     fn flatten_int_bounds_template_arg(
         &mut self,
         cursor: &mut Cursor<'c>,
@@ -218,31 +223,44 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 return;
             };
 
-            let (to, to_span) = match slice_kind {
-                SliceType::Exclusive => (to, to_span),
-                SliceType::PartSelect(_) => {
-                    self.errors.error(
-                        op_span,
-                        format!("Integer bounds can only use `..` or `..=`, not `{slice_kind}`"),
-                    );
-                    (to, to_span)
-                }
+            let one = |slf: &mut Self| {
+                slf.alloc_subexpr(
+                    ExpressionSource::Literal(Value::Integer(IBig::from(1))),
+                    op_span,
+                )
+            };
+            let (from, to, from_span, to_span) = match slice_kind {
+                SliceType::Exclusive => (from, to, from_span, to_span),
                 SliceType::Inclusive => {
-                    let one = self.alloc_subexpr(
-                        ExpressionSource::Literal(Value::Integer(IBig::from(1))),
-                        op_span,
-                    );
+                    let one = one(self);
                     let inclusive_span = Span::new_overarching(op_span, to_span);
-                    let to_plus_one = self.alloc_subexpr(
-                        ExpressionSource::BinaryOp {
-                            op: BinaryOperator::Add,
-                            rank: PeanoType::UNKNOWN,
-                            left: to,
-                            right: one,
-                        },
-                        inclusive_span,
+                    let to = self.alloc_scalar_binop(BinaryOperator::Add, to, one, inclusive_span);
+                    (from, to, from_span, inclusive_span)
+                }
+                SliceType::PartSelect(PartSelectKind::Up) => {
+                    let to = self.alloc_scalar_binop(BinaryOperator::Add, from, to, bounds_span);
+                    (from, to, from_span, bounds_span)
+                }
+                SliceType::PartSelect(PartSelectKind::Down) => {
+                    let one = one(self);
+                    let from_minus_width =
+                        self.alloc_scalar_binop(BinaryOperator::Subtract, from, to, bounds_span);
+                    let new_from = self.alloc_scalar_binop(
+                        BinaryOperator::Add,
+                        from_minus_width,
+                        one,
+                        bounds_span,
                     );
-                    (to_plus_one, inclusive_span)
+                    let new_to =
+                        self.alloc_scalar_binop(BinaryOperator::Add, from, one, bounds_span);
+                    (new_from, new_to, bounds_span, bounds_span)
+                }
+                SliceType::PartSelect(PartSelectKind::Multiplied) => {
+                    let width = to;
+                    let from =
+                        self.alloc_scalar_binop(BinaryOperator::Multiply, from, width, bounds_span);
+                    let to = self.alloc_scalar_binop(BinaryOperator::Add, from, width, bounds_span);
+                    (from, to, bounds_span, bounds_span)
                 }
             };
 
@@ -941,6 +959,25 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     fn flatten_subexpr(&mut self, cursor: &mut Cursor<'c>) -> FlatID {
         let (source, span) = self.flatten_expr_source(cursor);
         self.alloc_subexpr(source, span)
+    }
+
+    /// Only used for scalar integer arithmetic synthesized by the flattener, so the rank is known to be zero
+    fn alloc_scalar_binop(
+        &mut self,
+        op: BinaryOperator,
+        left: FlatID,
+        right: FlatID,
+        span: Span,
+    ) -> FlatID {
+        self.alloc_subexpr(
+            ExpressionSource::BinaryOp {
+                op,
+                rank: UniCell::from_known(PeanoType::Zero),
+                left,
+                right,
+            },
+            span,
+        )
     }
 
     fn alloc_subexpr(&mut self, source: ExpressionSource, span: Span) -> FlatID {

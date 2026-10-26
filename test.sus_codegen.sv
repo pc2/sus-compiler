@@ -4312,7 +4312,10 @@ module IntBoundsShorthand(
 	output /*mux_wire*/ logic[4:0] sum,
 	output /*mux_wire*/ logic[4:0] sum2,
 	output /*mux_wire*/ logic[4:0] sum3,
-	output /*mux_wire*/ logic signed[4:0] neg
+	output /*mux_wire*/ logic signed[4:0] neg,
+	output /*mux_wire*/ logic[4:0] part_select_sum,
+	output /*mux_wire*/ logic[4:0] multiplied_sum,
+	output /*mux_wire*/ logic signed[4:0] neg2
 );
 
 wire[4:0] _3;
@@ -4325,6 +4328,14 @@ wire signed[4:0] _11;
 assign _11 = -a;
 wire signed[4:0] _13;
 assign _13 = _11 - $signed({1'b0, 1'd1});
+wire[4:0] _16;
+assign _16 = a + b;
+wire[4:0] _19;
+assign _19 = a + b;
+wire signed[4:0] _21;
+assign _21 = -a;
+wire signed[4:0] _23;
+assign _23 = _21 - $signed({1'b0, 1'd1});
 always_comb begin // combinatorial sum
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	sum = 5'dx;
@@ -4344,6 +4355,21 @@ always_comb begin // combinatorial neg
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	neg = 5'sdx;
 	neg = _13;
+end
+always_comb begin // combinatorial part_select_sum
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	part_select_sum = 5'dx;
+	part_select_sum = _16;
+end
+always_comb begin // combinatorial multiplied_sum
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	multiplied_sum = 5'dx;
+	multiplied_sum = _19;
+end
+always_comb begin // combinatorial neg2
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	neg2 = 5'sdx;
+	neg2 = _23;
 end
 endmodule // IntBoundsShorthand #()
 
