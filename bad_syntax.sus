@@ -104,8 +104,8 @@ module beep {
 timeline (a -> r) .. (/ -> r)
 module dwiogo {
     interface dwiogo : bool[512] data -> bool[256] out 
-    state bool[256] save = data[256:511]
-	out = data[0:255]
+    state bool[256] save = data[256..511]
+	out = data[0..255]
 	#
 	out = save
 }
@@ -115,14 +115,14 @@ module dwiogo {
 timeline (v, true -> v) .. (/, false -> v) .. (/, false -> v) .. (/, false -> v)
 module packer {
     interface packer : bool[256] data /* v _ _ _ */, bool valid -> bool[64] o  /* v v v v */
-    state bool[192] save = data[64:256]
+    state bool[192] save = data[64..256]
 	state int part
 	initial part = 3
 	if valid {
 		part = 0
-		o = data[0:64]
+		o = data[0..64]
 	} else {
-		o = save[part*64 - 64:part*64]
+		o = save[part*64 - 64..part*64]
 		if part < 3 {
 			part = part + 1
 		}

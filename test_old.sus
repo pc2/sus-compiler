@@ -123,7 +123,7 @@ module Unpack4 {
 
     when st == INITIAL {
         out_stream = packed[0]
-        stored_packed[0] = packed[1] // Shorthand notation is possible here "stored_packed[0:2] = packed[1:3]"
+        stored_packed[0] = packed[1] // Shorthand notation is possible here "stored_packed[0..2] = packed[1..3]"
         stored_packed[1] = packed[2]
         stored_packed[2] = packed[3]
         st = 1
@@ -827,19 +827,19 @@ module use_MultiStateLoop {
 module multi_slice {
 	interface multi_slice : bool[20][30] matrix, int#(FROM: 0, TO: 27) a, int#(FROM: 2, TO: 19) b -> bool[20][9] slice, bool[2][27] slice2, bool[5][9] gen_partselect, bool[2][3] partselect
 
-	slice = matrix[:9][:]
-	slice2 = matrix[3:][4:6]
-	gen_partselect = matrix[3 +: 9][7 -: 5]
-	partselect = matrix[a +: 3][b -: 2]
+	slice = matrix[..9][..]
+	slice2 = matrix[3..][4..6]
+	gen_partselect = matrix[3 +.. 9][7 -.. 5]
+	partselect = matrix[a +.. 3][b -.. 2]
 }
 
 module multi_slice_reverse {
 	interface multi_slice_reverse : int#(FROM: 0, TO: 27) a, int#(FROM: 2, TO: 19) b, bool[20][9] slice, bool[2][27] slice2, bool[5][9] gen_partselect, bool[2][3] partselect -> bool[20][30] matrix
 
-	matrix[:9][:] = slice
-	matrix[3:][4:6] = slice2
-	matrix[3 +: 9][7 -: 5] = gen_partselect
-	matrix[a +: 3][b -: 2] = partselect
+	matrix[..9][..] = slice
+	matrix[3..][4..6] = slice2
+	matrix[3 +.. 9][7 -.. 5] = gen_partselect
+	matrix[a +.. 3][b -.. 2] = partselect
 }
 
 module zero_sized_stuffs {
@@ -898,11 +898,11 @@ module NonGenerativeSliceBoundsMustNotICE {
     bool[20] arr
 
     int x = 3
-    arr[3 +: x]
-    arr[x:5]
-    arr[5:x]
-    arr[x:]
-    arr[:x]
+    arr[3 +.. x]
+    arr[x..5]
+    arr[5..x]
+    arr[x..]
+    arr[..x]
 }
 
 
@@ -919,7 +919,7 @@ module TestZerosArrays {
 	manyzeros[16][3][2][3] = 0
 
 	int[2] nums = [5, 9]
-	int[2] sums = nums + [0, 0] + zeros + manyzeros[1][5:7][4][3]
+	int[2] sums = nums + [0, 0] + zeros + manyzeros[1][5..7][4][3]
 }
 
 module NegativeIntLiterals {

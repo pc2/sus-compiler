@@ -2118,7 +2118,7 @@ end
 end
 	for(int _v0 = 0; _v0 < 9; _v0 = _v0 + 1) begin
 for(int _v1 = 0; _v1 < 5; _v1 = _v1 + 1) begin
-matrix[3 + _v0][7 + _v1] = gen_partselect[_v0][_v1];
+matrix[3 + _v0][3 + _v1] = gen_partselect[_v0][_v1];
 end
 end
 	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
@@ -2163,7 +2163,7 @@ wire[4:0] _3[0:8];
 generate
 for(_g0 = 0; _g0 < 9; _g0 = _g0 + 1) begin
 for(_g1 = 0; _g1 < 5; _g1 = _g1 + 1) begin
-assign _3[_g0][_g1] = matrix[3 + _g0][7 + _g1];
+assign _3[_g0][_g1] = matrix[3 + _g0][3 + _g1];
 end
 end
 endgenerate
@@ -4303,6 +4303,51 @@ always_comb begin // combinatorial mul1
 	mul1 = __6_D1;
 end
 endmodule // example_md #()
+
+// InclusiveAndMultipliedSlices #()
+module InclusiveAndMultipliedSlices(
+	/* clock */ input clk,
+	input wire[31:0] data,
+	input wire[1:0] i,
+	output /*mux_wire*/ logic[7:0] byte_sel,
+	output /*mux_wire*/ logic[3:0] incl,
+	output /*mux_wire*/ logic[31:0] written
+);
+
+genvar _g0;
+wire[7:0] _2;
+generate
+for(_g0 = 0; _g0 < 8; _g0 = _g0 + 1) begin
+assign _2[_g0] = data[i * 8 + _g0];
+end
+endgenerate
+wire[3:0] _3;
+generate
+for(_g0 = 0; _g0 < 4; _g0 = _g0 + 1) begin
+assign _3[_g0] = data[4 + _g0];
+end
+endgenerate
+always_comb begin // combinatorial byte_sel
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	byte_sel = 8'bxxxxxxxx;
+	byte_sel = _2;
+end
+always_comb begin // combinatorial incl
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	incl = 4'bxxxx;
+	incl = _3;
+end
+always_comb begin // combinatorial written
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	written = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
+	for(int _v0 = 0; _v0 < 8; _v0 = _v0 + 1) begin
+written[i * 8 + _v0] = byte_sel[_v0];
+end
+	for(int _v0 = 0; _v0 < 4; _v0 = _v0 + 1) begin
+written[8 + _v0] = incl[_v0];
+end
+end
+endmodule // InclusiveAndMultipliedSlices #()
 
 // newlines_interface_body #()
 module newlines_interface_body(

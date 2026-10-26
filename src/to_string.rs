@@ -279,19 +279,27 @@ impl WireReference {
                     WireReferencePathElement::ArrayAccess { idx, .. } => {
                         write!(f, "[{idx:?}]")?;
                     }
-                    WireReferencePathElement::ArraySlice { from, to, .. } => match (from, to) {
-                        (None, None) => write!(f, "[:]")?,
-                        (None, Some(to)) => write!(f, "[:{to:?}]")?,
-                        (Some(from), None) => write!(f, "[{from:?}:]")?,
-                        (Some(from), Some(to)) => write!(f, "[{from:?}:{to:?}]")?,
-                    },
-                    WireReferencePathElement::ArrayPartSelect {
+                    WireReferencePathElement::ArraySlice {
                         from,
-                        width,
-                        direction,
+                        to,
+                        to_inclusive,
                         ..
                     } => {
-                        write!(f, "[{from:?}{direction}{width:?}]")?;
+                        let op = if *to_inclusive { "..=" } else { ".." };
+                        write!(f, "[")?;
+                        if let Some(from) = from {
+                            write!(f, "{from:?}")?;
+                        }
+                        write!(f, "{op}")?;
+                        if let Some(to) = to {
+                            write!(f, "{to:?}")?;
+                        }
+                        write!(f, "]")?;
+                    }
+                    WireReferencePathElement::ArrayPartSelect {
+                        from, width, kind, ..
+                    } => {
+                        write!(f, "[{from:?}{kind}{width:?}]")?;
                     }
                 }
             }
@@ -507,31 +515,34 @@ impl Display for Direction {
         })
     }
 }
-impl Display for PartSelectDirection {
+impl Display for PartSelectKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            PartSelectDirection::Up => "+:",
-            PartSelectDirection::Down => "-:",
+            PartSelectKind::Up => "+..",
+            PartSelectKind::Down => "-..",
+            PartSelectKind::Multiplied => "*..",
         })
     }
 }
 impl SliceType {
     pub fn from_kind_id(kind_id: u16) -> Self {
         match kind_id {
-            kw!(":") => SliceType::Normal,
-            kw!("+:") => SliceType::PartSelect(PartSelectDirection::Up),
-            kw!("-:") => SliceType::PartSelect(PartSelectDirection::Down),
+            kw!("..") => SliceType::Exclusive,
+            kw!("..=") => SliceType::Inclusive,
+            kw!("+..") => SliceType::PartSelect(PartSelectKind::Up),
+            kw!("-..") => SliceType::PartSelect(PartSelectKind::Down),
+            kw!("*..") => SliceType::PartSelect(PartSelectKind::Multiplied),
             _ => unreachable!(),
         }
     }
 }
 impl Display for SliceType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            SliceType::Normal => ":",
-            SliceType::PartSelect(PartSelectDirection::Up) => "+:",
-            SliceType::PartSelect(PartSelectDirection::Down) => "-:",
-        })
+        match self {
+            SliceType::Exclusive => f.write_str(".."),
+            SliceType::Inclusive => f.write_str("..="),
+            SliceType::PartSelect(kind) => kind.fmt(f),
+        }
     }
 }
 impl Display for InterfaceKind {
@@ -1241,19 +1252,19 @@ impl ModuleTypingContext<'_> {
                         write!(f, "[{idx}]")?;
                     }
                     RealWirePathElem::Slice { bounds, .. } => match bounds {
-                        PartialBound::Known(from, to) => write!(f, "[{from}:{to}]")?,
-                        PartialBound::From(from) => write!(f, "[{from}:]")?,
-                        PartialBound::To(to) => write!(f, "[:{to}]")?,
-                        PartialBound::WholeSlice => write!(f, "[:]")?,
+                        PartialBound::Known(from, to) => write!(f, "[{from}..{to}]")?,
+                        PartialBound::From(from) => write!(f, "[{from}..]")?,
+                        PartialBound::To(to) => write!(f, "[..{to}]")?,
+                        PartialBound::WholeSlice => write!(f, "[..]")?,
                     },
                     RealWirePathElem::PartSelect {
                         from_wire,
                         width,
-                        direction,
+                        kind,
                         ..
                     } => {
                         let from = self.name(*from_wire);
-                        write!(f, "[{from}{direction}{width}]")?;
+                        write!(f, "[{from}{kind}{width}]")?;
                     }
                 }
             }

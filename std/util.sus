@@ -34,13 +34,13 @@ module Tuple2 #(T1, T2) {
 
     domain pack_dom
     interface pack : T1 v1_i'0, T2 v2_i'0 -> bool[TO2] packed_o'0
-    packed_o[:TO1] = ToBits(v1_i)
-    packed_o[TO1:] = ToBits(v2_i)
+    packed_o[..TO1] = ToBits(v1_i)
+    packed_o[TO1..] = ToBits(v2_i)
 
     domain unpack_dom
     interface unpack : bool[TO2] packed_i'0 -> T1 v1_o'0, T2 v2_o'0
-    v1_o = FromBits(packed_i[:TO1])
-    v2_o = FromBits(packed_i[TO1:])
+    v1_o = FromBits(packed_i[..TO1])
+    v2_o = FromBits(packed_i[TO1..])
 }
 
 /// Temporary module for creating and deconstructing tuples, until we have structs
@@ -52,15 +52,15 @@ module Tuple3 #(T1, T2, T3) {
 
     domain pack_dom
     interface pack : T1 v1_i'0, T2 v2_i'0, T3 v3_i'0 -> bool[TO3] packed_o'0
-    packed_o[:TO1] = ToBits(v1_i)
-    packed_o[TO1:TO2] = ToBits(v2_i)
-    packed_o[TO2:] = ToBits(v3_i)
+    packed_o[..TO1] = ToBits(v1_i)
+    packed_o[TO1..TO2] = ToBits(v2_i)
+    packed_o[TO2..] = ToBits(v3_i)
 
     domain unpack_dom
     interface unpack : bool[TO3] packed_i'0 -> T1 v1_o'0, T2 v2_o'0, T3 v3_o'0
-    v1_o = FromBits(packed_i[:TO1])
-    v2_o = FromBits(packed_i[TO1:TO2])
-    v3_o = FromBits(packed_i[TO2:])
+    v1_o = FromBits(packed_i[..TO1])
+    v2_o = FromBits(packed_i[TO1..TO2])
+    v3_o = FromBits(packed_i[TO2..])
 }
 
 /// Temporary module for creating and deconstructing tuples, until we have structs
@@ -73,17 +73,17 @@ module Tuple4 #(T1, T2, T3, T4) {
 
     domain pack_dom
     interface pack : T1 v1_i'0, T2 v2_i'0, T3 v3_i'0, T4 v4_i'0 -> bool[TO4] packed_o'0
-    packed_o[:TO1] = ToBits(v1_i)
-    packed_o[TO1:TO2] = ToBits(v2_i)
-    packed_o[TO2:TO3] = ToBits(v3_i)
-    packed_o[TO3:] = ToBits(v4_i)
+    packed_o[..TO1] = ToBits(v1_i)
+    packed_o[TO1..TO2] = ToBits(v2_i)
+    packed_o[TO2..TO3] = ToBits(v3_i)
+    packed_o[TO3..] = ToBits(v4_i)
 
     domain unpack_dom
     interface unpack : bool[TO4] packed_i'0 -> T1 v1_o'0, T2 v2_o'0, T3 v3_o'0, T4 v4_o'0
-    v1_o = FromBits(packed_i[:TO1])
-    v2_o = FromBits(packed_i[TO1:TO2])
-    v3_o = FromBits(packed_i[TO2:TO3])
-    v4_o = FromBits(packed_i[TO3:])
+    v1_o = FromBits(packed_i[..TO1])
+    v2_o = FromBits(packed_i[TO1..TO2])
+    v3_o = FromBits(packed_i[TO2..TO3])
+    v4_o = FromBits(packed_i[TO3..])
 }
 
 /// Temporary module for creating and deconstructing tuples, until we have structs
@@ -97,17 +97,17 @@ module Tuple5 #(T1, T2, T3, T4, T5) {
 
     domain pack_dom
     interface pack : T1 v1_i'0, T2 v2_i'0, T3 v3_i'0, T4 v4_i'0, T5 v5_i'0 -> bool[TO5] packed_o'0
-    packed_o[:TO1] = ToBits(v1_i)
-    packed_o[TO1:TO2] = ToBits(v2_i)
-    packed_o[TO2:TO3] = ToBits(v3_i)
-    packed_o[TO3:TO4] = ToBits(v4_i)
-    packed_o[TO4:] = ToBits(v5_i)
+    packed_o[..TO1] = ToBits(v1_i)
+    packed_o[TO1..TO2] = ToBits(v2_i)
+    packed_o[TO2..TO3] = ToBits(v3_i)
+    packed_o[TO3..TO4] = ToBits(v4_i)
+    packed_o[TO4..] = ToBits(v5_i)
 
     domain unpack_dom
     interface unpack : bool[TO5] packed_i'0 -> T1 v1_o'0, T2 v2_o'0, T3 v3_o'0, T4 v4_o'0, T5 v5_o'0
-    v1_o = FromBits(packed_i[:TO1])
-    v2_o = FromBits(packed_i[TO1:TO2])
-    v3_o = FromBits(packed_i[TO2:TO3])
-    v4_o = FromBits(packed_i[TO3:TO4])
-    v5_o = FromBits(packed_i[TO4:])
+    v1_o = FromBits(packed_i[..TO1])
+    v2_o = FromBits(packed_i[TO1..TO2])
+    v3_o = FromBits(packed_i[TO2..TO3])
+    v4_o = FromBits(packed_i[TO3..TO4])
+    v5_o = FromBits(packed_i[TO4..])
 }

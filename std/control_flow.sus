@@ -63,14 +63,14 @@ module SlowState #(T, int DELAY) {
             old_is_stable = true
         } else {
             wait_for_slow[0] = true
-            wait_for_slow[1:] = RepeatGen#(T: type bool, V: false, SIZE: DELAY-1)
+            wait_for_slow[1..] = RepeatGen#(T: type bool, V: false, SIZE: DELAY-1)
             old_is_stable = false
         }
         new_value_slow_d = new_value_slow
     } else {
         if DELAY != 0 {
             wait_for_slow[0] = false
-            wait_for_slow[1:] = wait_for_slow[0:DELAY-1]
+            wait_for_slow[1..] = wait_for_slow[0..DELAY-1]
         }
     }
 
@@ -125,7 +125,7 @@ module SlowStateAdvanced #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
         when update_s | do_rst { // Importantly, there are no pipeline registers on update for the cooldown. Otherwise it could be called twice rapidly in a row
             cooldown = Repeat(false)
         } else {
-            cooldown[0:UPDATE_TOTAL_DEPTH - 1] = cooldown[1:]
+            cooldown[0..UPDATE_TOTAL_DEPTH - 1] = cooldown[1..]
             cooldown[UPDATE_TOTAL_DEPTH - 1] = true
         }
     } else {

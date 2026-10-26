@@ -277,24 +277,23 @@ impl GenerationState<'_> {
                 WireReferencePathElement::ArraySlice {
                     from,
                     to,
+                    to_inclusive,
                     bracket_span,
-                    ..
                 } => GenerativeWireRefPathElem::Slice {
                     from: from.map(|from| self.get_generation_integer(from).clone()),
-                    to: to.map(|to| self.get_generation_integer(to).clone()),
+                    to: to.map(|to| self.get_generation_integer(to) + usize::from(*to_inclusive)),
                     span: bracket_span.inner_span(),
                 },
                 WireReferencePathElement::ArrayPartSelect {
                     from,
                     width,
                     bracket_span,
-                    direction,
-                    ..
+                    kind,
                 } => {
                     let from = self.get_generation_integer(*from);
                     let width = self.get_generation_integer(*width);
 
-                    let range = direction.range_from(from.clone(), width.clone());
+                    let range = kind.range_from(from.clone(), width.clone());
                     GenerativeWireRefPathElem::Slice {
                         from: Some(range.from),
                         to: Some(range.to),
@@ -510,12 +509,15 @@ impl<'l> ExecutionContext<'l> {
                 WireReferencePathElement::ArraySlice {
                     from,
                     to,
+                    to_inclusive,
                     bracket_span,
-                    ..
                 } => {
                     let from =
                         from.map(|from| self.generation_state.get_generation_integer(from).clone());
-                    let to = to.map(|to| self.generation_state.get_generation_integer(to).clone());
+                    let to = to.map(|to| {
+                        self.generation_state.get_generation_integer(to)
+                            + usize::from(*to_inclusive)
+                    });
                     let bounds = match (from, to) {
                         (None, None) => PartialBound::WholeSlice,
                         (None, Some(to)) => PartialBound::To(to),
@@ -532,8 +534,7 @@ impl<'l> ExecutionContext<'l> {
                     from,
                     width,
                     bracket_span,
-                    direction,
-                    ..
+                    kind,
                 } => {
                     let width = self.generation_state.get_generation_integer(*width);
                     let span = *bracket_span;
@@ -544,14 +545,14 @@ impl<'l> ExecutionContext<'l> {
                                 span,
                                 from_wire,
                                 width: width.clone(),
-                                direction: *direction,
+                                kind: *kind,
                             });
                         }
                         WireOrInt::Int(from) => {
-                            let to = from + width;
+                            let range = kind.range_from(from.clone(), width.clone());
                             path.push(RealWirePathElem::Slice {
                                 span,
-                                bounds: PartialBound::Known(from.clone(), to),
+                                bounds: PartialBound::Known(range.from, range.to),
                             });
                         }
                     }

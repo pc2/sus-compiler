@@ -769,7 +769,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     };
 
                     match slice_kind {
-                        SliceType::PartSelect(direction) => {
+                        SliceType::PartSelect(kind) => {
                             let from = from.unwrap_or_else(|| {
                                 self.errors.error(
                                     bracket_span.inner_span().empty_span_at_front(),
@@ -780,7 +780,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             });
                             let width = to.unwrap_or_else(|| {
                                 self.errors.error(
-                                    bracket_span.inner_span().empty_span_at_front(),
+                                    bracket_span.inner_span().empty_span_at_end(),
                                     "Missing indexed part-select slices width",
                                 );
 
@@ -790,14 +790,31 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 from,
                                 width,
                                 bracket_span,
-                                direction,
+                                kind,
                             }
                         }
-                        SliceType::Normal => WireReferencePathElement::ArraySlice {
+                        SliceType::Exclusive => WireReferencePathElement::ArraySlice {
                             from,
                             to,
+                            to_inclusive: false,
                             bracket_span,
                         },
+                        SliceType::Inclusive => {
+                            let to = to.unwrap_or_else(|| {
+                                self.errors.error(
+                                    bracket_span.inner_span().empty_span_at_end(),
+                                    "Missing inclusive slice end index",
+                                );
+
+                                self.new_error_subexpr(slice_op_span)
+                            });
+                            WireReferencePathElement::ArraySlice {
+                                from,
+                                to: Some(to),
+                                to_inclusive: true,
+                                bracket_span,
+                            }
+                        }
                     }
                 })
             }

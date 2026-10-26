@@ -11,7 +11,7 @@ use crate::{
         sv_utils::{CommaSeparatedList, VariableAlloc},
     },
     flattening::{
-        BinaryOperator, ClockVisibility, Direction, Module, PartSelectDirection, UnaryOperator,
+        BinaryOperator, ClockVisibility, Direction, Module, PartSelectKind, UnaryOperator,
     },
     instantiation::{
         InstantiatedModule, InstantiatedPort, IsPort, MultiplexerSource, RealWire,
@@ -369,7 +369,7 @@ impl<'g> CodeGenerationContext<'g> {
                 RealWirePathElem::PartSelect {
                     from_wire,
                     width,
-                    direction,
+                    kind,
                     ..
                 } => {
                     let (arr_content, _sz) = typ.unwrap_array();
@@ -386,16 +386,21 @@ impl<'g> CodeGenerationContext<'g> {
                         idx: var.to_string(),
                     });
 
-                    match direction {
-                        PartSelectDirection::Up => {
+                    match kind {
+                        PartSelectKind::Up => {
                             source_path.push(PathElem::Array {
                                 idx: format!("{wire_name} + {var}"),
                             });
                         }
-                        PartSelectDirection::Down => {
+                        PartSelectKind::Down => {
                             let sz_dec = width - 1;
                             source_path.push(PathElem::Array {
                                 idx: format!("{wire_name} - ({sz_dec} - {var})"),
+                            });
+                        }
+                        PartSelectKind::Multiplied => {
+                            source_path.push(PathElem::Array {
+                                idx: format!("{wire_name} * {width} + {var}"),
                             });
                         }
                     }

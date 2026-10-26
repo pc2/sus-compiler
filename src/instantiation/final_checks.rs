@@ -139,7 +139,7 @@ impl<'l> ModuleTypingContext<'l> {
                     span,
                     from_wire,
                     width,
-                    direction,
+                    kind,
                 } => {
                     let (content, arr_sz) = typ.unwrap_array_known_size();
                     typ = content;
@@ -148,7 +148,7 @@ impl<'l> ModuleTypingContext<'l> {
 
                     let from_bounds = from_wire.typ.unwrap_int_bounds();
 
-                    let access_bounds = direction.range_from_range(from_bounds, width);
+                    let access_bounds = kind.range_from_range(from_bounds, width);
                     let span = span.inner_span();
                     self.boundscheck_array(
                         access_bounds.as_ref(),

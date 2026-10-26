@@ -49,8 +49,8 @@ module FirstSetBit #(int SIZE) {
             FirstSetBit left_part
             FirstSetBit right_part
 
-            left_part.find(bits[LEFT_SIZE:])
-            right_part.find(bits[:LEFT_SIZE])
+            left_part.find(bits[LEFT_SIZE..])
+            right_part.find(bits[..LEFT_SIZE])
 
             when left_part.is_nonzero : int left_first_nonzero {
                 is_nonzero(left_first_nonzero)
@@ -100,12 +100,12 @@ module PopCount #(int SIZE) {
 			assert#(C: false)
 		}
 	} else {
-		popcount = PopCount(bits[:SIZE / 2]) + PopCount(bits[SIZE / 2:])
+		popcount = PopCount(bits[..SIZE / 2]) + PopCount(bits[SIZE / 2..])
 	}
 }
 
 
-/// Splits the given integer. The upper `[LOWER_BITS:]` bits are returned as upper, the lower `[:LOWER_BITS]` bits are returned in lower
+/// Splits the given integer. The upper `[LOWER_BITS..]` bits are returned as upper, the lower `[..LOWER_BITS]` bits are returned in lower
 /// See also [BitwiseIntConcat].
 module BitwiseIntSplit #(int TO, int LOWER_BITS) {
     gen int UPPER_TO = (TO-1) / pow2#(E: LOWER_BITS) + 1
@@ -116,9 +116,9 @@ module BitwiseIntSplit #(int TO, int LOWER_BITS) {
 
     bool[clog2#(V: TO)] v_bits = UIntToBits(v)
 
-    lower = BitsToUInt(v_bits[:LOWER_BITS])
+    lower = BitsToUInt(v_bits[..LOWER_BITS])
 	// we use FromBits rather than BitsToUInt, because we can then immediately adjust the range too
-    upper = FromBits#(T: type int#(FROM: 0, TO: UPPER_TO))(v_bits[LOWER_BITS:])
+    upper = FromBits#(T: type int#(FROM: 0, TO: UPPER_TO))(v_bits[LOWER_BITS..])
 }
 
 /// Recombines a lower and upper integer parts.
@@ -130,13 +130,13 @@ module BitwiseIntConcat #(int UPPER_TO, int LOWER_BITS) {
         int#(FROM: 0, TO: UPPER_TO * pow2#(E: LOWER_BITS)) v'0
 
     bool[clog2#(V: UPPER_TO) + LOWER_BITS] v_bits
-    v_bits[:LOWER_BITS] = UIntToBits(lower)
-    v_bits[LOWER_BITS:] = UIntToBits(upper)
+    v_bits[..LOWER_BITS] = UIntToBits(lower)
+    v_bits[LOWER_BITS..] = UIntToBits(upper)
 	// we use FromBits rather than BitsToUInt, because we can then immediately adjust the range too
     v = FromBits#(T: type int#(FROM: 0, TO: UPPER_TO * pow2#(E: LOWER_BITS)))(v_bits)
 }
 
-/// Sets the lower `[:LOWER_BITS]` bits to false, thus aligning the value
+/// Sets the lower `[..LOWER_BITS]` bits to false, thus aligning the value
 /// Works for unsigned and signed integers alike.
 module AlignToPow2 #(int FROM, int TO, int LOWER_BITS) {
     gen int ALIGNED_FROM = FROM - (FROM mod clog2#(V: LOWER_BITS))
@@ -147,8 +147,8 @@ module AlignToPow2 #(int FROM, int TO, int LOWER_BITS) {
 
     bool[sizeof#(T: type int#(FROM, TO))] bits = ToBits(i)
     bool[sizeof#(T: type int#(FROM, TO))] aligned_bits
-    aligned_bits[:LOWER_BITS] = Repeat(false)
-    aligned_bits[LOWER_BITS:] = bits[LOWER_BITS:]
+    aligned_bits[..LOWER_BITS] = Repeat(false)
+    aligned_bits[LOWER_BITS..] = bits[LOWER_BITS..]
 	// we use FromBits rather than BitsToInt, because we can then immediately adjust the range too
     o = FromBits#(T: type int#(FROM: ALIGNED_FROM, TO: ALIGNED_TO))(aligned_bits)
 }

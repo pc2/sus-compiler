@@ -86,6 +86,9 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated newlines_lenient #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated newlines_interface_body #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate when_without_block #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated InclusiveAndMultipliedSlices #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate OutOfBoundsMultipliedSlice #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate MissingInclusiveSliceEnd #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -242,6 +245,8 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate SplitIndexNegative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate SplitIndexNegativeUnknownSize due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate when_without_block due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate OutOfBoundsMultipliedSlice due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate MissingInclusiveSliceEnd due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -1163,7 +1168,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:287:17 ]
      │
- 287 │     gen int[5][30] SUBSLICE = INTS[11:14][2:5]
+ 287 │     gen int[5][30] SUBSLICE = INTS[11..14][2..5]
      │                    ────┬───  
      │                        ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
@@ -1198,30 +1203,30 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:295:12 ]
      │
- 295 │     int[3][4] w = INTS[x+:4][y-:3]
+ 295 │     int[3][4] w = INTS[x+..4][y-..3]
      │               ┬  
      │               ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
      ╭─[ test.sus:297:25 ]
      │
- 297 │     int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4:4]
+ 297 │     int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4..4]
      │                            ─────┬────  
      │                                 ╰────── Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:297:25 ]
      │
- 297 │     int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4:4]
+ 297 │     int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4..4]
      │                            ─────┬────  
      │                                 ╰────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: Some parameters of 'INTS_3' were still unknown: int #(FROM: ?, TO: ?)[0]
      ╭─[ test.sus:297:38 ]
      │
- 297 │     int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4:4]
-     │                                         ──────┬─────  
-     │                                               ╰─────── Some parameters of 'INTS_3' were still unknown: int #(FROM: ?, TO: ?)[0]
+ 297 │     int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4..4]
+     │                                         ──────┬──────  
+     │                                               ╰──────── Some parameters of 'INTS_3' were still unknown: int #(FROM: ?, TO: ?)[0]
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:302:18 ]
@@ -1244,12 +1249,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                ┬  
      │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Attempting to write to this slice 11:14 (length 3) with an array of length 0.
+Error: Attempting to write to this slice 11..14 (length 3) with an array of length 0.
      ╭─[ test.sus:310:7 ]
      │
- 310 │     INTS[11:14][2:5] = []
-     │          ──┬──  
-     │            ╰──── Attempting to write to this slice 11:14 (length 3) with an array of length 0.
+ 310 │     INTS[11..14][2..5] = []
+     │          ───┬──  
+     │             ╰──── Attempting to write to this slice 11..14 (length 3) with an array of length 0.
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:315:18 ]
@@ -1275,23 +1280,23 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
      ╭─[ test.sus:323:25 ]
      │
- 323 │     int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4:3]
+ 323 │     int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4..3]
      │                            ───────┬──────  
      │                                   ╰──────── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:323:25 ]
      │
- 323 │     int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4:3]
+ 323 │     int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4..3]
      │                            ───────┬──────  
      │                                   ╰──────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Slice 4:3 has a negative length.
+Error: Slice 4..3 has a negative length.
      ╭─[ test.sus:323:50 ]
      │
- 323 │     int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4:3]
-     │                                                     ─┬─  
-     │                                                      ╰─── Slice 4:3 has a negative length.
+ 323 │     int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4..3]
+     │                                                     ──┬─  
+     │                                                       ╰─── Slice 4..3 has a negative length.
 ─────╯
 Warning: Not Instantiating duplicate_port_names #() due to abstract typing errors
      ╭─[ test.sus:327:8 ]
@@ -2225,16 +2230,16 @@ Error: Out of bounds! The array is of size 4, but the index is 4
 Error: Out of bounds! The array is of size 4, but the slice bound has bounds 2:6
      ╭─[ test.sus:632:4 ]
      │
- 632 │     a[2:6] = [true, true, true, true]
-     │       ─┬─  
-     │        ╰─── Out of bounds! The array is of size 4, but the slice bound has bounds 2:6
+ 632 │     a[2..6] = [true, true, true, true]
+     │       ──┬─  
+     │         ╰─── Out of bounds! The array is of size 4, but the slice bound has bounds 2:6
 ─────╯
 Error: Out of bounds! The array is of size 4, but the indexed part-select has bounds 0:5
      ╭─[ test.sus:634:4 ]
      │
- 634 │     b[i +: 2] = [true, true]
-     │       ───┬──  
-     │          ╰──── Out of bounds! The array is of size 4, but the indexed part-select has bounds 0:5
+ 634 │     b[i +.. 2] = [true, true]
+     │       ───┬───  
+     │          ╰───── Out of bounds! The array is of size 4, but the indexed part-select has bounds 0:5
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:639:13 ]
@@ -2316,16 +2321,16 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: This `when` statement is missing its body
      ╭─[ test.sus:749:2 ]
      │
- 749 │     when submod.beep : int x
+ 749 │     when submod.beep : int boop
      │     ──┬─  
      │       ╰─── This `when` statement is missing its body
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:749:25 ]
      │
- 749 │     when submod.beep : int x
-     │                            ┬  
-     │                            ╰── Unused Variable: This variable does not affect the output ports of this module
+ 749 │     when submod.beep : int boop
+     │                            ──┬─  
+     │                              ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: This `when` statement is missing its body
      ╭─[ test.sus:750:2 ]
@@ -2340,6 +2345,41 @@ Error: This `if` statement is missing its body
  751 │     if true
      │     ─┬  
      │      ╰── This `if` statement is missing its body
+─────╯
+Error: Out of bounds! The array is of size 32, but the indexed part-select has bounds 0:40
+     ╭─[ test.sus:786:28 ]
+     │
+ 786 │     output bool[8] o'0 = data[i*..8]
+     │                               ──┬──  
+     │                                 ╰──── Out of bounds! The array is of size 32, but the indexed part-select has bounds 0:40
+─────╯
+Warning: Not Instantiating MissingInclusiveSliceEnd #() due to abstract typing errors
+     ╭─[ test.sus:789:8 ]
+     │
+ 789 │ module MissingInclusiveSliceEnd {
+     │        ────────────┬───────────  
+     │                    ╰───────────── Not Instantiating MissingInclusiveSliceEnd #() due to abstract typing errors
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:790:10 ]
+     │
+ 790 │     bool[8] arr
+     │             ─┬─  
+     │              ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:791:10 ]
+     │
+ 791 │     bool[4] s = arr[3..=]
+     │             ┬  
+     │             ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Missing inclusive slice end index
+     ╭─[ test.sus:791:22 ]
+     │
+ 791 │     bool[4] s = arr[3..=]
+     │                         │ 
+     │                         ╰─ Missing inclusive slice end index
 ─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:28:6 ]
@@ -4447,72 +4487,72 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Warning: The result of this expression is not used. Only function calls can return nothing. 
      ╭─[ test_old.sus:901:5 ]
      │
- 901 │     arr[3 +: x]
-     │     ─────┬─────  
-     │          ╰─────── The result of this expression is not used. Only function calls can return nothing. 
+ 901 │     arr[3 +.. x]
+     │     ──────┬─────  
+     │           ╰─────── The result of this expression is not used. Only function calls can return nothing. 
 ─────╯
 Error: The width of a part-select cannot be non-generative
-     ╭─[ test_old.sus:901:14 ]
+     ╭─[ test_old.sus:901:15 ]
      │
- 901 │     arr[3 +: x]
-     │              ┬  
-     │              ╰── The width of a part-select cannot be non-generative
+ 901 │     arr[3 +.. x]
+     │               ┬  
+     │               ╰── The width of a part-select cannot be non-generative
 ─────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
      ╭─[ test_old.sus:902:5 ]
      │
- 902 │     arr[x:5]
-     │     ────┬───  
-     │         ╰───── The result of this expression is not used. Only function calls can return nothing. 
+ 902 │     arr[x..5]
+     │     ────┬────  
+     │         ╰────── The result of this expression is not used. Only function calls can return nothing. 
 ─────╯
 Error: A slice bound cannot be non-generative
      ╭─[ test_old.sus:902:9 ]
      │
- 902 │     arr[x:5]
+ 902 │     arr[x..5]
      │         ┬  
      │         ╰── A slice bound cannot be non-generative
 ─────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
      ╭─[ test_old.sus:903:5 ]
      │
- 903 │     arr[5:x]
-     │     ────┬───  
-     │         ╰───── The result of this expression is not used. Only function calls can return nothing. 
+ 903 │     arr[5..x]
+     │     ────┬────  
+     │         ╰────── The result of this expression is not used. Only function calls can return nothing. 
 ─────╯
 Error: A slice bound cannot be non-generative
-     ╭─[ test_old.sus:903:11 ]
+     ╭─[ test_old.sus:903:12 ]
      │
- 903 │     arr[5:x]
-     │           ┬  
-     │           ╰── A slice bound cannot be non-generative
+ 903 │     arr[5..x]
+     │            ┬  
+     │            ╰── A slice bound cannot be non-generative
 ─────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
      ╭─[ test_old.sus:904:5 ]
      │
- 904 │     arr[x:]
-     │     ───┬───  
-     │        ╰───── The result of this expression is not used. Only function calls can return nothing. 
+ 904 │     arr[x..]
+     │     ────┬───  
+     │         ╰───── The result of this expression is not used. Only function calls can return nothing. 
 ─────╯
 Error: A slice bound cannot be non-generative
      ╭─[ test_old.sus:904:9 ]
      │
- 904 │     arr[x:]
+ 904 │     arr[x..]
      │         ┬  
      │         ╰── A slice bound cannot be non-generative
 ─────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
      ╭─[ test_old.sus:905:5 ]
      │
- 905 │     arr[:x]
-     │     ───┬───  
-     │        ╰───── The result of this expression is not used. Only function calls can return nothing. 
+ 905 │     arr[..x]
+     │     ────┬───  
+     │         ╰───── The result of this expression is not used. Only function calls can return nothing. 
 ─────╯
 Error: A slice bound cannot be non-generative
-     ╭─[ test_old.sus:905:10 ]
+     ╭─[ test_old.sus:905:11 ]
      │
- 905 │     arr[:x]
-     │          ┬  
-     │          ╰── A slice bound cannot be non-generative
+ 905 │     arr[..x]
+     │           ┬  
+     │           ╰── A slice bound cannot be non-generative
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test_old.sus:910:56 ]
@@ -4607,7 +4647,7 @@ Warning: nums is effectively constant. Declare this wire as `gen` to make this e
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test_old.sus:922:9 ]
      │
- 922 │     int[2] sums = nums + [0, 0] + zeros + manyzeros[1][5:7][4][3]
+ 922 │     int[2] sums = nums + [0, 0] + zeros + manyzeros[1][5..7][4][3]
      │            ──┬─  
      │              ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
@@ -5713,6 +5753,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for newlines_helper #() as "newlines_helper"
 [INFO  sus_compiler::codegen] Code generated for newlines_lenient #() as "newlines_lenient"
 [INFO  sus_compiler::codegen] Code generated for newlines_interface_body #() as "newlines_interface_body"
+[INFO  sus_compiler::codegen] Code generated for InclusiveAndMultipliedSlices #() as "InclusiveAndMultipliedSlices"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"

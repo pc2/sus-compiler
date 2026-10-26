@@ -67,7 +67,7 @@ impl<T: Clone> PathRange<T> {
             RealWirePathElem::PartSelect {
                 from_wire,
                 width,
-                direction,
+                kind,
                 ..
             } => {
                 let from_wire_bounds = wires[*from_wire].typ.unwrap_int_bounds();
@@ -77,7 +77,7 @@ impl<T: Clone> PathRange<T> {
                 let width: usize = width.try_into()?;
 
                 for idx in from..to {
-                    let select_range = direction.range_from(idx, width);
+                    let select_range = kind.range_from(idx, width);
                     self.apply_range(wires, rest, typ, select_range.from..select_range.to, f)?;
                 }
                 Ok(())
@@ -212,7 +212,7 @@ impl GenerativeWireRefPathElem {
                     GenerativeWireRefPathElem::Slice { from, to, span: _ } => {
                         let from = display_maybe(from.as_ref(), |f, from| from.fmt(f));
                         let to = display_maybe(to.as_ref(), |f, to| to.fmt(f));
-                        write!(f, "[{from}:{to}]")?
+                        write!(f, "[{from}..{to}]")?
                     }
                 }
             }
@@ -287,7 +287,7 @@ impl Value {
                             return Err(CompileError::error(
                                 span,
                                 format!(
-                                    "Attempting to write to this slice {from}:{to} (length {slice_len}) with an array of length {from_len}."
+                                    "Attempting to write to this slice {from}..{to} (length {slice_len}) with an array of length {from_len}."
                                 ),
                             ));
                         }
@@ -329,7 +329,7 @@ pub fn make_array_bounds<'v>(
         if from > to {
             return Err(CompileError::error(
                 span,
-                format!("Slice {from}:{to} has a negative length."),
+                format!("Slice {from}..{to} has a negative length."),
             ));
         }
 
@@ -337,7 +337,7 @@ pub fn make_array_bounds<'v>(
             (Ok(from), Ok(to)) if to <= arr_sz => (from, to), // && from >= 0, but it's usize
             _ => {
                 let e = format!(
-                    "Slice {from}:{to} is out of bounds. The size of this array is {arr_sz}"
+                    "Slice {from}..{to} is out of bounds. The size of this array is {arr_sz}"
                 );
                 return Err(CompileError::error(span, e));
             }
@@ -355,7 +355,7 @@ pub fn make_array_bounds<'v>(
 
             if to_valid > other_arr_sz {
                 let e = format!(
-                    "Slice {from}:{to} is out of bounds. The size of this array is {other_arr_sz}"
+                    "Slice {from}..{to} is out of bounds. The size of this array is {other_arr_sz}"
                 );
                 return Err(CompileError::error(span, e));
             }

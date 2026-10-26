@@ -2301,15 +2301,23 @@
               "members": [
                 {
                   "type": "STRING",
-                  "value": ":"
+                  "value": ".."
                 },
                 {
                   "type": "STRING",
-                  "value": "+:"
+                  "value": "..="
                 },
                 {
                   "type": "STRING",
-                  "value": "-:"
+                  "value": "+.."
+                },
+                {
+                  "type": "STRING",
+                  "value": "-.."
+                },
+                {
+                  "type": "STRING",
+                  "value": "*.."
                 }
               ]
             }

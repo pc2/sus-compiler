@@ -77,7 +77,7 @@ module Unpack4<T> {
 
     if st == 0 {
         out_stream = packed[0]
-        stored_packed[0] = packed[1] // Shorthand notation is possible here "stored_packed[0:2] = packed[1:3]"
+        stored_packed[0] = packed[1] // Shorthand notation is possible here "stored_packed[0..2] = packed[1..3]"
         stored_packed[1] = packed[2]
         stored_packed[2] = packed[3]
         st = 1

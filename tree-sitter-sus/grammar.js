@@ -359,7 +359,7 @@ module.exports = grammar({
         
         slice: $ => seq(
             optional(field('index_a', $._expression)),
-            prec(PREC.part_select, field('type', choice(':', '+:', '-:'))),
+            prec(PREC.part_select, field('type', choice('..', '..=', '+..', '-..', '*..'))),
             optional(field('index_b', $._expression))
         ),
 

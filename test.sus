@@ -282,9 +282,9 @@ module testSlicing {
 		}
 	}
 
-	INTS[11:14][2:5] = [[1,1,1], [1,1,1], [1,1,1]]
+	INTS[11..14][2..5] = [[1,1,1], [1,1,1], [1,1,1]]
 
-	gen int[5][30] SUBSLICE = INTS[11:14][2:5]
+	gen int[5][30] SUBSLICE = INTS[11..14][2..5]
 
 	int x = 3
 
@@ -292,9 +292,9 @@ module testSlicing {
 
 	int z = INTS[x][y]
 
-	int[3][4] w = INTS[x+:4][y-:3]
+	int[3][4] w = INTS[x+..4][y-..3]
 
-	int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4:4]
+	int#(FROM:0, TO: 6)[0] zero_slice = INTS[5][4..4]
 }
 
 module wrong_slice_length {
@@ -307,7 +307,7 @@ module wrong_slice_length {
 		}
 	}
 
-	INTS[11:14][2:5] = []
+	INTS[11..14][2..5] = []
 }
 
 module negative_slice {
@@ -320,7 +320,7 @@ module negative_slice {
 		}
 	}
 
-	int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4:3]
+	int#(FROM:0, TO: 6)[0] negative_slice = INTS[5][4..3]
 }
 
 /// See Issue #94
@@ -629,9 +629,9 @@ module OutOfBoundsWrite204 {
 module OutOfBoundsSliceWrite {
 	input int#(FROM: 0, TO: 4) i'0
 	output bool[4] a'0
-	a[2:6] = [true, true, true, true]
+	a[2..6] = [true, true, true, true]
 	output bool[4] b'0
-	b[i +: 2] = [true, true]
+	b[i +.. 2] = [true, true]
 }
 
 // Split wire bounds checking. Execute exits on the first error, so one module per case
@@ -727,7 +727,7 @@ module newlines_lenient
         1
     ]
     output bool[2] slice_out = arr[
-        1 : 3
+        1 .. 3
     ]
 }
 
@@ -749,4 +749,44 @@ module when_without_block {
 	when submod.beep : int boop
 	when b
 	if true
+}
+
+module InclusiveAndMultipliedSlices {
+	gen int[16] INTS
+	for int I in 0..16 {
+		INTS[I] = I
+	}
+	gen int[4] A = INTS[2*..4]
+	assert#(C: A[0] == 8)
+	assert#(C: A[3] == 11)
+	gen int[4] B = INTS[5..=8]
+	assert#(C: B[0] == 5)
+	assert#(C: B[3] == 8)
+	gen int[4] C = INTS[..=3]
+	assert#(C: C[3] == 3)
+	gen int[3] D = INTS[9 -.. 3]
+	assert#(C: D[0] == 7)
+	assert#(C: D[2] == 9)
+	INTS[3*..4] = [100, 101, 102, 103]
+	assert#(C: INTS[12] == 100)
+	assert#(C: INTS[15] == 103)
+
+	input bool[32] data'0
+	input int#(FROM: 0, TO: 4) i'0
+	output bool[8] byte_sel'0 = data[i*..8]
+	output bool[4] incl'0 = data[4..=7]
+	output bool[32] written'0
+	written[i*..8] = byte_sel
+	written[8..=11] = incl
+}
+
+module OutOfBoundsMultipliedSlice {
+	input bool[32] data'0
+	input int#(FROM: 0, TO: 5) i'0
+	output bool[8] o'0 = data[i*..8]
+}
+
+module MissingInclusiveSliceEnd {
+	bool[8] arr
+	bool[4] s = arr[3..=]
 }

@@ -117,7 +117,7 @@ impl LintContext<'_> {
                     from: _,
                     width,
                     bracket_span: _,
-                    direction: _,
+                    kind: _,
                 } => {
                     let width = self.working_on.instructions[*width].unwrap_subexpression();
                     if !width.domain.unwrap().is_generative() {
@@ -130,6 +130,7 @@ impl LintContext<'_> {
                 WireReferencePathElement::ArraySlice {
                     from,
                     to,
+                    to_inclusive: _,
                     bracket_span: _,
                 } => {
                     for bound in from.iter().chain(to.iter()) {

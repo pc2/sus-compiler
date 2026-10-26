@@ -21,7 +21,7 @@ use crate::{
     errors::ErrorStore,
     flattening::{
         BinaryOperator, Direction, Expression, ExpressionSource, GlobalReference, Instruction,
-        Module, PartSelectDirection, UnaryOperator, WireReference, WireReferenceRoot,
+        Module, PartSelectKind, UnaryOperator, WireReference, WireReferenceRoot,
     },
     instantiation::concrete_typecheck::ModuleTypingSuperContext,
     latency::{AbsLat, InferenceFailure},
@@ -78,7 +78,7 @@ pub enum RealWirePathElem {
         span: BracketSpan,
         from_wire: WireID,
         width: IBig,
-        direction: PartSelectDirection,
+        kind: PartSelectKind,
     },
     Slice {
         span: BracketSpan,

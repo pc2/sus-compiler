@@ -19,7 +19,7 @@ use crate::{
 };
 
 use std::cell::OnceCell;
-use std::ops::{Add, Sub};
+use std::ops::{Add, Mul, Sub};
 
 pub use flatten::flatten_all_globals;
 use ibig::IBig;
@@ -290,16 +290,20 @@ pub enum WireReferencePathElement {
         idx: FlatID,
         bracket_span: BracketSpan,
     },
+    /// `[from..to]` or `[from..=to]`
     ArraySlice {
         from: Option<FlatID>,
         to: Option<FlatID>,
+        /// `[from..=to]`. Flattening guarantees that `to` is [Some] when this is set
+        to_inclusive: bool,
         bracket_span: BracketSpan,
     },
+    /// `[from +.. width]`, `[from -.. width]` or `[from *.. width]`. See [PartSelectKind]
     ArrayPartSelect {
         from: FlatID,
         width: FlatID,
         bracket_span: BracketSpan,
-        direction: PartSelectDirection,
+        kind: PartSelectKind,
     },
 }
 
@@ -507,55 +511,81 @@ pub enum BinaryOperator {
     LesserEq,
 }
 
+/// Indexed part-selects: slices of a generative `width`, positioned by a (possibly non-generative) `from` index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PartSelectDirection {
+pub enum PartSelectKind {
+    /// `[from +.. width]` selects `width` elements starting at `from`
     Up,
+    /// `[from -.. width]` selects `width` elements ending at `from` (inclusive)
     Down,
+    /// `[from *.. width]` selects `width` elements starting at `from * width`
+    Multiplied,
 }
 
-impl PartSelectDirection {
+impl PartSelectKind {
     pub fn range_from<
-        IntT: Clone + Add<IntT, Output = IntT> + Sub<IntT, Output = IntT> + Add<usize, Output = IntT>,
+        IntT: Clone
+            + Add<IntT, Output = IntT>
+            + Sub<IntT, Output = IntT>
+            + Mul<IntT, Output = IntT>
+            + Add<usize, Output = IntT>,
     >(
         &self,
         from: IntT,
         width: IntT,
     ) -> IntBounds<IntT> {
         match self {
-            PartSelectDirection::Up => IntBounds {
+            PartSelectKind::Up => IntBounds {
                 from: from.clone(),
                 to: from + width,
             },
-            PartSelectDirection::Down => IntBounds {
+            PartSelectKind::Down => IntBounds {
                 from: from.clone() - width + 1,
                 to: from + 1,
             },
+            PartSelectKind::Multiplied => {
+                let from = from * width.clone();
+                IntBounds {
+                    from: from.clone(),
+                    to: from + width,
+                }
+            }
         }
     }
+    /// Given the bounds of `from`, computes the bounds of all indices that can be selected.
     pub fn range_from_range(&self, from_range: IntBounds<&IBig>, width: &IBig) -> IntBounds<IBig> {
         match self {
-            PartSelectDirection::Up => {
+            PartSelectKind::Up => {
                 let to = from_range.to + width - 1;
                 IntBounds {
                     from: from_range.from.clone(),
                     to,
                 }
             }
-            PartSelectDirection::Down => {
+            PartSelectKind::Down => {
                 let from = from_range.from - width + 1;
                 IntBounds {
                     from,
                     to: from_range.to.clone(),
                 }
             }
+            PartSelectKind::Multiplied => IntBounds {
+                from: from_range.from * width,
+                to: from_range.to * width,
+            },
         }
     }
 }
 
+/// The operator in the middle of an array slice `[a OP b]`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SliceType {
-    Normal,
-    PartSelect(PartSelectDirection),
+    /// `[a..b]`
+    Exclusive,
+    /// `[a..=b]`
+    Inclusive,
+    /// `[a +.. b]`, `[a -.. b]`, `[a *.. b]`
+    PartSelect(PartSelectKind),
 }
 
 /// See [Expression]
