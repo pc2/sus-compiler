@@ -205,9 +205,7 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate try_conflicting_latencies #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate RegressionForBadPort #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TwoDomainsWithLatRegs #()
-[INFO  sus_compiler::instantiation::instantiator] Instantiated LatencyOffset #(T: type bool #(), OFFSET: 3)
-[INFO  sus_compiler::instantiation::instantiator] Instantiated LatencyOffset #(T: type bool #(), OFFSET: -3)
-[INFO  sus_compiler::instantiation::instantiator] Instantiated PositiveAndNegativeLatencyOffset #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated PositiveAndNegativeNext #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated ParametrizeableRegs #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestNexts #()
 [ERROR sus_compiler::compiler_top] Cannot instantiate use_no_input_module due to errors
@@ -5704,157 +5702,67 @@ Error: While parsing 'template_global', parser found a missing field in the fiel
      │                      ╰─ Parent node 'template_global'
 ─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
-     ╭─[ test_latencies.sus:403:42 ]
+     ╭─[ test_latencies.sus:409:6 ]
      │
- 403 │     LatencyOffset#(T: type bool, OFFSET: 3) pos
-     │                                             ─┬─  
-     │                                              ╰─── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
-─────╯
-Warning: Unused port 'din'
-     ╭─[ test_latencies.sus:403:42 ]
-     │
- 403 │     LatencyOffset#(T: type bool, OFFSET: 3) pos
-     │                                             ─┬─  
-     │                                              ╰─── Unused port 'din'
-     │
-     ├─[ core.sus:55:33 ]
-     │
-  55 │     interface LatencyOffset : T din'0 -> T dout'OFFSET
-     │                                 ─┬─  
-     │                                  ╰─── Port 'din' declared here
-     │
-     ├─[ test_latencies.sus:403:42 ]
-     │
- 403 │     LatencyOffset#(T: type bool, OFFSET: 3) pos
-     │                                             ─┬─  
-     │                                              ╰─── pos declared here
-─────╯
-Warning: Unused port 'dout'
-     ╭─[ test_latencies.sus:403:42 ]
-     │
- 403 │     LatencyOffset#(T: type bool, OFFSET: 3) pos
-     │                                             ─┬─  
-     │                                              ╰─── Unused port 'dout'
-     │
-     ├─[ core.sus:55:44 ]
-     │
-  55 │     interface LatencyOffset : T din'0 -> T dout'OFFSET
-     │                                            ──┬─  
-     │                                              ╰─── Port 'dout' declared here
-     │
-     ├─[ test_latencies.sus:403:42 ]
-     │
- 403 │     LatencyOffset#(T: type bool, OFFSET: 3) pos
-     │                                             ─┬─  
-     │                                              ╰─── pos declared here
-─────╯
-Warning: Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
-     ╭─[ test_latencies.sus:404:43 ]
-     │
- 404 │     LatencyOffset#(T: type bool, OFFSET: -3) neg
-     │                                              ─┬─  
-     │                                               ╰─── Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
-─────╯
-Warning: Unused port 'din'
-     ╭─[ test_latencies.sus:404:43 ]
-     │
- 404 │     LatencyOffset#(T: type bool, OFFSET: -3) neg
-     │                                              ─┬─  
-     │                                               ╰─── Unused port 'din'
-     │
-     ├─[ core.sus:55:33 ]
-     │
-  55 │     interface LatencyOffset : T din'0 -> T dout'OFFSET
-     │                                 ─┬─  
-     │                                  ╰─── Port 'din' declared here
-     │
-     ├─[ test_latencies.sus:404:43 ]
-     │
- 404 │     LatencyOffset#(T: type bool, OFFSET: -3) neg
-     │                                              ─┬─  
-     │                                               ╰─── neg declared here
-─────╯
-Warning: Unused port 'dout'
-     ╭─[ test_latencies.sus:404:43 ]
-     │
- 404 │     LatencyOffset#(T: type bool, OFFSET: -3) neg
-     │                                              ─┬─  
-     │                                               ╰─── Unused port 'dout'
-     │
-     ├─[ core.sus:55:44 ]
-     │
-  55 │     interface LatencyOffset : T din'0 -> T dout'OFFSET
-     │                                            ──┬─  
-     │                                              ╰─── Port 'dout' declared here
-     │
-     ├─[ test_latencies.sus:404:43 ]
-     │
- 404 │     LatencyOffset#(T: type bool, OFFSET: -3) neg
-     │                                              ─┬─  
-     │                                               ╰─── neg declared here
-─────╯
-Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
-     ╭─[ test_latencies.sus:408:6 ]
-     │
- 408 │     int x = 5
+ 409 │     int x = 5
      │         ┬  
      │         ╰── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test_latencies.sus:408:6 ]
+     ╭─[ test_latencies.sus:409:6 ]
      │
- 408 │     int x = 5
+ 409 │     int x = 5
      │         ┬  
      │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: x is effectively constant. Declare this wire as `gen` to make this explicit.
-     ╭─[ test_latencies.sus:408:6 ]
+     ╭─[ test_latencies.sus:409:6 ]
      │
- 408 │     int x = 5
+ 409 │     int x = 5
      │     ──┬─┬  
      │       ╰──── x = 5
      │         │  
      │         ╰── x is effectively constant. Declare this wire as `gen` to make this explicit.
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test_latencies.sus:409:13 ]
+     ╭─[ test_latencies.sus:410:13 ]
      │
- 409 │     reg(5) int y = x
+ 410 │     reg(5) int y = x
      │                ┬  
      │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test_latencies.sus:421:16 ]
+     ╭─[ test_latencies.sus:422:16 ]
      │
- 421 │     input bool a'0
+ 422 │     input bool a'0
      │                ┬  
      │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test_latencies.sus:422:10 ]
+     ╭─[ test_latencies.sus:423:10 ]
      │
- 422 │     bool b'5
+ 423 │     bool b'5
      │          ┬  
      │          ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: b is never written to.
-     ╭─[ test_latencies.sus:422:10 ]
+     ╭─[ test_latencies.sus:423:10 ]
      │
- 422 │     bool b'5
+ 423 │     bool b'5
      │          ┬  
      │          ╰── b is never written to.
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test_latencies.sus:424:10 ]
+     ╭─[ test_latencies.sus:425:10 ]
      │
- 424 │     bool c
+ 425 │     bool c
      │          ┬  
      │          ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test_latencies.sus:425:10 ]
+     ╭─[ test_latencies.sus:426:10 ]
      │
- 425 │     bool d
+ 426 │     bool d
      │          ┬  
      │          ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
@@ -5948,6 +5856,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for TestSplits #() as "TestSplits"
 [INFO  sus_compiler::codegen] Code generated for CountBitsWithSplits #() as "CountBitsWithSplits"
 [INFO  sus_compiler::codegen] Code generated for TwoDomainsWithLatRegs #() as "TwoDomainsWithLatRegs"
-[INFO  sus_compiler::codegen] Code generated for PositiveAndNegativeLatencyOffset #() as "PositiveAndNegativeLatencyOffset"
+[INFO  sus_compiler::codegen] Code generated for PositiveAndNegativeNext #() as "PositiveAndNegativeNext"
 [INFO  sus_compiler::codegen] Code generated for ParametrizeableRegs #() as "ParametrizeableRegs"
 [INFO  sus_compiler::codegen] Code generated for TestNexts #() as "TestNexts"

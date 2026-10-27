@@ -399,9 +399,10 @@ module TwoDomainsWithLatRegs {
 	output bool b_o = b_i
 }
 
-module PositiveAndNegativeLatencyOffset {
-	LatencyOffset#(T: type bool, OFFSET: 3) pos
-	LatencyOffset#(T: type bool, OFFSET: -3) neg
+module PositiveAndNegativeNext {
+	input bool i'0
+	next(-3) output bool pos = i
+	next(3) output bool neg = i
 }
 
 module ParametrizeableRegs {

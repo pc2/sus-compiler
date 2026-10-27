@@ -71,42 +71,29 @@ always_comb begin // combinatorial y
 end
 endmodule // ParametrizeableRegs #()
 
-// PositiveAndNegativeLatencyOffset #()
-module PositiveAndNegativeLatencyOffset(
-	/* clock */ input clk
-);
-
-LatencyOffset_T_type_bool_OFFSET_3 pos(
-	.clk(clk),
-	.din(),
-	.dout()
-);
-LatencyOffset_T_type_bool_OFFSET_N3 neg(
-	.clk(clk),
-	.din(),
-	.dout()
-);
-endmodule // PositiveAndNegativeLatencyOffset #()
-
-// LatencyOffset #(T: type bool #(), OFFSET: -3)
-module LatencyOffset_T_type_bool_OFFSET_N3(
+// PositiveAndNegativeNext #()
+module PositiveAndNegativeNext(
 	/* clock */ input clk,
-	input wire din,
-	output /*mux_wire*/ logic dout
+	input wire i,
+	output /*mux_wire*/ logic pos,
+	output /*mux_wire*/ logic neg
 );
 
-	assign dout = din;
-endmodule // LatencyOffset #(T: type bool #(), OFFSET: -3)
-
-// LatencyOffset #(T: type bool #(), OFFSET: 3)
-module LatencyOffset_T_type_bool_OFFSET_3(
-	/* clock */ input clk,
-	input wire din,
-	output /*mux_wire*/ logic dout
-);
-
-	assign dout = din;
-endmodule // LatencyOffset #(T: type bool #(), OFFSET: 3)
+always_comb begin // combinatorial pos
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	pos = 1'bx;
+	pos = i;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	pos = pos;
+end
+always_comb begin // combinatorial neg
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	neg = 1'bx;
+	neg = i;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	neg = neg;
+end
+endmodule // PositiveAndNegativeNext #()
 
 // TwoDomainsWithLatRegs #()
 module TwoDomainsWithLatRegs(

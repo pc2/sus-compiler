@@ -937,15 +937,6 @@ impl<'g> CodeGenerationContext<'g> {
         let args = &self.instance.global_ref.template_args;
         use Direction::{Input, Output};
         match self.md.link_info.name.as_str() {
-            "LatencyOffset" => {
-                if self.check_ports_basic([(Input, "din"), (Output, "dout")]) {
-                    return;
-                }
-
-                self.program_text
-                    .write_str("\tassign dout = din;\n")
-                    .unwrap();
-            }
             "CrossDomain" => {
                 if self.check_ports_basic([(Input, "din"), (Output, "dout")]) {
                     return;

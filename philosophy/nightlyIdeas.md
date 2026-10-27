@@ -39,7 +39,7 @@ Same as ConcurrentLoop, but keeps internal state index
 ```sus
 module ReorderedLoop#(T1, T2, ..., int D, int O1, int O2, int MAX_ITERATIONS) {
     state int#(0..D * MAX_ITERATIONS) cur_idx
-    next cur_idx = LatencyOffset #(OFFSET: -D)(cur_idx)
+    next(D + 1) cur_idx = cur_idx
 
     state Tuple2#(T1, T2)[D * MAX_ITERATIONS] reorder_buffer
 

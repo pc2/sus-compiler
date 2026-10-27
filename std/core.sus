@@ -49,12 +49,6 @@ __builtin__ const int sizeof #(T) {}
 /// `Result == V`, but this prevents this from being included in the inference parameters. 
 __builtin__ const int noinfer #(int V) {}
 
-/// Unsafe builtin to circumvent the Latency Counting System. Connects `dout` to `din` without adding the requisite latency
-/// Or: used for negative latencies, for instance to implement Almost-Full FIFOs, stateful for loops, etc. 
-__builtin__ module LatencyOffset #(T, int OFFSET) {
-    interface LatencyOffset : T din'0 -> T dout'OFFSET
-}
-
 /// Cuts Latency Counting information between `din` and `dout`. 
 /// Internally implemented as a simple wire. 
 module LatencyCut#(T) {
@@ -72,38 +66,4 @@ __builtin__ module CrossDomain #(T) {
     input T din'0
     clock out_clk
     output T dout'0
-}
-
-module LatencyOffsetAction #(T, int OFFSET, int DATA_DELAY) {
-    T stored_data
-    bool is_valid
-    
-    action din'0 : T data_i'DATA_DELAY {
-        is_valid = true
-        stored_data = data_i
-    } else {
-        is_valid = false
-    }
-
-    trigger dout'OFFSET : T data_o'OFFSET+DATA_DELAY
-
-    when LatencyOffset #(OFFSET)(is_valid) {
-        dout(LatencyOffset #(OFFSET)(stored_data))
-    }
-}
-
-module LatencyOffsetActionNoData #(int OFFSET) {
-    bool is_valid
-    
-    action din'0 {
-        is_valid = true
-    } else {
-        is_valid = false
-    }
-
-    trigger dout'OFFSET
-
-    when LatencyOffset #(OFFSET)(is_valid) {
-        dout()
-    }
 }

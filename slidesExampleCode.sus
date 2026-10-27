@@ -208,7 +208,7 @@ module BRAMShiftReg #(T, int LATENCY) {
 
     idx = idx + 1 mod LATENCY
 
-    d_out = LatencyOffset #(OFFSET: LATENCY)(out_data)
+    next(-LATENCY) d_out = out_data
 }
 
 
@@ -360,7 +360,7 @@ module BRAMShiftReg #(T, int LATENCY) {
 
     idx = idx + 1 mod LATENCY
 
-    d_out = LatencyOffset #(OFFSET: LATENCY)(out_data)
+    next(-LATENCY) d_out = out_data
 }
 
 module use_bram {
