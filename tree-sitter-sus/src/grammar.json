@@ -888,22 +888,10 @@
         },
         {
           "type": "FIELD",
-          "name": "from",
+          "name": "range",
           "content": {
             "type": "SYMBOL",
-            "name": "_expression"
-          }
-        },
-        {
-          "type": "STRING",
-          "value": ".."
-        },
-        {
-          "type": "FIELD",
-          "name": "to",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_expression"
+            "name": "slice"
           }
         },
         {

@@ -180,9 +180,7 @@ module.exports = grammar({
             field('for_kw', 'for'),
             field('for_decl', $.declaration),
             'in',
-            field('from', $._expression),
-            '..',
-            field('to', $._expression),
+            field('range', $.slice),
             optional($._linebreak),
             field('block', $.block)
         ),

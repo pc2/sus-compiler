@@ -1,3 +1,6 @@
+// Node kind ids are grammar-generated and sometimes happen to be consecutive; a range pattern would be meaningless
+#![allow(clippy::manual_range_patterns)]
+
 use crate::prelude::*;
 
 use std::cell::OnceCell;
@@ -145,6 +148,16 @@ struct FlatteningContext<'l, 'errs> {
 
 // Otherwise clippy reports silly things like kind!("number") | kind!("float") | kind!("bool_array_literal") as "make this a range" errors
 #[allow(clippy::manual_range_patterns)]
+/// Result of [FlatteningContext::flatten_slice_as_bounds]
+struct SliceBounds {
+    /// Inclusive
+    from: FlatID,
+    /// Exclusive
+    to: FlatID,
+    from_span: Span,
+    to_span: Span,
+}
+
 impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     fn flatten_latency_specifier(&mut self, cursor: &mut Cursor<'c>) -> Option<(FlatID, Span)> {
         cursor.optional_field(field!("latency_specifier")).then(|| {
@@ -198,6 +211,40 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         result: &mut Vec<WrittenTemplateArg>,
     ) {
         let bounds_span = cursor.span();
+        let Some(bounds) = self.flatten_slice_as_bounds(cursor, "`int#(FROM..TO)`") else {
+            return;
+        };
+
+        result.push(WrittenTemplateArg {
+            name: "FROM".to_owned(),
+            name_span: bounds_span,
+            value_span: bounds.from_span,
+            kind: Some(TemplateKind::Value(bounds.from)),
+            refers_to: OnceCell::new(),
+        });
+        result.push(WrittenTemplateArg {
+            name: "TO".to_owned(),
+            name_span: bounds_span,
+            value_span: bounds.to_span,
+            kind: Some(TemplateKind::Value(bounds.to)),
+            refers_to: OnceCell::new(),
+        });
+    }
+
+    /// Flattens a `slice` node that is used as an integer range (`int#(..)` bounds, `for` loop ranges) into an inclusive `from` and exclusive `to`:
+    /// - `A..B` is `from: A, to: B`
+    /// - `A..=B` is `from: A, to: B + 1`
+    /// - `A +.. W` is `from: A, to: A + W`
+    /// - `A -.. W` is `from: A - W + 1, to: A + 1`
+    /// - `A *.. W` is `from: A * W, to: A * W + W`
+    ///
+    /// Both bounds are required. If one is missing, an error is reported using `example`, and [None] is returned.
+    fn flatten_slice_as_bounds(
+        &mut self,
+        cursor: &mut Cursor<'c>,
+        example: &str,
+    ) -> Option<SliceBounds> {
+        let bounds_span = cursor.span();
         cursor.go_down(kind!("slice"), |cursor| {
             let from = if cursor.optional_field(field!("index_a")) {
                 Some((self.flatten_subexpr(cursor), cursor.span()))
@@ -218,9 +265,9 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             let (Some((from, from_span)), Some((to, to_span))) = (from, to) else {
                 self.errors.error(
                     bounds_span,
-                    "Integer bounds require both a lower and an upper bound: `int#(FROM..TO)`",
+                    format!("A range requires both a lower and an upper bound: {example}"),
                 );
-                return;
+                return None;
             };
 
             let one = |slf: &mut Self| {
@@ -264,20 +311,12 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 }
             };
 
-            result.push(WrittenTemplateArg {
-                name: "FROM".to_owned(),
-                name_span: bounds_span,
-                value_span: from_span,
-                kind: Some(TemplateKind::Value(from)),
-                refers_to: OnceCell::new(),
-            });
-            result.push(WrittenTemplateArg {
-                name: "TO".to_owned(),
-                name_span: bounds_span,
-                value_span: to_span,
-                kind: Some(TemplateKind::Value(to)),
-                refers_to: OnceCell::new(),
-            });
+            Some(SliceBounds {
+                from,
+                to,
+                from_span,
+                to_span,
+            })
         })
     }
 
@@ -1561,11 +1600,15 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             cursor,
         );
 
-        cursor.field(field!("from"));
-        let start = self.flatten_subexpr(cursor);
-
-        cursor.field(field!("to"));
-        let end = self.flatten_subexpr(cursor);
+        cursor.field(field!("range"));
+        let range_span = cursor.span();
+        let (start, end) = match self.flatten_slice_as_bounds(cursor, "`for int I in FROM..TO`") {
+            Some(bounds) => (bounds.from, bounds.to),
+            None => (
+                self.new_error_subexpr(range_span),
+                self.new_error_subexpr(range_span),
+            ),
+        };
 
         let for_id = self
             .instructions

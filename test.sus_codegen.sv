@@ -4291,6 +4291,15 @@ always_comb begin // combinatorial mul1
 end
 endmodule // example_md #()
 
+// ForLoopSliceForms #()
+module ForLoopSliceForms(
+	/* clock */ input clk
+);
+
+// PATCH XRT 2.16 over-zealous empty module DRC
+initial begin end
+endmodule // ForLoopSliceForms #()
+
 // UseIntBoundsShorthandInference #()
 module UseIntBoundsShorthandInference(
 	/* clock */ input clk,

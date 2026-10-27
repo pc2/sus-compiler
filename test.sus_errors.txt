@@ -93,6 +93,8 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate IntBoundsShorthandErrors #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated IntBoundsShorthandInference #(FROM: -2, TO: 9)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated UseIntBoundsShorthandInference #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated ForLoopSliceForms #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate ForLoopMissingBound #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -250,6 +252,7 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate OutOfBoundsMultipliedSlice due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate MissingInclusiveSliceEnd due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate IntBoundsShorthandErrors due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate ForLoopMissingBound due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -2483,12 +2486,12 @@ Error: The `FROM..TO` bounds shorthand can only be used on `int`. Use named temp
      │              ──┬─  
      │                ╰─── The `FROM..TO` bounds shorthand can only be used on `int`. Use named template arguments instead.
 ─────╯
-Error: Integer bounds require both a lower and an upper bound: `int#(FROM..TO)`
+Error: A range requires both a lower and an upper bound: `int#(FROM..TO)`
      ╭─[ test.sus:824:7 ]
      │
  824 │     int#(..5) missing_lower
      │          ─┬─  
-     │           ╰─── Integer bounds require both a lower and an upper bound: `int#(FROM..TO)`
+     │           ╰─── A range requires both a lower and an upper bound: `int#(FROM..TO)`
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:824:12 ]
@@ -2497,12 +2500,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │               ──────┬──────  
      │                     ╰──────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Integer bounds require both a lower and an upper bound: `int#(FROM..TO)`
+Error: A range requires both a lower and an upper bound: `int#(FROM..TO)`
      ╭─[ test.sus:825:7 ]
      │
  825 │     int#(0..) missing_upper
      │          ─┬─  
-     │           ╰─── Integer bounds require both a lower and an upper bound: `int#(FROM..TO)`
+     │           ╰─── A range requires both a lower and an upper bound: `int#(FROM..TO)`
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:825:12 ]
@@ -2510,6 +2513,27 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  825 │     int#(0..) missing_upper
      │               ──────┬──────  
      │                     ╰──────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Not Instantiating ForLoopMissingBound #() due to abstract typing errors
+     ╭─[ test.sus:864:8 ]
+     │
+ 864 │ module ForLoopMissingBound {
+     │        ─────────┬─────────  
+     │                 ╰─────────── Not Instantiating ForLoopMissingBound #() due to abstract typing errors
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:865:10 ]
+     │
+ 865 │     for int I in ..4 {
+     │             ┬  
+     │             ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: A range requires both a lower and an upper bound: `for int I in FROM..TO`
+     ╭─[ test.sus:865:15 ]
+     │
+ 865 │     for int I in ..4 {
+     │                  ─┬─  
+     │                   ╰─── A range requires both a lower and an upper bound: `for int I in FROM..TO`
 ─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:28:6 ]
@@ -5796,6 +5820,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for InclusiveAndMultipliedSlices #() as "InclusiveAndMultipliedSlices"
 [INFO  sus_compiler::codegen] Code generated for IntBoundsShorthand #() as "IntBoundsShorthand"
 [INFO  sus_compiler::codegen] Code generated for UseIntBoundsShorthandInference #() as "UseIntBoundsShorthandInference"
+[INFO  sus_compiler::codegen] Code generated for ForLoopSliceForms #() as "ForLoopSliceForms"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"

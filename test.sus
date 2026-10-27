@@ -837,3 +837,31 @@ module UseIntBoundsShorthandInference {
 	input int#(-2..5) y'0
 	output bool are_eq'0 = inst.equals(x, y)
 }
+
+// For loop ranges accept every slice form, with the same meaning as int bounds
+module ForLoopSliceForms {
+	gen int SUM_INCL = 0
+	for int I in 1..=4 {
+		SUM_INCL = SUM_INCL + I
+	}
+	assert#(C: SUM_INCL == 10)
+	gen int SUM_UP = 0
+	for int I in 5+..3 {
+		SUM_UP = SUM_UP + I
+	}
+	assert#(C: SUM_UP == 18)
+	gen int SUM_DOWN = 0
+	for int I in 7-..3 {
+		SUM_DOWN = SUM_DOWN + I
+	}
+	assert#(C: SUM_DOWN == 18)
+	gen int SUM_MUL = 0
+	for int I in 2*..4 {
+		SUM_MUL = SUM_MUL + I
+	}
+	assert#(C: SUM_MUL == 38)
+}
+module ForLoopMissingBound {
+	for int I in ..4 {
+	}
+}
