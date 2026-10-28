@@ -489,6 +489,15 @@ impl core::fmt::Debug for DeclarationKind {
                 }
                 write!(f, "{direction} binding(in when {when_id:?})")
             }
+            DeclarationKind::FunctionParameter {
+                direction,
+                is_state,
+            } => {
+                if *is_state {
+                    f.write_str("state")?;
+                }
+                write!(f, "{direction} function param")
+            }
             DeclarationKind::RegularGenerative => {
                 write!(f, "gen")
             }
@@ -504,6 +513,7 @@ impl core::fmt::Debug for ActionKind {
             Self::Unconditional => write!(f, "interface"),
             Self::Action(port) => write!(f, "action({port:?})"),
             Self::Trigger(port) => write!(f, "trigger({port:?})"),
+            Self::Function => write!(f, "function"),
         }
     }
 }

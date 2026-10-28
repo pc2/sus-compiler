@@ -986,6 +986,10 @@
               {
                 "type": "STRING",
                 "value": "trigger"
+              },
+              {
+                "type": "STRING",
+                "value": "function"
               }
             ]
           }

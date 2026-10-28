@@ -84,6 +84,8 @@ pub struct LocationInfo<'linker> {
 pub enum RefersTo<'linker> {
     LocalDecl(GlobalUUID, &'linker Declaration, FlatID),
     LocalSubModule(GlobalUUID, &'linker SubModuleInstance, FlatID),
+    /// A [crate::flattening::ActionKind::Function], which has no [Field]
+    LocalAction(GlobalUUID, &'linker ActionDeclaration, FlatID),
     Global(GlobalUUID),
     Field(GlobalUUID, &'linker Field, FieldID),
     Parameter(GlobalUUID, &'linker Parameter, TemplateID),
@@ -96,6 +98,7 @@ impl<'linker> PartialEq for RefersTo<'linker> {
             (Self::LocalSubModule(_, l1, _), Self::LocalSubModule(_, r1, _)) => {
                 std::ptr::eq(*l1, *r1)
             }
+            (Self::LocalAction(_, l1, _), Self::LocalAction(_, r1, _)) => std::ptr::eq(*l1, *r1),
             (Self::Global(l0), Self::Global(r0)) => *l0 == *r0,
             (Self::Field(_, l1, _), Self::Field(_, r1, _)) => std::ptr::eq(*l1, *r1),
             (Self::Parameter(_, l1, _), Self::Parameter(_, r1, _)) => std::ptr::eq(*l1, *r1),
@@ -146,11 +149,10 @@ impl<'linker> LocationInfo<'linker> {
     ) -> RefersTo<'linker> {
         let md = &linker.modules[in_global.unwrap_module()];
         let interface_decl = md.link_info.instructions[interface_decl_id].unwrap_interface();
-        RefersTo::Field(
-            in_global,
-            &md.fields[interface_decl.field_id],
-            interface_decl.field_id,
-        )
+        match interface_decl.field_id {
+            Some(field_id) => RefersTo::Field(in_global, &md.fields[field_id], field_id),
+            None => RefersTo::LocalAction(in_global, interface_decl, interface_decl_id),
+        }
     }
     pub fn refers_to(&self, linker: &'linker Linker) -> Option<RefersTo<'linker>> {
         match self.kind {
@@ -240,7 +242,9 @@ impl<'linker> RefersTo<'linker> {
     /// Used to optimize search for references. If not global, then no need to search through the whole program.
     pub fn is_strictly_local(&self) -> Option<GlobalUUID> {
         match self {
-            RefersTo::LocalDecl(in_obj, ..) | RefersTo::LocalSubModule(in_obj, ..) => Some(*in_obj),
+            RefersTo::LocalDecl(in_obj, ..)
+            | RefersTo::LocalSubModule(in_obj, ..)
+            | RefersTo::LocalAction(in_obj, ..) => Some(*in_obj),
             RefersTo::Global(..) | RefersTo::Field(..) | RefersTo::Parameter(..) => None,
         }
     }

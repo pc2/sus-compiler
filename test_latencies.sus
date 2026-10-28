@@ -429,3 +429,29 @@ module TestNexts {
         next d = a
     }
 }
+
+// A function's condition and parameters take part in latency counting like any other wire
+module LocalFunctionLatency {
+	input int#(0..100) a'0
+	output int r1
+	output int r2
+	function add_one : int#(0..100) x -> int y {
+		reg y = x + 1
+	}
+	r1 = add_one(a)
+	reg int#(0..100) a_delayed = a
+	r2 = r1 + a_delayed
+}
+// Calling a function from two different latencies delays the earlier call, like calling a submodule action twice.
+// It is still one physical block, so both calls see the same result.
+module LocalFunctionCalledFromTwoLatencies {
+	input int#(0..100) a'0
+	output int r1
+	output int r2
+	function add_one : int#(0..100) x -> int y {
+		y = x + 1
+	}
+	r1 = add_one(a)
+	reg int#(0..100) a_delayed = a
+	r2 = add_one(a_delayed)
+}

@@ -37,7 +37,7 @@ fn completions_fallback(linker: &Linker, file: &FileData, position: usize) -> Ve
                 }
                 Instruction::Action(d) => match &d.action_kind {
                     ActionKind::Action(_) | ActionKind::Unconditional => {}
-                    ActionKind::Trigger(_) => {
+                    ActionKind::Trigger(_) | ActionKind::Function => {
                         let trigger_params = suggest_funccall_ports(global, &d.inputs);
 
                         let label = d.name.to_string();
@@ -45,7 +45,7 @@ fn completions_fallback(linker: &Linker, file: &FileData, position: usize) -> Ve
                         completions.push(CompletionItem {
                             label,
                             insert_text,
-                            detail: Some("trigger".to_string()),
+                            detail: Some(d.action_kind.kind_uncapitalized().to_string()),
                             kind: Some(CompletionItemKind::METHOD),
                             ..Default::default()
                         });
@@ -164,6 +164,7 @@ fn get_module_port_completions(linker: &Linker, md: &Module) -> Vec<CompletionIt
                         ..Default::default()
                     });
                 }
+                ActionKind::Function => unreachable!("Functions are not fields"),
                 ActionKind::Trigger(_) => {
                     let label = interf_decl.name.clone();
                     let trigger_inputs =

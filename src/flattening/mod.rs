@@ -225,16 +225,21 @@ impl Direction {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ActionKind {
+    /// The old `interface` syntax: just a group of ports, no condition wire
     Unconditional,
+    /// `action`: an input port that is the condition for the block
     Action(PortID),
+    /// `trigger`: an output port that is the condition for the block, fired by calling it locally
     Trigger(PortID),
+    /// `function`: like a trigger, but the condition and the parameters are plain local wires. Not visible from outside the module.
+    Function,
 }
 
 impl ActionKind {
     pub fn is_conditional(&self) -> bool {
         match self {
             ActionKind::Unconditional => false,
-            ActionKind::Action(_) | ActionKind::Trigger(_) => true,
+            ActionKind::Action(_) | ActionKind::Trigger(_) | ActionKind::Function => true,
         }
     }
 
@@ -243,6 +248,7 @@ impl ActionKind {
             ActionKind::Unconditional => "Interface",
             ActionKind::Action(_) => "Action",
             ActionKind::Trigger(_) => "Trigger",
+            ActionKind::Function => "Function",
         }
     }
     pub fn kind_uncapitalized(&self) -> &'static str {
@@ -250,6 +256,7 @@ impl ActionKind {
             ActionKind::Unconditional => "interface",
             ActionKind::Action(_) => "action",
             ActionKind::Trigger(_) => "trigger",
+            ActionKind::Function => "function",
         }
     }
 }
@@ -712,6 +719,11 @@ pub enum DeclarationKind {
         direction: Direction,
         is_state: bool,
     },
+    /// A parameter of an [ActionKind::Function]. Inputs are written by the call sites, outputs by the body.
+    FunctionParameter {
+        direction: Direction,
+        is_state: bool,
+    },
     RegularGenerative,
     TemplateParameter(TemplateID),
 }
@@ -729,6 +741,7 @@ impl DeclarationKind {
         match self {
             DeclarationKind::RegularWire { .. }
             | DeclarationKind::ConditionalBinding { .. }
+            | DeclarationKind::FunctionParameter { .. }
             | DeclarationKind::StructField(_)
             | DeclarationKind::Port { .. } => false,
             DeclarationKind::RegularGenerative | DeclarationKind::TemplateParameter(..) => true,
@@ -740,6 +753,7 @@ impl DeclarationKind {
             DeclarationKind::StructField(_)
             | DeclarationKind::Port { .. }
             | DeclarationKind::ConditionalBinding { .. }
+            | DeclarationKind::FunctionParameter { .. }
             | DeclarationKind::RegularGenerative
             | DeclarationKind::TemplateParameter(_) => 0,
         }
@@ -748,7 +762,8 @@ impl DeclarationKind {
         match self {
             DeclarationKind::RegularWire { is_state, .. }
             | DeclarationKind::Port { is_state, .. }
-            | DeclarationKind::ConditionalBinding { is_state, .. } => *is_state,
+            | DeclarationKind::ConditionalBinding { is_state, .. }
+            | DeclarationKind::FunctionParameter { is_state, .. } => *is_state,
             DeclarationKind::StructField(_)
             | DeclarationKind::RegularGenerative
             | DeclarationKind::TemplateParameter(..) => false,
@@ -1046,7 +1061,8 @@ pub struct ActionDeclaration {
     pub interface_kw_span: Span,
     pub documentation: Documentation,
     pub latency_specifier: Option<FlatID>,
-    pub field_id: FieldID,
+    /// `None` for [ActionKind::Function], which is not visible from outside the module
+    pub field_id: Option<FieldID>,
     pub action_kind: ActionKind,
     /// These and [Self::outputs] are respective to the function-call syntax!
     ///

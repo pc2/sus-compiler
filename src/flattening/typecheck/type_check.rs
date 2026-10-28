@@ -849,6 +849,7 @@ impl<'l> TypeCheckingContext<'l> {
         trig: RemoteFn<'l, &'l TVec<TemplateKind<AbstractRankedType, ()>>>,
     ) {
         let f = &trig.fn_decl;
+        // TODO: Allow conditional bindings on functions and actions "after the fact", as an alternative to their body
         if !matches!(&f.action_kind, ActionKind::Trigger(_)) {
             let interface_name = &f.name;
             let kind_str = f.action_kind;

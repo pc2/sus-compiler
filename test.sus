@@ -865,3 +865,61 @@ module ForLoopMissingBound {
 	for int I in ..4 {
 	}
 }
+
+// Functions are local actions: a condition wire plus parameters, but no ports
+module LocalFunction {
+	input int#(0..100) a
+	input int#(0..100) b
+	output int r1
+	output int r2
+	output bool was_big
+	output bool ticked
+
+	function add_one : int#(0..100) x -> int y {
+		y = x + 1
+	}
+	function tick {
+		ticked = true
+	}
+	function check_big : int#(0..100) v -> bool big {
+		big = v > 100
+	} else {
+		big = false
+	}
+
+	r1 = add_one(a)
+	when b > 3 {
+		r2 = add_one(b)
+		tick()
+	}
+	when a > 5 {
+		tick()
+	}
+	was_big = check_big(a)
+}
+module LocalFunctionNoBlock {
+	function no_body : int x -> int y
+}
+module LocalFunctionRecursion {
+	function recurse : int x -> int y {
+		y = recurse(x)
+	}
+}
+module LocalFunctionNotAField {
+	LocalFunction submod
+	int r = submod.add_one(3)
+}
+module LocalFunctionInputReadOnly {
+	function f : int x -> int y {
+		x = 3
+		y = x
+	}
+}
+module LocalFunctionNoBinding {
+	function f : int x -> int y {
+		y = x
+	}
+	when f : int xx -> int yy {
+		yy = xx
+	}
+}

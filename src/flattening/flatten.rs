@@ -807,6 +807,27 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         when_id,
                     }
                 }
+                DeclarationKind::FunctionParameter { direction, .. } => {
+                    self.forbid_keyword(input_kw, "on a function parameter");
+                    self.forbid_keyword(output_kw, "on a function parameter");
+                    self.forbid_keyword(gen_kw, "on a function parameter");
+                    self.forbid_keyword(last_split_kw, "on a function parameter");
+                    let is_state = match direction {
+                        Direction::Input => {
+                            self.forbid_keyword(
+                                state_kw,
+                                "on function inputs, because they are read-only",
+                            );
+                            read_only = true;
+                            false
+                        }
+                        Direction::Output => state_kw.is_some(),
+                    };
+                    DeclarationKind::FunctionParameter {
+                        direction,
+                        is_state,
+                    }
+                }
                 DeclarationKind::Port {
                     direction,
                     parent_field,
@@ -868,7 +889,9 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 }
             };
 
-            let clock_domain = if let DeclarationKind::Port { .. } = decl_kind {
+            let clock_domain = if let DeclarationKind::Port { .. }
+            | DeclarationKind::FunctionParameter { .. } = decl_kind
+            {
                 ClockDomain::Physical(UniCell::new(self.current_clock))
             } else if decl_kind.is_generative() {
                 ClockDomain::Generative
@@ -1694,6 +1717,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             kw!("interface") => (Direction::Input, ActionKind::Unconditional),
             kw!("action") => (Direction::Input, ActionKind::Action(UUID::PLACEHOLDER)),
             kw!("trigger") => (Direction::Output, ActionKind::Trigger(UUID::PLACEHOLDER)),
+            kw!("function") => (Direction::Input, ActionKind::Function),
             _ => unreachable!(),
         };
 
@@ -1711,7 +1735,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         let declaration_instruction = self.instructions.get_next_alloc_id();
         match &mut action_kind {
-            ActionKind::Unconditional => {}
+            ActionKind::Unconditional | ActionKind::Function => {}
             ActionKind::Action(port_id) => {
                 *port_id = self.ports.alloc(Port {
                     name: name.to_owned(),
@@ -1747,7 +1771,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 decl_span: interface_decl_span,
                 interface_kw_span,
                 documentation,
-                field_id: UUID::PLACEHOLDER,
+                field_id: None,
                 action_kind,
                 latency_specifier,
                 inputs: Vec::new(),
@@ -1763,24 +1787,52 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         let then_block_starts_at = self.instructions.get_next_alloc_id();
 
-        let new_interface = Field {
-            name_span,
-            name: name.to_owned(),
-            lat_dom: Some(self.current_latency_domain),
-            clock: Some(self.current_clock),
-            declaration_instruction: Some(FieldDeclKind::Action(declaration_instruction)),
-        };
-        let field_id = if name == self.name {
-            self.fields[FieldID::MAIN_INTERFACE] = new_interface;
-            FieldID::MAIN_INTERFACE
-        } else {
-            let interface_id = self.fields.alloc(new_interface);
+        let field_id = if let ActionKind::Function = action_kind {
+            // Functions are internal to the module, so they are not a [Field]
             self.alloc_local_name(
                 name_span,
                 name,
                 NamedLocal::LocalInterface(declaration_instruction),
             );
-            interface_id
+            None
+        } else {
+            let new_interface = Field {
+                name_span,
+                name: name.to_owned(),
+                lat_dom: Some(self.current_latency_domain),
+                clock: Some(self.current_clock),
+                declaration_instruction: Some(FieldDeclKind::Action(declaration_instruction)),
+            };
+            Some(if name == self.name {
+                self.fields[FieldID::MAIN_INTERFACE] = new_interface;
+                FieldID::MAIN_INTERFACE
+            } else {
+                let interface_id = self.fields.alloc(new_interface);
+                self.alloc_local_name(
+                    name_span,
+                    name,
+                    NamedLocal::LocalInterface(declaration_instruction),
+                );
+                interface_id
+            })
+        };
+
+        let current_latency_domain = self.current_latency_domain;
+        let param_decl_kind = move |direction: Direction| match action_kind {
+            ActionKind::Function => DeclarationKind::FunctionParameter {
+                direction,
+                is_state: false,
+            },
+            ActionKind::Unconditional | ActionKind::Action(_) | ActionKind::Trigger(_) => {
+                DeclarationKind::Port {
+                    direction,
+                    is_state: false,
+                    parent_field: field_id.unwrap(),
+                    port_id: UUID::PLACEHOLDER,
+                    is_standalone_port: false,
+                    latency_domain: current_latency_domain,
+                }
+            }
         };
 
         let is_action_or_trigger = action_kind.is_conditional();
@@ -1790,7 +1842,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 is_action_or_trigger.then_some(declaration_instruction),
                 |slf| {
                     let (inputs, outputs) =
-                        slf.flatten_interface_ports(left_direction, field_id, cursor);
+                        slf.flatten_interface_ports(left_direction, &param_decl_kind, cursor);
 
                     let (then_block, else_block, then_span, else_span) =
                         slf.flatten_then_else_blocks(cursor, is_action_or_trigger);
@@ -1826,6 +1878,12 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             if then_span.is_none() {
                                 slf.errors
                                     .error(interface_kw_span, "An action requires a block");
+                            }
+                        }
+                        ActionKind::Function => {
+                            if then_span.is_none() {
+                                slf.errors
+                                    .error(interface_kw_span, "A function requires a block");
                             }
                         }
                         ActionKind::Trigger(_) => {}
@@ -2063,10 +2121,13 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         }
     }
 
+    /// `param_decl_kind` builds the [DeclarationKind] for a parameter in the given direction.
+    /// This is [DeclarationKind::Port] for interfaces, actions and triggers, and
+    /// [DeclarationKind::FunctionParameter] for functions.
     fn flatten_interface_ports(
         &mut self,
         left_direction: Direction,
-        parent_field: FieldID,
+        param_decl_kind: &impl Fn(Direction) -> DeclarationKind,
         cursor: &mut Cursor<'c>,
     ) -> (Vec<FlatID>, Vec<FlatID>) {
         if !cursor.optional_field(field!("interface_ports")) {
@@ -2075,27 +2136,13 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         cursor.go_down(kind!("interface_ports"), |cursor| {
             let inputs = self.flatten_declaration_list(
                 field!("inputs"),
-                DeclarationKind::Port {
-                    direction: left_direction,
-                    is_state: false,
-                    parent_field,
-                    port_id: UUID::PLACEHOLDER,
-                    is_standalone_port: false,
-                    latency_domain: self.current_latency_domain,
-                },
+                param_decl_kind(left_direction),
                 cursor,
             );
 
             let outputs = self.flatten_declaration_list(
                 field!("outputs"),
-                DeclarationKind::Port {
-                    direction: left_direction.invert(),
-                    is_state: false,
-                    parent_field,
-                    port_id: UUID::PLACEHOLDER,
-                    is_standalone_port: false,
-                    latency_domain: self.current_latency_domain,
-                },
+                param_decl_kind(left_direction.invert()),
                 cursor,
             );
 

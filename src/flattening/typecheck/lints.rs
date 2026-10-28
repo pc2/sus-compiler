@@ -216,16 +216,12 @@ impl LintContext<'_> {
                                         cur = parent_when.parent_condition;
                                     }
                                     Instruction::Action(interface_declaration) => {
-                                        let msg = match interface_declaration.action_kind {
-                                            ActionKind::Unconditional => unreachable!(),
-                                            ActionKind::Action(_) => {
-                                                "Assignment passes through this 'action'"
-                                            }
-                                            ActionKind::Trigger(_) => {
-                                                "Assignment passes through this 'trigger'"
-                                            }
-                                        };
-                                        err_ref.info(interface_declaration.interface_kw_span, msg);
+                                        let kind = interface_declaration.action_kind;
+                                        assert!(kind.is_conditional());
+                                        err_ref.info(
+                                            interface_declaration.interface_kw_span,
+                                            format!("Assignment passes through this '{kind}'"),
+                                        );
 
                                         cur = interface_declaration.parent_condition;
                                     }
@@ -450,7 +446,10 @@ impl LintContext<'_> {
                                         self.working_on.instructions[*trig_id].unwrap_interface();
 
                                     // User might have targeted an action, in that case just ignore their error.
-                                    if matches!(trig_decl.action_kind, ActionKind::Trigger(_)) {
+                                    if matches!(
+                                        trig_decl.action_kind,
+                                        ActionKind::Trigger(_) | ActionKind::Function
+                                    ) {
                                         for o in &trig_decl.outputs {
                                             instruction_fanins[instr_id].push(*o);
                                         }
@@ -530,6 +529,7 @@ impl LintContext<'_> {
                                 Some((&field.name, field.name_span, "interface"))
                             }
                             ActionKind::Action(_) | ActionKind::Trigger(_) => None, // Covered by ports
+                            ActionKind::Function => unreachable!("Functions are not fields"),
                         }
                     }
                     FieldDeclKind::SinglePort(_) => None, // Covered by ports
@@ -624,7 +624,25 @@ impl LintContext<'_> {
                             format!("{kind_capitalized} {} declared here", interface_instr.name),
                         );
                 }
-                ActionKind::Trigger(_) => {}
+                ActionKind::Trigger(_) | ActionKind::Function => {
+                    // Calling from within its own body would require the condition wire before it exists
+                    let mut cur = expr_instr.parent_condition;
+                    while let Some(parent) = cur {
+                        if parent.parent_when == *interf {
+                            self.errors
+                                .error(
+                                    fc_func_wireref.root_span,
+                                    format!(
+                                        "Cannot call '{}' from inside its own body",
+                                        interface_instr.name
+                                    ),
+                                )
+                                .info_obj(interface_instr);
+                            break;
+                        }
+                        cur = md.link_info.instructions[parent.parent_when].get_parent_condition();
+                    }
+                }
             }
         }
     }

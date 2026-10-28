@@ -152,7 +152,9 @@ fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifier
                         )
                     }
                 }
-                RefersTo::LocalSubModule(..) => IDEIdentifierType::Interface,
+                RefersTo::LocalSubModule(..) | RefersTo::LocalAction(..) => {
+                    IDEIdentifierType::Interface
+                }
                 RefersTo::Global(global_obj) => match global_obj {
                     GlobalUUID::Module(_) => IDEIdentifierType::Interface,
                     GlobalUUID::Type(_) => IDEIdentifierType::Type,

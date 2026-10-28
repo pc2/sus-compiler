@@ -930,6 +930,7 @@ impl<'l> ExecutionContext<'l> {
                         unreachable!("Non-conditional interfaces can't have condition")
                     }
                     ActionKind::Action(_) | ActionKind::Trigger(_) => (ConcreteType::BOOL, true),
+                    ActionKind::Function => unreachable!("Functions are not ports"),
                 },
                 _ => unreachable!("Ports can only point to Declaration or InterfaceDeclaration"),
             };
@@ -999,6 +1000,7 @@ impl<'l> ExecutionContext<'l> {
                 Some(self.get_submodule_port(submod_id, condition_port, Some(field_span), domain))
             }
             ActionKind::Unconditional => None,
+            ActionKind::Function => unreachable!("Functions are not fields of a submodule"),
         };
 
         let inputs = interface
@@ -1075,7 +1077,7 @@ impl<'l> ExecutionContext<'l> {
                         unreachable!("Can't call interfaces locally")
                     }
                     ActionKind::Action(_) => unreachable!("Can't call actions locally"),
-                    ActionKind::Trigger(_trigger_port) => {
+                    ActionKind::Trigger(_) | ActionKind::Function => {
                         Some(self.generation_state[*interface_decl].unwrap_wire())
                     }
                 };
@@ -1646,21 +1648,25 @@ impl<'l> ExecutionContext<'l> {
                         let specified_latency =
                             self.get_specified_latency(interface.latency_specifier)?;
 
-                        let is_port = match interface.action_kind {
+                        // Triggers and functions are fired by local calls, so their condition is a multiplexer that defaults to false
+                        let (is_port, is_fired_locally) = match interface.action_kind {
                             ActionKind::Unconditional => unreachable!(),
-                            ActionKind::Action(port_id) => IsPort::Port(port_id, Direction::Input),
-                            ActionKind::Trigger(port_id) => {
-                                IsPort::Port(port_id, Direction::Output)
+                            ActionKind::Action(port_id) => {
+                                (IsPort::Port(port_id, Direction::Input), false)
                             }
+                            ActionKind::Trigger(port_id) => {
+                                (IsPort::Port(port_id, Direction::Output), true)
+                            }
+                            ActionKind::Function => (IsPort::PlainWire, true),
                         };
 
-                        let source = match is_port {
-                            IsPort::Port(_, Direction::Input) => RealWireDataSource::ReadOnly,
-                            IsPort::Port(_, Direction::Output) => RealWireDataSource::Multiplexer {
+                        let source = if is_fired_locally {
+                            RealWireDataSource::Multiplexer {
                                 is_state: None,
                                 sources: Vec::new(),
-                            },
-                            _ => unreachable!(),
+                            }
+                        } else {
+                            RealWireDataSource::ReadOnly
                         };
                         let domain = *interface.clock_domain.unwrap();
                         let condition_wire = self.wires.alloc(RealWire {
@@ -1674,7 +1680,7 @@ impl<'l> ExecutionContext<'l> {
                             is_port,
                         });
 
-                        if let ActionKind::Trigger(_) = interface.action_kind {
+                        if is_fired_locally {
                             let false_wire = self.alloc_bool(false, original_instruction, domain);
                             self.instantiate_write_to_wire(
                                 condition_wire,

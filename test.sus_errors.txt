@@ -95,6 +95,12 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated UseIntBoundsShorthandInference #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated ForLoopSliceForms #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate ForLoopMissingBound #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated LocalFunction #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate LocalFunctionNoBlock #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate LocalFunctionRecursion #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate LocalFunctionNotAField #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate LocalFunctionInputReadOnly #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate LocalFunctionNoBinding #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -210,6 +216,8 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated PositiveAndNegativeNext #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated ParametrizeableRegs #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestNexts #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated LocalFunctionLatency #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated LocalFunctionCalledFromTwoLatencies #()
 [ERROR sus_compiler::compiler_top] Cannot instantiate use_no_input_module due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_write_to_gen_var due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate make_tree_add due to errors
@@ -253,6 +261,11 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate MissingInclusiveSliceEnd due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate IntBoundsShorthandErrors due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate ForLoopMissingBound due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate LocalFunctionNoBlock due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate LocalFunctionRecursion due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate LocalFunctionNotAField due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate LocalFunctionInputReadOnly due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate LocalFunctionNoBinding due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -2534,6 +2547,202 @@ Error: A range requires both a lower and an upper bound: `for int I in FROM..TO`
  865 │     for int I in ..4 {
      │                  ─┬─  
      │                   ╰─── A range requires both a lower and an upper bound: `for int I in FROM..TO`
+─────╯
+Warning: ticked is effectively constant. Declare this wire as `gen` to make this explicit.
+     ╭─[ test.sus:876:14 ]
+     │
+ 876 │     output bool ticked
+     │                 ───┬──  
+     │                    ╰──── ticked is effectively constant. Declare this wire as `gen` to make this explicit.
+     │ 
+ 882 │        ticked = true
+     │        ───┬──  
+     │           ╰──── ticked = true
+─────╯
+Warning: Not Instantiating LocalFunctionNoBlock #() due to abstract typing errors
+     ╭─[ test.sus:900:8 ]
+     │
+ 900 │ module LocalFunctionNoBlock {
+     │        ──────────┬─────────  
+     │                  ╰─────────── Not Instantiating LocalFunctionNoBlock #() due to abstract typing errors
+─────╯
+Error: A function requires a block
+     ╭─[ test.sus:901:2 ]
+     │
+ 901 │     function no_body : int x -> int y
+     │     ────┬───  
+     │         ╰───── A function requires a block
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:901:25 ]
+     │
+ 901 │     function no_body : int x -> int y
+     │                            ┬  
+     │                            ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:901:34 ]
+     │
+ 901 │     function no_body : int x -> int y
+     │                                     ┬  
+     │                                     ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Not Instantiating LocalFunctionRecursion #() due to abstract typing errors
+     ╭─[ test.sus:903:8 ]
+     │
+ 903 │ module LocalFunctionRecursion {
+     │        ───────────┬──────────  
+     │                   ╰──────────── Not Instantiating LocalFunctionRecursion #() due to abstract typing errors
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:904:25 ]
+     │
+ 904 │     function recurse : int x -> int y {
+     │                            ┬  
+     │                            ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:904:34 ]
+     │
+ 904 │     function recurse : int x -> int y {
+     │                                     ┬  
+     │                                     ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Cannot call 'recurse' from inside its own body
+     ╭─[ test.sus:905:7 ]
+     │
+ 905 │        y = recurse(x)
+     │            ───┬───  
+     │               ╰───── Cannot call 'recurse' from inside its own body
+     │
+     ├─[ test.sus:905:7 ]
+     │
+ 904 │     function recurse : int x -> int y {
+     │              ───┬───  
+     │                 ╰───── 'recurse' declared here
+─────╯
+Warning: Not Instantiating LocalFunctionNotAField #() due to abstract typing errors
+     ╭─[ test.sus:908:8 ]
+     │
+ 908 │ module LocalFunctionNotAField {
+     │        ───────────┬──────────  
+     │                   ╰──────────── Not Instantiating LocalFunctionNotAField #() due to abstract typing errors
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:910:6 ]
+     │
+ 910 │     int r = submod.add_one(3)
+     │         ┬  
+     │         ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
+     ╭─[ test.sus:910:10 ]
+     │
+ 910 │     int r = submod.add_one(3)
+     │             ───────┬──────  
+     │                    ╰──────── A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
+─────╯
+Error: No such field 'add_one' on LocalFunction #(). Available fields are 'LocalFunction', 'a', 'b', 'r1', 'r2', 'was_big', 'ticked'
+     ╭─[ test.sus:910:17 ]
+     │
+ 910 │     int r = submod.add_one(3)
+     │                    ───┬───  
+     │                       ╰───── No such field 'add_one' on LocalFunction #(). Available fields are 'LocalFunction', 'a', 'b', 'r1', 'r2', 'was_big', 'ticked'
+     │
+     ├─[ test.sus:910:17 ]
+     │
+ 870 │ module LocalFunction {
+     │        ──────┬──────  
+     │              ╰──────── Module 'LocalFunction' defined here. module LocalFunction #():
+domain default:
+input int#(0..100) a
+input int#(0..100) b
+output int r1
+output int r2
+output bool was_big
+output bool ticked
+─────╯
+Warning: Not Instantiating LocalFunctionInputReadOnly #() due to abstract typing errors
+     ╭─[ test.sus:912:8 ]
+     │
+ 912 │ module LocalFunctionInputReadOnly {
+     │        ─────────────┬────────────  
+     │                     ╰────────────── Not Instantiating LocalFunctionInputReadOnly #() due to abstract typing errors
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:913:19 ]
+     │
+ 913 │     function f : int x -> int y {
+     │                      ┬  
+     │                      ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:913:28 ]
+     │
+ 913 │     function f : int x -> int y {
+     │                               ┬  
+     │                               ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: 'x' is read-only
+     ╭─[ test.sus:914:3 ]
+     │
+ 914 │        x = 3
+     │        ┬  
+     │        ╰── 'x' is read-only
+     │
+     ├─[ test.sus:914:3 ]
+     │
+ 913 │     function f : int x -> int y {
+     │                      ┬  
+     │                      ╰── 'x' declared here
+─────╯
+Warning: Not Instantiating LocalFunctionNoBinding #() due to abstract typing errors
+     ╭─[ test.sus:918:8 ]
+     │
+ 918 │ module LocalFunctionNoBinding {
+     │        ───────────┬──────────  
+     │                   ╰──────────── Not Instantiating LocalFunctionNoBinding #() due to abstract typing errors
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:919:19 ]
+     │
+ 919 │     function f : int x -> int y {
+     │                      ┬  
+     │                      ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:919:28 ]
+     │
+ 919 │     function f : int x -> int y {
+     │                               ┬  
+     │                               ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Can only use conditional bindings on triggers. 'f' is an function
+     ╭─[ test.sus:922:7 ]
+     │
+ 922 │     when f : int xx -> int yy {
+     │          ┬  
+     │          ╰── Can only use conditional bindings on triggers. 'f' is an function
+     │
+     ├─[ test.sus:922:7 ]
+     │
+ 919 │     function f : int x -> int y {
+     │              ┬  
+     │              ╰── Interface 'f' defined here
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:922:15 ]
+     │
+ 922 │     when f : int xx -> int yy {
+     │                  ─┬  
+     │                   ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:922:25 ]
+     │
+ 922 │     when f : int xx -> int yy {
+     │                            ─┬  
+     │                             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:28:6 ]
@@ -5821,6 +6030,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for IntBoundsShorthand #() as "IntBoundsShorthand"
 [INFO  sus_compiler::codegen] Code generated for UseIntBoundsShorthandInference #() as "UseIntBoundsShorthandInference"
 [INFO  sus_compiler::codegen] Code generated for ForLoopSliceForms #() as "ForLoopSliceForms"
+[INFO  sus_compiler::codegen] Code generated for LocalFunction #() as "LocalFunction"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"
@@ -5884,3 +6094,5 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for PositiveAndNegativeNext #() as "PositiveAndNegativeNext"
 [INFO  sus_compiler::codegen] Code generated for ParametrizeableRegs #() as "ParametrizeableRegs"
 [INFO  sus_compiler::codegen] Code generated for TestNexts #() as "TestNexts"
+[INFO  sus_compiler::codegen] Code generated for LocalFunctionLatency #() as "LocalFunctionLatency"
+[INFO  sus_compiler::codegen] Code generated for LocalFunctionCalledFromTwoLatencies #() as "LocalFunctionCalledFromTwoLatencies"

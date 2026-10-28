@@ -199,7 +199,7 @@ module.exports = grammar({
         ),
 
         interface_statement: $ => seq(
-            field('action_kind', choice('interface', 'action', 'trigger')),
+            field('action_kind', choice('interface', 'action', 'trigger', 'function')),
             field('name', $.identifier),
             optional(field('latency_specifier', $.latency_specifier)),
             optional(field('interface_ports', $.interface_ports)),
