@@ -2398,8 +2398,8 @@ Error: 'FROM' has already been defined previously
      ╭─[ test.sus:818:13 ]
      │
  818 │     int#(0..5, FROM: 3) duplicate_from
-     │          ──┬─  ──┬─  
-     │            ╰───────── 'FROM' specified here previously
+     │          │     ──┬─  
+     │          ╰─────────── 'FROM' specified here previously
      │                  │   
      │                  ╰─── 'FROM' has already been defined previously
 ─────╯
@@ -2411,13 +2411,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                ╰──────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: 'TO' has already been defined previously
-     ╭─[ test.sus:819:14 ]
+     ╭─[ test.sus:819:17 ]
      │
  819 │     int#(TO: 3, 0..5) duplicate_to
-     │          ─┬     ──┬─  
-     │           ╰─────────── 'TO' specified here previously
-     │                   │   
-     │                   ╰─── 'TO' has already been defined previously
+     │          ─┬        │ 
+     │           ╰────────── 'TO' specified here previously
+     │                    │ 
+     │                    ╰─ 'TO' has already been defined previously
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:819:20 ]
@@ -2430,19 +2430,19 @@ Error: 'FROM' has already been defined previously
      ╭─[ test.sus:820:13 ]
      │
  820 │     int#(0..5, 2..=3) duplicate_both
-     │          ──┬─  ──┬──  
-     │            ╰────────── 'FROM' specified here previously
-     │                  │    
-     │                  ╰──── 'FROM' has already been defined previously
+     │          │     │ 
+     │          ╰─────── 'FROM' specified here previously
+     │                │ 
+     │                ╰─ 'FROM' has already been defined previously
 ─────╯
 Error: 'TO' has already been defined previously
-     ╭─[ test.sus:820:13 ]
+     ╭─[ test.sus:820:17 ]
      │
  820 │     int#(0..5, 2..=3) duplicate_both
-     │          ──┬─  ──┬──  
-     │            ╰────────── 'TO' specified here previously
-     │                  │    
-     │                  ╰──── 'TO' has already been defined previously
+     │             │      │ 
+     │             ╰──────── 'TO' specified here previously
+     │                    │ 
+     │                    ╰─ 'TO' has already been defined previously
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:820:20 ]

@@ -156,6 +156,8 @@ struct SliceBounds {
     to: FlatID,
     from_span: Span,
     to_span: Span,
+    /// Span of the `..`, `..=`, `+..`, `-..` or `*..` operator
+    op_span: Span,
 }
 
 impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
@@ -210,21 +212,23 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         cursor: &mut Cursor<'c>,
         result: &mut Vec<WrittenTemplateArg>,
     ) {
-        let bounds_span = cursor.span();
+        // The names `FROM` and `TO` do not appear in the source, so their spans are empty: `FROM` at the front of the slice, `TO` right after the operator
+        let from_name_span = cursor.span().empty_span_at_front();
         let Some(bounds) = self.flatten_slice_as_bounds(cursor, "`int#(FROM..TO)`") else {
             return;
         };
+        let to_name_span = bounds.op_span.empty_span_at_end();
 
         result.push(WrittenTemplateArg {
             name: "FROM".to_owned(),
-            name_span: bounds_span,
+            name_span: from_name_span,
             value_span: bounds.from_span,
             kind: Some(TemplateKind::Value(bounds.from)),
             refers_to: OnceCell::new(),
         });
         result.push(WrittenTemplateArg {
             name: "TO".to_owned(),
-            name_span: bounds_span,
+            name_span: to_name_span,
             value_span: bounds.to_span,
             kind: Some(TemplateKind::Value(bounds.to)),
             refers_to: OnceCell::new(),
@@ -316,6 +320,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 to,
                 from_span,
                 to_span,
+                op_span,
             })
         })
     }
