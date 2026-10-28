@@ -1249,17 +1249,7 @@
     "type": "interface_statement",
     "named": true,
     "fields": {
-      "else_block": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "else_block",
-            "named": true
-          }
-        ]
-      },
-      "interface_kind": {
+      "action_kind": {
         "multiple": false,
         "required": true,
         "types": [
@@ -1274,6 +1264,16 @@
           {
             "type": "trigger",
             "named": false
+          }
+        ]
+      },
+      "else_block": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "else_block",
+            "named": true
           }
         ]
       },
@@ -1294,16 +1294,6 @@
           {
             "type": "latency_specifier",
             "named": true
-          }
-        ]
-      },
-      "local": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "local",
-            "named": false
           }
         ]
       },
@@ -2215,10 +2205,6 @@
   },
   {
     "type": "interface",
-    "named": false
-  },
-  {
-    "type": "local",
     "named": false
   },
   {

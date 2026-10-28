@@ -99,7 +99,7 @@ impl<'l> TypeCheckingContext<'l> {
                         .set_initial(self.written_to_abstract_type(&decl.typ_expr));
                 }
                 Instruction::Expression(_)
-                | Instruction::Interface(_)
+                | Instruction::Action(_)
                 | Instruction::IfStatement(_)
                 | Instruction::ForStatement(_) => {}
             }
@@ -528,7 +528,7 @@ impl<'l> TypeCheckingContext<'l> {
                         .info_obj(field);
                     return None;
                 };
-                let_unwrap!(FieldDeclKind::Interface(field), field);
+                let_unwrap!(FieldDeclKind::Action(field), field);
                 Some(submod.get_fn(field))
             }
             Ok(AbstractInnerType::LocalInterface(interface_decl)) => {
@@ -838,7 +838,7 @@ impl<'l> TypeCheckingContext<'l> {
                     self.typecheck_multi_output_expr(expr, write_tos);
                 }
             },
-            Instruction::Interface(_act_trig) => {}
+            Instruction::Action(_act_trig) => {}
         }
     }
 
@@ -849,9 +849,9 @@ impl<'l> TypeCheckingContext<'l> {
         trig: RemoteFn<'l, &'l TVec<TemplateKind<AbstractRankedType, ()>>>,
     ) {
         let f = &trig.fn_decl;
-        if !matches!(&f.interface_kind, InterfaceKind::Trigger(_)) {
+        if !matches!(&f.action_kind, ActionKind::Trigger(_)) {
             let interface_name = &f.name;
-            let kind_str = f.interface_kind;
+            let kind_str = f.action_kind;
             let err = format!(
                 "Can only use conditional bindings on triggers. '{interface_name}' is an {kind_str}"
             );

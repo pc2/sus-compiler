@@ -181,7 +181,7 @@ impl LintContext<'_> {
                 }
                 Instruction::IfStatement(_)
                 | Instruction::ForStatement(_)
-                | Instruction::Interface(_) => {}
+                | Instruction::Action(_) => {}
             }
         }
     }
@@ -215,13 +215,13 @@ impl LintContext<'_> {
 
                                         cur = parent_when.parent_condition;
                                     }
-                                    Instruction::Interface(interface_declaration) => {
-                                        let msg = match interface_declaration.interface_kind {
-                                            InterfaceKind::RegularInterface => unreachable!(),
-                                            InterfaceKind::Action(_) => {
+                                    Instruction::Action(interface_declaration) => {
+                                        let msg = match interface_declaration.action_kind {
+                                            ActionKind::Unconditional => unreachable!(),
+                                            ActionKind::Action(_) => {
                                                 "Assignment passes through this 'action'"
                                             }
-                                            InterfaceKind::Trigger(_) => {
+                                            ActionKind::Trigger(_) => {
                                                 "Assignment passes through this 'trigger'"
                                             }
                                         };
@@ -412,7 +412,7 @@ impl LintContext<'_> {
                         instruction_fanins[instr_id].push(id);
                     });
                 }
-                Instruction::Interface(act) => {
+                Instruction::Action(act) => {
                     if let Some(lat_spec) = act.latency_specifier {
                         instruction_fanins[instr_id].push(lat_spec);
                     }
@@ -450,8 +450,7 @@ impl LintContext<'_> {
                                         self.working_on.instructions[*trig_id].unwrap_interface();
 
                                     // User might have targeted an action, in that case just ignore their error.
-                                    if matches!(trig_decl.interface_kind, InterfaceKind::Trigger(_))
-                                    {
+                                    if matches!(trig_decl.action_kind, ActionKind::Trigger(_)) {
                                         for o in &trig_decl.outputs {
                                             instruction_fanins[instr_id].push(*o);
                                         }
@@ -521,16 +520,16 @@ impl LintContext<'_> {
             .map(|(_, port)| (&port.name, port.name_span, "port"))
             .chain(md.fields.iter().filter_map(|(_, field)| {
                 match field.declaration_instruction? {
-                    FieldDeclKind::Interface(interf_id) => {
+                    FieldDeclKind::Action(interf_id) => {
                         let_unwrap!(
-                            Instruction::Interface(interface_declaration),
+                            Instruction::Action(interface_declaration),
                             &md.link_info.instructions[interf_id]
                         );
-                        match interface_declaration.interface_kind {
-                            InterfaceKind::RegularInterface => {
+                        match interface_declaration.action_kind {
+                            ActionKind::Unconditional => {
                                 Some((&field.name, field.name_span, "interface"))
                             }
-                            InterfaceKind::Action(_) | InterfaceKind::Trigger(_) => None, // Covered by ports
+                            ActionKind::Action(_) | ActionKind::Trigger(_) => None, // Covered by ports
                         }
                     }
                     FieldDeclKind::SinglePort(_) => None, // Covered by ports
@@ -579,7 +578,7 @@ impl LintContext<'_> {
                 }
                 Instruction::Expression(_)
                 | Instruction::SubModule(_)
-                | Instruction::Interface(_)
+                | Instruction::Action(_)
                 | Instruction::IfStatement(_)
                 | Instruction::ForStatement(_) => {}
             }
@@ -612,24 +611,20 @@ impl LintContext<'_> {
             };
 
             let interface_instr = md.link_info.instructions[*interf].unwrap_interface();
-            match interface_instr.interface_kind {
-                InterfaceKind::RegularInterface | InterfaceKind::Action(_) => {
-                    let kind_capitalized = match interface_instr.interface_kind {
-                        InterfaceKind::RegularInterface => "Interface",
-                        InterfaceKind::Action(_) => "Action",
-                        InterfaceKind::Trigger(_) => "Trigger",
-                    };
+            match interface_instr.action_kind {
+                ActionKind::Unconditional | ActionKind::Action(_) => {
+                    let kind_capitalized = interface_instr.action_kind.kind_capitalized();
                     self.errors
                         .error(
                             fc_func_wireref.root_span,
-                            format!("Cannot call local {}s", interface_instr.interface_kind),
+                            format!("Cannot call local {}s", interface_instr.action_kind),
                         )
                         .info(
                             interface_instr.name_span,
                             format!("{kind_capitalized} {} declared here", interface_instr.name),
                         );
                 }
-                InterfaceKind::Trigger(_) => {}
+                ActionKind::Trigger(_) => {}
             }
         }
     }
@@ -695,7 +690,7 @@ impl LintContext<'_> {
                 }
                 Instruction::Expression(_)
                 | Instruction::SubModule(_)
-                | Instruction::Interface(_)
+                | Instruction::Action(_)
                 | Instruction::IfStatement(_)
                 | Instruction::ForStatement(_) => {}
             }

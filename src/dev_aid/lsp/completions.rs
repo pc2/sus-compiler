@@ -3,7 +3,7 @@ use std::fmt::Display;
 use crate::{
     dev_aid::lsp::tree_walk::{LocationKind, MultiGlobalRef, get_selected_object},
     flattening::{
-        Declaration, Direction, FieldDeclKind, GlobalReference, InterfaceKind, Module,
+        ActionKind, Declaration, Direction, FieldDeclKind, GlobalReference, Module,
         PathElemRefersTo, SubModuleInstance,
     },
     linker::{FileData, GlobalObj, GlobalUUID, LinkInfo, LinkerGlobals},
@@ -35,9 +35,9 @@ fn completions_fallback(linker: &Linker, file: &FileData, position: usize) -> Ve
                         ..Default::default()
                     });
                 }
-                Instruction::Interface(d) => match &d.interface_kind {
-                    InterfaceKind::Action(_) | InterfaceKind::RegularInterface => {}
-                    InterfaceKind::Trigger(_) => {
+                Instruction::Action(d) => match &d.action_kind {
+                    ActionKind::Action(_) | ActionKind::Unconditional => {}
+                    ActionKind::Trigger(_) => {
                         let trigger_params = suggest_funccall_ports(global, &d.inputs);
 
                         let label = d.name.to_string();
@@ -114,7 +114,7 @@ fn get_module_port_completions(linker: &Linker, md: &Module) -> Vec<CompletionIt
 
     for (_, field) in &md.fields {
         let instr = match field.declaration_instruction {
-            Some(FieldDeclKind::Interface(instr)) | Some(FieldDeclKind::SinglePort(instr)) => instr,
+            Some(FieldDeclKind::Action(instr)) | Some(FieldDeclKind::SinglePort(instr)) => instr,
             None => continue,
         };
         match &md.link_info.instructions[instr] {
@@ -135,8 +135,8 @@ fn get_module_port_completions(linker: &Linker, md: &Module) -> Vec<CompletionIt
                     ..Default::default()
                 });
             }
-            Instruction::Interface(interf_decl) => match interf_decl.interface_kind {
-                InterfaceKind::RegularInterface | InterfaceKind::Action(_) => {
+            Instruction::Action(interf_decl) => match interf_decl.action_kind {
+                ActionKind::Unconditional | ActionKind::Action(_) => {
                     let label = interf_decl.name.clone();
                     let action_func_params =
                         suggest_funccall_ports(&md.link_info, &interf_decl.inputs);
@@ -164,7 +164,7 @@ fn get_module_port_completions(linker: &Linker, md: &Module) -> Vec<CompletionIt
                         ..Default::default()
                     });
                 }
-                InterfaceKind::Trigger(_) => {
+                ActionKind::Trigger(_) => {
                     let label = interf_decl.name.clone();
                     let trigger_inputs =
                         suggest_interface_ports_decls(&md.link_info, file, &interf_decl.inputs);

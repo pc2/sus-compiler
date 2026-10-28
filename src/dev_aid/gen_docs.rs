@@ -3,8 +3,8 @@ use crate::config::GenDocs;
 use crate::dev_aid::port_diagram;
 use crate::file_position::FileText;
 use crate::flattening::{
-    ClockVisibility, DeclarationKind, FieldDeclKind, InterfaceDeclaration, InterfaceKind, Module,
-    NamedConstant, StructType,
+    ActionDeclaration, ClockVisibility, DeclarationKind, FieldDeclKind, Module, NamedConstant,
+    StructType,
 };
 use crate::latency::port_latency_inference::InferenceTarget;
 use crate::linker::{FileData, GlobalObj, IsExtern, LinkInfo};
@@ -76,7 +76,7 @@ fn fmt_param(li: &LinkInfo, decl_id: FlatID, ft: &FileText) -> String {
     format!("{typ} {}{lat}", decl.name)
 }
 
-fn build_interface_params(li: &LinkInfo, iface: &InterfaceDeclaration, ft: &FileText) -> String {
+fn build_interface_params(li: &LinkInfo, iface: &ActionDeclaration, ft: &FileText) -> String {
     if iface.inputs.is_empty() && iface.outputs.is_empty() {
         return String::new();
     }
@@ -127,16 +127,9 @@ fn build_interface_block(md: &Module, ft: &FileText) -> String {
                     format!("    {}\n", li.display_decl(None, decl, ft)),
                 )
             }
-            FieldDeclKind::Interface(iface_id) => {
+            FieldDeclKind::Action(iface_id) => {
                 let iface = li.instructions[iface_id].unwrap_interface();
-                if iface.is_local {
-                    continue;
-                }
-                let kw = match iface.interface_kind {
-                    InterfaceKind::RegularInterface => "interface",
-                    InterfaceKind::Action(_) => "action",
-                    InterfaceKind::Trigger(_) => "trigger",
-                };
+                let kw = iface.action_kind.kind_uncapitalized();
                 let lat = fmt_latency(li, &iface.latency_specifier, ft);
                 let params = build_interface_params(li, iface, ft);
                 (

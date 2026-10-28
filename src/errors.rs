@@ -9,8 +9,8 @@ use std::fmt::Display;
 use crate::typing::template::Parameter;
 
 use crate::flattening::{
-    ClockInfo, Declaration, Field, Instruction, InterfaceDeclaration, LatencyDomainInfo, Module,
-    Port, SubModuleInstance,
+    ActionDeclaration, ClockInfo, Declaration, Field, Instruction, LatencyDomainInfo, Module, Port,
+    SubModuleInstance,
 };
 use crate::linker::{LinkInfo, checkpoint::ErrorCheckpoint};
 
@@ -391,7 +391,7 @@ impl ErrorInfoObject for &SubModuleInstance {
     }
 }
 
-impl ErrorInfoObject for &InterfaceDeclaration {
+impl ErrorInfoObject for &ActionDeclaration {
     fn make_info(self) -> Option<ErrorInfo> {
         Some(ErrorInfo {
             span: self.name_span,
@@ -405,7 +405,7 @@ impl ErrorInfoObject for &Instruction {
         match self {
             Instruction::SubModule(decl) => decl.make_info(),
             Instruction::Declaration(decl) => decl.make_info(),
-            Instruction::Interface(decl) => decl.make_info(),
+            Instruction::Action(decl) => decl.make_info(),
             Instruction::Expression(_) => None,
             _ => unreachable!(
                 "At least there shouldn't be cases where we're referring to something other than SubModule or Declaration"

@@ -329,7 +329,7 @@ pub fn hover(info: LocationInfo, linker: &Linker) -> Vec<MarkedString> {
             Some(PathElemRefersTo::Field(in_module_id, Some(field_id))) => {
                 let md = &linker.modules[*in_module_id];
                 match md.fields[*field_id].declaration_instruction {
-                    Some(FieldDeclKind::Interface(decl_id)) => {
+                    Some(FieldDeclKind::Action(decl_id)) => {
                         let interface_decl = md.link_info.instructions[decl_id].unwrap_interface();
 
                         hover.sus_code(

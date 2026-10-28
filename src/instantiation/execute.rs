@@ -925,13 +925,11 @@ impl<'l> ExecutionContext<'l> {
                     let typ = self.concretize_type(&substituted_type, None).unwrap();
                     (typ, false)
                 }
-                Instruction::Interface(interface_decl) => match interface_decl.interface_kind {
-                    InterfaceKind::RegularInterface => {
+                Instruction::Action(interface_decl) => match interface_decl.action_kind {
+                    ActionKind::Unconditional => {
                         unreachable!("Non-conditional interfaces can't have condition")
                     }
-                    InterfaceKind::Action(_) | InterfaceKind::Trigger(_) => {
-                        (ConcreteType::BOOL, true)
-                    }
+                    ActionKind::Action(_) | ActionKind::Trigger(_) => (ConcreteType::BOOL, true),
                 },
                 _ => unreachable!("Ports can only point to Declaration or InterfaceDeclaration"),
             };
@@ -990,17 +988,17 @@ impl<'l> ExecutionContext<'l> {
         let md = &self.globals.modules[self.submodules[submod_id].refers_to.id];
         let field = &md.fields[field_id];
         let_unwrap!(
-            Some(FieldDeclKind::Interface(interface_id)),
+            Some(FieldDeclKind::Action(interface_id)),
             field.declaration_instruction
         );
 
         let interface = md.link_info.instructions[interface_id].unwrap_interface();
 
-        let condition_wire = match interface.interface_kind {
-            InterfaceKind::Action(condition_port) | InterfaceKind::Trigger(condition_port) => {
+        let condition_wire = match interface.action_kind {
+            ActionKind::Action(condition_port) | ActionKind::Trigger(condition_port) => {
                 Some(self.get_submodule_port(submod_id, condition_port, Some(field_span), domain))
             }
-            InterfaceKind::RegularInterface => None,
+            ActionKind::Unconditional => None,
         };
 
         let inputs = interface
@@ -1071,13 +1069,13 @@ impl<'l> ExecutionContext<'l> {
                     todo!("Can't yet work with sub-interfaces");
                 }
 
-                let condition_wire = match interface.interface_kind {
-                    InterfaceKind::RegularInterface => {
+                let condition_wire = match interface.action_kind {
+                    ActionKind::Unconditional => {
                         interface.decl_span.debug();
                         unreachable!("Can't call interfaces locally")
                     }
-                    InterfaceKind::Action(_) => unreachable!("Can't call actions locally"),
-                    InterfaceKind::Trigger(_trigger_port) => {
+                    ActionKind::Action(_) => unreachable!("Can't call actions locally"),
+                    ActionKind::Trigger(_trigger_port) => {
                         Some(self.generation_state[*interface_decl].unwrap_wire())
                     }
                 };
@@ -1643,17 +1641,15 @@ impl<'l> ExecutionContext<'l> {
                     instruction_range.skip_to(if_stm.else_block.1);
                     continue;
                 }
-                Instruction::Interface(interface) => {
-                    if interface.interface_kind.is_conditional() {
+                Instruction::Action(interface) => {
+                    if interface.action_kind.is_conditional() {
                         let specified_latency =
                             self.get_specified_latency(interface.latency_specifier)?;
 
-                        let is_port = match interface.interface_kind {
-                            InterfaceKind::RegularInterface => unreachable!(),
-                            InterfaceKind::Action(port_id) => {
-                                IsPort::Port(port_id, Direction::Input)
-                            }
-                            InterfaceKind::Trigger(port_id) => {
+                        let is_port = match interface.action_kind {
+                            ActionKind::Unconditional => unreachable!(),
+                            ActionKind::Action(port_id) => IsPort::Port(port_id, Direction::Input),
+                            ActionKind::Trigger(port_id) => {
                                 IsPort::Port(port_id, Direction::Output)
                             }
                         };
@@ -1678,7 +1674,7 @@ impl<'l> ExecutionContext<'l> {
                             is_port,
                         });
 
-                        if let InterfaceKind::Trigger(_) = interface.interface_kind {
+                        if let ActionKind::Trigger(_) = interface.action_kind {
                             let false_wire = self.alloc_bool(false, original_instruction, domain);
                             self.instantiate_write_to_wire(
                                 condition_wire,

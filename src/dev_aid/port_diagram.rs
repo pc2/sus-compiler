@@ -1,4 +1,4 @@
-use crate::flattening::{Direction, FieldDeclKind, InterfaceKind, Module};
+use crate::flattening::{ActionKind, Direction, FieldDeclKind, Module};
 use crate::latency::port_latency_inference::InferenceTarget;
 use crate::prelude::*;
 use crate::typing::template::TemplateKind;
@@ -61,12 +61,10 @@ pub fn render_port_diagram(md: &Module, show_poison: bool) -> String {
                 let (pid, _) = md.get_port_for_decl(decl_id);
                 port_group.insert(pid, g);
             }
-            FieldDeclKind::Interface(iface_id) => {
+            FieldDeclKind::Action(iface_id) => {
                 let iface = md.link_info.instructions[iface_id].unwrap_interface();
                 // The control (valid) port of an action/trigger
-                if let InterfaceKind::Action(pid) | InterfaceKind::Trigger(pid) =
-                    iface.interface_kind
-                {
+                if let ActionKind::Action(pid) | ActionKind::Trigger(pid) = iface.action_kind {
                     port_group.insert(pid, g);
                 }
                 for &id in iface.inputs.iter().chain(iface.outputs.iter()) {

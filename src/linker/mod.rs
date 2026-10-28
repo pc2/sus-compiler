@@ -116,7 +116,7 @@ impl LinkInfo {
             Instruction::Declaration(decl) => decl.decl_span,
             Instruction::Expression(w) => w.span,
             Instruction::IfStatement(if_stmt) => if_stmt.if_keyword_span,
-            Instruction::Interface(interface) => interface.name_span,
+            Instruction::Action(interface) => interface.name_span,
             Instruction::ForStatement(for_stmt) => {
                 self.get_instruction_span(for_stmt.loop_var_decl)
             }
@@ -130,7 +130,7 @@ impl LinkInfo {
         match &self.instructions[instr_id] {
             Instruction::SubModule(sm) => &sm.name,
             Instruction::Declaration(decl) => &decl.name,
-            Instruction::Interface(interface) => &interface.name,
+            Instruction::Action(interface) => &interface.name,
             Instruction::Expression(expr) => match &expr.source {
                 ExpressionSource::WireRef(wr) => match &wr.root {
                     WireReferenceRoot::LocalDecl(decl_id) => {

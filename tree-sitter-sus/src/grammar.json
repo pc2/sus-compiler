@@ -970,24 +970,8 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "FIELD",
-              "name": "local",
-              "content": {
-                "type": "STRING",
-                "value": "local"
-              }
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        },
-        {
           "type": "FIELD",
-          "name": "interface_kind",
+          "name": "action_kind",
           "content": {
             "type": "CHOICE",
             "members": [

@@ -649,7 +649,7 @@ impl PortLatencyInferenceInfo {
                     };
                     inference_walker.walk(&decl.typ_expr);
                 }
-                Instruction::Interface(_) => {} // Ignore, no type
+                Instruction::Action(_) => {} // Ignore, no type
                 _ => unreachable!("Can't be a port"),
             }
         }

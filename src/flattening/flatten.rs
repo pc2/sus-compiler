@@ -1667,25 +1667,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             slf.flatten_for_statement(cursor);
                         })
                     }),
-                    /*kind!("interface_statement") => {
-                        cursor.go_down_no_check(|cursor| {
-                            // Skip name
-                            let (name_span, name) =
-                                cursor.field_to_string(field!("name"), kind!("identifier"));
-
-                            let (inputs, outputs) = self.flatten_interface_ports(true, cursor);
-
-                            self.alloc_interface(
-                                name.clone(),
-                                name_span,
-                                InterfaceKind::RegularInterface,
-                                inputs,
-                                outputs,
-                            );
-                        });
-                    }*/
                     kind!("interface_statement") => cursor.go_down_no_check(|cursor| {
-                        slf.parse_interface(cursor);
+                        slf.parse_action(cursor);
                     }),
                     kind!("domain_declaration") => cursor.go_down_no_check(|cursor| {
                         slf.parse_domain(cursor);
@@ -1703,15 +1686,14 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         })
     }
 
-    fn parse_interface(&mut self, cursor: &mut Cursor<'c>) {
+    fn parse_action(&mut self, cursor: &mut Cursor<'c>) {
         // Skip interface kind
-        let is_local = cursor.optional_field(field!("local"));
-        cursor.field(field!("interface_kind"));
+        cursor.field(field!("action_kind"));
         let (interface_kw, interface_kw_span) = cursor.kind_span();
-        let (left_direction, mut interface_kind) = match interface_kw {
-            kw!("interface") => (Direction::Input, InterfaceKind::RegularInterface),
-            kw!("action") => (Direction::Input, InterfaceKind::Action(UUID::PLACEHOLDER)),
-            kw!("trigger") => (Direction::Output, InterfaceKind::Trigger(UUID::PLACEHOLDER)),
+        let (left_direction, mut action_kind) = match interface_kw {
+            kw!("interface") => (Direction::Input, ActionKind::Unconditional),
+            kw!("action") => (Direction::Input, ActionKind::Action(UUID::PLACEHOLDER)),
+            kw!("trigger") => (Direction::Output, ActionKind::Trigger(UUID::PLACEHOLDER)),
             _ => unreachable!(),
         };
 
@@ -1728,9 +1710,9 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let documentation = cursor.extract_gathered_docs();
 
         let declaration_instruction = self.instructions.get_next_alloc_id();
-        match &mut interface_kind {
-            InterfaceKind::RegularInterface => {}
-            InterfaceKind::Action(port_id) => {
+        match &mut action_kind {
+            ActionKind::Unconditional => {}
+            ActionKind::Action(port_id) => {
                 *port_id = self.ports.alloc(Port {
                     name: name.to_owned(),
                     name_span,
@@ -1742,7 +1724,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     latency_specifier,
                 });
             }
-            InterfaceKind::Trigger(port_id) => {
+            ActionKind::Trigger(port_id) => {
                 *port_id = self.ports.alloc(Port {
                     name: name.to_owned(),
                     name_span,
@@ -1758,7 +1740,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         self.instructions.alloc_next_alloc_id(
             declaration_instruction,
-            Instruction::Interface(InterfaceDeclaration {
+            Instruction::Action(ActionDeclaration {
                 parent_condition: self.current_parent_condition,
                 name: name.to_owned(),
                 name_span,
@@ -1766,9 +1748,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 interface_kw_span,
                 documentation,
                 field_id: UUID::PLACEHOLDER,
-                interface_kind,
+                action_kind,
                 latency_specifier,
-                is_local,
                 inputs: Vec::new(),
                 outputs: Vec::new(),
                 clock_domain: UniCell::new(self.current_clock),
@@ -1787,7 +1768,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             name: name.to_owned(),
             lat_dom: Some(self.current_latency_domain),
             clock: Some(self.current_clock),
-            declaration_instruction: Some(FieldDeclKind::Interface(declaration_instruction)),
+            declaration_instruction: Some(FieldDeclKind::Action(declaration_instruction)),
         };
         let field_id = if name == self.name {
             self.fields[FieldID::MAIN_INTERFACE] = new_interface;
@@ -1802,7 +1783,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             interface_id
         };
 
-        let is_action_or_trigger = interface_kind.is_conditional();
+        let is_action_or_trigger = action_kind.is_conditional();
 
         self.with_nested_context_maybe(is_action_or_trigger, |slf| {
             slf.with_parent_condition(
@@ -1816,7 +1797,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
                     let then_block = UUIDRange(then_block_starts_at, then_block.1);
                     let_unwrap!(
-                        Instruction::Interface(interface),
+                        Instruction::Action(interface),
                         &mut slf.instructions[declaration_instruction]
                     );
 
@@ -1828,8 +1809,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     interface.then_span = then_span;
                     interface.else_span = else_span;
 
-                    match interface_kind {
-                        InterfaceKind::RegularInterface => {
+                    match action_kind {
+                        ActionKind::Unconditional => {
                             if let Some((_, lat_spec_span)) = parsed_latency_specifier {
                                 slf.errors.error(
                                     lat_spec_span,
@@ -1841,13 +1822,13 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                     .error(else_span, "Regular interfaces cannot take else blocks");
                             }
                         }
-                        InterfaceKind::Action(_) => {
+                        ActionKind::Action(_) => {
                             if then_span.is_none() {
                                 slf.errors
                                     .error(interface_kw_span, "An action requires a block");
                             }
                         }
-                        InterfaceKind::Trigger(_) => {}
+                        ActionKind::Trigger(_) => {}
                     }
                 },
             );

@@ -598,7 +598,7 @@ impl<'linker, 'fns> TreeWalker<'linker, 'fns> {
                         });
                     }
                 }
-                Instruction::Interface(interface) => {
+                Instruction::Action(interface) => {
                     self.visit(LocationInfo {
                         span: interface.name_span,
                         kind: LocationKind::LocalInterface(id),

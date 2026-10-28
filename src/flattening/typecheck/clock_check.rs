@@ -202,7 +202,7 @@ impl<'l> TypeCheckingContext<'l> {
                 self.must_be_generative(for_statement.start, "For Loop start");
                 self.must_be_generative(for_statement.end, "For Loop end");
             }
-            Instruction::Interface(_) => {}
+            Instruction::Action(_) => {}
         }
     }
 
@@ -237,7 +237,7 @@ impl<'l> TypeCheckingContext<'l> {
     ) -> Option<(&'l UniCell<ClockID>, Span)> {
         while let Some(p_cond) = parent_condition {
             match &self.instructions[p_cond.parent_when] {
-                Instruction::Interface(decl) => return Some((&decl.clock_domain, decl.name_span)),
+                Instruction::Action(decl) => return Some((&decl.clock_domain, decl.name_span)),
                 Instruction::IfStatement(when) => {
                     let when_cond_expr = self.instructions[when.condition].unwrap_subexpression();
                     if let Physical(when_cond_physical) = when_cond_expr.domain.unwrap() {
@@ -460,7 +460,7 @@ impl<'l> TypeCheckingContext<'l> {
                 }
                 Instruction::IfStatement(_)
                 | Instruction::ForStatement(_)
-                | Instruction::Interface(_) => {}
+                | Instruction::Action(_) => {}
             }
         }
     }

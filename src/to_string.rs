@@ -498,10 +498,10 @@ impl core::fmt::Debug for DeclarationKind {
         }
     }
 }
-impl core::fmt::Debug for InterfaceKind {
+impl core::fmt::Debug for ActionKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::RegularInterface => write!(f, "interface"),
+            Self::Unconditional => write!(f, "interface"),
             Self::Action(port) => write!(f, "action({port:?})"),
             Self::Trigger(port) => write!(f, "trigger({port:?})"),
         }
@@ -545,13 +545,9 @@ impl Display for SliceType {
         }
     }
 }
-impl Display for InterfaceKind {
+impl Display for ActionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            InterfaceKind::RegularInterface => "interface",
-            InterfaceKind::Action(_) => "action",
-            InterfaceKind::Trigger(_) => "trigger",
-        })
+        f.write_str(self.kind_uncapitalized())
     }
 }
 
@@ -800,7 +796,7 @@ impl LinkInfo {
     ) -> impl Display + 's {
         FmtWrapper(move |f| match &self.instructions[instr_id] {
             Instruction::Declaration(decl) => decl.clock_domain.display(domains).fmt(f),
-            Instruction::Interface(interface) => interface.clock_domain.display(domains).fmt(f),
+            Instruction::Action(interface) => interface.clock_domain.display(domains).fmt(f),
             Instruction::Expression(expr) => expr.clock_domain.display(domains).fmt(f),
             Instruction::SubModule(_)
             | Instruction::IfStatement(_)
@@ -936,21 +932,19 @@ impl LinkInfo {
                         }
                     }
                 }
-                Instruction::Interface(InterfaceDeclaration {
+                Instruction::Action(ActionDeclaration {
                     name,
                     latency_specifier,
-                    is_local,
                     field_id,
-                    interface_kind,
+                    action_kind,
                     inputs,
                     outputs,
                     then_block,
                     else_block,
                     ..
                 }) => {
-                    let is_local = if *is_local { "local " } else { "" };
                     let name = name.green();
-                    write!(f, "{is_local} {interface_kind:?} {field_id:?} {name}")?;
+                    write!(f, "{action_kind:?} {field_id:?} {name}")?;
                     if let Some(lat_spec) = latency_specifier {
                         write!(f, "'{lat_spec:?}")?;
                     }
@@ -1052,19 +1046,19 @@ impl LinkInfo {
 impl Module {
     pub fn display_interface_info(
         &self,
-        interface: &InterfaceDeclaration,
+        interface: &ActionDeclaration,
         file_text: &FileText,
         may_print_domain: bool,
     ) -> impl Display {
         let latency_domains = may_print_domain.then_some(&self.latency_domains);
         let domain = display_latency_domain(latency_domains, interface.latency_domain);
-        let interface_kind = interface.interface_kind;
+        let action_kind = interface.action_kind;
         let name = &file_text[interface.name_span];
         let lat_spec = self
             .link_info
             .display_latency(&interface.latency_specifier, file_text);
         FmtWrapper(move |f| {
-            write!(f, "{domain}{interface_kind} {name}{lat_spec}:")?;
+            write!(f, "{domain}{action_kind} {name}{lat_spec}:")?;
             for decl_id in &interface.inputs {
                 let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
                 let port_info = self.link_info.display_decl(None, port_decl, file_text);
@@ -1099,7 +1093,7 @@ impl Module {
                         continue;
                     }
                     match field.declaration_instruction {
-                        Some(FieldDeclKind::Interface(decl_id)) => {
+                        Some(FieldDeclKind::Action(decl_id)) => {
                             let interface = self.link_info.instructions[decl_id].unwrap_interface();
                             let info = self.display_interface_info(interface, file_text, false);
                             write!(f, "\n{info}")?;
@@ -1168,22 +1162,15 @@ impl InstantiatedModule {
             if !interf_is_valid {
                 return Ok(());
             }
-            match interf.interface_kind {
-                InterfaceKind::RegularInterface => {
+            match interf.action_kind {
+                ActionKind::Unconditional => {
                     write!(f, "    interface {}", interf.name)?;
                 }
-                InterfaceKind::Action(_) => {
+                _ => {
                     if let SubModuleOrWire::Wire(w) = &self.generation_state[interf_id] {
                         let w = &self.wires[*w];
-                        write!(f, "    action {}'{}", w.name, w.absolute_latency)?;
-                    } else {
-                        return Ok(());
-                    }
-                }
-                InterfaceKind::Trigger(_) => {
-                    if let SubModuleOrWire::Wire(w) = &self.generation_state[interf_id] {
-                        let w = &self.wires[*w];
-                        write!(f, "    trigger {}'{}", w.name, w.absolute_latency)?;
+                        let kind = interf.action_kind.kind_uncapitalized();
+                        write!(f, "    {kind} {}'{}", w.name, w.absolute_latency)?;
                     } else {
                         return Ok(());
                     }
@@ -1217,7 +1204,7 @@ impl InstantiatedModule {
             writeln!(f, "module {}:", self.global_ref.display(globals))?;
             for (_, field) in &md.fields {
                 match field.declaration_instruction {
-                    Some(FieldDeclKind::Interface(interf_id)) => {
+                    Some(FieldDeclKind::Action(interf_id)) => {
                         let disp_interf = self.display_action(md, interf_id, globals);
                         disp_interf.fmt(f)?;
                     }

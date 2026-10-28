@@ -72,10 +72,10 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn get_fn_interface(&self, field_id: FieldID) -> &InterfaceDeclaration {
+    pub fn get_fn_interface(&self, field_id: FieldID) -> &ActionDeclaration {
         let interface = &self.fields[field_id];
         let_unwrap!(
-            Some(FieldDeclKind::Interface(i)),
+            Some(FieldDeclKind::Action(i)),
             interface.declaration_instruction
         );
         self.link_info.instructions[i].unwrap_interface()
@@ -224,36 +224,51 @@ impl Direction {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum InterfaceKind {
-    RegularInterface,
+pub enum ActionKind {
+    Unconditional,
     Action(PortID),
     Trigger(PortID),
 }
 
-impl InterfaceKind {
+impl ActionKind {
     pub fn is_conditional(&self) -> bool {
         match self {
-            InterfaceKind::RegularInterface => false,
-            InterfaceKind::Action(_) | InterfaceKind::Trigger(_) => true,
+            ActionKind::Unconditional => false,
+            ActionKind::Action(_) | ActionKind::Trigger(_) => true,
+        }
+    }
+
+    pub fn kind_capitalized(&self) -> &'static str {
+        match self {
+            ActionKind::Unconditional => "Interface",
+            ActionKind::Action(_) => "Action",
+            ActionKind::Trigger(_) => "Trigger",
+        }
+    }
+    pub fn kind_uncapitalized(&self) -> &'static str {
+        match self {
+            ActionKind::Unconditional => "interface",
+            ActionKind::Action(_) => "action",
+            ActionKind::Trigger(_) => "trigger",
         }
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum FieldDeclKind {
-    Interface(FlatID),
+    Action(FlatID),
     SinglePort(FlatID),
 }
 
-/// An interface, like:
+/// An action, like:
 ///
 /// ```sus
 /// module md {
-///     interface beep : int a -> bool b, int[3] c
+///     action beep : int a -> bool b, int[3] c
 /// }
 /// ```
 ///
-/// So this struct represents an interface, which always can be called with a method-call notation:
+/// So this struct represents an action, which always can be called with a method-call notation:
 ///
 /// ```sus
 /// module use_md {
@@ -1023,7 +1038,7 @@ pub struct ParentCondition {
 }
 
 #[derive(Debug)]
-pub struct InterfaceDeclaration {
+pub struct ActionDeclaration {
     pub parent_condition: Option<ParentCondition>,
     pub name: String,
     pub name_span: Span,
@@ -1031,12 +1046,11 @@ pub struct InterfaceDeclaration {
     pub interface_kw_span: Span,
     pub documentation: Documentation,
     pub latency_specifier: Option<FlatID>,
-    pub is_local: bool,
     pub field_id: FieldID,
-    pub interface_kind: InterfaceKind,
+    pub action_kind: ActionKind,
     /// These and [Self::outputs] are respective to the function-call syntax!
     ///
-    /// Do not be confused by [InterfaceKind::Trigger], where [Self::inputs] corresponds to module Output ports!
+    /// Do not be confused by [ActionKind::Trigger], where [Self::inputs] corresponds to module Output ports!
     pub inputs: Vec<FlatID>,
     /// See [Self::inputs]
     pub outputs: Vec<FlatID>,
@@ -1062,7 +1076,7 @@ pub struct InterfaceDeclaration {
 pub enum Instruction {
     SubModule(SubModuleInstance),
     Declaration(Declaration),
-    Interface(InterfaceDeclaration),
+    Action(ActionDeclaration),
     Expression(Expression),
     IfStatement(IfStatement),
     ForStatement(ForStatement),
@@ -1106,8 +1120,8 @@ impl Instruction {
         decl
     }
     #[track_caller]
-    pub fn unwrap_interface(&self) -> &InterfaceDeclaration {
-        let Self::Interface(interf) = self else {
+    pub fn unwrap_interface(&self) -> &ActionDeclaration {
+        let Self::Action(interf) = self else {
             panic!("unwrap_declaration on not a Declaration! Found {self:?}")
         };
         interf
@@ -1144,7 +1158,7 @@ impl Instruction {
             | Instruction::ForStatement(ForStatement {
                 parent_condition, ..
             })
-            | Instruction::Interface(InterfaceDeclaration {
+            | Instruction::Action(ActionDeclaration {
                 parent_condition, ..
             }) => *parent_condition,
         }
@@ -1153,7 +1167,7 @@ impl Instruction {
         match self {
             Instruction::SubModule(sub_module_instance) => sub_module_instance.name_span,
             Instruction::Declaration(declaration) => declaration.name_span,
-            Instruction::Interface(act_trig) => act_trig.name_span,
+            Instruction::Action(act_trig) => act_trig.name_span,
             Instruction::Expression(expression) => expression.span,
             Instruction::IfStatement(if_stm) => if_stm.if_keyword_span,
             Instruction::ForStatement(for_stm) => for_stm.for_kw_span,
@@ -1162,7 +1176,7 @@ impl Instruction {
     pub fn get_name(&self) -> &str {
         match self {
             Instruction::Declaration(declaration) => &declaration.name,
-            Instruction::Interface(interface_declaration) => &interface_declaration.name,
+            Instruction::Action(interface_declaration) => &interface_declaration.name,
             Instruction::SubModule(submod) => &submod.name,
             Instruction::Expression(_)
             | Instruction::IfStatement(_)
@@ -1172,7 +1186,7 @@ impl Instruction {
     pub fn get_latency_specifier(&self) -> Option<FlatID> {
         match self {
             Instruction::Declaration(declaration) => declaration.latency_specifier,
-            Instruction::Interface(interface) => interface.latency_specifier,
+            Instruction::Action(interface) => interface.latency_specifier,
             Instruction::SubModule(_)
             | Instruction::Expression(_)
             | Instruction::IfStatement(_)

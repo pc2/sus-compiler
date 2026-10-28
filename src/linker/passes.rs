@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
     errors::ErrorInfoObject,
-    flattening::{Declaration, GlobalReference, InterfaceDeclaration, Port, SubModuleInstance},
+    flattening::{ActionDeclaration, Declaration, GlobalReference, Port, SubModuleInstance},
     linker::checkpoint::ResolvedGlobalsCheckpoint,
     typing::{
         abstract_type::{AbstractGlobalReference, AbstractInnerType, AbstractRankedType},
@@ -292,7 +292,7 @@ impl<'l, TemplateT: Copy> LocalOrRemoteParentModule<'l, TemplateT> {
 #[derive(Clone, Copy)]
 pub struct RemoteFn<'l, TemplateT> {
     pub parent: LocalOrRemoteParentModule<'l, TemplateT>,
-    pub fn_decl: &'l InterfaceDeclaration,
+    pub fn_decl: &'l ActionDeclaration,
 }
 /// For interfaces of this module
 impl<TemplateT> ErrorInfoObject for &RemoteFn<'_, TemplateT> {

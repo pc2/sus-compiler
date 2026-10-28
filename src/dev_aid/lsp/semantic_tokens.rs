@@ -168,7 +168,7 @@ fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifier
                                 .unwrap_physical();
                             IDEIdentifierType::make_local(false, domain)
                         }
-                        FieldDeclKind::Interface(_decl_id) => IDEIdentifierType::Interface,
+                        FieldDeclKind::Action(_decl_id) => IDEIdentifierType::Interface,
                     }
                 }
                 RefersTo::Parameter(_, parameter, _) => match &parameter.kind {
