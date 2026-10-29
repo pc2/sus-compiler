@@ -923,3 +923,19 @@ module LocalFunctionNoBinding {
 		yy = xx
 	}
 }
+
+module functions_example {
+	state int#(0..128) x
+	initial x = 0
+
+	function increase_x : int by {
+		x = x + by mod 128
+	}
+
+	action increase_by_5 {
+		increase_x(5)
+	}
+	action increase_by_10 {
+		increase_x(10)
+	}
+}
