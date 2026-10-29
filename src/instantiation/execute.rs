@@ -401,7 +401,7 @@ impl<'l> ExecutionContext<'l> {
                         ),
                     })
                 }
-                AbstractInnerType::Interface(_, _) | AbstractInnerType::LocalInterface(_) => {
+                AbstractInnerType::Interface(_, _) => {
                     unreachable!(
                         "Cannot concretize an interface type. Only proper wire types are concretizeable! Should have been caught by typecheck!"
                     )
@@ -647,15 +647,28 @@ impl<'l> ExecutionContext<'l> {
             WireReferenceRoot::LocalSubmodule(submod_id) => {
                 let submod = self.link_info.instructions[*submod_id].unwrap_submodule();
                 let submod_md = &self.globals.modules[submod.module_ref.id];
-                let submod_interface = &submod_md.fields[port_field];
-                let_unwrap!(
-                    Some(FieldDeclKind::SinglePort(port_decl)),
-                    submod_interface.declaration_instruction
-                );
-                let port_decl = submod_md.link_info.instructions[port_decl].unwrap_declaration();
-                let_unwrap!(DeclarationKind::Port { port_id, .. }, port_decl.decl_kind);
+                let submod_field = &submod_md.fields[port_field];
+                let port_id = match submod_field.declaration_instruction {
+                    Some(FieldDeclKind::SinglePort(port_decl)) => {
+                        let port_decl =
+                            submod_md.link_info.instructions[port_decl].unwrap_declaration();
+                        let_unwrap!(DeclarationKind::Port { port_id, .. }, port_decl.decl_kind);
+                        port_id
+                    }
+                    // Actions and triggers are their condition port
+                    Some(FieldDeclKind::Action(action_id)) => {
+                        let action = submod_md.link_info.instructions[action_id].unwrap_interface();
+                        match action.action_kind {
+                            ActionKind::Action(port_id) | ActionKind::Trigger(port_id) => port_id,
+                            ActionKind::Unconditional | ActionKind::Function => {
+                                caught_by_typecheck!("Only actions and triggers are wires")
+                            }
+                        }
+                    }
+                    None => caught_by_typecheck!("Can't turn a submodule into a wire"),
+                };
                 let local_domain_map = submod.submodule_clock_map.get().unwrap();
-                let clock = &local_domain_map[submod_interface.clock.unwrap()];
+                let clock = &local_domain_map[submod_field.clock.unwrap()];
                 let submod_id = self.generation_state[*submod_id].unwrap_submodule_instance();
                 self.get_submodule_port(submod_id, port_id, Some(port_span), *clock.unwrap())
             }
@@ -670,7 +683,11 @@ impl<'l> ExecutionContext<'l> {
                     wire_ref.root_span,
                 )?
             }
-            WireReferenceRoot::LocalTrigger(_) | WireReferenceRoot::NamedModule(_) => {
+            WireReferenceRoot::LocalTrigger(action_id) => {
+                // Actions, triggers and functions are their condition wire
+                self.generation_state[*action_id].unwrap_wire()
+            }
+            WireReferenceRoot::NamedModule(_) => {
                 caught_by_typecheck!("Can't turn an inline module into a wire")
             }
             WireReferenceRoot::Error => caught_by_typecheck!(),
@@ -1463,16 +1480,55 @@ impl<'l> ExecutionContext<'l> {
         }))
     }
 
+    /// Does this wire reference name an action, trigger or function directly? So `my_trigger` or `submod.push`, but not `submod.port` or `submod`
+    ///
+    /// Such references are the condition wire of what they name. Typecheck has already rejected any paths on them
+    fn names_action_condition(&self, wire_ref: &WireReference) -> bool {
+        match &wire_ref.root {
+            WireReferenceRoot::LocalTrigger(_) => true,
+            WireReferenceRoot::LocalSubmodule(_) => {
+                let [WireReferencePathElement::FieldAccess { refers_to, .. }] =
+                    wire_ref.path.as_slice()
+                else {
+                    return false;
+                };
+                let_unwrap!(
+                    PathElemRefersTo::Field(md_id, Some(field)),
+                    refers_to.get().unwrap()
+                );
+                matches!(
+                    self.globals.modules[*md_id].fields[*field].declaration_instruction,
+                    Some(FieldDeclKind::Action(_))
+                )
+            }
+            WireReferenceRoot::LocalDecl(_)
+            | WireReferenceRoot::NamedConstant(_)
+            | WireReferenceRoot::NamedModule(_)
+            | WireReferenceRoot::Error => false,
+        }
+    }
+
     fn instantiate_expression(
         &mut self,
         expr: &'l Expression,
         original_instruction: FlatID,
     ) -> ExecutionResult<SubModuleOrWire> {
-        if let ExpressionOutput::SubExpression(typ) = &expr.output
-            && typ.inner.is_interface()
-        {
-            // Interface execution is up to whoever calls it
-            return Ok(SubModuleOrWire::Unassigned);
+        if let ExpressionOutput::SubExpression(typ) = &expr.output {
+            if typ.inner.is_interface() {
+                // Submodules and inline modules are instantiated by whoever calls them
+                return Ok(SubModuleOrWire::Unassigned);
+            }
+            if let ExpressionSource::WireRef(wire_ref) = &expr.source
+                && self.names_action_condition(wire_ref)
+            {
+                // Actions, triggers and functions are their condition wire. Don't copy it into a new wire,
+                // so that function calls and conditional bindings on this expression target the condition wire itself
+                let domain = expr.clock_domain.unwrap_physical();
+                let (condition_wire, path) =
+                    self.wire_ref_to_real_path(wire_ref, original_instruction, domain)?;
+                assert!(path.is_empty());
+                return Ok(SubModuleOrWire::Wire(condition_wire));
+            }
         }
         Ok(match expr.clock_domain.unwrap() {
             ClockDomain::Generative => {
@@ -1576,10 +1632,7 @@ impl<'l> ExecutionContext<'l> {
                         };
                         self.instantiate_code_block(run_range)?;
                     } else {
-                        let condition_expr =
-                            self.link_info.instructions[if_stm.condition].unwrap_subexpression();
-
-                        if condition_expr.typ.inner.is_interface() {
+                        if if_stm.conditional_bindings_span.is_some() {
                             let wr_expr = self.link_info.instructions[if_stm.condition]
                                 .unwrap_subexpression();
                             let_unwrap!(ExpressionSource::WireRef(interface), &wr_expr.source);

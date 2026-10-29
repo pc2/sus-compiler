@@ -197,7 +197,6 @@ impl<'s> SubstituteRecurse<'s, AbstractInnerType> for AbstractUnifier<'s> {
             AbstractInnerType::Template(_) => true,
             AbstractInnerType::Named(named) => self.fully_substitute_recurse(named),
             AbstractInnerType::Interface(named, _) => self.fully_substitute_recurse(named),
-            AbstractInnerType::LocalInterface(_) => true,
         }
     }
 
@@ -206,7 +205,6 @@ impl<'s> SubstituteRecurse<'s, AbstractInnerType> for AbstractUnifier<'s> {
             AbstractInnerType::Template(_) => Ok(()),
             AbstractInnerType::Named(named) => self.resolve_recurse(named),
             AbstractInnerType::Interface(named, _) => self.resolve_recurse(named),
-            AbstractInnerType::LocalInterface(_) => Ok(()),
         }
     }
 }
@@ -219,9 +217,6 @@ impl<'s> UnifyRecurse<'s, AbstractInnerType> for AbstractUnifier<'s> {
             (AbstractInnerType::Named(a), AbstractInnerType::Named(b)) => self.unify_subtrees(a, b),
             (AbstractInnerType::Interface(a, a_uuid), AbstractInnerType::Interface(b, b_uuid)) => {
                 self.unify_subtrees(a, b) & UnifyResult::from(a_uuid == b_uuid)
-            }
-            (AbstractInnerType::LocalInterface(a), AbstractInnerType::LocalInterface(b)) => {
-                UnifyResult::from(a == b)
             }
             _ => UnifyResult::Failure,
         }
@@ -236,9 +231,6 @@ impl<'s> UnifyRecurse<'s, AbstractInnerType> for AbstractUnifier<'s> {
             (AbstractInnerType::Interface(a, a_uuid), AbstractInnerType::Interface(b, b_uuid)) => {
                 self.set_subtrees(a, b) & UnifyResult::from(a_uuid == b_uuid)
             }
-            (AbstractInnerType::LocalInterface(a), AbstractInnerType::LocalInterface(b)) => {
-                UnifyResult::from(a == b)
-            }
             _ => UnifyResult::Failure,
         }
     }
@@ -250,7 +242,6 @@ impl<'s> UnifyRecurse<'s, AbstractInnerType> for AbstractUnifier<'s> {
             AbstractInnerType::Interface(named, uuid) => {
                 AbstractInnerType::Interface(self.clone_known(named), *uuid)
             }
-            AbstractInnerType::LocalInterface(uuid) => AbstractInnerType::LocalInterface(*uuid),
         }
     }
 }
@@ -277,7 +268,6 @@ impl<'s> Unifier<'s, AbstractInnerType> for AbstractUnifier<'s> {
             AbstractInnerType::Template(_) => false,
             AbstractInnerType::Named(named) => contains_subtree_named(self, named, subtree),
             AbstractInnerType::Interface(named, _) => contains_subtree_named(self, named, subtree),
-            AbstractInnerType::LocalInterface(_) => false,
         }
     }
 }

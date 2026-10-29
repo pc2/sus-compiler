@@ -101,6 +101,9 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate LocalFunctionNotAField #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate LocalFunctionInputReadOnly #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate LocalFunctionNoBinding #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated functions_example #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated ActionsAreBools #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate ActionsAreBoolsBadUses #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -266,6 +269,7 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate LocalFunctionNotAField due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate LocalFunctionInputReadOnly due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate LocalFunctionNoBinding due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate ActionsAreBoolsBadUses due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -2635,13 +2639,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │         ┬  
      │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
-     ╭─[ test.sus:910:10 ]
-     │
- 910 │     int r = submod.add_one(3)
-     │             ───────┬──────  
-     │                    ╰──────── A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
-─────╯
 Error: No such field 'add_one' on LocalFunction #(). Available fields are 'LocalFunction', 'a', 'b', 'r1', 'r2', 'was_big', 'ticked'
      ╭─[ test.sus:910:17 ]
      │
@@ -2743,6 +2740,171 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  922 │     when f : int xx -> int yy {
      │                            ─┬  
      │                             ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:928:21 ]
+     │
+ 928 │     state int#(0..128) x
+     │                        ┬  
+     │                        ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:931:28 ]
+     │
+ 931 │     function increase_x : int by {
+     │                               ─┬  
+     │                                ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused port 'boop'
+     ╭─[ test.sus:945:14 ]
+     │
+ 945 │     use_trigger submod
+     │                 ───┬──  
+     │                    ╰──── Unused port 'boop'
+     │
+     ├─[ test.sus:945:14 ]
+     │
+ 249 │     trigger beep : int boop
+     │                        ──┬─  
+     │                          ╰─── Port 'boop' declared here
+     │ 
+ 945 │     use_trigger submod
+     │                 ───┬──  
+     │                    ╰──── submod declared here
+─────╯
+Warning: Not Instantiating ActionsAreBoolsBadUses #() due to abstract typing errors
+     ╭─[ test.sus:969:8 ]
+     │
+ 969 │ module ActionsAreBoolsBadUses {
+     │        ───────────┬──────────  
+     │                   ╰──────────── Not Instantiating ActionsAreBoolsBadUses #() due to abstract typing errors
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:972:12 ]
+     │
+ 972 │     input int i
+     │               ┬  
+     │               ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Cannot write to action 'maybe_use_trigger'. Call it instead: `maybe_use_trigger(...)`
+     ╭─[ test.sus:978:9 ]
+     │
+ 978 │     submod.maybe_use_trigger = a
+     │            ────────┬────────  
+     │                    ╰────────── Cannot write to action 'maybe_use_trigger'. Call it instead: `maybe_use_trigger(...)`
+     │
+     ├─[ test.sus:978:9 ]
+     │
+ 251 │     action maybe_use_trigger {
+     │            ────────┬────────  
+     │                    ╰────────── 'maybe_use_trigger' declared here
+─────╯
+Error: Cannot write to trigger 'beep'. Call it instead: `beep(...)`
+     ╭─[ test.sus:979:9 ]
+     │
+ 979 │     submod.beep = a
+     │            ──┬─  
+     │              ╰─── Cannot write to trigger 'beep'. Call it instead: `beep(...)`
+     │
+     ├─[ test.sus:979:9 ]
+     │
+ 249 │     trigger beep : int boop
+     │             ──┬─  
+     │               ╰─── 'beep' declared here
+─────╯
+Error: Cannot write to trigger 'my_trigger'. Call it instead: `my_trigger(...)`
+     ╭─[ test.sus:980:2 ]
+     │
+ 980 │     my_trigger = a
+     │     ─────┬────  
+     │          ╰────── Cannot write to trigger 'my_trigger'. Call it instead: `my_trigger(...)`
+     │
+     ├─[ test.sus:980:2 ]
+     │
+ 975 │     trigger my_trigger
+     │             ─────┬────  
+     │                  ╰────── 'my_trigger' declared here
+─────╯
+Error: Cannot write to action 'my_action'. Call it instead: `my_action(...)`
+     ╭─[ test.sus:981:2 ]
+     │
+ 981 │     my_action = a
+     │     ────┬────  
+     │         ╰────── Cannot write to action 'my_action'. Call it instead: `my_action(...)`
+     │
+     ├─[ test.sus:981:2 ]
+     │
+ 974 │     action my_action {}
+     │            ────┬────  
+     │                ╰────── 'my_action' declared here
+─────╯
+Error: Cannot write to function 'my_function'. Call it instead: `my_function(...)`
+     ╭─[ test.sus:982:2 ]
+     │
+ 982 │     my_function = a
+     │     ─────┬─────  
+     │          ╰─────── Cannot write to function 'my_function'. Call it instead: `my_function(...)`
+     │
+     ├─[ test.sus:982:2 ]
+     │
+ 976 │     function my_function {}
+     │              ─────┬─────  
+     │                   ╰─────── 'my_function' declared here
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:983:7 ]
+     │
+ 983 │     bool x = submod.maybe_use_trigger
+     │          ┬  
+     │          ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Action 'maybe_use_trigger' cannot be read, input ports cannot be read.
+     ╭─[ test.sus:983:18 ]
+     │
+ 983 │     bool x = submod.maybe_use_trigger
+     │                     ────────┬────────  
+     │                             ╰────────── Action 'maybe_use_trigger' cannot be read, input ports cannot be read.
+     │
+     ├─[ test.sus:983:18 ]
+     │
+ 251 │     action maybe_use_trigger {
+     │            ────────┬────────  
+     │                    ╰────────── 'maybe_use_trigger' declared here
+─────╯
+Error: A conditional binding expects this to be an interface, but found a regular wire
+     ╭─[ test.sus:984:7 ]
+     │
+ 984 │     when a : int y {}
+     │          ┬  
+     │          ╰── A conditional binding expects this to be an interface, but found a regular wire
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:984:15 ]
+     │
+ 984 │     when a : int y {}
+     │                  ┬  
+     │                  ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Typing Error: if statement condition expects 'bool #()' but was given 'int #(FROM: _, TO: _)'
+     ╭─[ test.sus:985:7 ]
+     │
+ 985 │     when i {}
+     │          ┬  
+     │          ╰── Typing Error: if statement condition expects 'bool #()' but was given 'int #(FROM: _, TO: _)'
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:986:6 ]
+     │
+ 986 │     int z = my_trigger[0]
+     │         ┬  
+     │         ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: This is not an array. Expected an array but found 'bool #()'
+     ╭─[ test.sus:986:20 ]
+     │
+ 986 │     int z = my_trigger[0]
+     │                       ─┬─  
+     │                        ╰─── This is not an array. Expected an array but found 'bool #()'
 ─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:28:6 ]
@@ -3277,31 +3439,18 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                           ──┬─  
      │                             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Can only use conditional bindings on triggers. 'write' is an interface
+Error: 'write' is an interface, which has no condition wire. Only actions, triggers and functions can be referenced by name
      ╭─[ test_old.sus:499:7 ]
      │
  499 │     when write {
      │          ──┬──  
-     │            ╰──── Can only use conditional bindings on triggers. 'write' is an interface
+     │            ╰──── 'write' is an interface, which has no condition wire. Only actions, triggers and functions can be referenced by name
      │
      ├─[ test_old.sus:499:7 ]
      │
  495 │     interface write : bool write, bool[20] wr_data, int#(0..511) wr_addr
      │               ──┬──  
-     │                 ╰──── Interface 'write' defined here
-─────╯
-Error: Too few bindings. This interface provides 3 read-only bindings, but 0 were provided.
-     ╭─[ test_old.sus:499:7 ]
-     │
- 499 │     when write {
-     │          ──┬──  
-     │            ╰──── Too few bindings. This interface provides 3 read-only bindings, but 0 were provided.
-     │
-     ├─[ test_old.sus:499:7 ]
-     │
- 495 │     interface write : bool write, bool[20] wr_data, int#(0..511) wr_addr
-     │               ──┬──  
-     │                 ╰──── Interface 'write' defined here
+     │                 ╰──── 'write' declared here
 ─────╯
 Error: No such field 'i' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
      ╭─[ test_old.sus:504:7 ]
@@ -3322,44 +3471,18 @@ interface out:
 	->
 	output bool[20][512] o'0
 ─────╯
-Error: Can only use conditional bindings on triggers. 'read' is an interface
+Error: 'read' is an interface, which has no condition wire. Only actions, triggers and functions can be referenced by name
      ╭─[ test_old.sus:505:7 ]
      │
  505 │     when read {
      │          ──┬─  
-     │            ╰─── Can only use conditional bindings on triggers. 'read' is an interface
+     │            ╰─── 'read' is an interface, which has no condition wire. Only actions, triggers and functions can be referenced by name
      │
      ├─[ test_old.sus:505:7 ]
      │
  497 │     interface read : bool read, int#(0..511) rd_addr -> bool[20] rd_data
      │               ──┬─  
-     │                 ╰─── Interface 'read' defined here
-─────╯
-Error: Too few bindings. This interface provides 1 writable bindings, but 0 were provided.
-     ╭─[ test_old.sus:505:7 ]
-     │
- 505 │     when read {
-     │          ──┬─  
-     │            ╰─── Too few bindings. This interface provides 1 writable bindings, but 0 were provided.
-     │
-     ├─[ test_old.sus:505:7 ]
-     │
- 497 │     interface read : bool read, int#(0..511) rd_addr -> bool[20] rd_data
-     │               ──┬─  
-     │                 ╰─── Interface 'read' defined here
-─────╯
-Error: Too few bindings. This interface provides 2 read-only bindings, but 0 were provided.
-     ╭─[ test_old.sus:505:7 ]
-     │
- 505 │     when read {
-     │          ──┬─  
-     │            ╰─── Too few bindings. This interface provides 2 read-only bindings, but 0 were provided.
-     │
-     ├─[ test_old.sus:505:7 ]
-     │
- 497 │     interface read : bool read, int#(0..511) rd_addr -> bool[20] rd_data
-     │               ──┬─  
-     │                 ╰─── Interface 'read' defined here
+     │                 ╰─── 'read' declared here
 ─────╯
 Error: No such field 'o' on cross_memory #(). Available fields are 'cross_memory', 'in', 'out'
      ╭─[ test_old.sus:506:18 ]
@@ -3592,13 +3715,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                            ──┬──  
      │                              ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Can't write to an interface. Use a function call or interface connector instead
-     ╭─[ test_old.sus:570:2 ]
-     │
- 570 │     start_cr.i = start
-     │     ─────┬────  
-     │          ╰────── Can't write to an interface. Use a function call or interface connector instead
-─────╯
 Error: No such field 'i' on cross_bool #(). Available fields are 'cross_bool', 'in', 'out'
      ╭─[ test_old.sus:570:11 ]
      │
@@ -3617,6 +3733,19 @@ interface in:
 interface out:
 	->
 	output bool o'0
+─────╯
+Error: 'start' is an interface, which has no condition wire. Only actions, triggers and functions can be referenced by name
+     ╭─[ test_old.sus:570:15 ]
+     │
+ 570 │     start_cr.i = start
+     │                  ──┬──  
+     │                    ╰──── 'start' is an interface, which has no condition wire. Only actions, triggers and functions can be referenced by name
+     │
+     ├─[ test_old.sus:570:15 ]
+     │
+ 563 │     interface start : bool start'0, int#(0..100) upTo'0
+     │               ──┬──  
+     │                 ╰──── 'start' declared here
 ─────╯
 Error: No such field 'i' on cross_int #(). Available fields are 'cross_int', 'in', 'out'
      ╭─[ test_old.sus:573:10 ]
@@ -3949,6 +4078,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                          ──┬──  
      │                                            ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: A conditional binding must name an action, trigger or function, not an arbitrary expression
+     ╭─[ test_old.sus:658:7 ]
+     │
+ 658 │     when decoder.is_jump() : int target_addr {
+     │          ────────┬────────  
+     │                  ╰────────── A conditional binding must name an action, trigger or function, not an arbitrary expression
+─────╯
 Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test_old.sus:658:7 ]
      │
@@ -3962,19 +4098,19 @@ Error: Excess output targets. Function returns 0 results, but 1 targets were giv
      │               ───┬───  
      │                  ╰───── Interface 'is_jump' defined here
 ─────╯
-Error: Cannot use conditional bingings because the condition isn't an action or a trigger
-     ╭─[ test_old.sus:658:25 ]
-     │
- 658 │     when decoder.is_jump() : int target_addr {
-     │                            ────────┬────────  
-     │                                    ╰────────── Cannot use conditional bingings because the condition isn't an action or a trigger
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test_old.sus:658:31 ]
      │
  658 │     when decoder.is_jump() : int target_addr {
      │                                  ─────┬─────  
      │                                       ╰─────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: A conditional binding must name an action, trigger or function, not an arbitrary expression
+     ╭─[ test_old.sus:661:7 ]
+     │
+ 661 │     when decoder.is_load() : int reg_to, int addr {
+     │          ────────┬────────  
+     │                  ╰────────── A conditional binding must name an action, trigger or function, not an arbitrary expression
 ─────╯
 Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test_old.sus:661:7 ]
@@ -3988,13 +4124,6 @@ Error: Excess output targets. Function returns 0 results, but 1 targets were giv
  648 │     interface is_load
      │               ───┬───  
      │                  ╰───── Interface 'is_load' defined here
-─────╯
-Error: Cannot use conditional bingings because the condition isn't an action or a trigger
-     ╭─[ test_old.sus:661:25 ]
-     │
- 661 │     when decoder.is_load() : int reg_to, int addr {
-     │                            ───────────┬──────────  
-     │                                       ╰──────────── Cannot use conditional bingings because the condition isn't an action or a trigger
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test_old.sus:661:31 ]
@@ -4010,6 +4139,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                              ──┬─  
      │                                                ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: A conditional binding must name an action, trigger or function, not an arbitrary expression
+     ╭─[ test_old.sus:664:7 ]
+     │
+ 664 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │          ─────────┬────────  
+     │                   ╰────────── A conditional binding must name an action, trigger or function, not an arbitrary expression
+─────╯
 Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test_old.sus:664:7 ]
      │
@@ -4022,13 +4158,6 @@ Error: Excess output targets. Function returns 0 results, but 1 targets were giv
  649 │     interface is_arith
      │               ────┬───  
      │                   ╰───── Interface 'is_arith' defined here
-─────╯
-Error: Cannot use conditional bingings because the condition isn't an action or a trigger
-     ╭─[ test_old.sus:664:26 ]
-     │
- 664 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
-     │                             ─────────────────┬─────────────────  
-     │                                              ╰─────────────────── Cannot use conditional bingings because the condition isn't an action or a trigger
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test_old.sus:664:32 ]
@@ -4281,19 +4410,19 @@ Error: No Global 'DualPortMem' was found.
      │     ─────┬─────  
      │          ╰─────── No Global 'DualPortMem' was found.
 ─────╯
-Error: A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
+Error: A function call expects this to be an interface, but found a regular wire
      ╭─[ test_old.sus:744:2 ]
      │
  744 │     mem.write(do_write, addr, data)
      │     ────┬────  
-     │         ╰────── A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
+     │         ╰────── A function call expects this to be an interface, but found a regular wire
 ─────╯
-Error: A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
+Error: A function call expects this to be an interface, but found a regular wire
      ╭─[ test_old.sus:746:14 ]
      │
  746 │     read_data = mem.read(addr)
      │                 ────┬───  
-     │                     ╰───── A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
+     │                     ╰───── A function call expects this to be an interface, but found a regular wire
 ─────╯
 Warning: Not Instantiating use_Iterator #() due to abstract typing errors
      ╭─[ test_old.sus:749:8 ]
@@ -4316,19 +4445,19 @@ Error: No Global 'Iterator' was found.
      │     ────┬───  
      │         ╰───── No Global 'Iterator' was found.
 ─────╯
-Error: A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
+Error: A function call expects this to be an interface, but found a regular wire
      ╭─[ test_old.sus:757:2 ]
      │
  757 │     arrayStream.start(do_start, 10)
      │     ────────┬────────  
-     │             ╰────────── A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
+     │             ╰────────── A function call expects this to be an interface, but found a regular wire
 ─────╯
-Error: A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
+Error: A function call expects this to be an interface, but found a regular wire
      ╭─[ test_old.sus:760:31 ]
      │
  760 │     bool iter_valid, int value = arrayStream.iter()
      │                                  ────────┬───────  
-     │                                          ╰───────── A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
+     │                                          ╰───────── A function call expects this to be an interface, but found a regular wire
 ─────╯
 Error: Used 'if' in a non generative context, use 'when' instead
      ╭─[ test_old.sus:761:2 ]
@@ -4467,13 +4596,6 @@ action next_state'II:
 	input T next_state_value
 action request_output:
 	input T result
-─────╯
-Error: Cannot use conditional bingings because the condition isn't an action or a trigger
-     ╭─[ test_old.sus:819:20 ]
-     │
- 819 │     when loop.process : float cur_state {
-     │                       ────────┬────────  
-     │                               ╰────────── Cannot use conditional bingings because the condition isn't an action or a trigger
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test_old.sus:819:28 ]
@@ -5221,13 +5343,6 @@ Warning: Not Instantiating multiply_add_with_latencies #() due to abstract typin
  4 │ module multiply_add_with_latencies {
    │        ─────────────┬─────────────  
    │                     ╰─────────────── Not Instantiating multiply_add_with_latencies #() due to abstract typing errors
-───╯
-Error: A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
-   ╭─[ test_latencies.sus:6:17 ]
-   │
- 6 │     int tmp'1 = multiply(a, b)
-   │                 ────┬───  
-   │                     ╰───── A function call expects this to be an interface, but whatever it was the typechecker couldn't resolve
 ───╯
 Error: No Global 'multiply' was found.
    ╭─[ test_latencies.sus:6:17 ]
@@ -6031,6 +6146,8 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for UseIntBoundsShorthandInference #() as "UseIntBoundsShorthandInference"
 [INFO  sus_compiler::codegen] Code generated for ForLoopSliceForms #() as "ForLoopSliceForms"
 [INFO  sus_compiler::codegen] Code generated for LocalFunction #() as "LocalFunction"
+[INFO  sus_compiler::codegen] Code generated for functions_example #() as "functions_example"
+[INFO  sus_compiler::codegen] Code generated for ActionsAreBools #() as "ActionsAreBools"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"

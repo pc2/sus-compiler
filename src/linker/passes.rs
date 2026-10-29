@@ -215,6 +215,16 @@ impl<'linker, 'from> GlobalResolver<'linker, 'from> {
             md: self.get_module(md_ref.id),
         }
     }
+    /// For inline module uses like `Repeat(...)`
+    pub fn get_inline_module(
+        &self,
+        md_ref: &'linker GlobalReference<ModuleUUID>,
+    ) -> RemoteSubModule<'linker, &'linker TVec<TemplateKind<AbstractRankedType, ()>>> {
+        RemoteSubModule {
+            template_args: md_ref.template_arg_types.get().unwrap(),
+            md: self.get_module(md_ref.id),
+        }
+    }
     pub fn get_global_constant(
         &self,
         cst: &'linker GlobalReference<ConstantUUID>,

@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
 
 use sus_proc_macro::{get_builtin_const, get_builtin_type};
 
@@ -51,8 +51,12 @@ impl LintContext<'_> {
                         .info_obj(decl);
                 }
             }
-            WireReferenceRoot::LocalTrigger(interface_decl_id) => {
-                let _ = self.working_on.instructions[*interface_decl_id].unwrap_interface();
+            WireReferenceRoot::LocalTrigger(action_id) => {
+                let action = self.working_on.instructions[*action_id].unwrap_interface();
+                // Old-style `interface`s are already rejected by the typechecker
+                if is_writing_to && action.action_kind.is_conditional() {
+                    self.cannot_write_to_action(wire_ref.root_span, action);
+                }
             }
             WireReferenceRoot::LocalSubmodule(submod_decl_id) => {
                 let submod = self.globals.get_declared_submodule(
@@ -66,28 +70,63 @@ impl LintContext<'_> {
                     } = p
                     {
                         match refers_to.get() {
-                            Some(PathElemRefersTo::Field(_, Some(port))) => {
-                                if let Some(FieldDeclKind::SinglePort(port_decl)) =
-                                    submod.md.fields[*port].declaration_instruction
-                                {
-                                    let module_port_decl = submod.get_decl(port_decl);
-                                    let_unwrap!(
-                                        DeclarationKind::Port { direction, .. },
-                                        module_port_decl.remote_decl.decl_kind
-                                    );
-                                    match (is_writing_to, direction) {
-                                        (true, Direction::Input) | (false, Direction::Output) => {}
-                                        (true, Direction::Output) => {
-                                            self.errors
-                                                .error(*name_span, "Cannot write to an output port")
-                                                .info_obj(&module_port_decl);
-                                        }
-                                        (false, Direction::Input) => {
-                                            self.errors
-                                                .error(*name_span, "Cannot read from an input port")
-                                                .info_obj(&module_port_decl);
+                            Some(PathElemRefersTo::Field(_, Some(field))) => {
+                                match submod.md.fields[*field].declaration_instruction {
+                                    Some(FieldDeclKind::SinglePort(port_decl)) => {
+                                        let module_port_decl = submod.get_decl(port_decl);
+                                        let_unwrap!(
+                                            DeclarationKind::Port { direction, .. },
+                                            module_port_decl.remote_decl.decl_kind
+                                        );
+                                        match (is_writing_to, direction) {
+                                            (true, Direction::Input)
+                                            | (false, Direction::Output) => {}
+                                            (true, Direction::Output) => {
+                                                self.errors
+                                                    .error(
+                                                        *name_span,
+                                                        "Cannot write to an output port",
+                                                    )
+                                                    .info_obj(&module_port_decl);
+                                            }
+                                            (false, Direction::Input) => {
+                                                self.errors
+                                                    .error(
+                                                        *name_span,
+                                                        "Cannot read from an input port",
+                                                    )
+                                                    .info_obj(&module_port_decl);
+                                            }
                                         }
                                     }
+                                    Some(FieldDeclKind::Action(action_id)) => {
+                                        let action = submod.get_fn(action_id).fn_decl;
+                                        match (is_writing_to, action.action_kind) {
+                                            (true, _) => {
+                                                self.cannot_write_to_action(*name_span, action);
+                                            }
+                                            // An action's condition is an input port of the submodule
+                                            (false, ActionKind::Action(_)) => {
+                                                self.errors
+                                                    .error(
+                                                        *name_span,
+                                                        format!(
+                                                            "Action '{}' cannot be read, input ports cannot be read.",
+                                                            action.name
+                                                        ),
+                                                    )
+                                                    .info_obj(action);
+                                            }
+                                            // A trigger's condition is an output port, and so may be read
+                                            (false, ActionKind::Trigger(_)) => {}
+                                            // Hierarchical reference, handled by the typechecker
+                                            (false, ActionKind::Unconditional) => {}
+                                            (false, ActionKind::Function) => {
+                                                unreachable!("Functions are not fields")
+                                            }
+                                        }
+                                    }
+                                    None => {}
                                 }
                             }
                             Some(PathElemRefersTo::Field(_, None)) | None => {}
@@ -144,31 +183,54 @@ impl LintContext<'_> {
             }
         }
     }
-    fn cant_be_interface(&self, operation: &'static str, wire_ref: &WireReference) {
-        match wire_ref.output_typ.inner.get() {
-            Some(AbstractInnerType::Interface(_, _))
-            | Some(AbstractInnerType::LocalInterface(_)) => {
-                self.errors.error(wire_ref.get_total_span(), format!("Can't {operation} an interface. Use a function call or interface connector instead"));
+    /// Actions, triggers and functions are `bool` wires, but their condition may only be set through a call
+    fn cannot_write_to_action(&self, span: Span, action: &ActionDeclaration) {
+        let kind = action.action_kind;
+        let name = &action.name;
+        let call_hint = if kind.is_conditional() {
+            format!(". Call it instead: `{name}(...)`")
+        } else {
+            String::new()
+        };
+        self.errors
+            .error(span, format!("Cannot write to {kind} '{name}'{call_hint}"))
+            .info_obj(action);
+    }
+    /// The callee of a function call and the condition of a conditional binding name an action, they don't read its condition wire
+    fn collect_action_use_sites(&self) -> HashSet<FlatID> {
+        let mut action_use_sites = HashSet::new();
+        for (_, instr) in &self.working_on.instructions {
+            match instr {
+                Instruction::Expression(Expression {
+                    source: ExpressionSource::FuncCall(fc),
+                    ..
+                }) => {
+                    action_use_sites.insert(fc.func_wire_ref);
+                }
+                Instruction::IfStatement(if_stm) if if_stm.conditional_bindings_span.is_some() => {
+                    action_use_sites.insert(if_stm.condition);
+                }
+                _ => {}
             }
-            Some(AbstractInnerType::Template(_)) | Some(AbstractInnerType::Named(_)) | None => {}
         }
+        action_use_sites
     }
     fn lint_instructions(&self) {
-        for (_, instr) in &self.working_on.instructions {
+        let action_use_sites = self.collect_action_use_sites();
+        for (instr_id, instr) in &self.working_on.instructions {
             match instr {
                 Instruction::SubModule(_) => {}
                 Instruction::Declaration(_) => {}
                 Instruction::Expression(expr) => {
-                    if let ExpressionSource::WireRef(wire_ref) = &expr.source {
+                    if let ExpressionSource::WireRef(wire_ref) = &expr.source
+                        && !action_use_sites.contains(&instr_id)
+                    {
                         self.lint_wire_ref(wire_ref, false);
-                        // TODO: Now that function's func is also a plain Expression, we'd have to check if it's used in a func.
-                        // self.cant_be_interface("read from", wire_ref);
                     }
                     match &expr.output {
                         ExpressionOutput::MultiWrite(writes) => {
                             for wr in writes {
                                 self.lint_wire_ref(&wr.to, true);
-                                self.cant_be_interface("write to", &wr.to);
                                 if let WireReferenceRoot::LocalDecl(decl_id) = &wr.to.root {
                                     let decl =
                                         self.working_on.instructions[*decl_id].unwrap_declaration();
@@ -612,7 +674,9 @@ impl LintContext<'_> {
 
             let interface_instr = md.link_info.instructions[*interf].unwrap_interface();
             match interface_instr.action_kind {
-                ActionKind::Unconditional | ActionKind::Action(_) => {
+                // Already rejected by the typechecker
+                ActionKind::Unconditional => {}
+                ActionKind::Action(_) => {
                     let kind_capitalized = interface_instr.action_kind.kind_capitalized();
                     self.errors
                         .error(

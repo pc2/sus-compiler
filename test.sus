@@ -939,3 +939,49 @@ module functions_example {
 		increase_x(10)
 	}
 }
+
+// Actions, triggers and functions are plain bools: their condition wire
+module ActionsAreBools {
+	use_trigger submod
+	input bool a
+	output bool beeped
+	output bool fired
+	output bool trig_read
+
+	action my_action {}
+	trigger my_trigger
+	function my_function {}
+
+	beeped = submod.beep & a
+	when submod.beep | a {
+		my_trigger()
+	}
+	when a {
+		my_function()
+	}
+	fired = my_action | my_trigger | my_function
+	trig_read = submod.beep
+	when submod.beep {
+		submod.maybe_use_trigger()
+	}
+}
+
+module ActionsAreBoolsBadUses {
+	use_trigger submod
+	input bool a
+	input int i
+
+	action my_action {}
+	trigger my_trigger
+	function my_function {}
+
+	submod.maybe_use_trigger = a
+	submod.beep = a
+	my_trigger = a
+	my_action = a
+	my_function = a
+	bool x = submod.maybe_use_trigger
+	when a : int y {}
+	when i {}
+	int z = my_trigger[0]
+}

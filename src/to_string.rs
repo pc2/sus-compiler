@@ -75,13 +75,6 @@ impl UniCell<AbstractInnerType> {
                     md_id.display(globals, link_info)
                 )
             }
-            Some(AbstractInnerType::LocalInterface(local_interface)) => write!(
-                f,
-                "Local Interface '{}'",
-                link_info.instructions[*local_interface]
-                    .unwrap_interface()
-                    .name,
-            ),
             None => write!(f, "?"),
         })
     }

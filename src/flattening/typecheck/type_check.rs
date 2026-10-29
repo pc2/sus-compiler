@@ -117,9 +117,23 @@ impl<'l> TypeCheckingContext<'l> {
                 let submod = self.instructions[*submod_decl].unwrap_submodule();
                 self.unifier.clone_known(&submod.typ)
             }
-            WireReferenceRoot::LocalTrigger(interface_decl) => {
-                let _ = self.instructions[*interface_decl].unwrap_interface();
-                AbstractInnerType::LocalInterface(*interface_decl).scalar()
+            WireReferenceRoot::LocalTrigger(action_id) => {
+                let action = self.instructions[*action_id].unwrap_interface();
+                if action.action_kind.is_conditional() {
+                    // An action, trigger or function is its condition wire
+                    BOOL_SCALAR
+                } else {
+                    self.errors
+                        .error(
+                            wire_ref.root_span,
+                            format!(
+                                "'{}' is an interface, which has no condition wire. Only actions, triggers and functions can be referenced by name",
+                                action.name
+                            ),
+                        )
+                        .info_obj(action);
+                    AbstractRankedType::UNKNOWN
+                }
             }
             WireReferenceRoot::NamedConstant(cst) => {
                 self.typecheck_global_ref(cst);
@@ -209,19 +223,6 @@ impl<'l> TypeCheckingContext<'l> {
                     .info_obj(template_arg);
                 AbstractRankedType::UNKNOWN
             }
-            AbstractInnerType::LocalInterface(interface_id) => {
-                let interface_decl = self.link_info.instructions[*interface_id].unwrap_interface();
-                self.errors
-                    .error(
-                        *name_span,
-                        format!(
-                            "The type of this object is a local interface '{}'. You cannot use struct fields on local interfaces",
-                            interface_decl.name
-                        ),
-                    )
-                    .info_obj(interface_decl);
-                AbstractRankedType::UNKNOWN
-            }
             AbstractInnerType::Named(_) => {
                 self.errors.todo(*name_span, "Structs");
                 AbstractRankedType::UNKNOWN // todo!("Structs")
@@ -244,13 +245,21 @@ impl<'l> TypeCheckingContext<'l> {
                     .unwrap();
 
                 if let Some(field) = field {
-                    if let Some(FieldDeclKind::SinglePort(port_decl)) =
-                        md.md.fields[field].declaration_instruction
-                    {
-                        md.get_decl(port_decl).get_local_type(self)
-                    } else {
-                        AbstractInnerType::Interface(self.unifier.clone_known(md_ref), field)
-                            .scalar()
+                    match md.md.fields[field].declaration_instruction {
+                        Some(FieldDeclKind::SinglePort(port_decl)) => {
+                            md.get_decl(port_decl).get_local_type(self)
+                        }
+                        // An action or trigger is its condition wire
+                        Some(FieldDeclKind::Action(action_id))
+                            if md.get_fn(action_id).fn_decl.action_kind.is_conditional() =>
+                        {
+                            BOOL_SCALAR
+                        }
+                        // Old-style `interface`s, and the main interface when the module has no main action
+                        Some(FieldDeclKind::Action(_)) | None => {
+                            AbstractInnerType::Interface(self.unifier.clone_known(md_ref), field)
+                                .scalar()
+                        }
                     }
                 } else {
                     let md = self.globals.get_module(md_ref.id);
@@ -500,7 +509,9 @@ impl<'l> TypeCheckingContext<'l> {
         }
     }
 
-    /// If the wire_ref refers to a callable (so not just a hierarchical) interface, then this returns a RemoteFn. Handles the needed error reporting
+    /// If the wire_ref directly names a callable (so not just a hierarchical) interface, then this returns a RemoteFn. Handles the needed error reporting
+    ///
+    /// Actions, triggers and functions are plain `bool` wires, so whether something is callable is decided by what the wire reference names (`my_trigger`, `submod.push`, `submod`, `Repeat`), not by its type.
     fn get_callable_func(
         &self,
         wire_ref_id: FlatID,
@@ -510,46 +521,71 @@ impl<'l> TypeCheckingContext<'l> {
         let ExpressionSource::WireRef(wire_ref) = &wire_ref_expr.source else {
             self.errors.error(
                 wire_ref_expr.span,
-                "Cannot function-call on any expression. It must be a wire reference",
+                format!("{context} must name an action, trigger or function, not an arbitrary expression"),
             );
             return None;
         };
-        match self.unifier.resolve(&wire_ref.output_typ.inner) {
-            Ok(AbstractInnerType::Interface(sm_ref, interface)) => {
-                let submod = self.globals.get_submodule(sm_ref);
-                let field = &submod.md.fields[*interface];
-                let Some(field) = field.declaration_instruction else {
-                    let name = &field.name;
-                    let err_text = format!(
-                        "{context} expects this to be a callable interface, the interface `{name}` is not callable"
-                    );
-                    self.errors
-                        .error(wire_ref.get_total_span(), err_text)
-                        .info_obj(field);
-                    return None;
-                };
-                let_unwrap!(FieldDeclKind::Action(field), field);
-                Some(submod.get_fn(field))
-            }
-            Ok(AbstractInnerType::LocalInterface(interface_decl)) => {
-                let fn_decl = self.link_info.instructions[*interface_decl].unwrap_interface();
-                Some(RemoteFn {
-                    parent: LocalOrRemoteParentModule::Local(self.link_info),
-                    fn_decl,
-                })
-            }
-            Ok(AbstractInnerType::Template(_)) | Ok(AbstractInnerType::Named(_)) => {
-                self.errors.error(
-                    wire_ref.get_total_span(),
-                    format!("{context} expects this to be an interface, but found a regular wire"),
-                );
+        let not_an_interface = || {
+            self.errors.error(
+                wire_ref.get_total_span(),
+                format!("{context} expects this to be an interface, but found a regular wire"),
+            );
+        };
+        // `submod` and `Repeat` name their main interface, `submod.push` names a field. Anything else is a regular wire
+        let field_of_path = || match wire_ref.path.as_slice() {
+            [] => Some(FieldID::MAIN_INTERFACE),
+            [WireReferencePathElement::FieldAccess { refers_to, .. }] => match refers_to.get() {
+                Some(PathElemRefersTo::Field(_, Some(field))) => Some(*field),
+                // Already reported by typecheck_wire_reference
+                Some(PathElemRefersTo::Field(_, None)) | None => None,
+            },
+            _ => {
+                not_an_interface();
                 None
             }
-            Err(_) => {
-                self.errors.error(
-                    wire_ref.get_total_span(),
-                    format!("{context} expects this to be an interface, but whatever it was the typechecker couldn't resolve"),
+        };
+        let (submod, field) = match &wire_ref.root {
+            WireReferenceRoot::LocalTrigger(action_id) => {
+                if !wire_ref.path.is_empty() {
+                    not_an_interface();
+                    return None;
+                }
+                let fn_decl = self.link_info.instructions[*action_id].unwrap_interface();
+                return Some(RemoteFn {
+                    parent: LocalOrRemoteParentModule::Local(self.link_info),
+                    fn_decl,
+                });
+            }
+            WireReferenceRoot::LocalSubmodule(submod_decl) => {
+                let submod = self
+                    .globals
+                    .get_declared_submodule(self.instructions[*submod_decl].unwrap_submodule());
+                (submod, field_of_path()?)
+            }
+            WireReferenceRoot::NamedModule(md_ref) => {
+                (self.globals.get_inline_module(md_ref), field_of_path()?)
+            }
+            WireReferenceRoot::LocalDecl(_) | WireReferenceRoot::NamedConstant(_) => {
+                not_an_interface();
+                return None;
+            }
+            WireReferenceRoot::Error => return None,
+        };
+        let field = &submod.md.fields[field];
+        match field.declaration_instruction {
+            Some(FieldDeclKind::Action(action_id)) => Some(submod.get_fn(action_id)),
+            Some(FieldDeclKind::SinglePort(_)) => {
+                not_an_interface();
+                None
+            }
+            None => {
+                let name = &field.name;
+                let err_text = format!(
+                    "{context} expects this to be a callable interface, the interface `{name}` is not callable"
                 );
+                self.errors
+                    .error(wire_ref.get_total_span(), err_text)
+                    .info_obj(field);
                 None
             }
         }
@@ -796,19 +832,13 @@ impl<'l> TypeCheckingContext<'l> {
             }
             Instruction::IfStatement(if_stm) => {
                 let condition_expr = &self.instructions[if_stm.condition].unwrap_subexpression();
-                if let Ok(inner) = self.unifier.resolve(&condition_expr.typ.inner)
-                    && inner.is_interface()
-                {
+                if if_stm.conditional_bindings_span.is_some() {
                     if let Some(trig) =
                         self.get_callable_func(if_stm.condition, "A conditional binding")
                     {
                         self.type_check_conditional_bindings(if_stm, condition_expr, trig);
                     }
                 } else {
-                    if let Some(bindings_span) = if_stm.conditional_bindings_span {
-                        self.errors.error(bindings_span, "Cannot use conditional bingings because the condition isn't an action or a trigger");
-                    }
-
                     self.unify_type_report_error(
                         condition_expr.typ,
                         &BOOL_SCALAR_FOR_REF,
