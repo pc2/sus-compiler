@@ -66,14 +66,8 @@ impl UniCell<AbstractInnerType> {
             Some(AbstractInnerType::Named(name)) => {
                 write!(f, "{}", name.display(globals, link_info))
             }
-            Some(AbstractInnerType::Interface(md_id)) => {
-                let md = &globals.modules[md_id.id];
-                write!(
-                    f,
-                    "Interface {} of {}",
-                    md.link_info.name,
-                    md_id.display(globals, link_info)
-                )
+            Some(AbstractInnerType::SubModule(md_id)) => {
+                write!(f, "SubModule {}", md_id.display(globals, link_info))
             }
             None => write!(f, "?"),
         })

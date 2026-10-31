@@ -145,7 +145,7 @@ impl<'l> TypeCheckingContext<'l> {
             }
             WireReferenceRoot::NamedModule(md) => {
                 self.typecheck_global_ref(md);
-                AbstractInnerType::Interface(self.make_global_ref_types(md)).scalar()
+                AbstractInnerType::SubModule(self.make_global_ref_types(md)).scalar()
             }
             WireReferenceRoot::Error => AbstractRankedType::UNKNOWN,
         };
@@ -224,12 +224,12 @@ impl<'l> TypeCheckingContext<'l> {
                 AbstractRankedType::UNKNOWN // todo!("Structs")
             }
             // TODO "subinterfaces"
-            AbstractInnerType::Interface(_) => {
+            AbstractInnerType::SubModule(_) => {
                 // Convert to 'l
                 let inner: &'l UniCell<AbstractInnerType> = self
                     .typ_alloc
                     .alloc(UniCell::new(inner.into_owned(&self.unifier)));
-                let_unwrap!(AbstractInnerType::Interface(md_ref), inner.unwrap());
+                let_unwrap!(AbstractInnerType::SubModule(md_ref), inner.unwrap());
                 let md = self.globals.get_submodule(md_ref);
                 let field = md.md.fields.find(|_, field| field.name == field_name);
 
@@ -250,7 +250,7 @@ impl<'l> TypeCheckingContext<'l> {
                         }
                         // The main interface, whether or not the module declares one
                         Some(FieldDeclKind::Action(_)) | None => {
-                            AbstractInnerType::Interface(self.unifier.clone_known(md_ref)).scalar()
+                            AbstractInnerType::SubModule(self.unifier.clone_known(md_ref)).scalar()
                         }
                     }
                 } else {
@@ -810,7 +810,7 @@ impl<'l> TypeCheckingContext<'l> {
             Instruction::SubModule(sm) => {
                 self.typecheck_global_ref(&sm.module_ref);
                 sm.typ.set_initial(
-                    AbstractInnerType::Interface(self.make_global_ref_types(&sm.module_ref))
+                    AbstractInnerType::SubModule(self.make_global_ref_types(&sm.module_ref))
                         .scalar(),
                 );
             }

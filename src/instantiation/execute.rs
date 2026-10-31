@@ -401,7 +401,7 @@ impl<'l> ExecutionContext<'l> {
                         ),
                     })
                 }
-                AbstractInnerType::Interface(_) => {
+                AbstractInnerType::SubModule(_) => {
                     unreachable!(
                         "Cannot concretize an interface type. Only proper wire types are concretizeable! Should have been caught by typecheck!"
                     )
@@ -1514,7 +1514,7 @@ impl<'l> ExecutionContext<'l> {
         original_instruction: FlatID,
     ) -> ExecutionResult<SubModuleOrWire> {
         if let ExpressionOutput::SubExpression(typ) = &expr.output {
-            if typ.inner.is_interface() {
+            if typ.inner.is_submodule() {
                 // Submodules and inline modules are instantiated by whoever calls them
                 return Ok(SubModuleOrWire::Unassigned);
             }
