@@ -6,9 +6,7 @@
 /// ToOneHot#(SIZE: 5)(3) == [false, false, false, true, false]
 /// ToOneHot#(SIZE: 2)(0) == [true, false]
 /// ```
-module ToOneHot #(int SIZE) {
-	interface ToOneHot : int#(0..SIZE - 1) selection'0 -> bool[SIZE] bits'0
-
+module ToOneHot #(int SIZE) : int#(0..SIZE - 1) selection'0 -> bool[SIZE] bits'0 {
     bits = RepeatGen#(T: type bool, V: false, SIZE)
 
 	bits[selection] = true
@@ -68,11 +66,10 @@ module FirstSetBit #(int SIZE) {
 /// PopCount([true, false, true, true, true]) == 4
 /// PopCount(8'b00111011) == 5
 /// ```
-module PopCount #(int SIZE) {
+module PopCount #(int SIZE) : bool[SIZE] bits'0 -> int#(0..SIZE+1) popcount {
 	// Should be chosen based on what's most efficient for the target architecture
 	gen int BASE_CASE_SIZE = 6
 
-	interface PopCount : bool[SIZE] bits'0 -> int#(0..SIZE+1) popcount
 
 	if SIZE == 0 {
 		int zero'0 = 0
@@ -107,12 +104,11 @@ module PopCount #(int SIZE) {
 
 /// Splits the given integer. The upper `[LOWER_BITS..]` bits are returned as upper, the lower `[..LOWER_BITS]` bits are returned in lower
 /// See also [BitwiseIntConcat].
-module BitwiseIntSplit #(int TO, int LOWER_BITS) {
+module BitwiseIntSplit #(int TO, int LOWER_BITS) :
+    int#(FROM: 0, TO) v'0 ->
+    int#(0..(TO-1) / pow2#(E: LOWER_BITS) + 1) upper'0,
+    int#(0..pow2#(E: LOWER_BITS)) lower'0 {
     gen int UPPER_TO = (TO-1) / pow2#(E: LOWER_BITS) + 1
-    interface BitwiseIntSplit :
-        int#(FROM: 0, TO) v'0 ->
-        int#(0..UPPER_TO) upper'0,
-        int#(0..pow2#(E: LOWER_BITS)) lower'0
 
     bool[clog2#(V: TO)] v_bits = UIntToBits(v)
 
@@ -123,12 +119,10 @@ module BitwiseIntSplit #(int TO, int LOWER_BITS) {
 
 /// Recombines a lower and upper integer parts.
 /// See also [BitwiseIntSplit].
-module BitwiseIntConcat #(int UPPER_TO, int LOWER_BITS) {
-    interface BitwiseIntConcat :
-        int#(0..UPPER_TO) upper'0,
-        int#(0..pow2#(E: LOWER_BITS)) lower'0 ->
-        int#(0..UPPER_TO * pow2#(E: LOWER_BITS)) v'0
-
+module BitwiseIntConcat #(int UPPER_TO, int LOWER_BITS) :
+    int#(0..UPPER_TO) upper'0,
+    int#(0..pow2#(E: LOWER_BITS)) lower'0 ->
+    int#(0..UPPER_TO * pow2#(E: LOWER_BITS)) v'0 {
     bool[clog2#(V: UPPER_TO) + LOWER_BITS] v_bits
     v_bits[..LOWER_BITS] = UIntToBits(lower)
     v_bits[LOWER_BITS..] = UIntToBits(upper)
@@ -138,12 +132,11 @@ module BitwiseIntConcat #(int UPPER_TO, int LOWER_BITS) {
 
 /// Sets the lower `[..LOWER_BITS]` bits to false, thus aligning the value
 /// Works for unsigned and signed integers alike.
-module AlignToPow2 #(int FROM, int TO, int LOWER_BITS) {
+module AlignToPow2 #(int FROM, int TO, int LOWER_BITS) :
+    int#(FROM, TO) i'0 ->
+    int#(FROM - (FROM mod clog2#(V: LOWER_BITS))..TO - (TO + 1 mod clog2#(V: LOWER_BITS))) o'0 {
     gen int ALIGNED_FROM = FROM - (FROM mod clog2#(V: LOWER_BITS))
     gen int ALIGNED_TO = TO - (TO + 1 mod clog2#(V: LOWER_BITS))
-    interface AlignToPow2 :
-        int#(FROM, TO) i'0 ->
-        int#(ALIGNED_FROM..ALIGNED_TO) o'0
 
     bool[sizeof#(T: type int#(FROM, TO))] bits = ToBits(i)
     bool[sizeof#(T: type int#(FROM, TO))] aligned_bits

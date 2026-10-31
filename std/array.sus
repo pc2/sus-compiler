@@ -4,9 +4,7 @@
 /// Should not consume any hardware.
 ///
 /// Runtime version of [RepeatGen].
-module Repeat #(T, int SIZE) {
-	interface Repeat : T v'0 -> T[SIZE] result'0
-
+module Repeat #(T, int SIZE) : T v'0 -> T[SIZE] result'0 {
 	for int I in 0..SIZE {
 		result[I] = v
 	}
@@ -17,9 +15,7 @@ module Repeat #(T, int SIZE) {
 /// Should not consume any hardware.
 ///
 /// Runtime version of [ReverseGen].
-module Reverse #(T, int SIZE) {
-	interface Reverse : T[SIZE] v'0 -> T[SIZE] result'0
-
+module Reverse #(T, int SIZE) : T[SIZE] v'0 -> T[SIZE] result'0 {
 	for int I in 0..SIZE {
 		result[I] = v[SIZE - I - 1]
 	}
@@ -30,9 +26,7 @@ module Reverse #(T, int SIZE) {
 /// Should not consume any hardware.
 ///
 /// Runtime version of [ConcatGen].
-module Concat #(T, int SIZE_A, int SIZE_B) {
-	interface Concat : T[SIZE_A] a'0, T[SIZE_B] b'0 -> T[SIZE_A + SIZE_B] result'0
-
+module Concat #(T, int SIZE_A, int SIZE_B) : T[SIZE_A] a'0, T[SIZE_B] b'0 -> T[SIZE_A + SIZE_B] result'0 {
 	result[..SIZE_A] = a
 	result[SIZE_A..] = b
 }
@@ -40,9 +34,7 @@ module Concat #(T, int SIZE_A, int SIZE_B) {
 /// Rotates towards lower indexes by the provided offset. Implemented as a Barrel Shifter.
 ///
 /// Example: `RotateLeft([1, 2, 3, 4], 1) == [2, 3, 4, 1]`
-module RotateLeft#(T, int ARRAY_LEN) {
-    interface RotateLeft : T[ARRAY_LEN] data'0, int#(0..ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0
-
+module RotateLeft#(T, int ARRAY_LEN) : T[ARRAY_LEN] data'0, int#(0..ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0 {
     gen int NUM_STAGES = clog2#(V: ARRAY_LEN)
     bool[NUM_STAGES] offset_bits = UIntToBits(offset)
 
@@ -68,9 +60,7 @@ module RotateLeft#(T, int ARRAY_LEN) {
 ///
 /// Example:
 /// ```sus RotateRight([1, 2, 3, 4], 1) == [4, 1, 2, 3]```
-module RotateRight#(T, int ARRAY_LEN) {
-    interface RotateRight : T[ARRAY_LEN] data'0, int#(0..ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0
-
+module RotateRight#(T, int ARRAY_LEN) : T[ARRAY_LEN] data'0, int#(0..ARRAY_LEN) offset'0 -> T[ARRAY_LEN] rotated_data'0 {
     gen int NUM_STAGES = clog2#(V: ARRAY_LEN)
     bool[NUM_STAGES] offset_bits = UIntToBits(offset)
 

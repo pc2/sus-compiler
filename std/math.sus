@@ -44,9 +44,7 @@ __builtin__ const int max #(int A, int B) {}
 /// Abs(3) == 3
 /// Abs(-7) == 7
 /// ```
-module Abs #(int TO) {
-	interface Abs : int #(FROM: -TO+1, TO) a -> int #(FROM: 0, TO) o
-
+module Abs #(int TO) : int #(FROM: -TO+1, TO) a -> int #(FROM: 0, TO) o {
 	when a < 0 {
 		o = IntNarrow#(FROM: 0, TO)(-a)
 	} else {
@@ -176,6 +174,5 @@ module TreeMin#(int SIZE, int FROM, int TO) {
 /// Unsafely shrinks the bounds of an integer.
 /// The result is not defined if the value lies outside the FROM:TO range.
 /// For folding behavior choose the `mod` operator instead. 
-__builtin__ module IntNarrow #(int FROM_I, int TO_I, int FROM, int TO) {
-    interface IntNarrow : int#(FROM_I..TO_I) din'0 -> int#(FROM, TO) dout'0
+__builtin__ module IntNarrow #(int FROM_I, int TO_I, int FROM, int TO) : int#(FROM_I..TO_I) din'0 -> int#(FROM, TO) dout'0 {
 }

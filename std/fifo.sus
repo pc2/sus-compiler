@@ -280,8 +280,7 @@ module JoiningFIFO#(T, int NUM_FIFOS, int DEPTH, int MAY_PUSH_LATENCY) {
 /// It is meant to bridge a long latency difference. 
 /// 
 /// We keep one latency register on the inflow, and one on the outflow, as they tend to slot into the primitives we synthesize to. 
-module ShiftReg#(T, int LATENCY) {
-    interface ShiftReg : T din'0 -> T dout'LATENCY
+module ShiftReg#(T, int LATENCY) : T din'0 -> T dout'LATENCY {
     assert#(C: LATENCY >= 0)
     
     if LATENCY <= 3 {

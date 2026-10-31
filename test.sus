@@ -332,16 +332,16 @@ module duplicate_port_names {
 	}
 
 	if true {
-		interface interf
+		action interf {}
 	} else {
-		interface interf
+		action interf {}
 	}
 
-	interface port_interf: bool port_interf
+	action port_interf: bool port_interf {}
 	if true {
-		interface proooot: bool preeee
+		action proooot: bool preeee {}
 	} else {
-		interface preeee
+		action preeee {}
 	}
 }
 

@@ -861,6 +861,7 @@ module use_infer_me_with_negative_delta(
 	output /*mux_wire*/ logic y
 );
 
+/*mux_wire*/ logic _inf_a;
 /*mux_wire*/ logic _inf_x;
 wire _inf_y;
 /*latency*/ logic __inf_y_N30; always_ff @(posedge clk) begin __inf_y_N30 <= _inf_y; end
@@ -893,12 +894,15 @@ wire _inf_y;
 /*latency*/ logic __inf_y_N3; always_ff @(posedge clk) begin __inf_y_N3 <= __inf_y_N4; end
 /*latency*/ logic __inf_y_N2; always_ff @(posedge clk) begin __inf_y_N2 <= __inf_y_N3; end
 /*latency*/ logic __inf_y_N1; always_ff @(posedge clk) begin __inf_y_N1 <= __inf_y_N2; end
+/*mux_wire*/ logic _inf_b;
 /*mux_wire*/ logic _inf_p;
 wire _inf_q;
 infer_me_with_negative_delta_V_31 inf(
 	.clk(clk),
+	.a(_inf_a),
 	.x(_inf_x),
 	.y(_inf_y),
+	.b(_inf_b),
 	.p(_inf_p),
 	.q(_inf_q)
 );
@@ -910,12 +914,28 @@ always_comb begin // combinatorial y
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	y = y;
 end
+always_comb begin // combinatorial _inf_a
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_inf_a = 1'bx;
+	_inf_a = 1'b0;
+	_inf_a = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_inf_a = _inf_a;
+end
 always_comb begin // combinatorial _inf_x
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	_inf_x = 1'bx;
 	_inf_x = x;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_inf_x = _inf_x;
+end
+always_comb begin // combinatorial _inf_b
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_inf_b = 1'bx;
+	_inf_b = 1'b0;
+	_inf_b = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_inf_b = _inf_b;
 end
 always_comb begin // combinatorial _inf_p
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -929,8 +949,10 @@ endmodule // use_infer_me_with_negative_delta #()
 // infer_me_with_negative_delta #(V: 31)
 module infer_me_with_negative_delta_V_31(
 	/* clock */ input clk,
+	input wire a,
 	input wire x,
 	output /*mux_wire*/ logic y,
+	input wire b,
 	input wire p,
 	output /*mux_wire*/ logic q
 );
@@ -956,6 +978,7 @@ module use_infer_me_with_delta(
 	output /*mux_wire*/ logic y
 );
 
+/*mux_wire*/ logic _inf_a;
 /*mux_wire*/ logic _inf_x;
 wire _inf_y;
 /*latency*/ logic __inf_y_N30; always_ff @(posedge clk) begin __inf_y_N30 <= _inf_y; end
@@ -988,12 +1011,15 @@ wire _inf_y;
 /*latency*/ logic __inf_y_N3; always_ff @(posedge clk) begin __inf_y_N3 <= __inf_y_N4; end
 /*latency*/ logic __inf_y_N2; always_ff @(posedge clk) begin __inf_y_N2 <= __inf_y_N3; end
 /*latency*/ logic __inf_y_N1; always_ff @(posedge clk) begin __inf_y_N1 <= __inf_y_N2; end
+/*mux_wire*/ logic _inf_b;
 /*mux_wire*/ logic _inf_p;
 wire _inf_q;
 infer_me_with_delta_V_N31 inf(
 	.clk(clk),
+	.a(_inf_a),
 	.x(_inf_x),
 	.y(_inf_y),
+	.b(_inf_b),
 	.p(_inf_p),
 	.q(_inf_q)
 );
@@ -1005,12 +1031,28 @@ always_comb begin // combinatorial y
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	y = y;
 end
+always_comb begin // combinatorial _inf_a
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_inf_a = 1'bx;
+	_inf_a = 1'b0;
+	_inf_a = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_inf_a = _inf_a;
+end
 always_comb begin // combinatorial _inf_x
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	_inf_x = 1'bx;
 	_inf_x = x;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_inf_x = _inf_x;
+end
+always_comb begin // combinatorial _inf_b
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_inf_b = 1'bx;
+	_inf_b = 1'b0;
+	_inf_b = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_inf_b = _inf_b;
 end
 always_comb begin // combinatorial _inf_p
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -1024,8 +1066,10 @@ endmodule // use_infer_me_with_delta #()
 // infer_me_with_delta #(V: -31)
 module infer_me_with_delta_V_N31(
 	/* clock */ input clk,
+	input wire a,
 	input wire x,
 	output /*mux_wire*/ logic y,
+	input wire b,
 	input wire p,
 	output /*mux_wire*/ logic q
 );
@@ -1338,8 +1382,10 @@ endmodule // infer_me #(A: 5)
 // latency_counting_disjoint_blocks #()
 module latency_counting_disjoint_blocks(
 	/* clock */ input clk,
+	input wire x,
 	input wire a,
 	output /*mux_wire*/ logic b,
+	input wire y,
 	input wire c,
 	output /*mux_wire*/ logic d
 );
@@ -1349,6 +1395,13 @@ wire _3;
 assign _3 = a ^ shared;
 wire _6;
 assign _6 = c ^ shared;
+always_comb begin // combinatorial shared
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	shared = 1'bx;
+	shared = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	shared = shared;
+end
 always_comb begin // combinatorial b
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	b = 1'bx;
@@ -1362,13 +1415,6 @@ always_comb begin // combinatorial d
 	d = _6;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	d = d;
-end
-always_comb begin // combinatorial shared
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	shared = 1'bx;
-	shared = 1'b1;
-	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
-	shared = shared;
 end
 endmodule // latency_counting_disjoint_blocks #()
 
@@ -2498,16 +2544,6 @@ module no_main_interface(
 initial begin end
 endmodule // no_main_interface #()
 
-// instruction_decoder #()
-module instruction_decoder(
-	/* clock */ input clk,
-	input wire[31:0] instr
-);
-
-// PATCH XRT 2.16 over-zealous empty module DRC
-initial begin end
-endmodule // instruction_decoder #()
-
 // use_permute #()
 module use_permute(
 	/* clock */ input clk
@@ -2574,6 +2610,119 @@ always_comb begin // combinatorial d_out
 end
 endmodule // permute_t #(T: type int #(FROM: 1, TO: 8), SIZE: 8, SOURCES: [3, 2, 4, 5, 1, 2, 7, 6])
 
+// sequenceDownFrom #()
+module sequenceDownFrom(
+	/* clock */ input clk,
+	input wire start,
+	input wire[6:0] upTo,
+	output /*mux_wire*/ logic ready,
+	output /*mux_wire*/ logic iter,
+	output /*mux_wire*/ logic[6:0] index_out
+);
+
+/*state*/ logic[6:0] index;
+/*mux_wire*/ logic valid;
+/*mux_wire*/ logic[6:0] _upTo_cr_i;
+/*mux_wire*/ logic _start_cr_i;
+wire _ready_cr_o;
+wire _7;
+assign _7 = index != 1'd0;
+wire _9;
+assign _9 = ~valid;
+/*mux_wire*/ logic _ready_cr_i;
+wire signed[7:0] _13;
+assign _13 = index - 1'd1;
+/*mux_wire*/ logic signed[7:0] _IntNarrow_din;
+wire[6:0] _IntNarrow_dout;
+wire _start_cr_o;
+wire[0:0] _upTo_cr_o;
+cross_bool start_cr(
+	.clk(clk),
+	.i(_start_cr_i),
+	.o(_start_cr_o)
+);
+cross_int upTo_cr(
+	.clk(clk),
+	.i(_upTo_cr_i),
+	.o(_upTo_cr_o)
+);
+cross_bool ready_cr(
+	.clk(clk),
+	.i(_ready_cr_i),
+	.o(_ready_cr_o)
+);
+IntNarrow_FROM_I_N1_TO_I_100_FROM_0_TO_101 IntNarrow(
+	.clk(clk),
+	.din(_IntNarrow_din),
+	.dout(_IntNarrow_dout)
+);
+always_comb begin // combinatorial _upTo_cr_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_upTo_cr_i = 7'dx;
+	_upTo_cr_i = upTo;
+end
+always_comb begin // combinatorial _start_cr_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_start_cr_i = 1'bx;
+	_start_cr_i = start;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_start_cr_i = _start_cr_i;
+end
+always_comb begin // combinatorial ready
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	ready = 1'bx;
+	ready = _ready_cr_o;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	ready = ready;
+end
+always_comb begin // combinatorial iter
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	iter = 1'bx;
+	iter = 1'b0;
+	if(valid) iter = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	iter = iter;
+end
+always_comb begin // combinatorial index_out
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	index_out = 7'dx;
+	index_out = index;
+end
+always_ff @(posedge clk) begin // state index
+	if(valid) index <= _IntNarrow_dout;
+	if(_start_cr_o) index <= _upTo_cr_o;
+end
+always_comb begin // combinatorial valid
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	valid = 1'bx;
+	valid = _7;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	valid = valid;
+end
+always_comb begin // combinatorial _ready_cr_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_ready_cr_i = 1'bx;
+	_ready_cr_i = _9;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_ready_cr_i = _ready_cr_i;
+end
+always_comb begin // combinatorial _IntNarrow_din
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_IntNarrow_din = 8'sdx;
+	_IntNarrow_din = _13;
+end
+endmodule // sequenceDownFrom #()
+
+// IntNarrow #(FROM_I: -1, TO_I: 100, FROM: 0, TO: 101)
+module IntNarrow_FROM_I_N1_TO_I_100_FROM_0_TO_101(
+	/* clock */ input clk,
+	input wire signed[7:0] din,
+	output /*mux_wire*/ logic[6:0] dout
+);
+
+	assign dout = din;
+endmodule // IntNarrow #(FROM_I: -1, TO_I: 100, FROM: 0, TO: 101)
+
 // mod_with_unused_interface #()
 module mod_with_unused_interface(
 	/* clock */ input clk
@@ -2582,6 +2731,99 @@ module mod_with_unused_interface(
 // PATCH XRT 2.16 over-zealous empty module DRC
 initial begin end
 endmodule // mod_with_unused_interface #()
+
+// test_separated_domain #()
+module test_separated_domain(
+	/* clock */ input clk,
+	input wire main
+);
+
+/*mux_wire*/ logic domain2;
+/*mux_wire*/ logic domain3;
+/*mux_wire*/ logic domain4;
+/*mux_wire*/ logic domain5;
+/*mux_wire*/ logic[7:0] my_int;
+/*mux_wire*/ logic _ci_i;
+wire _ci_o;
+cross_bool ci(
+	.clk(clk),
+	.i(_ci_i),
+	.o(_ci_o)
+);
+always_comb begin // combinatorial domain2
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	domain2 = 1'bx;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	domain2 = domain2;
+end
+always_comb begin // combinatorial domain3
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	domain3 = 1'bx;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	domain3 = domain3;
+end
+always_comb begin // combinatorial domain4
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	domain4 = 1'bx;
+	domain4 = _ci_o;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	domain4 = domain4;
+end
+always_comb begin // combinatorial _ci_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_ci_i = 1'bx;
+	_ci_i = domain3;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_ci_i = _ci_i;
+end
+always_comb begin // combinatorial domain5
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	domain5 = 1'bx;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	domain5 = domain5;
+end
+always_comb begin // combinatorial my_int
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	my_int = 8'dx;
+end
+endmodule // test_separated_domain #()
+
+// dual_port_mem #()
+module dual_port_mem(
+	/* clock */ input clk,
+	input wire write,
+	input wire[19:0] wr_data,
+	input wire[8:0] wr_addr,
+	input wire read,
+	input wire[8:0] rd_addr,
+	output /*mux_wire*/ logic[19:0] rd_data
+);
+
+/*state*/ logic[19:0] mem[0:511];
+/*mux_wire*/ logic[19:0] _cr_m_i[0:511];
+wire[19:0] _cr_m_o[0:511];
+wire[19:0] _5 = _cr_m_o[rd_addr];
+cross_memory cr_m(
+	.clk(clk),
+	.i(_cr_m_i),
+	.o(_cr_m_o)
+);
+always_ff @(posedge clk) begin // state mem
+	if(write) mem[wr_addr] <= wr_data;
+end
+always_comb begin // combinatorial _cr_m_i
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_cr_m_i = '{20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx};
+	for(int _v0 = 0; _v0 < 512; _v0 = _v0 + 1) begin
+_cr_m_i[_v0] = mem[_v0];
+end
+end
+always_comb begin // combinatorial rd_data
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	rd_data = 20'bxxxxxxxxxxxxxxxxxxxx;
+	rd_data = _5;
+end
+endmodule // dual_port_mem #()
 
 // offset_backwards #()
 module offset_backwards(

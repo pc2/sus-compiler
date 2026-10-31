@@ -29,9 +29,7 @@ module axi_send #(T) {
 
 
 
-module fp_mul {
-    interface fp_mul : float a, float b -> float result
-
+module fp_mul : float a, float b -> float result {
     fp_mul_impl impl
 
     result = impl.c
@@ -55,9 +53,8 @@ module for_loop {
     }
 }
 
-module fizz_buzz_gen {
+module fizz_buzz_gen : int#(0..256) v -> int fb {
     gen int TABLE_SIZE = 256
-    interface fizz_buzz_gen : int#(0..TABLE_SIZE) v -> int fb 
     gen int FIZZ = 15
     gen int BUZZ = 11
     gen int FIZZ_BUZZ = 1511
@@ -167,8 +164,7 @@ module fibonnaci {
     cur = num
 }
 
-module pow17 {
-    interface pow17 : int#(0..100) i -> int o 
+module pow17 : int#(0..100) i -> int o {
         int i2  = i * i
     reg int i4  = i2 * i2
         int i8  = i4 * i4
@@ -176,13 +172,11 @@ module pow17 {
             o   = i16 * i
 }
 
-module example_md {
-    interface example_md :
-        int#(0..5)[4] factors,
-        int#(0..5) add_to ->
-        int product, 
-        int total
-
+module example_md :
+    int#(0..5)[4] factors,
+    int#(0..5) add_to ->
+    int product,
+    int total {
 	reg int mul0 = factors[0] * factors[1]
 	reg int mul1 = factors[2] * factors[3]
 
@@ -190,16 +184,12 @@ module example_md {
 	reg total = product + add_to
 }
 
-module module_taking_time {
-    interface module_taking_time: bool i'0 -> bool o'5
-
+module module_taking_time : bool i'0 -> bool o'5 {
     o = i
 }
 
 
-module BRAMShiftReg #(T, int LATENCY) {
-    interface BRAMShiftReg: T d_in'0 -> T d_out'LATENCY
-
+module BRAMShiftReg #(T, int LATENCY) : T d_in'0 -> T d_out'LATENCY {
     state T[LATENCY] memory
     state int idx = 0
 
@@ -238,9 +228,7 @@ module FIFOExample {
 
 
 // Recursive Tree Add module recurses smaller copies of itself. 
-module TreeAdder #(int WIDTH) {
-	interface TreeAdder : int[WIDTH] values'0 -> int total
-
+module TreeAdder #(int WIDTH) : int[WIDTH] values'0 -> int total {
 	if WIDTH == 0 {
 		// Have to explicitly give zero a latency count. 
 		// Otherwise total's latency can't be determined. 
@@ -267,9 +255,7 @@ module use_TreeAdder {
     TreeAdder #(WIDTH: 20) t
 }
 
-module TreeAdderBaseCase #(int WIDTH) {
-	interface TreeAdderBaseCase : int[WIDTH] values'0 -> int total
-
+module TreeAdderBaseCase #(int WIDTH) : int[WIDTH] values'0 -> int total {
     gen int L_SZ = WIDTH / 2
     gen int R_SZ = WIDTH - L_SZ
 
@@ -284,9 +270,7 @@ module TreeAdderBaseCase #(int WIDTH) {
 }
 
 
-module pairwiseMultiply #(int SIZE) {
-	interface pairwiseMultiply: int[SIZE] a -> int[SIZE-1] out
-
+module pairwiseMultiply #(int SIZE) : int[SIZE] a -> int[SIZE-1] out {
 	for int I in 0..SIZE-1 {
 		out[I] = a[I] * a[I+1]
 	}
@@ -326,9 +310,7 @@ module use_splitAt {
 }
 
 
-module pairwiseMultiplyFlattened #(int SIZE) {
-	interface pairwiseMultiplyFlattened: int[SIZE] a -> int[SIZE-1] out
-
+module pairwiseMultiplyFlattened #(int SIZE) : int[SIZE] a -> int[SIZE-1] out {
     gen int _0 = SIZE-1
 	for int I in 0.._0 {
         int _1 = a[I]
@@ -340,18 +322,14 @@ module pairwiseMultiplyFlattened #(int SIZE) {
 
 
 
-module pairwiseMultiplyExecuted /* #(int SIZE = 3)*/ {
-	interface pairwiseMultiplyExecuted: int[3] a -> int[2] out
-
+module pairwiseMultiplyExecuted : int[3] a -> int[2] out {
     out[0] = a[0] * a[1]
     out[1] = a[1] * a[2]
 }
 
 
 
-module BRAMShiftReg #(T, int LATENCY) {
-    interface BRAMShiftReg: T d_in'0 -> T d_out'LATENCY
-
+module BRAMShiftReg #(T, int LATENCY) : T d_in'0 -> T d_out'LATENCY {
     state T[LATENCY] memory
     state int idx = 0
 

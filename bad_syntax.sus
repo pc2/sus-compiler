@@ -2,21 +2,18 @@
 // This is there to check for ICEs
 
 
-module multiply#(int MIN1, int MAX1, int MIN2, int MAX2) {
-    interface multiply : int#(MIN1..MAX1) a, int#(MIN2..MAX2) b -> int r 
+module multiply#(int MIN1, int MAX1, int MIN2, int MAX2) : int#(MIN1..MAX1) a, int#(MIN2..MAX2) b -> int r {
 	r = a * b
 }
 
 // test
-module contains_submodule {
-    interface contains_submodule : int#(0..1) a, int b, int c -> int r 
+module contains_submodule : int#(0..1) a, int b, int c -> int r {
     int tmp = multiply(a, b)
 	reg r = tmp + c
 }
 
 template<int Size>     
-module ExactlyOne {
-    interface ExactlyOne : bool[Size] inputs -> bool exactlyOne 
+module ExactlyOne : bool[Size] inputs -> bool exactlyOne {
 	if Size == 0 {
 		exactlyOne = false
 	} else if Size == 1 {
@@ -35,8 +32,7 @@ module ExactlyOne {
 }
 
 
-module parallel_mul_add_reg {
-    interface parallel_mul_add_reg : int a, int b -> int p, int q 
+module parallel_mul_add_reg : int a, int b -> int p, int q {
     reg int a2 = a * a
 	reg int a3 = a * a2 + 3
 	reg p = a * a3
@@ -61,8 +57,7 @@ module parallel_mul_add_reg {
 */
 
 timeline (v v _ -> _) .. (_ _ v -> v)
-module mul_add {
-    interface mul_add : int a, int b, int c -> int result 
+module mul_add : int a, int b, int c -> int result {
 	reg int tmp = a * b
 	result = tmp + c
 }
@@ -71,8 +66,7 @@ module mul_add {
 
 
 /* a module to test the syntax */
-module MultiplyAdd {
-    interface MultiplyAdd : i32 a, i32 b, i32 c -> i32 result 
+module MultiplyAdd : i32 a, i32 b, i32 c -> i32 result {
 	// temporary variable
 	i32 tmp = a * b
 	result = tmp + cooo * 30 + 5
@@ -91,8 +85,7 @@ module MultiplyAdd {
 	@
 }
 
-module beep {
-    interface beep : i32 a 
+module beep : i32 a {
 	state i32 beep
 
 	beep = 5
@@ -102,8 +95,7 @@ module beep {
 }
 
 timeline (a -> r) .. (/ -> r)
-module dwiogo {
-    interface dwiogo : bool[512] data -> bool[256] out 
+module dwiogo : bool[512] data -> bool[256] out {
     state bool[256] save = data[256..511]
 	out = data[0..255]
 	#
@@ -113,8 +105,7 @@ module dwiogo {
 
 
 timeline (v, true -> v) .. (/, false -> v) .. (/, false -> v) .. (/, false -> v)
-module packer {
-    interface packer : bool[256] data /* v _ _ _ */, bool valid -> bool[64] o  /* v v v v */
+module packer : bool[256] data /* v _ _ _ */, bool valid -> bool[64] o  /* v v v v */ {
     state bool[192] save = data[64..256]
 	state int part
 	initial part = 3
@@ -130,34 +121,27 @@ module packer {
 }
 
 
-module multiply_add_old {
-    interface multiply_add_old : i32 a, i32 b, i32 c -> i32 result, double double_result 
+module multiply_add_old : i32 a, i32 b, i32 c -> i32 result, double double_result {
 	i32 tmp = a * b
 	reg result = tmp + c
 	reg double_result = cvt_to_double(result)
 }
 
-module exists {
-    interface exists : hello a -> int result 
-
+module exists : hello a -> int result {
 }
 
-module hello {
-    interface hello : int a -> int b }
+module hello : int a -> int b {}
 
-module test_exists {
-    interface test_exists : -> int result 
+module test_exists : -> int result {
 	int x = exists(5)
 	int b = doesnt_exist(3)
 }
 
-module exists {
-    interface exists : duplicate a 
+module exists : duplicate a {
 	// Should be a duplicate of previous exists
 }
 
-module use_other_file {
-    interface use_other_file : int a -> int r 
+module use_other_file : int a -> int r {
 	r = hello_from_the_other_side(a)
 }
 
