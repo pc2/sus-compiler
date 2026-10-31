@@ -196,7 +196,7 @@ impl<'s> SubstituteRecurse<'s, AbstractInnerType> for AbstractUnifier<'s> {
         match known {
             AbstractInnerType::Template(_) => true,
             AbstractInnerType::Named(named) => self.fully_substitute_recurse(named),
-            AbstractInnerType::Interface(named, _) => self.fully_substitute_recurse(named),
+            AbstractInnerType::Interface(named) => self.fully_substitute_recurse(named),
         }
     }
 
@@ -204,7 +204,7 @@ impl<'s> SubstituteRecurse<'s, AbstractInnerType> for AbstractUnifier<'s> {
         match v {
             AbstractInnerType::Template(_) => Ok(()),
             AbstractInnerType::Named(named) => self.resolve_recurse(named),
-            AbstractInnerType::Interface(named, _) => self.resolve_recurse(named),
+            AbstractInnerType::Interface(named) => self.resolve_recurse(named),
         }
     }
 }
@@ -215,8 +215,8 @@ impl<'s> UnifyRecurse<'s, AbstractInnerType> for AbstractUnifier<'s> {
                 UnifyResult::from(a == b)
             }
             (AbstractInnerType::Named(a), AbstractInnerType::Named(b)) => self.unify_subtrees(a, b),
-            (AbstractInnerType::Interface(a, a_uuid), AbstractInnerType::Interface(b, b_uuid)) => {
-                self.unify_subtrees(a, b) & UnifyResult::from(a_uuid == b_uuid)
+            (AbstractInnerType::Interface(a), AbstractInnerType::Interface(b)) => {
+                self.unify_subtrees(a, b)
             }
             _ => UnifyResult::Failure,
         }
@@ -228,8 +228,8 @@ impl<'s> UnifyRecurse<'s, AbstractInnerType> for AbstractUnifier<'s> {
                 UnifyResult::from(a == b)
             }
             (AbstractInnerType::Named(a), AbstractInnerType::Named(b)) => self.set_subtrees(a, b),
-            (AbstractInnerType::Interface(a, a_uuid), AbstractInnerType::Interface(b, b_uuid)) => {
-                self.set_subtrees(a, b) & UnifyResult::from(a_uuid == b_uuid)
+            (AbstractInnerType::Interface(a), AbstractInnerType::Interface(b)) => {
+                self.set_subtrees(a, b)
             }
             _ => UnifyResult::Failure,
         }
@@ -239,8 +239,8 @@ impl<'s> UnifyRecurse<'s, AbstractInnerType> for AbstractUnifier<'s> {
         match known {
             AbstractInnerType::Template(uuid) => AbstractInnerType::Template(*uuid),
             AbstractInnerType::Named(named) => AbstractInnerType::Named(self.clone_known(named)),
-            AbstractInnerType::Interface(named, uuid) => {
-                AbstractInnerType::Interface(self.clone_known(named), *uuid)
+            AbstractInnerType::Interface(named) => {
+                AbstractInnerType::Interface(self.clone_known(named))
             }
         }
     }
@@ -267,7 +267,7 @@ impl<'s> Unifier<'s, AbstractInnerType> for AbstractUnifier<'s> {
         match in_obj {
             AbstractInnerType::Template(_) => false,
             AbstractInnerType::Named(named) => contains_subtree_named(self, named, subtree),
-            AbstractInnerType::Interface(named, _) => contains_subtree_named(self, named, subtree),
+            AbstractInnerType::Interface(named) => contains_subtree_named(self, named, subtree),
         }
     }
 }

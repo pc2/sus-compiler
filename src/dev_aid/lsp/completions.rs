@@ -36,7 +36,7 @@ fn completions_fallback(linker: &Linker, file: &FileData, position: usize) -> Ve
                     });
                 }
                 Instruction::Action(d) => match &d.action_kind {
-                    ActionKind::Action(_) | ActionKind::Unconditional => {}
+                    ActionKind::Action(_) | ActionKind::MainInterface => {}
                     ActionKind::Trigger(_) | ActionKind::Function => {
                         let trigger_params = suggest_funccall_ports(global, &d.inputs);
 
@@ -136,7 +136,7 @@ fn get_module_port_completions(linker: &Linker, md: &Module) -> Vec<CompletionIt
                 });
             }
             Instruction::Action(interf_decl) => match interf_decl.action_kind {
-                ActionKind::Unconditional | ActionKind::Action(_) => {
+                ActionKind::MainInterface | ActionKind::Action(_) => {
                     let label = interf_decl.name.clone();
                     let action_func_params =
                         suggest_funccall_ports(&md.link_info, &interf_decl.inputs);

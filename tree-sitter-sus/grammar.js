@@ -117,7 +117,7 @@ module.exports = grammar({
                 $.for_statement,
                 $.domain_declaration,
                 $.clock_declaration,
-                $.interface_statement
+                $.action_statement
             )),
             '}'
         ),
@@ -200,8 +200,8 @@ module.exports = grammar({
             field('name', $.identifier),
         ),
 
-        interface_statement: $ => seq(
-            field('action_kind', choice('interface', 'action', 'trigger', 'function')),
+        action_statement: $ => seq(
+            field('action_kind', choice('action', 'trigger', 'function')),
             field('name', $.identifier),
             optional(field('latency_specifier', $.latency_specifier)),
             optional(field('interface_ports', $.interface_ports)),
@@ -435,7 +435,7 @@ module.exports = grammar({
         // These allow newlines before optional continuations of a statement ('else', '->', an interface body).
         // On a newline LR(1) can't tell if the statement ends or continues, so GLR explores both until the next token.
         [$._then_else_block], // `}` newline `else`
-        [$.interface_statement], // `action x : int a` newline `{`
+        [$.action_statement], // `action x : int a` newline `{`
         [$.if_statement], // `when x` newline `{`
         [$.interface_ports], // `action x : int a` newline `->`
         [$._interface_ports_output],

@@ -4207,14 +4207,14 @@ Error: An action requires a block
      │     ───┬──  
      │        ╰──── An action requires a block
 ─────╯
-Error: While parsing 'interface_statement', parser found a syntax error in a node of type 'ERROR'
+Error: While parsing 'action_statement', parser found a syntax error in a node of type 'ERROR'
      ╭─[ test_old.sus:747:24 ]
      │
  747 │     action request_output : -> trigger output_valid : T result
      │     ─────────────────────────────┬────┬───────────────────────  
-     │                                  ╰────────────────────────────── Parent node 'interface_statement'
+     │                                  ╰────────────────────────────── Parent node 'action_statement'
      │                                       │                         
-     │                                       ╰───────────────────────── While parsing 'interface_statement', parser found a syntax error in a node of type 'ERROR'
+     │                                       ╰───────────────────────── While parsing 'action_statement', parser found a syntax error in a node of type 'ERROR'
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test_old.sus:747:54 ]
@@ -4251,16 +4251,16 @@ Error: No Global 'trigger' was found.
      │                                ───┬───  
      │                                   ╰───── No Global 'trigger' was found.
 ─────╯
-Error: While parsing 'interface_statement', parser found a syntax error in a node of type 'ERROR'
+Error: While parsing 'action_statement', parser found a syntax error in a node of type 'ERROR'
      ╭─[ test_old.sus:756:50 ]
      │
  756 │ ╭─▶     action request_result : -> trigger result_valid : {
      │ │                                                       ┬  
-     │ │                                                       ╰── While parsing 'interface_statement', parser found a syntax error in a node of type 'ERROR'
+     │ │                                                       ╰── While parsing 'action_statement', parser found a syntax error in a node of type 'ERROR'
      ┆ ┆   
  758 │ ├─▶     }
      │ │           
-     │ ╰─────────── Parent node 'interface_statement'
+     │ ╰─────────── Parent node 'action_statement'
 ─────╯
 Error: No such field 'process' on MultiStateLoop #(T: type ?[...], II: _). Available fields are 'MultiStateLoop', 'may_process', 'next_state', 'request_output'
      ╭─[ test_old.sus:760:12 ]

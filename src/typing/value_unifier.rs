@@ -403,7 +403,7 @@ impl Value {
             AbstractInnerType::Named(AbstractGlobalReference { .. }) => {
                 return Err("TODO: Structs".to_string()); // todo!("Structs")
             }
-            AbstractInnerType::Interface(_, _) => {
+            AbstractInnerType::Interface(_) => {
                 unreachable!(
                     "Interfaces can't be concretized, should have been caught by typecheck!"
                 )

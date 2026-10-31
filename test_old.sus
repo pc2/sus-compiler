@@ -1,4 +1,4 @@
-// Old tests using the deprecated `interface` port syntax, and tests that produce a lot of diagnostics.
+// Older tests, and tests that produce a lot of diagnostics.
 // Part of the regression test together with test.sus and test_latencies.sus
 
 module example_md : int#(0..100)[4] factors,

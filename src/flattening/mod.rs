@@ -225,8 +225,9 @@ impl Direction {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ActionKind {
-    /// The old `interface` syntax: just a group of ports, no condition wire
-    Unconditional,
+    /// The module's main interface, declared in the module header: `module M : int a -> bool b {}`.
+    /// Just a group of ports, no condition wire. Always [FieldID::MAIN_INTERFACE]
+    MainInterface,
     /// `action`: an input port that is the condition for the block
     Action(PortID),
     /// `trigger`: an output port that is the condition for the block, fired by calling it locally
@@ -238,14 +239,14 @@ pub enum ActionKind {
 impl ActionKind {
     pub fn is_conditional(&self) -> bool {
         match self {
-            ActionKind::Unconditional => false,
+            ActionKind::MainInterface => false,
             ActionKind::Action(_) | ActionKind::Trigger(_) | ActionKind::Function => true,
         }
     }
 
     pub fn kind_capitalized(&self) -> &'static str {
         match self {
-            ActionKind::Unconditional => "Interface",
+            ActionKind::MainInterface => "Interface",
             ActionKind::Action(_) => "Action",
             ActionKind::Trigger(_) => "Trigger",
             ActionKind::Function => "Function",
@@ -253,7 +254,7 @@ impl ActionKind {
     }
     pub fn kind_uncapitalized(&self) -> &'static str {
         match self {
-            ActionKind::Unconditional => "interface",
+            ActionKind::MainInterface => "interface",
             ActionKind::Action(_) => "action",
             ActionKind::Trigger(_) => "trigger",
             ActionKind::Function => "function",
@@ -1061,7 +1062,8 @@ pub struct ActionDeclaration {
     pub interface_kw_span: Span,
     pub documentation: Documentation,
     pub latency_specifier: Option<FlatID>,
-    /// `None` for [ActionKind::Function], which is not visible from outside the module
+    /// `None` for [ActionKind::Function], which is not visible from outside the module.
+    /// [FieldID::MAIN_INTERFACE] for [ActionKind::MainInterface]
     pub field_id: Option<FieldID>,
     pub action_kind: ActionKind,
     /// These and [Self::outputs] are respective to the function-call syntax!

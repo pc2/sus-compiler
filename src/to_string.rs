@@ -66,12 +66,12 @@ impl UniCell<AbstractInnerType> {
             Some(AbstractInnerType::Named(name)) => {
                 write!(f, "{}", name.display(globals, link_info))
             }
-            Some(AbstractInnerType::Interface(md_id, interface_field_id)) => {
+            Some(AbstractInnerType::Interface(md_id)) => {
                 let md = &globals.modules[md_id.id];
                 write!(
                     f,
                     "Interface {} of {}",
-                    md.fields[*interface_field_id].name,
+                    md.link_info.name,
                     md_id.display(globals, link_info)
                 )
             }
@@ -503,7 +503,7 @@ impl core::fmt::Debug for DeclarationKind {
 impl core::fmt::Debug for ActionKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Unconditional => write!(f, "interface"),
+            Self::MainInterface => write!(f, "interface"),
             Self::Action(port) => write!(f, "action({port:?})"),
             Self::Trigger(port) => write!(f, "trigger({port:?})"),
             Self::Function => write!(f, "function"),
@@ -1166,8 +1166,8 @@ impl InstantiatedModule {
                 return Ok(());
             }
             match interf.action_kind {
-                ActionKind::Unconditional => {
-                    write!(f, "    interface {}", interf.name)?;
+                ActionKind::MainInterface => {
+                    write!(f, "module {}", self.global_ref.display(globals))?;
                 }
                 _ => {
                     if let SubModuleOrWire::Wire(w) = &self.generation_state[interf_id] {
@@ -1204,8 +1204,17 @@ impl InstantiatedModule {
         FmtWrapper(|f| {
             let md = &globals.modules[self.global_ref.id];
 
-            writeln!(f, "module {}:", self.global_ref.display(globals))?;
-            for (_, field) in &md.fields {
+            if let Some(FieldDeclKind::Action(main_interface)) =
+                md.fields[FieldID::MAIN_INTERFACE].declaration_instruction
+            {
+                self.display_action(md, main_interface, globals).fmt(f)?;
+            } else {
+                writeln!(f, "module {}:", self.global_ref.display(globals))?;
+            }
+            for (field_id, field) in &md.fields {
+                if field_id == FieldID::MAIN_INTERFACE {
+                    continue;
+                }
                 match field.declaration_instruction {
                     Some(FieldDeclKind::Action(interf_id)) => {
                         let disp_interf = self.display_action(md, interf_id, globals);

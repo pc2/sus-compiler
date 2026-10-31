@@ -119,8 +119,8 @@ impl LintContext<'_> {
                                             }
                                             // A trigger's condition is an output port, and so may be read
                                             (false, ActionKind::Trigger(_)) => {}
-                                            // Hierarchical reference, handled by the typechecker
-                                            (false, ActionKind::Unconditional) => {}
+                                            // The main interface, handled by the typechecker
+                                            (false, ActionKind::MainInterface) => {}
                                             (false, ActionKind::Function) => {
                                                 unreachable!("Functions are not fields")
                                             }
@@ -587,7 +587,7 @@ impl LintContext<'_> {
                             &md.link_info.instructions[interf_id]
                         );
                         match interface_declaration.action_kind {
-                            ActionKind::Unconditional => {
+                            ActionKind::MainInterface => {
                                 Some((&field.name, field.name_span, "interface"))
                             }
                             ActionKind::Action(_) | ActionKind::Trigger(_) => None, // Covered by ports
@@ -675,7 +675,7 @@ impl LintContext<'_> {
             let interface_instr = md.link_info.instructions[*interf].unwrap_interface();
             match interface_instr.action_kind {
                 // Already rejected by the typechecker
-                ActionKind::Unconditional => {}
+                ActionKind::MainInterface => {}
                 ActionKind::Action(_) => {
                     let kind_capitalized = interface_instr.action_kind.kind_capitalized();
                     self.errors

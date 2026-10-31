@@ -1478,13 +1478,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         result
     }
-    fn with_nested_context_maybe<R>(&mut self, new_ctx: bool, f: impl FnOnce(&mut Self) -> R) -> R {
-        if new_ctx {
-            self.with_nested_context(f)
-        } else {
-            f(self)
-        }
-    }
 
     /// Makes sure to reset [Self::current_parent_condition] appropriately
     fn with_parent_condition(&mut self, new_parent: Option<FlatID>, f: impl FnOnce(&mut Self)) {
@@ -1690,7 +1683,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             slf.flatten_for_statement(cursor);
                         })
                     }),
-                    kind!("interface_statement") => cursor.go_down_no_check(|cursor| {
+                    kind!("action_statement") => cursor.go_down_no_check(|cursor| {
                         slf.parse_action(cursor);
                     }),
                     kind!("domain_declaration") => cursor.go_down_no_check(|cursor| {
@@ -1710,11 +1703,9 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     }
 
     fn parse_action(&mut self, cursor: &mut Cursor<'c>) {
-        // Skip interface kind
         cursor.field(field!("action_kind"));
         let (interface_kw, interface_kw_span) = cursor.kind_span();
         let (left_direction, mut action_kind) = match interface_kw {
-            kw!("interface") => (Direction::Input, ActionKind::Unconditional),
             kw!("action") => (Direction::Input, ActionKind::Action(UUID::PLACEHOLDER)),
             kw!("trigger") => (Direction::Output, ActionKind::Trigger(UUID::PLACEHOLDER)),
             kw!("function") => (Direction::Input, ActionKind::Function),
@@ -1735,7 +1726,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         let declaration_instruction = self.instructions.get_next_alloc_id();
         match &mut action_kind {
-            ActionKind::Unconditional | ActionKind::Function => {}
+            ActionKind::MainInterface => unreachable!("Only declared in the module header"),
+            ActionKind::Function => {}
             ActionKind::Action(port_id) => {
                 *port_id = self.ports.alloc(Port {
                     name: name.to_owned(),
@@ -1803,6 +1795,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 clock: Some(self.current_clock),
                 declaration_instruction: Some(FieldDeclKind::Action(declaration_instruction)),
             };
+            // An action or trigger named after the module is its main interface: `Name(args)` calls it
             Some(if name == self.name {
                 let existing = &self.fields[FieldID::MAIN_INTERFACE];
                 if existing.declaration_instruction.is_some() {
@@ -1829,73 +1822,58 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 direction,
                 is_state: false,
             },
-            ActionKind::Unconditional | ActionKind::Action(_) | ActionKind::Trigger(_) => {
-                DeclarationKind::Port {
-                    direction,
-                    is_state: false,
-                    parent_field: field_id.unwrap(),
-                    port_id: UUID::PLACEHOLDER,
-                    is_standalone_port: false,
-                    latency_domain: current_latency_domain,
-                }
-            }
+            ActionKind::MainInterface => unreachable!("Only declared in the module header"),
+            ActionKind::Action(_) | ActionKind::Trigger(_) => DeclarationKind::Port {
+                direction,
+                is_state: false,
+                parent_field: field_id.unwrap(),
+                port_id: UUID::PLACEHOLDER,
+                is_standalone_port: false,
+                latency_domain: current_latency_domain,
+            },
         };
 
-        let is_action_or_trigger = action_kind.is_conditional();
+        self.with_nested_context(|slf| {
+            slf.with_parent_condition(Some(declaration_instruction), |slf| {
+                let (inputs, outputs) =
+                    slf.flatten_interface_ports(left_direction, &param_decl_kind, cursor);
 
-        self.with_nested_context_maybe(is_action_or_trigger, |slf| {
-            slf.with_parent_condition(
-                is_action_or_trigger.then_some(declaration_instruction),
-                |slf| {
-                    let (inputs, outputs) =
-                        slf.flatten_interface_ports(left_direction, &param_decl_kind, cursor);
+                let (then_block, else_block, then_span, else_span) =
+                    slf.flatten_then_else_blocks(cursor, true);
 
-                    let (then_block, else_block, then_span, else_span) =
-                        slf.flatten_then_else_blocks(cursor, is_action_or_trigger);
+                let then_block = UUIDRange(then_block_starts_at, then_block.1);
+                let_unwrap!(
+                    Instruction::Action(interface),
+                    &mut slf.instructions[declaration_instruction]
+                );
 
-                    let then_block = UUIDRange(then_block_starts_at, then_block.1);
-                    let_unwrap!(
-                        Instruction::Action(interface),
-                        &mut slf.instructions[declaration_instruction]
-                    );
+                interface.field_id = field_id;
+                interface.inputs = inputs;
+                interface.outputs = outputs;
+                interface.then_block = then_block;
+                interface.else_block = else_block;
+                interface.then_span = then_span;
+                interface.else_span = else_span;
 
-                    interface.field_id = field_id;
-                    interface.inputs = inputs;
-                    interface.outputs = outputs;
-                    interface.then_block = then_block;
-                    interface.else_block = else_block;
-                    interface.then_span = then_span;
-                    interface.else_span = else_span;
-
-                    match action_kind {
-                        ActionKind::Unconditional => {
-                            if let Some((_, lat_spec_span)) = parsed_latency_specifier {
-                                slf.errors.error(
-                                    lat_spec_span,
-                                    "Can only add latency specifiers to actions or triggers",
-                                );
-                            }
-                            if let Some(else_span) = else_span {
-                                slf.errors
-                                    .error(else_span, "Regular interfaces cannot take else blocks");
-                            }
-                        }
-                        ActionKind::Action(_) => {
-                            if then_span.is_none() {
-                                slf.errors
-                                    .error(interface_kw_span, "An action requires a block");
-                            }
-                        }
-                        ActionKind::Function => {
-                            if then_span.is_none() {
-                                slf.errors
-                                    .error(interface_kw_span, "A function requires a block");
-                            }
-                        }
-                        ActionKind::Trigger(_) => {}
+                match action_kind {
+                    ActionKind::MainInterface => {
+                        unreachable!("Only declared in the module header")
                     }
-                },
-            );
+                    ActionKind::Action(_) => {
+                        if then_span.is_none() {
+                            slf.errors
+                                .error(interface_kw_span, "An action requires a block");
+                        }
+                    }
+                    ActionKind::Function => {
+                        if then_span.is_none() {
+                            slf.errors
+                                .error(interface_kw_span, "A function requires a block");
+                        }
+                    }
+                    ActionKind::Trigger(_) => {}
+                }
+            });
         });
     }
 
@@ -2320,7 +2298,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 documentation: cursor.extract_gathered_docs(),
                 latency_specifier: None,
                 field_id: Some(FieldID::MAIN_INTERFACE),
-                action_kind: ActionKind::Unconditional,
+                action_kind: ActionKind::MainInterface,
                 inputs: Vec::new(),
                 outputs: Vec::new(),
                 clock_domain: UniCell::new(self.current_clock),

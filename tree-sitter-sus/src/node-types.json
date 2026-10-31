@@ -1,5 +1,79 @@
 [
   {
+    "type": "action_statement",
+    "named": true,
+    "fields": {
+      "action_kind": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "action",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": false
+          },
+          {
+            "type": "trigger",
+            "named": false
+          }
+        ]
+      },
+      "else_block": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "else_block",
+            "named": true
+          }
+        ]
+      },
+      "interface_ports": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "interface_ports",
+            "named": true
+          }
+        ]
+      },
+      "latency_specifier": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "latency_specifier",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "then_block": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "array_access_bracket_expression",
     "named": true,
     "fields": {
@@ -576,6 +650,10 @@
         "required": false,
         "types": [
           {
+            "type": "action_statement",
+            "named": true
+          },
+          {
             "type": "assign_left_side",
             "named": true
           },
@@ -601,10 +679,6 @@
           },
           {
             "type": "if_statement",
-            "named": true
-          },
-          {
-            "type": "interface_statement",
             "named": true
           }
         ]
@@ -1249,84 +1323,6 @@
         "types": [
           {
             "type": "declaration_list",
-            "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
-    "type": "interface_statement",
-    "named": true,
-    "fields": {
-      "action_kind": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "action",
-            "named": false
-          },
-          {
-            "type": "function",
-            "named": false
-          },
-          {
-            "type": "interface",
-            "named": false
-          },
-          {
-            "type": "trigger",
-            "named": false
-          }
-        ]
-      },
-      "else_block": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "else_block",
-            "named": true
-          }
-        ]
-      },
-      "interface_ports": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "interface_ports",
-            "named": true
-          }
-        ]
-      },
-      "latency_specifier": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "latency_specifier",
-            "named": true
-          }
-        ]
-      },
-      "name": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      },
-      "then_block": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "block",
             "named": true
           }
         ]
@@ -2219,10 +2215,6 @@
   },
   {
     "type": "input",
-    "named": false
-  },
-  {
-    "type": "interface",
     "named": false
   },
   {

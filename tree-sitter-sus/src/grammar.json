@@ -446,7 +446,7 @@
                           },
                           {
                             "type": "SYMBOL",
-                            "name": "interface_statement"
+                            "name": "action_statement"
                           }
                         ]
                       }
@@ -496,7 +496,7 @@
                                 },
                                 {
                                   "type": "SYMBOL",
-                                  "name": "interface_statement"
+                                  "name": "action_statement"
                                 }
                               ]
                             }
@@ -982,7 +982,7 @@
         }
       ]
     },
-    "interface_statement": {
+    "action_statement": {
       "type": "SEQ",
       "members": [
         {
@@ -991,10 +991,6 @@
           "content": {
             "type": "CHOICE",
             "members": [
-              {
-                "type": "STRING",
-                "value": "interface"
-              },
               {
                 "type": "STRING",
                 "value": "action"
@@ -2877,7 +2873,7 @@
       "_then_else_block"
     ],
     [
-      "interface_statement"
+      "action_statement"
     ],
     [
       "if_statement"

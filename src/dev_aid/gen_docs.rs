@@ -105,14 +105,24 @@ fn build_interface_params(li: &LinkInfo, iface: &ActionDeclaration, ft: &FileTex
 fn build_interface_block(md: &Module, ft: &FileText) -> String {
     let li = &md.link_info;
     let name = li.display_full_name_and_args::<true>(ft);
-    let mut out = format!("module {name} {{\n");
+    let main_interface = match md.fields[FieldID::MAIN_INTERFACE].declaration_instruction {
+        Some(FieldDeclKind::Action(iface_id)) => {
+            build_interface_params(li, li.instructions[iface_id].unwrap_interface(), ft)
+        }
+        Some(FieldDeclKind::SinglePort(_)) => unreachable!("Main interface is not a port"),
+        None => String::new(),
+    };
+    let mut out = format!("module {name}{main_interface} {{\n");
 
     let multiple_domains = md.latency_domains.len() > 1;
 
     // Group fields by latency domain, preserving source order within each group.
     let mut domain_fields: HashMap<LatDomID, Vec<(usize, String)>> = HashMap::new();
 
-    for (_, field) in &md.fields {
+    for (field_id, field) in &md.fields {
+        if field_id == FieldID::MAIN_INTERFACE {
+            continue;
+        }
         let Some(decl_instr) = field.declaration_instruction else {
             continue;
         };

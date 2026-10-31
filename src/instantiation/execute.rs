@@ -401,7 +401,7 @@ impl<'l> ExecutionContext<'l> {
                         ),
                     })
                 }
-                AbstractInnerType::Interface(_, _) => {
+                AbstractInnerType::Interface(_) => {
                     unreachable!(
                         "Cannot concretize an interface type. Only proper wire types are concretizeable! Should have been caught by typecheck!"
                     )
@@ -660,7 +660,7 @@ impl<'l> ExecutionContext<'l> {
                         let action = submod_md.link_info.instructions[action_id].unwrap_interface();
                         match action.action_kind {
                             ActionKind::Action(port_id) | ActionKind::Trigger(port_id) => port_id,
-                            ActionKind::Unconditional | ActionKind::Function => {
+                            ActionKind::MainInterface | ActionKind::Function => {
                                 caught_by_typecheck!("Only actions and triggers are wires")
                             }
                         }
@@ -943,7 +943,7 @@ impl<'l> ExecutionContext<'l> {
                     (typ, false)
                 }
                 Instruction::Action(interface_decl) => match interface_decl.action_kind {
-                    ActionKind::Unconditional => {
+                    ActionKind::MainInterface => {
                         unreachable!("Non-conditional interfaces can't have condition")
                     }
                     ActionKind::Action(_) | ActionKind::Trigger(_) => (ConcreteType::BOOL, true),
@@ -1016,7 +1016,7 @@ impl<'l> ExecutionContext<'l> {
             ActionKind::Action(condition_port) | ActionKind::Trigger(condition_port) => {
                 Some(self.get_submodule_port(submod_id, condition_port, Some(field_span), domain))
             }
-            ActionKind::Unconditional => None,
+            ActionKind::MainInterface => None,
             ActionKind::Function => unreachable!("Functions are not fields of a submodule"),
         };
 
@@ -1089,7 +1089,7 @@ impl<'l> ExecutionContext<'l> {
                 }
 
                 let condition_wire = match interface.action_kind {
-                    ActionKind::Unconditional => {
+                    ActionKind::MainInterface => {
                         interface.decl_span.debug();
                         unreachable!("Can't call interfaces locally")
                     }
@@ -1703,7 +1703,7 @@ impl<'l> ExecutionContext<'l> {
 
                         // Triggers and functions are fired by local calls, so their condition is a multiplexer that defaults to false
                         let (is_port, is_fired_locally) = match interface.action_kind {
-                            ActionKind::Unconditional => unreachable!(),
+                            ActionKind::MainInterface => unreachable!(),
                             ActionKind::Action(port_id) => {
                                 (IsPort::Port(port_id, Direction::Input), false)
                             }

@@ -29,10 +29,10 @@ use crate::{
 pub enum AbstractInnerType {
     Template(TemplateID),
     Named(AbstractGlobalReference<TypeUUID>),
-    /// A submodule instance ([FieldID::MAIN_INTERFACE]), or one of its old-style `interface` fields.
+    /// A submodule instance, or a module named directly: its main interface ([FieldID::MAIN_INTERFACE]).
     ///
     /// Actions, triggers and functions are not interfaces: they are plain `bool` wires (their condition wire).
-    Interface(AbstractGlobalReference<ModuleUUID>, FieldID),
+    Interface(AbstractGlobalReference<ModuleUUID>),
 }
 
 pub const BOOL_INNER: AbstractInnerType = AbstractInnerType::Named(AbstractGlobalReference {
@@ -76,7 +76,7 @@ impl AbstractInnerType {
     }
     pub fn is_interface(&self) -> bool {
         match self {
-            AbstractInnerType::Interface(_, _) => true,
+            AbstractInnerType::Interface(_) => true,
             AbstractInnerType::Template(_) | AbstractInnerType::Named(_) => false,
         }
     }
@@ -211,11 +211,10 @@ impl AbstractRankedType {
                 AbstractInnerType::Named(named_ref.substitute_template_args(args))
                     .with_rank(self.rank.unwrap().clone())
             }
-            AbstractInnerType::Interface(module_ref, interface_id) => AbstractInnerType::Interface(
-                module_ref.substitute_template_args(args),
-                *interface_id,
-            )
-            .with_rank(self.rank.unwrap().clone()),
+            AbstractInnerType::Interface(module_ref) => {
+                AbstractInnerType::Interface(module_ref.substitute_template_args(args))
+                    .with_rank(self.rank.unwrap().clone())
+            }
         }
     }
 }

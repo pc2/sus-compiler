@@ -111,8 +111,7 @@ One big decision all of these (including SUS) make is going all-in on Synchronou
 ## Main Features through examples
 ### Pipelining through [Latency Counting](philosophy/latency.md)
 ```Verilog
-module pow17 {
-    interface pow17 : int i -> int o 
+module pow17 : int i -> int o {
         int i2  = i * i
     reg int i4  = i2 * i2
         int i8  = i4 * i4
@@ -124,8 +123,7 @@ module pow17 {
 
 ### FIZZ-BUZZ Lookup Table using Generative Code
 ```Verilog
-module fizz_buzz_gen {
-    interface fizz_buzz_gen : int v -> int fb 
+module fizz_buzz_gen : int v -> int fb {
     gen int FIZZ = 15
     gen int BUZZ = 11
     gen int FIZZ_BUZZ = 1511
