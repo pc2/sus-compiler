@@ -985,3 +985,18 @@ module ActionsAreBoolsBadUses {
 	when i {}
 	int z = my_trigger[0]
 }
+
+/// Tests the `module M : inputs -> outputs` main interface shorthand
+module module_interface_shorthand #(T, int N) : T v'0, bool invert -> T[N] result'0, bool inverted'0 {
+	result = Repeat(v)
+	inverted = !invert
+}
+
+module use_module_interface_shorthand : int#(0..100) a, bool b -> int[3] x, bool y {
+	bool inverted
+	x, inverted = module_interface_shorthand#(N: 3)(a, b)
+
+	module_interface_shorthand#(T: type bool, N: 5) sub
+	bool[5] sub_x, bool sub_y = sub(b, b)
+	y = inverted | &sub_x | sub_y
+}

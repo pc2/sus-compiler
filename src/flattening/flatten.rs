@@ -1804,6 +1804,12 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 declaration_instruction: Some(FieldDeclKind::Action(declaration_instruction)),
             };
             Some(if name == self.name {
+                let existing = &self.fields[FieldID::MAIN_INTERFACE];
+                if existing.declaration_instruction.is_some() {
+                    self.errors
+                        .error(name_span, "Duplicate main interface declaration")
+                        .info(existing.name_span, "Main interface declared here");
+                }
                 self.fields[FieldID::MAIN_INTERFACE] = new_interface;
                 FieldID::MAIN_INTERFACE
             } else {
@@ -2133,6 +2139,16 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         if !cursor.optional_field(field!("interface_ports")) {
             return (Vec::new(), Vec::new());
         }
+        self.flatten_interface_ports_list(left_direction, param_decl_kind, cursor)
+    }
+
+    /// Expects to be at a [kind!("interface_ports")] node
+    fn flatten_interface_ports_list(
+        &mut self,
+        left_direction: Direction,
+        param_decl_kind: &impl Fn(Direction) -> DeclarationKind,
+        cursor: &mut Cursor<'c>,
+    ) -> (Vec<FlatID>, Vec<FlatID>) {
         cursor.go_down(kind!("interface_ports"), |cursor| {
             let inputs = self.flatten_declaration_list(
                 field!("inputs"),
@@ -2228,6 +2244,25 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             );
         }
 
+        let main_interface = self.fields.alloc(Field {
+            name_span,
+            name: name.to_owned(),
+            lat_dom: None,
+            clock: Some(self.current_clock),
+            declaration_instruction: None,
+        });
+        assert_eq!(main_interface, FieldID::MAIN_INTERFACE);
+
+        if cursor.optional_field(field!("interface_ports")) {
+            let is_module = matches!(self.default_decl_kind, DeclarationKind::RegularWire { .. });
+            if is_module {
+                self.flatten_module_interface(name, name_span, cursor);
+            } else {
+                self.errors
+                    .error(cursor.span(), "Only modules can declare an interface");
+            }
+        }
+
         if let Some(mut const_type_cursor) = const_type_cursor {
             let decl_span = const_type_cursor.span();
             const_type_cursor.go_down(kind!("const_and_type"), |const_type_cursor| {
@@ -2254,16 +2289,71 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             });
         }
 
-        self.fields.alloc(Field {
-            name_span,
-            name: name.to_owned(),
-            lat_dom: None,
-            clock: Some(self.current_clock),
-            declaration_instruction: None,
-        });
-
         cursor.field(field!("block"));
         self.flatten_code(cursor);
+    }
+
+    /// Flattens the main interface declared in the module header: `module M : int a -> bool b {}`
+    ///
+    /// Expects to be at a [kind!("interface_ports")] node
+    fn flatten_module_interface(&mut self, name: &str, name_span: Span, cursor: &mut Cursor<'c>) {
+        let decl_span = Span::new_overarching(name_span, cursor.span());
+        let declaration_instruction = self.instructions.get_next_alloc_id();
+        let latency_domain = self.current_latency_domain;
+
+        self.fields[FieldID::MAIN_INTERFACE] = Field {
+            name_span,
+            name: name.to_owned(),
+            lat_dom: Some(latency_domain),
+            clock: Some(self.current_clock),
+            declaration_instruction: Some(FieldDeclKind::Action(declaration_instruction)),
+        };
+
+        self.instructions.alloc_next_alloc_id(
+            declaration_instruction,
+            Instruction::Action(ActionDeclaration {
+                parent_condition: self.current_parent_condition,
+                name: name.to_owned(),
+                name_span,
+                decl_span,
+                interface_kw_span: name_span,
+                documentation: cursor.extract_gathered_docs(),
+                latency_specifier: None,
+                field_id: Some(FieldID::MAIN_INTERFACE),
+                action_kind: ActionKind::Unconditional,
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                clock_domain: UniCell::new(self.current_clock),
+                latency_domain,
+                then_block: FlatIDRange::PLACEHOLDER,
+                else_block: FlatIDRange::PLACEHOLDER,
+                then_span: None,
+                else_span: None,
+            }),
+        );
+
+        let ports_start_at = self.instructions.get_next_alloc_id();
+        let param_decl_kind = |direction| DeclarationKind::Port {
+            direction,
+            is_state: false,
+            parent_field: FieldID::MAIN_INTERFACE,
+            port_id: UUID::PLACEHOLDER,
+            is_standalone_port: false,
+            latency_domain,
+        };
+        let (inputs, outputs) =
+            self.flatten_interface_ports_list(Direction::Input, &param_decl_kind, cursor);
+        let ports_end_at = self.instructions.get_next_alloc_id();
+
+        let_unwrap!(
+            Instruction::Action(interface),
+            &mut self.instructions[declaration_instruction]
+        );
+        interface.inputs = inputs;
+        interface.outputs = outputs;
+        // Mirrors a body-less `interface`: the port declarations are its then_block
+        interface.then_block = FlatIDRange::new(ports_start_at, ports_end_at);
+        interface.else_block = FlatIDRange::new(ports_end_at, ports_end_at);
     }
 }
 

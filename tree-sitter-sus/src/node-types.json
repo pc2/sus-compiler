@@ -1075,6 +1075,16 @@
           }
         ]
       },
+      "interface_ports": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "interface_ports",
+            "named": true
+          }
+        ]
+      },
       "name": {
         "multiple": false,
         "required": true,

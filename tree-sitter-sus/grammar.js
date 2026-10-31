@@ -76,6 +76,8 @@ module.exports = grammar({
             field('object_type', choice('module', 'struct', $.const_and_type)),
             field('name', $.identifier),
             optional(field('template_declaration_arguments', $.template_declaration_arguments)),
+            // `module M : int a -> bool b {}` declares the module's main interface
+            optional(field('interface_ports', $.interface_ports)),
             optional($._linebreak),
             field('block', $.block)
         ),

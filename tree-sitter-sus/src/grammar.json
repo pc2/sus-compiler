@@ -150,6 +150,22 @@
           "type": "CHOICE",
           "members": [
             {
+              "type": "FIELD",
+              "name": "interface_ports",
+              "content": {
+                "type": "SYMBOL",
+                "name": "interface_ports"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
               "type": "SYMBOL",
               "name": "_linebreak"
             },

@@ -104,6 +104,11 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated functions_example #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated ActionsAreBools #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate ActionsAreBoolsBadUses #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated Repeat #(T: type int #(FROM: 0, TO: 100), SIZE: 3)
+[INFO  sus_compiler::instantiation::instantiator] Instantiated module_interface_shorthand #(T: type int #(FROM: 0, TO: 100), N: 3)
+[INFO  sus_compiler::instantiation::instantiator] Instantiated Repeat #(T: type bool #(), SIZE: 5)
+[INFO  sus_compiler::instantiation::instantiator] Instantiated module_interface_shorthand #(T: type bool #(), N: 5)
+[INFO  sus_compiler::instantiation::instantiator] Instantiated use_module_interface_shorthand #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -6148,6 +6153,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for LocalFunction #() as "LocalFunction"
 [INFO  sus_compiler::codegen] Code generated for functions_example #() as "functions_example"
 [INFO  sus_compiler::codegen] Code generated for ActionsAreBools #() as "ActionsAreBools"
+[INFO  sus_compiler::codegen] Code generated for use_module_interface_shorthand #() as "use_module_interface_shorthand"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"

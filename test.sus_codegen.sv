@@ -4396,6 +4396,219 @@ always_comb begin // combinatorial mul1
 end
 endmodule // example_md #()
 
+// use_module_interface_shorthand #()
+module use_module_interface_shorthand(
+	/* clock */ input clk,
+	input wire[6:0] a,
+	input wire b,
+	output /*mux_wire*/ logic[6:0] x[0:2],
+	output /*mux_wire*/ logic y
+);
+
+/*mux_wire*/ logic inverted;
+/*mux_wire*/ logic[4:0] sub_x;
+/*mux_wire*/ logic sub_y;
+/*mux_wire*/ logic[6:0] _module_interface_shorthand_v;
+/*mux_wire*/ logic _module_interface_shorthand_invert;
+wire[6:0] _module_interface_shorthand_result[0:2];
+wire _module_interface_shorthand_inverted;
+/*mux_wire*/ logic _sub_v;
+/*mux_wire*/ logic _sub_invert;
+wire[4:0] _sub_result;
+wire _sub_inverted;
+wire _7;
+assign _7 = &sub_x;
+wire _8;
+assign _8 = inverted | _7;
+wire _10;
+assign _10 = _8 | sub_y;
+module_interface_shorthand_T_type_int_FROM_0_TO_100_N_3 module_interface_shorthand(
+	.clk(clk),
+	.v(_module_interface_shorthand_v),
+	.invert(_module_interface_shorthand_invert),
+	.result(_module_interface_shorthand_result),
+	.inverted(_module_interface_shorthand_inverted)
+);
+module_interface_shorthand_T_type_bool_N_5 sub(
+	.clk(clk),
+	.v(_sub_v),
+	.invert(_sub_invert),
+	.result(_sub_result),
+	.inverted(_sub_inverted)
+);
+always_comb begin // combinatorial x
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x = '{7'dx, 7'dx, 7'dx};
+	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
+x[_v0] = _module_interface_shorthand_result[_v0];
+end
+end
+always_comb begin // combinatorial y
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	y = 1'bx;
+	y = _10;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	y = y;
+end
+always_comb begin // combinatorial inverted
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	inverted = 1'bx;
+	inverted = _module_interface_shorthand_inverted;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	inverted = inverted;
+end
+always_comb begin // combinatorial _module_interface_shorthand_v
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_module_interface_shorthand_v = 7'dx;
+	_module_interface_shorthand_v = a;
+end
+always_comb begin // combinatorial _module_interface_shorthand_invert
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_module_interface_shorthand_invert = 1'bx;
+	_module_interface_shorthand_invert = b;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_module_interface_shorthand_invert = _module_interface_shorthand_invert;
+end
+always_comb begin // combinatorial sub_x
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sub_x = 5'bxxxxx;
+	sub_x = _sub_result;
+end
+always_comb begin // combinatorial sub_y
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sub_y = 1'bx;
+	sub_y = _sub_inverted;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	sub_y = sub_y;
+end
+always_comb begin // combinatorial _sub_v
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_sub_v = 1'bx;
+	_sub_v = b;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_sub_v = _sub_v;
+end
+always_comb begin // combinatorial _sub_invert
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_sub_invert = 1'bx;
+	_sub_invert = b;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_sub_invert = _sub_invert;
+end
+endmodule // use_module_interface_shorthand #()
+
+// module_interface_shorthand #(T: type bool #(), N: 5)
+module module_interface_shorthand_T_type_bool_N_5(
+	/* clock */ input clk,
+	input wire v,
+	input wire invert,
+	output /*mux_wire*/ logic[4:0] result,
+	output /*mux_wire*/ logic inverted
+);
+
+/*mux_wire*/ logic _Repeat_v;
+wire[4:0] _Repeat_result;
+wire _3;
+assign _3 = ~invert;
+Repeat_T_type_bool_SIZE_5 Repeat(
+	.clk(clk),
+	.v(_Repeat_v),
+	.result(_Repeat_result)
+);
+always_comb begin // combinatorial result
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	result = 5'bxxxxx;
+	result = _Repeat_result;
+end
+always_comb begin // combinatorial inverted
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	inverted = 1'bx;
+	inverted = _3;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	inverted = inverted;
+end
+always_comb begin // combinatorial _Repeat_v
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_Repeat_v = 1'bx;
+	_Repeat_v = v;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_Repeat_v = _Repeat_v;
+end
+endmodule // module_interface_shorthand #(T: type bool #(), N: 5)
+
+// Repeat #(T: type bool #(), SIZE: 5)
+module Repeat_T_type_bool_SIZE_5(
+	/* clock */ input clk,
+	input wire v,
+	output /*mux_wire*/ logic[4:0] result
+);
+
+always_comb begin // combinatorial result
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	result = 5'bxxxxx;
+	result[0] = v;
+	result[1] = v;
+	result[2] = v;
+	result[3] = v;
+	result[4] = v;
+end
+endmodule // Repeat #(T: type bool #(), SIZE: 5)
+
+// module_interface_shorthand #(T: type int #(FROM: 0, TO: 100), N: 3)
+module module_interface_shorthand_T_type_int_FROM_0_TO_100_N_3(
+	/* clock */ input clk,
+	input wire[6:0] v,
+	input wire invert,
+	output /*mux_wire*/ logic[6:0] result[0:2],
+	output /*mux_wire*/ logic inverted
+);
+
+/*mux_wire*/ logic[6:0] _Repeat_v;
+wire[6:0] _Repeat_result[0:2];
+wire _3;
+assign _3 = ~invert;
+Repeat_T_type_int_FROM_0_TO_100_SIZE_3 Repeat(
+	.clk(clk),
+	.v(_Repeat_v),
+	.result(_Repeat_result)
+);
+always_comb begin // combinatorial result
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	result = '{7'dx, 7'dx, 7'dx};
+	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
+result[_v0] = _Repeat_result[_v0];
+end
+end
+always_comb begin // combinatorial inverted
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	inverted = 1'bx;
+	inverted = _3;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	inverted = inverted;
+end
+always_comb begin // combinatorial _Repeat_v
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_Repeat_v = 7'dx;
+	_Repeat_v = v;
+end
+endmodule // module_interface_shorthand #(T: type int #(FROM: 0, TO: 100), N: 3)
+
+// Repeat #(T: type int #(FROM: 0, TO: 100), SIZE: 3)
+module Repeat_T_type_int_FROM_0_TO_100_SIZE_3(
+	/* clock */ input clk,
+	input wire[6:0] v,
+	output /*mux_wire*/ logic[6:0] result[0:2]
+);
+
+always_comb begin // combinatorial result
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	result = '{7'dx, 7'dx, 7'dx};
+	result[0] = v;
+	result[1] = v;
+	result[2] = v;
+end
+endmodule // Repeat #(T: type int #(FROM: 0, TO: 100), SIZE: 3)
+
 // ActionsAreBools #()
 module ActionsAreBools(
 	/* clock */ input clk,
