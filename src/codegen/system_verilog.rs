@@ -685,10 +685,19 @@ impl<'g> CodeGenerationContext<'g> {
             RealWireDataSource::ReadOnly => {
                 writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
             }
-            RealWireDataSource::ConstructArray { array_wires } => {
+            RealWireDataSource::ConstructArray {
+                array_wires,
+                default,
+            } => {
                 writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
 
-                for (arr_idx, elem) in array_wires.iter().enumerate() {
+                // Slots past the listed elements are filled with the default
+                let (_, arr_sz) = w.typ.unwrap_array_known_size();
+                let arr_sz: usize = arr_sz.try_into().unwrap();
+                let default_slots =
+                    std::iter::repeat_n(default, arr_sz - array_wires.len()).flatten();
+
+                for (arr_idx, elem) in array_wires.iter().chain(default_slots).enumerate() {
                     let elem = &self.instance.wires[*elem];
                     elem.get_span(&self.md.link_info).debug();
                     let element_wire_name = self.wire_name(elem, w.absolute_latency);

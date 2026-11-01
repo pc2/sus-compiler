@@ -290,19 +290,25 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 // Checked in final_check
                 let _ = unifier.unify_concrete_all(found, expected);
             }
-            RealWireDataSource::ConstructArray { array_wires } => {
+            RealWireDataSource::ConstructArray {
+                array_wires,
+                default,
+            } => {
                 let (array_content_supertyp, arr_sz) = out.typ.unwrap_array();
 
-                unifier.create_subtype_constraint(array_wires.iter().map(|w_id| {
+                unifier.create_subtype_constraint(array_wires.iter().chain(default).map(|w_id| {
                     let w = &self.wires[*w_id];
                     (array_content_supertyp, &w.typ)
                 }));
 
-                // Is checked in final_checks
-                let _ = unifier.set(
-                    arr_sz,
-                    &mut UniCell::from_known(Value::Integer(IBig::from(array_wires.len()))),
-                );
+                // With a default, the size is left to be inferred from where the array is used
+                if default.is_none() {
+                    // Is checked in final_checks
+                    let _ = unifier.set(
+                        arr_sz,
+                        &mut UniCell::from_known(Value::Integer(IBig::from(array_wires.len()))),
+                    );
+                }
             }
             // type is already set when the wire was created
             RealWireDataSource::Constant { value: _ } => {}

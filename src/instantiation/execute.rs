@@ -10,6 +10,7 @@ use std::ops::{Deref, Index, IndexMut};
 use crate::errors::CompileError;
 use crate::instantiation::paths::{GenerativeWireRefPathElem, assign_checked, make_array_bounds};
 use crate::to_string::display_join;
+use crate::value::ArrayValue;
 use crate::{
     flattening::*,
     instantiation::*,
@@ -356,14 +357,15 @@ impl<'l> ExecutionContext<'l> {
                     }
                     TemplateKind::Value(_) => TemplateKind::Value(
                         if let Some(v) = global_ref.get_value_arg_for(param_id) {
-                            let value = self.generation_state.get_generation_value(v);
+                            let mut value = self.generation_state.get_generation_value(v).clone();
+                            value.fix_grown_array_sizes();
                             if value.has_unknown_size() {
                                 return Err(CompileError::error(
                                     self.generation_state.span_of(v),
                                     "Template arguments must be arrays of known size",
                                 ));
                             }
-                            value.clone().into()
+                            value.into()
                         } else {
                             Value::UNKNOWN
                         },
@@ -833,12 +835,13 @@ impl<'l> ExecutionContext<'l> {
     }
     fn alloc_wire_for_const(
         &mut self,
-        value: Value,
+        mut value: Value,
         abs_typ: &AbstractRankedType,
         original_instruction: FlatID,
         domain: ClockID,
         const_span: Span,
     ) -> ExecutionResult<WireID> {
+        value.fix_grown_array_sizes();
         if value.contains_unset() {
             return Err(CompileError::error(
                 const_span,
@@ -1211,13 +1214,21 @@ impl<'l> ExecutionContext<'l> {
 
                 return Ok(func_interface.outputs);
             }
-            ExpressionSource::ArrayConstruct(arr) => {
-                let mut array_wires = Vec::with_capacity(arr.len());
-                for v_id in arr {
+            ExpressionSource::ArrayConstruct { elements, default } => {
+                let mut array_wires = Vec::with_capacity(elements.len());
+                for v_id in elements {
                     let wire_id = self.get_wire_or_constant_as_wire(*v_id, clock)?;
                     array_wires.push(wire_id);
                 }
-                RealWireDataSource::ConstructArray { array_wires }
+                let default = if let Some(default) = default {
+                    Some(self.get_wire_or_constant_as_wire(*default, clock)?)
+                } else {
+                    None
+                };
+                RealWireDataSource::ConstructArray {
+                    array_wires,
+                    default,
+                }
             }
             ExpressionSource::Literal(_) => {
                 unreachable!("Constant cannot be non-compile-time");
@@ -1446,13 +1457,16 @@ impl<'l> ExecutionContext<'l> {
             ExpressionSource::FuncCall(_) => {
                 todo!("Func Calls cannot yet be executed at compiletime")
             }
-            ExpressionSource::ArrayConstruct(arr) => {
-                let mut result = Vec::with_capacity(arr.len());
-                for v_id in arr {
+            ExpressionSource::ArrayConstruct { elements, default } => {
+                let mut values = Vec::with_capacity(elements.len());
+                for v_id in elements {
                     let val = self.generation_state.get_generation_value(*v_id);
-                    result.push(val.clone());
+                    values.push(val.clone());
                 }
-                Value::Array(result.into())
+                let default = default.map(|default| {
+                    Box::new(self.generation_state.get_generation_value(default).clone())
+                });
+                Value::Array(ArrayValue { values, default })
             }
             ExpressionSource::Literal(value) => value.clone(),
         })

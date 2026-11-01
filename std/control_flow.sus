@@ -63,7 +63,7 @@ module SlowState #(T, int DELAY) {
             old_is_stable = true
         } else {
             wait_for_slow[0] = true
-            wait_for_slow[1..] = RepeatGen#(T: type bool, V: false, SIZE: DELAY-1)
+            wait_for_slow[1..] = [false ...]
             old_is_stable = false
         }
         new_value_slow_d = new_value_slow
@@ -77,12 +77,12 @@ module SlowState #(T, int DELAY) {
     action set_fast'0 : T new_value_fast'0 {
         old_v = new_value_fast
         old_is_stable = true
-        wait_for_slow = RepeatGen#(T: type bool, V: false, SIZE: DELAY)
+        wait_for_slow = [false ...]
     }
 
     domain reset
     action rst {
-        wait_for_slow = RepeatGen#(T: type bool, V: false, SIZE: DELAY)
+        wait_for_slow = [false ...]
     }
 }
 
@@ -123,7 +123,7 @@ module SlowStateAdvanced #(T, T RESET_TO, int OLD_DELAY, int NEW_DELAY) {
         state bool[UPDATE_TOTAL_DEPTH] cooldown
         may_update = cooldown[0]
         when update_s | do_rst { // Importantly, there are no pipeline registers on update for the cooldown. Otherwise it could be called twice rapidly in a row
-            cooldown = Repeat(false)
+            cooldown = [false ...]
         } else {
             cooldown[0..UPDATE_TOTAL_DEPTH - 1] = cooldown[1..]
             cooldown[UPDATE_TOTAL_DEPTH - 1] = true
@@ -155,7 +155,7 @@ module SlowPipelineEnd#(T, int PIPELINE_DEPTH) {
 
     input T din'PIPELINE_DEPTH
     action input_changed'0 {
-        cooldown = RepeatGen#(T: type bool, V: false, SIZE: PIPELINE_DEPTH)
+        cooldown = [false ...]
     } else {
         if PIPELINE_DEPTH >= 1 {
             for int I in 1..PIPELINE_DEPTH {
@@ -176,7 +176,7 @@ module SlowPipelineEnd#(T, int PIPELINE_DEPTH) {
 
     domain reset
     action rst {
-        cooldown = RepeatGen#(T: type bool, V: false, SIZE: PIPELINE_DEPTH)
+        cooldown = [false ...]
     }
 }
 
@@ -202,7 +202,7 @@ module SlowPipelineBegin#(T, int PIPELINE_DEPTH) {
 
     input T din'0
     action input_changed'0 {
-        cooldown = RepeatGen#(T: type bool, V: false, SIZE: PIPELINE_DEPTH)
+        cooldown = [false ...]
     } else {
         if PIPELINE_DEPTH >= 1 {
             for int I in 1..PIPELINE_DEPTH {
@@ -225,7 +225,7 @@ module SlowPipelineBegin#(T, int PIPELINE_DEPTH) {
 
     domain reset
     action rst {
-        cooldown = RepeatGen#(T: type bool, V: false, SIZE: PIPELINE_DEPTH)
+        cooldown = [false ...]
     }
 }
 

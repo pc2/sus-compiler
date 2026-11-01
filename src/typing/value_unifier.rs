@@ -241,7 +241,7 @@ impl Value {
         template_args: &TVec<ConcreteTemplateArg>,
     ) -> Result<ConcreteType, String> {
         let array_depth = abs_typ.rank.count_unwrap();
-        let mut tensor_sizes = Vec::with_capacity(array_depth);
+        let mut tensor_sizes: Vec<TensorDim> = Vec::with_capacity(array_depth);
 
         let content_typ = match abs_typ.inner.unwrap() {
             AbstractInnerType::Template(template_id) => {
@@ -413,7 +413,10 @@ impl Value {
         assert!(tensor_sizes.len() <= array_depth);
         let mut array_size_vars: Vec<UniCell<Value>> = Vec::with_capacity(array_depth);
         for sz in tensor_sizes {
-            array_size_vars.push(Value::Integer(IBig::from(sz)).into());
+            array_size_vars.push(match sz {
+                TensorDim::Exact(sz) => Value::Integer(IBig::from(sz)).into(),
+                TensorDim::AtLeast(_) => Value::UNKNOWN,
+            });
         }
         // Because we might encounter zero sized arrays, we don't actually know sizes under there
         // Fill remaining array slots with Unknown
@@ -428,7 +431,7 @@ impl Value {
         &'v self,
         name: &str,
         max_depth: usize,
-        tensor_sizes: &mut Vec<usize>,
+        tensor_sizes: &mut Vec<TensorDim>,
         elem_fn: &mut impl FnMut(&'v Value) -> Result<(), String>,
     ) -> Result<(), String> {
         self.get_tensor_size_recursive(
@@ -445,7 +448,7 @@ impl Value {
         &'v self,
         name: &str,
         max_depth: usize,
-        tensor_sizes: &mut Vec<usize>,
+        tensor_sizes: &mut Vec<TensorDim>,
         index_path: &mut Vec<usize>,
         elem_fn: &mut impl FnMut(&'v Value) -> Result<(), String>,
     ) -> Result<(), String> {
@@ -456,8 +459,13 @@ impl Value {
             let Value::Array(values) = self else {
                 unreachable!()
             };
-            if let Some(sz) = tensor_sizes.get(depth) {
-                if *sz != values.len() {
+            let found = if values.default.is_some() {
+                TensorDim::AtLeast(values.len())
+            } else {
+                TensorDim::Exact(values.len())
+            };
+            if let Some(sz) = tensor_sizes.get_mut(depth) {
+                let Some(merged) = sz.merge(found) else {
                     let fmt_path = |path: &[usize]| -> String {
                         let idxs: String = path.iter().map(|i| format!("[{i}]")).collect();
                         format!("{name}{idxs}")
@@ -469,17 +477,57 @@ impl Value {
                         "This array contains multiple arrays of different sizes. This is not allowed! {this_path} has size {}, but {first_path} has size {sz}",
                         values.len()
                     ));
-                }
+                };
+                *sz = merged;
             } else {
                 assert!(tensor_sizes.len() == depth);
-                tensor_sizes.push(values.len());
+                tensor_sizes.push(found);
             }
             for (idx, v) in values.iter().enumerate() {
                 index_path.push(idx);
                 v.get_tensor_size_recursive(name, max_depth, tensor_sizes, index_path, elem_fn)?;
                 index_path.pop();
             }
+            if let Some(default) = &values.default {
+                index_path.push(values.len());
+                default.get_tensor_size_recursive(
+                    name,
+                    max_depth,
+                    tensor_sizes,
+                    index_path,
+                    elem_fn,
+                )?;
+                index_path.pop();
+            }
             Ok(())
+        }
+    }
+}
+
+/// The size of one array dimension of a constant, as found by walking its values.
+#[derive(Clone, Copy)]
+enum TensorDim {
+    Exact(usize),
+    /// Some array on this level still has an [ArrayValue::default], so its size is decided by where the constant is used.
+    AtLeast(usize),
+}
+impl TensorDim {
+    /// Combines the sizes of two arrays on the same level. None if they can't be the same size.
+    fn merge(self, other: Self) -> Option<Self> {
+        match (self, other) {
+            (Self::Exact(a), Self::Exact(b)) => (a == b).then_some(Self::Exact(a)),
+            (Self::Exact(exact), Self::AtLeast(min)) | (Self::AtLeast(min), Self::Exact(exact)) => {
+                (min <= exact).then_some(Self::Exact(exact))
+            }
+            (Self::AtLeast(a), Self::AtLeast(b)) => Some(Self::AtLeast(a.max(b))),
+        }
+    }
+}
+impl Display for TensorDim {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TensorDim::Exact(sz) => write!(f, "{sz}"),
+            TensorDim::AtLeast(sz) => write!(f, "at least {sz}"),
         }
     }
 }

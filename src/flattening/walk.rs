@@ -37,8 +37,8 @@ impl ExpressionSource {
                 }
             }
             ExpressionSource::Literal(_) => {}
-            ExpressionSource::ArrayConstruct(arr) => {
-                for v in arr {
+            ExpressionSource::ArrayConstruct { elements, default } => {
+                for v in elements.iter().chain(default) {
                     collect(*v);
                 }
             }

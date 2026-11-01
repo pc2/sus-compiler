@@ -629,7 +629,12 @@ pub enum ExpressionSource {
         left: FlatID,
         right: FlatID,
     },
-    ArrayConstruct(Vec<FlatID>),
+    /// `[a, b, c]`, or `[a, b, v ...]` where the `default` fills every slot after the listed elements.
+    /// With a default the size of the array comes from the context it is used in.
+    ArrayConstruct {
+        elements: Vec<FlatID>,
+        default: Option<FlatID>,
+    },
     Literal(Value),
 }
 impl ExpressionSource {

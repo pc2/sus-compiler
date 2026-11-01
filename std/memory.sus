@@ -103,7 +103,7 @@ module RAM_Unbalanced #(ElemT, int DEPTH, int WRITE_SIZE, int READ_SIZE) {
     
     state bool[MEMORY_WIDTH][MEMORY_DEPTH] mem
 
-    bool[NUM_WRITE_SEGMENTS] should_write_segment = RepeatGen#(T: type bool, SIZE: NUM_WRITE_SEGMENTS, V: false)
+    bool[NUM_WRITE_SEGMENTS] should_write_segment = [false ...]
     bool[WRITE_WIDTH] wr_data
     int#(0..MEMORY_DEPTH) write_row
     for int WR_SEGMENT in 0..NUM_WRITE_SEGMENTS {

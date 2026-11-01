@@ -388,7 +388,7 @@ module test_vivado_bug {
 	input bool b
 	when b {
 		for int SZ in 1..4 {
-			bool[SZ] x = Repeat(false)
+			bool[SZ] x = [false ...]
 			bool[SZ] y = x
 
 			int#(0..SZ) u = 0
@@ -469,7 +469,7 @@ module ModuleWithInitialStates {
 }
 
 module TestGenArrayOps {
-	gen int[4] REPEATS = RepeatGen#(T: type int#(0..10), SIZE: 4, V: 7)
+	gen int[4] REPEATS = [7 ...]
 	assert#(C: &(REPEATS == [7, 7, 7, 7]))
 	gen int[4] REVERSE = ReverseGen#(T: type int#(0..10), SIZE: 4, V: [1,2,3,4])
 	assert#(C: &(REVERSE == [4, 3, 2, 1]))
@@ -988,7 +988,7 @@ module ActionsAreBoolsBadUses {
 
 /// Tests the `module M : inputs -> outputs` main interface shorthand
 module module_interface_shorthand #(T, int N) : T v'0, bool invert -> T[N] result'0, bool inverted'0 {
-	result = Repeat(v)
+	result = [v ...]
 	inverted = !invert
 }
 
@@ -1043,14 +1043,71 @@ module TemplateArgSizeMismatch {
 	output int x = m.x
 }
 
-module TemplateArgUnknownSize {
+module TemplateArgGrownArray {
 	gen int[] X
 	X[0] = 1
 	TemplateArrayParam#(N: 4, V: X) m
 	output int x = m.x
 }
 
+module TemplateArgDefaultArray {
+	TemplateArrayParam#(N: 4, V: [1 ...]) m
+	output int x = m.x
+}
+
 module TemplateArgOk {
 	TemplateArrayParam#(N: 3, V: [1,2,3]) m
 	output int x = m.x
+}
+
+// Array literals with a default element: `[a, b, v ...]` fills the remaining slots with `v`.
+// The size comes from the context the literal is used in.
+module ArrayDefaultGen {
+	output bool[4] a'0 = [false ...]
+	output int[4] b'0 = [1, 2, 0 ...]
+	gen int[6] G = [5, 4 ...]
+	output int g3'0 = G[3]
+	gen int[2][2] N = [[1, 2], [3 ...]]
+	output int n11'0 = N[1][1]
+}
+
+module ArrayDefaultWires {
+	input int#(0..10) v
+	output int[3] d = [v ...]
+	output int[4] e = [v, 3, v ...]
+}
+
+module ArrayDefaultState {
+	input bool c
+	state bool[8] cool
+	initial cool = [false ...]
+	when c {
+		cool[2] = true
+	}
+	output bool c2 = cool[2]
+	bool[4] overridden = [false ...]
+	when c {
+		overridden[1] = true
+	}
+	output bool[4] ov = overridden
+}
+
+module ArrayDefaultGenTooMany {
+	gen int[2] X = [1, 2, 3, 0 ...]
+	output int x = X[0]
+}
+
+module ArrayDefaultWiresTooMany {
+	input int#(0..10) v
+	output int[2] x = [v, v, v, v ...]
+}
+
+module ArrayDefaultConstTooMany {
+	output int[2] x = [1, 2, 3, 0 ...]
+}
+
+module ArrayDefaultNoContext {
+	input int#(0..10) v
+	int[] y = [v ...]
+	output int z = y[0]
 }

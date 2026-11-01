@@ -239,8 +239,24 @@ impl Value {
             | Value::Float(_)
             | Value::Double(_)
             | Value::String(_) => false,
-            Value::Array(values) => values.iter().any(|v| v.contains_unset()),
+            Value::Array(values) => values
+                .iter()
+                .chain(values.default.as_deref())
+                .any(|v| v.contains_unset()),
             Value::Unset => true,
+        }
+    }
+    /// An array of unknown size whose default is still [Value::Unset] was only ever grown by writes to its elements.
+    /// Once it leaves generative code it becomes an array of exactly the elements written so far.
+    ///
+    /// Arrays with a real default keep it: they still take their size from where they are used.
+    pub fn fix_grown_array_sizes(&mut self) {
+        let Value::Array(arr) = self else { return };
+        if arr.default.as_ref().is_some_and(|d| d.is_unset()) {
+            arr.default = None;
+        }
+        for v in arr.values.iter_mut().chain(arr.default.as_deref_mut()) {
+            v.fix_grown_array_sizes();
         }
     }
     /// True if this value contains an array that still has an [ArrayValue::default], so its size hasn't been fixed yet.
@@ -315,8 +331,17 @@ impl Value {
             }
             Value::Array(values) => {
                 let (content, sz) = typ.unwrap_array_known_size();
-                values.len() == usize::try_from(sz).unwrap()
-                    && values.iter().all(|v| v.is_of_type(content))
+                let sz = usize::try_from(sz).unwrap();
+                let size_fits = if values.default.is_some() {
+                    values.len() <= sz
+                } else {
+                    values.len() == sz
+                };
+                size_fits
+                    && values
+                        .iter()
+                        .chain(values.default.as_deref())
+                        .all(|v| v.is_of_type(content))
             }
             Value::Unset => true,
         }
@@ -329,7 +354,7 @@ impl Value {
         if let Some(sz) = sz.get() {
             let sz: usize = sz.unwrap_int();
 
-            if arr.values.len() != sz {
+            if arr.values.len() < sz {
                 let default = arr
                     .default
                     .take()
@@ -337,6 +362,7 @@ impl Value {
 
                 arr.values.resize(sz, *default);
             }
+            // An array with more elements than `sz` is left as is, final_checks reports it
         }
         arr.default = None;
         for v in &mut arr.values {

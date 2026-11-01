@@ -661,8 +661,8 @@ impl<'l> TypeCheckingContext<'l> {
                     AbstractRankedType::UNKNOWN
                 }
             }
-            ExpressionSource::ArrayConstruct(arr) => {
-                let mut arr_iter = arr.iter();
+            ExpressionSource::ArrayConstruct { elements, default } => {
+                let mut arr_iter = elements.iter().chain(default);
                 let arr_elem_typ = if let Some(first_elem) = arr_iter.next() {
                     let first_elem_expr = self.instructions[*first_elem].unwrap_subexpression();
                     let elem_typ = first_elem_expr.typ;
@@ -764,7 +764,7 @@ impl<'l> TypeCheckingContext<'l> {
             ExpressionSource::WireRef(..)
             | ExpressionSource::UnaryOp { .. }
             | ExpressionSource::BinaryOp { .. }
-            | ExpressionSource::ArrayConstruct(..)
+            | ExpressionSource::ArrayConstruct { .. }
             | ExpressionSource::Literal(..) => {
                 let expr_out_typ = self.typecheck_single_output_expr(expr);
                 if let Some(first_write) = multi_write.first() {

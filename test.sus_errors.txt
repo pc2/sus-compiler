@@ -48,9 +48,6 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated check_non_inlineds #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate make_when #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate use_make_when #()
-[INFO  sus_compiler::instantiation::instantiator] Instantiated Repeat #(T: type bool #(), SIZE: 1)
-[INFO  sus_compiler::instantiation::instantiator] Instantiated Repeat #(T: type bool #(), SIZE: 2)
-[INFO  sus_compiler::instantiation::instantiator] Instantiated Repeat #(T: type bool #(), SIZE: 3)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated test_vivado_bug #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated boolean_array_literals #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated floats_and_doubles #()
@@ -104,9 +101,7 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated functions_example #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated ActionsAreBools #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate ActionsAreBoolsBadUses #()
-[INFO  sus_compiler::instantiation::instantiator] Instantiated Repeat #(T: type int #(FROM: 0, TO: 100), SIZE: 3)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated module_interface_shorthand #(T: type int #(FROM: 0, TO: 100), N: 3)
-[INFO  sus_compiler::instantiation::instantiator] Instantiated Repeat #(T: type bool #(), SIZE: 5)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated module_interface_shorthand #(T: type bool #(), N: 5)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated use_module_interface_shorthand #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate GenArraySizeMismatch205 #()
@@ -116,9 +111,18 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated GenUnsizedIntoSized205 #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TemplateArrayParam #(N: 4, V: [1, 2, 3])
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TemplateArgSizeMismatch #()
-[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TemplateArgUnknownSize #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TemplateArrayParam #(N: 4, V: [1])
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TemplateArgGrownArray #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TemplateArgDefaultArray #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TemplateArrayParam #(N: 3, V: [1, 2, 3])
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TemplateArgOk #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated ArrayDefaultGen #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated ArrayDefaultWires #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated ArrayDefaultState #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate ArrayDefaultGenTooMany #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate ArrayDefaultWiresTooMany #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate ArrayDefaultConstTooMany #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate ArrayDefaultNoContext #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -290,7 +294,12 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate GenNestedArraySizeMismatch205 due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate GenUnsizedOuterSizedInnerMismatch205 due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate TemplateArgSizeMismatch due to errors
-[ERROR sus_compiler::compiler_top] Cannot instantiate TemplateArgUnknownSize due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TemplateArgGrownArray due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TemplateArgDefaultArray due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate ArrayDefaultGenTooMany due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate ArrayDefaultWiresTooMany due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate ArrayDefaultConstTooMany due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate ArrayDefaultNoContext due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -1656,9 +1665,36 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:391:13 ]
      │
- 391 │          bool[SZ] x = Repeat(false)
+ 391 │          bool[SZ] x = [false ...]
      │                   ┬  
      │                   ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: x is effectively constant. Declare this wire as `gen` to make this explicit.
+     ╭─[ test.sus:391:13 ]
+     │
+ 391 │          bool[SZ] x = [false ...]
+     │          ─────┬───┬  
+     │               ╰────── x = 1'b0
+     │                   │  
+     │                   ╰── x is effectively constant. Declare this wire as `gen` to make this explicit.
+─────╯
+Warning: x_2 is effectively constant. Declare this wire as `gen` to make this explicit.
+     ╭─[ test.sus:391:13 ]
+     │
+ 391 │          bool[SZ] x = [false ...]
+     │          ─────┬───┬  
+     │               ╰────── x_2 = 2'b00
+     │                   │  
+     │                   ╰── x_2 is effectively constant. Declare this wire as `gen` to make this explicit.
+─────╯
+Warning: x_3 is effectively constant. Declare this wire as `gen` to make this explicit.
+     ╭─[ test.sus:391:13 ]
+     │
+ 391 │          bool[SZ] x = [false ...]
+     │          ─────┬───┬  
+     │               ╰────── x_3 = 3'b000
+     │                   │  
+     │                   ╰── x_3 is effectively constant. Declare this wire as `gen` to make this explicit.
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:392:13 ]
@@ -3013,6 +3049,13 @@ Warning: xx is effectively constant. Declare this wire as `gen` to make this exp
       │                 │  
       │                 ╰── xx is effectively constant. Declare this wire as `gen` to make this explicit.
 ──────╯
+Error: Cannot assign an array of size 1 to an array of size 4
+      ╭─[ test.sus:1037:36 ]
+      │
+ 1037 │ module TemplateArrayParam #(int N, int[N] V) {
+      │                                    ────┬───  
+      │                                        ╰───── Cannot assign an array of size 1 to an array of size 4
+──────╯
 Error: Cannot assign an array of size 3 to an array of size 4
       ╭─[ test.sus:1037:36 ]
       │
@@ -3030,11 +3073,89 @@ Warning: x is effectively constant. Declare this wire as `gen` to make this expl
       │                ╰── x is effectively constant. Declare this wire as `gen` to make this explicit.
 ──────╯
 Error: Template arguments must be arrays of known size
-      ╭─[ test.sus:1049:31 ]
+      ╭─[ test.sus:1054:31 ]
       │
- 1049 │     TemplateArrayParam#(N: 4, V: X) m
-      │                                  ┬  
-      │                                  ╰── Template arguments must be arrays of known size
+ 1054 │     TemplateArrayParam#(N: 4, V: [1 ...]) m
+      │                                  ───┬───  
+      │                                     ╰───── Template arguments must be arrays of known size
+──────╯
+Warning: a is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1066:17 ]
+      │
+ 1066 │     output bool[4] a'0 = [false ...]
+      │     ─────────┬─────┬──  
+      │              ╰────────── a = 4'b0000
+      │                    │    
+      │                    ╰──── a is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: b is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1067:16 ]
+      │
+ 1067 │     output int[4] b'0 = [1, 2, 0 ...]
+      │     ────────┬─────┬──  
+      │             ╰────────── b = [1, 2, 0, 0]
+      │                   │    
+      │                   ╰──── b is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: g3 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1069:13 ]
+      │
+ 1069 │     output int g3'0 = G[3]
+      │     ───────┬────┬──  
+      │            ╰───────── g3 = 4
+      │                 │    
+      │                 ╰──── g3 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: n11 is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1071:13 ]
+      │
+ 1071 │     output int n11'0 = N[1][1]
+      │     ────────┬───┬───  
+      │             ╰───────── n11 = 3
+      │                 │     
+      │                 ╰───── n11 is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: cool[0:2] is never written to.
+      ╭─[ test.sus:1082:16 ]
+      │
+ 1082 │     state bool[8] cool
+      │                   ──┬─  
+      │                     ╰─── cool[0:2] is never written to.
+──────╯
+Error: Cannot assign an array of size 3 to an array of size 2
+      ╭─[ test.sus:1096:17 ]
+      │
+ 1096 │     gen int[2] X = [1, 2, 3, 0 ...]
+      │                    ────────┬───────  
+      │                            ╰───────── Cannot assign an array of size 3 to an array of size 2
+──────╯
+Error: This array literal has 3 elements, but it is used as an array of size 2
+      ╭─[ test.sus:1102:20 ]
+      │
+ 1102 │     output int[2] x = [v, v, v, v ...]
+      │                       ────────┬───────  
+      │                               ╰───────── This array literal has 3 elements, but it is used as an array of size 2
+──────╯
+Error: This constant does not fit its type int #(FROM: 0, TO: 4)[2]: [1, 2, 3]
+      ╭─[ test.sus:1106:20 ]
+      │
+ 1106 │     output int[2] x = [1, 2, 3, 0 ...]
+      │                       ────────┬───────  
+      │                               ╰───────── This constant does not fit its type int #(FROM: 0, TO: 4)[2]: [1, 2, 3]
+──────╯
+Error: Some parameters of 'y' were still unknown: int #(FROM: 0, TO: 10)[_]
+      ╭─[ test.sus:1111:8 ]
+      │
+ 1111 │     int[] y = [v ...]
+      │           ┬  
+      │           ╰── Some parameters of 'y' were still unknown: int #(FROM: 0, TO: 10)[_]
+──────╯
+Error: Some parameters of '_2' were still unknown: int #(FROM: 0, TO: 10)[_]
+      ╭─[ test.sus:1111:12 ]
+      │
+ 1111 │     int[] y = [v ...]
+      │               ───┬───  
+      │                  ╰───── Some parameters of '_2' were still unknown: int #(FROM: 0, TO: 10)[_]
 ──────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:24:6 ]
@@ -5975,6 +6096,9 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for GenUnsizedOuterSizedInner205 #() as "GenUnsizedOuterSizedInner205"
 [INFO  sus_compiler::codegen] Code generated for GenUnsizedIntoSized205 #() as "GenUnsizedIntoSized205"
 [INFO  sus_compiler::codegen] Code generated for TemplateArgOk #() as "TemplateArgOk"
+[INFO  sus_compiler::codegen] Code generated for ArrayDefaultGen #() as "ArrayDefaultGen"
+[INFO  sus_compiler::codegen] Code generated for ArrayDefaultWires #() as "ArrayDefaultWires"
+[INFO  sus_compiler::codegen] Code generated for ArrayDefaultState #() as "ArrayDefaultState"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"

@@ -241,23 +241,14 @@ impl<'t> Cursor<'t> {
 
     /// Goes down the current node, checks it's kind, and then iterates through 'item' fields.
     #[track_caller]
-    pub fn list(&mut self, parent_kind: u16, mut func: impl FnMut(&mut Self)) {
+    /// Goes down the current node, checks its kind, and calls `func` on every child that is a field, with that field's id.
+    fn for_each_field(&mut self, parent_kind: u16, mut func: impl FnMut(&mut Self, NonZeroU16)) {
         self.assert_is_kind(parent_kind);
 
         if self.cursor.goto_first_child() {
             loop {
                 if let Some(found) = self.cursor.field_id() {
-                    if found == field!("item") {
-                        func(self);
-                    } else {
-                        self.print_stack();
-                        panic!(
-                            "List did not only contain 'item' fields, found field '{}' instead!",
-                            tree_sitter_sus::language()
-                                .field_name_for_id(found.into())
-                                .unwrap()
-                        );
-                    }
+                    func(self, found);
                 } else {
                     self.maybe_add_comment();
                 }
@@ -267,6 +258,42 @@ impl<'t> Cursor<'t> {
             }
             assert!(self.cursor.goto_parent());
         }
+    }
+
+    pub fn list(&mut self, parent_kind: u16, mut func: impl FnMut(&mut Self)) {
+        self.for_each_field(parent_kind, |cursor, found| {
+            if found == field!("item") {
+                func(cursor);
+            } else {
+                cursor.print_stack();
+                panic!(
+                    "List did not only contain 'item' fields, found field '{}' instead!",
+                    tree_sitter_sus::language()
+                        .field_name_for_id(found.into())
+                        .unwrap()
+                );
+            }
+        });
+    }
+
+    /// Like [Self::collect_list], but the list may end in a single `default` field, which is returned separately.
+    pub fn collect_list_and_default<OT>(
+        &mut self,
+        parent_kind: u16,
+        mut func: impl FnMut(&mut Self) -> OT,
+    ) -> (Vec<OT>, Option<OT>) {
+        let mut items = Vec::new();
+        let mut default = None;
+        self.for_each_field(parent_kind, |cursor, found| {
+            assert!(default.is_none(), "The default must be the last element");
+            if found == field!("item") {
+                items.push(func(cursor));
+            } else {
+                assert_eq!(found, field!("default"));
+                default = Some(func(cursor));
+            }
+        });
+        (items, default)
     }
 
     /// Goes down the current node, checks it's kind, and then iterates through 'item' fields.

@@ -166,8 +166,19 @@ impl<'l> ModuleTypingContext<'l> {
             match &w.source {
                 RealWireDataSource::ReadOnly
                 | RealWireDataSource::UnaryOp { .. }
-                | RealWireDataSource::BinaryOp { .. }
-                | RealWireDataSource::Constant { .. } => {}
+                | RealWireDataSource::BinaryOp { .. } => {}
+                RealWireDataSource::Constant { value } => {
+                    // Constants of unknown size were sized to the wire's type in post processing. This catches the ones that didn't fit.
+                    if !value.is_of_type(&w.typ) {
+                        self.errors.error(
+                            w.get_span(self.link_info),
+                            format!(
+                                "This constant does not fit its type {}: {value}",
+                                w.typ.display(self.globals)
+                            ),
+                        );
+                    }
+                }
                 RealWireDataSource::Select { root, path } => {
                     let root_wire = &self.wires[*root];
                     self.check_wire_ref_bounds(&root_wire.typ, path);
@@ -218,10 +229,23 @@ impl<'l> ModuleTypingContext<'l> {
                         }
                     }
                 }
-                RealWireDataSource::ConstructArray { array_wires } => {
-                    let (arr_content, _sz) = w.typ.unwrap_array_known_size();
+                RealWireDataSource::ConstructArray {
+                    array_wires,
+                    default,
+                } => {
+                    let (arr_content, sz) = w.typ.unwrap_array_known_size();
 
-                    for arr_wire in array_wires {
+                    if default.is_some() && IBig::from(array_wires.len()) > *sz {
+                        self.errors.error(
+                            w.get_span(self.link_info),
+                            format!(
+                                "This array literal has {} elements, but it is used as an array of size {sz}",
+                                array_wires.len()
+                            ),
+                        );
+                    }
+
+                    for arr_wire in array_wires.iter().chain(default) {
                         self.wire_must_be_subtype(
                             "array construct",
                             &self.wires[*arr_wire],

@@ -338,14 +338,21 @@ impl Display for Value {
                 write!(f, "\"{}\"", text.escape_default())
             }
             Value::Array(elements) => {
-                if elements.iter().all(|e| matches!(e, Value::Bool(_))) {
+                if elements.default.is_none()
+                    && elements.iter().all(|e| matches!(e, Value::Bool(_)))
+                {
                     write!(f, "{}'b", elements.len())?;
                     for e in elements.iter().rev() {
                         f.write_char(if e.unwrap_bool() { '1' } else { '0' })?;
                     }
                 } else {
                     let content = display_join(", ", elements.iter(), |f, v| v.fmt(f));
-                    write!(f, "[{content}]")?;
+                    write!(f, "[{content}")?;
+                    if let Some(default) = &elements.default {
+                        let sep = if elements.is_empty() { "" } else { ", " };
+                        write!(f, "{sep}{default} ...")?;
+                    }
+                    write!(f, "]")?;
                 }
                 Ok(())
             }
@@ -919,10 +926,15 @@ impl LinkInfo {
                             let op_text = op.op_text();
                             write!(f, "{left:?} {op_text} {right:?}")?
                         }
-                        ExpressionSource::ArrayConstruct(elements) => {
+                        ExpressionSource::ArrayConstruct { elements, default } => {
                             let arr_elems =
                                 display_join(", ", elements, |f, elem| write!(f, "{elem:?}"));
-                            write!(f, "[{arr_elems}]")?;
+                            write!(f, "[{arr_elems}")?;
+                            if let Some(default) = default {
+                                let sep = if elements.is_empty() { "" } else { ", " };
+                                write!(f, "{sep}{default:?} ...")?;
+                            }
+                            write!(f, "]")?;
                         }
                         ExpressionSource::Literal(value) => {
                             write!(f, "literal {value}")?;
@@ -1365,11 +1377,19 @@ impl ModuleTypingContext<'_> {
                     let path = self.display_path(path);
                     writeln!(f, " = {root}{path}")?;
                 }
-                RealWireDataSource::ConstructArray { array_wires } => {
+                RealWireDataSource::ConstructArray {
+                    array_wires,
+                    default,
+                } => {
                     let s = display_join(", ", array_wires.iter(), |f, item| {
                         write!(f, "{}", self.name(*item))
                     });
-                    write!(f, " = [{s}]")?;
+                    write!(f, " = [{s}")?;
+                    if let Some(default) = default {
+                        let sep = if array_wires.is_empty() { "" } else { ", " };
+                        write!(f, "{sep}{} ...", self.name(*default))?;
+                    }
+                    write!(f, "]")?;
                 }
                 RealWireDataSource::Constant { value } => writeln!(f, " = {value}")?,
             }

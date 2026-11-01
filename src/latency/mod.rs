@@ -331,8 +331,11 @@ impl RealWireDataSource {
                 f(*root, 0, 0);
                 path.for_each_wire(&mut |w| f(w, 0, 0));
             }
-            RealWireDataSource::ConstructArray { array_wires } => {
-                for w in array_wires {
+            RealWireDataSource::ConstructArray {
+                array_wires,
+                default,
+            } => {
+                for w in array_wires.iter().chain(default) {
                     f(*w, 0, 0);
                 }
             }

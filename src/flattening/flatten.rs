@@ -1324,10 +1324,11 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 });
             }
             kind!("array_list_expression") => {
-                let list = cursor.collect_list(kind!("array_list_expression"), |cursor| {
-                    self.flatten_subexpr(cursor)
-                });
-                ExpressionSource::ArrayConstruct(list)
+                let (elements, default) = cursor
+                    .collect_list_and_default(kind!("array_list_expression"), |cursor| {
+                        self.flatten_subexpr(cursor)
+                    });
+                ExpressionSource::ArrayConstruct { elements, default }
             }
             _other => ExpressionSource::WireRef(self.flatten_wire_reference(cursor)),
         };

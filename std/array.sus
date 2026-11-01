@@ -1,15 +1,4 @@
 
-/// Returns an array of `SIZE` copies of `v`.
-///
-/// Should not consume any hardware.
-///
-/// Runtime version of [RepeatGen].
-module Repeat #(T, int SIZE) : T v'0 -> T[SIZE] result'0 {
-	for int I in 0..SIZE {
-		result[I] = v
-	}
-}
-
 /// Reverse an array.
 ///
 /// Should not consume any hardware.
@@ -81,9 +70,6 @@ module RotateRight#(T, int ARRAY_LEN) : T[ARRAY_LEN] data'0, int#(0..ARRAY_LEN) 
 
     rotated_data = rotate_stages[NUM_STAGES]
 }
-
-/// Generative version of [Repeat]
-__builtin__ const T[SIZE] RepeatGen #(T, int SIZE, T V) {}
 
 /// Generative version of [Reverse]
 __builtin__ const T[SIZE] ReverseGen #(T, int SIZE, T[SIZE] V) {}

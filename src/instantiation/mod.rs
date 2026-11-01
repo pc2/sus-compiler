@@ -124,8 +124,11 @@ pub enum RealWireDataSource {
         root: WireID,
         path: Vec<RealWirePathElem>,
     },
+    /// `[a, b, c]`, or `[a, b, v ...]` where `default` fills every slot after `array_wires`.
+    /// With a default the array's size is not known from this expression alone, so it is inferred from where the array is used.
     ConstructArray {
         array_wires: Vec<WireID>,
+        default: Option<WireID>,
     },
     Constant {
         value: Value,
@@ -388,8 +391,14 @@ impl ForEachContainedWire for RealWireDataSource {
                 f(*root);
                 path.for_each_wire(f);
             }
-            RealWireDataSource::ConstructArray { array_wires } => {
+            RealWireDataSource::ConstructArray {
+                array_wires,
+                default,
+            } => {
                 array_wires.for_each_wire(f);
+                if let Some(default) = default {
+                    f(*default);
+                }
             }
             RealWireDataSource::Constant { value: _ } => {}
         }

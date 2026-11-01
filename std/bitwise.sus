@@ -7,7 +7,7 @@
 /// ToOneHot#(SIZE: 2)(0) == [true, false]
 /// ```
 module ToOneHot #(int SIZE) : int#(0..SIZE - 1) selection'0 -> bool[SIZE] bits'0 {
-    bits = RepeatGen#(T: type bool, V: false, SIZE)
+    bits = [false ...]
 
 	bits[selection] = true
 }
@@ -140,7 +140,7 @@ module AlignToPow2 #(int FROM, int TO, int LOWER_BITS) :
 
     bool[sizeof#(T: type int#(FROM, TO))] bits = ToBits(i)
     bool[sizeof#(T: type int#(FROM, TO))] aligned_bits
-    aligned_bits[..LOWER_BITS] = Repeat(false)
+    aligned_bits[..LOWER_BITS] = [false ...]
     aligned_bits[LOWER_BITS..] = bits[LOWER_BITS..]
 	// we use FromBits rather than BitsToInt, because we can then immediately adjust the range too
     o = FromBits#(T: type int#(ALIGNED_FROM..ALIGNED_TO))(aligned_bits)

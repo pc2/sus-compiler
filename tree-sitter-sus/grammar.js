@@ -362,11 +362,30 @@ module.exports = grammar({
             optional(field('index_b', $._expression))
         ),
 
-        array_list_expression: $ => seq(
-            '[',
-            commaSepSeq($, $._expression),
-            ']'
-        ),
+        // `[a, b, c]`, or with a default element that fills the remaining slots: `[a, b, v ...]`, `[v ...]`.
+        // An array with a default takes its size from the context it's used in.
+        // Like commaSepSeq, but the default element must be separated from the items by a comma.
+        array_list_expression: $ => {
+            const lenientComma = seq(optional($._linebreak), ',', optional($._linebreak));
+            const item = field('item', $._expression);
+            const defaultElem = seq(field('default', $._expression), '...', optional($._linebreak));
+            return seq(
+                '[',
+                optional($._linebreak),
+                optional(choice(
+                    seq(
+                        item,
+                        repeat(seq(lenientComma, item)),
+                        optional(choice(
+                            seq(lenientComma, optional(defaultElem)),
+                            $._linebreak
+                        ))
+                    ),
+                    defaultElem
+                )),
+                ']'
+            );
+        },
 
         // Utilities
 
