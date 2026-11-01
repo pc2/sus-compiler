@@ -226,7 +226,7 @@ impl GenerativeWireRefPathElem {
 /// Arrays of known size must receive exactly as many elements. An array of unknown size (one that still has an
 /// [ArrayValue::default]) adopts the size of `from`, but each element must still fit the declared element shape.
 /// A `from` array that is itself of unknown size is padded with its default to the target's size.
-fn assign_checked(target: &mut Value, from: Value, write_span: Span) -> ExecutionResult<()> {
+pub fn assign_checked(target: &mut Value, from: Value, write_span: Span) -> ExecutionResult<()> {
     let Value::Array(tgt) = target else {
         *target = from;
         return Ok(());

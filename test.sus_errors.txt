@@ -114,6 +114,11 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate GenUnsizedOuterSizedInnerMismatch205 #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated GenUnsizedOuterSizedInner205 #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated GenUnsizedIntoSized205 #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TemplateArrayParam #(N: 4, V: [1, 2, 3])
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TemplateArgSizeMismatch #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TemplateArgUnknownSize #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TemplateArrayParam #(N: 3, V: [1, 2, 3])
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TemplateArgOk #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -284,6 +289,8 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate GenArraySizeMismatch205 due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate GenNestedArraySizeMismatch205 due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate GenUnsizedOuterSizedInnerMismatch205 due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TemplateArgSizeMismatch due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TemplateArgUnknownSize due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -3005,6 +3012,29 @@ Warning: xx is effectively constant. Declare this wire as `gen` to make this exp
       │           ╰──────── xx = 7
       │                 │  
       │                 ╰── xx is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Error: Cannot assign an array of size 3 to an array of size 4
+      ╭─[ test.sus:1037:36 ]
+      │
+ 1037 │ module TemplateArrayParam #(int N, int[N] V) {
+      │                                    ────┬───  
+      │                                        ╰───── Cannot assign an array of size 3 to an array of size 4
+──────╯
+Warning: x is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1038:13 ]
+      │
+ 1038 │     output int x = V[0]
+      │     ──────┬────┬  
+      │           ╰─────── x = 1
+      │                │  
+      │                ╰── x is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Error: Template arguments must be arrays of known size
+      ╭─[ test.sus:1049:31 ]
+      │
+ 1049 │     TemplateArrayParam#(N: 4, V: X) m
+      │                                  ┬  
+      │                                  ╰── Template arguments must be arrays of known size
 ──────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:24:6 ]
@@ -5944,6 +5974,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for use_module_interface_shorthand #() as "use_module_interface_shorthand"
 [INFO  sus_compiler::codegen] Code generated for GenUnsizedOuterSizedInner205 #() as "GenUnsizedOuterSizedInner205"
 [INFO  sus_compiler::codegen] Code generated for GenUnsizedIntoSized205 #() as "GenUnsizedIntoSized205"
+[INFO  sus_compiler::codegen] Code generated for TemplateArgOk #() as "TemplateArgOk"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"

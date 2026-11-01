@@ -243,6 +243,20 @@ impl Value {
             Value::Unset => true,
         }
     }
+    /// True if this value contains an array that still has an [ArrayValue::default], so its size hasn't been fixed yet.
+    pub fn has_unknown_size(&self) -> bool {
+        match self {
+            Value::Array(arr) => {
+                arr.default.is_some() || arr.values.iter().any(|v| v.has_unknown_size())
+            }
+            Value::Bool(_)
+            | Value::Integer(_)
+            | Value::Float(_)
+            | Value::Double(_)
+            | Value::String(_)
+            | Value::Unset => false,
+        }
+    }
     pub fn is_unset(&self) -> bool {
         match self {
             Value::Unset => true,

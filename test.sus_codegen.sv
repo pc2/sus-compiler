@@ -4638,6 +4638,41 @@ always_comb begin // combinatorial mul1
 end
 endmodule // example_md #()
 
+// TemplateArgOk #()
+module TemplateArgOk(
+	/* clock */ input clk,
+	output /*mux_wire*/ logic[0:0] x
+);
+
+wire[0:0] _m_x;
+TemplateArrayParam_N_3_V_1_2_3 m(
+	.clk(clk),
+	.x(_m_x)
+);
+always_comb begin // combinatorial x
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x = 1'dx;
+	x = _m_x;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x = x;
+end
+endmodule // TemplateArgOk #()
+
+// TemplateArrayParam #(N: 3, V: [1, 2, 3])
+module TemplateArrayParam_N_3_V_1_2_3(
+	/* clock */ input clk,
+	output /*mux_wire*/ logic[0:0] x
+);
+
+always_comb begin // combinatorial x
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	x = 1'dx;
+	x = 1'd1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	x = x;
+end
+endmodule // TemplateArrayParam #(N: 3, V: [1, 2, 3])
+
 // GenUnsizedIntoSized205 #()
 module GenUnsizedIntoSized205(
 	/* clock */ input clk,

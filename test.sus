@@ -1032,3 +1032,25 @@ module GenUnsizedIntoSized205 {
 	B[..] = A
 	output int xx = B[1]
 }
+
+// Template argument values must fit the parameter's declared type
+module TemplateArrayParam #(int N, int[N] V) {
+	output int x = V[0]
+}
+
+module TemplateArgSizeMismatch {
+	TemplateArrayParam#(N: 4, V: [1,2,3]) m
+	output int x = m.x
+}
+
+module TemplateArgUnknownSize {
+	gen int[] X
+	X[0] = 1
+	TemplateArrayParam#(N: 4, V: X) m
+	output int x = m.x
+}
+
+module TemplateArgOk {
+	TemplateArrayParam#(N: 3, V: [1,2,3]) m
+	output int x = m.x
+}

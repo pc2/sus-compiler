@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use std::ops::{Deref, Index, IndexMut};
 
 use crate::errors::CompileError;
-use crate::instantiation::paths::{GenerativeWireRefPathElem, make_array_bounds};
+use crate::instantiation::paths::{GenerativeWireRefPathElem, assign_checked, make_array_bounds};
 use crate::to_string::display_join;
 use crate::{
     flattening::*,
@@ -356,7 +356,14 @@ impl<'l> ExecutionContext<'l> {
                     }
                     TemplateKind::Value(_) => TemplateKind::Value(
                         if let Some(v) = global_ref.get_value_arg_for(param_id) {
-                            self.generation_state.get_generation_value(v).clone().into()
+                            let value = self.generation_state.get_generation_value(v);
+                            if value.has_unknown_size() {
+                                return Err(CompileError::error(
+                                    self.generation_state.span_of(v),
+                                    "Template arguments must be arrays of known size",
+                                ));
+                            }
+                            value.clone().into()
                         } else {
                             Value::UNKNOWN
                         },
@@ -1248,17 +1255,16 @@ impl<'l> ExecutionContext<'l> {
         let typ = self.concretize_type(&wire_decl.typ, Some(&wire_decl.typ_expr))?;
 
         Ok(if wire_decl.decl_kind.is_generative() {
-            let value: Value =
-                if let DeclarationKind::TemplateParameter(template_id) = wire_decl.decl_kind {
-                    // Only for template arguments, we must initialize their value to the value they've been assigned in the template instantiation
-                    self.working_on_template_args[template_id]
-                        .unwrap_value()
-                        .unwrap()
-                        .clone()
-                } else {
-                    // Empty initial value
-                    typ.get_initial_val()
-                };
+            let mut value = typ.get_initial_val();
+            if let DeclarationKind::TemplateParameter(template_id) = wire_decl.decl_kind {
+                // Template parameters start out as the value given at the instantiation site. Like any
+                // generative write, that value must fit the declared type
+                let arg = self.working_on_template_args[template_id]
+                    .unwrap_value()
+                    .unwrap()
+                    .clone();
+                assign_checked(&mut value, arg, wire_decl.decl_span)?;
+            }
             SubModuleOrWire::CompileTimeValue(value)
         } else {
             let specified_latency = self.get_specified_latency(wire_decl.latency_specifier)?;
