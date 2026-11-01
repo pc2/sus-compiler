@@ -221,11 +221,59 @@ impl GenerativeWireRefPathElem {
     }
 }
 
+/// Writes `from` into `target`, keeping the array sizes that the declared type gave `target`.
+///
+/// Arrays of known size must receive exactly as many elements. An array of unknown size (one that still has an
+/// [ArrayValue::default]) adopts the size of `from`, but each element must still fit the declared element shape.
+/// A `from` array that is itself of unknown size is padded with its default to the target's size.
+fn assign_checked(target: &mut Value, from: Value, write_span: Span) -> ExecutionResult<()> {
+    let Value::Array(tgt) = target else {
+        *target = from;
+        return Ok(());
+    };
+    let Value::Array(mut src) = from else {
+        unreachable!()
+    };
+
+    let Some(elem_template) = tgt.default.take() else {
+        let sz = tgt.values.len();
+        let from_sz = src.values.len();
+        if !src.fit_to_size(sz) {
+            return Err(CompileError::error(
+                write_span,
+                format!("Cannot assign an array of size {from_sz} to an array of size {sz}"),
+            ));
+        }
+        for (t, f) in zip_eq(&mut tgt.values, src.values) {
+            assign_checked(t, f, write_span)?;
+        }
+        return Ok(());
+    };
+
+    tgt.values = Vec::with_capacity(src.values.len());
+    for f in src.values {
+        let mut t = (*elem_template).clone();
+        assign_checked(&mut t, f, write_span)?;
+        tgt.values.push(t);
+    }
+    if let Some(src_default) = src.default {
+        let mut t = elem_template;
+        assign_checked(&mut t, *src_default, write_span)?;
+        tgt.default = Some(t);
+    }
+    Ok(())
+}
+
 impl Value {
+    /// Writes `to_write` into the part of `self` that `path` points at.
+    ///
+    /// `self` has the shape of its declared type (see [ConcreteType::get_initial_val]),
+    /// so array sizes are checked against it here. Only arrays of unknown size grow to fit.
     pub fn write(
         &mut self,
         path: Vec<GenerativeWireRefPathElem>,
         to_write: Value,
+        write_span: Span,
     ) -> ExecutionResult<()> {
         fn array_access<'t>(
             tgt_ref: &'t mut Value,
@@ -275,13 +323,13 @@ impl Value {
 
                     for (target, value) in cur_targets {
                         let_unwrap!(Value::Array(target), target);
-                        let Value::Array(value) = value else {
+                        let Value::Array(mut value) = value else {
                             unreachable!()
                         };
 
                         let slice_len = slice.len();
                         let from_len = value.len();
-                        if from_len != slice_len {
+                        if !value.fit_to_size(slice_len) {
                             let from = slice.start;
                             let to = slice.end;
                             return Err(CompileError::error(
@@ -303,7 +351,7 @@ impl Value {
         }
 
         for (t, f) in cur_targets {
-            *t = f;
+            assign_checked(t, f, write_span)?;
         }
 
         Ok(())

@@ -119,11 +119,12 @@ impl GenerationState<'_> {
         target: &mut Value,
         conn_path: &[WireReferencePathElement],
         to_write: Value,
+        write_span: Span,
     ) -> ExecutionResult<()> {
         // must be an array, from earlier typechecking
         let executed_path = self.execute_path(conn_path)?;
 
-        target.write(executed_path, to_write)
+        target.write(executed_path, to_write, write_span)
     }
     fn read_from_path(
         &self,
@@ -776,7 +777,12 @@ impl<'l> ExecutionContext<'l> {
         Ok(())
     }
 
-    fn write_generative(&mut self, write_to: &'l WriteTo, value: Value) -> ExecutionResult<()> {
+    fn write_generative(
+        &mut self,
+        write_to: &'l WriteTo,
+        value: Value,
+        write_span: Span,
+    ) -> ExecutionResult<()> {
         let root_decl_id = write_to.to.root.unwrap_local_decl();
         match &write_to.write_modifiers {
             WriteModifiers::Connection { .. } => {
@@ -786,8 +792,12 @@ impl<'l> ExecutionContext<'l> {
                 );
 
                 let mut new_val = std::mem::replace(v_writable, Value::Unset);
-                self.generation_state
-                    .write_gen_variable(&mut new_val, &write_to.to.path, value)?;
+                self.generation_state.write_gen_variable(
+                    &mut new_val,
+                    &write_to.to.path,
+                    value,
+                    write_span,
+                )?;
 
                 let_unwrap!(
                     SubModuleOrWire::CompileTimeValue(v_writable),
@@ -808,6 +818,7 @@ impl<'l> ExecutionContext<'l> {
                     initial_value,
                     &write_to.to.path,
                     value,
+                    write_span,
                 )?;
             }
         }
@@ -1542,6 +1553,7 @@ impl<'l> ExecutionContext<'l> {
                                     self.write_generative(
                                         single_write,
                                         value_computed.clone(), // We do an extra clone, maybe not needed, such that we can show the value in GenerationState
+                                        expr.span,
                                     )?;
                                 }
                                 ClockDomain::Physical(domain) => {

@@ -284,7 +284,7 @@ module testSlicing {
 
 	INTS[11..14][2..5] = [[1,1,1], [1,1,1], [1,1,1]]
 
-	gen int[5][30] SUBSLICE = INTS[11..14][2..5]
+	gen int[3][3] SUBSLICE = INTS[11..14][2..5]
 
 	int x = 3
 
@@ -473,7 +473,7 @@ module TestGenArrayOps {
 	assert#(C: &(REPEATS == [7, 7, 7, 7]))
 	gen int[4] REVERSE = ReverseGen#(T: type int#(0..10), SIZE: 4, V: [1,2,3,4])
 	assert#(C: &(REVERSE == [4, 3, 2, 1]))
-	gen int[4] CONCAT = ConcatGen#(T: type int#(0..10), SIZE_A: 4, SIZE_B: 3, V_A: [1,2,3,4], V_B: [7, 8, 9])
+	gen int[7] CONCAT = ConcatGen#(T: type int#(0..10), SIZE_A: 4, SIZE_B: 3, V_A: [1,2,3,4], V_B: [7, 8, 9])
 	assert#(C: &(CONCAT == [1, 2, 3, 4, 7, 8, 9]))
 }
 
@@ -999,4 +999,36 @@ module use_module_interface_shorthand : int#(0..100) a, bool b -> int[3] x, bool
 	module_interface_shorthand#(T: type bool, N: 5) sub
 	bool[5] sub_x, bool sub_y = sub(b, b)
 	y = inverted | &sub_x | sub_y
+}
+
+// Issue #205: generative assignments must respect the declared array size
+module GenArraySizeMismatch205 {
+	gen int[10] X = [1,2,3]
+	int xx = X[5]
+}
+
+module GenNestedArraySizeMismatch205 {
+	gen int[3][2] X = [[1,2,3],[4,5]]
+	int xx = X[1][1]
+}
+
+module GenUnsizedOuterSizedInnerMismatch205 {
+	gen int[3][] A
+	A[0] = [1,2]
+}
+
+module GenUnsizedOuterSizedInner205 {
+	gen int[3][] A
+	A[0] = [1,2,3]
+	A[1] = [4,5,6]
+	gen int[3][2] B = A
+	output int xx = B[1][2]
+}
+
+module GenUnsizedIntoSized205 {
+	gen int[] A
+	A[1] = 7
+	gen int[4] B
+	B[..] = A
+	output int xx = B[1]
 }

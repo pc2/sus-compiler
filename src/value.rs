@@ -147,6 +147,19 @@ impl ArrayValue {
         }
         Some(&mut self.values[range])
     }
+    /// Makes this array exactly `sz` elements long, so it can be written into a target of known size.
+    ///
+    /// An array of unknown size is padded with its default. Returns false if this array has more than
+    /// `sz` elements, or is of known size and that size isn't `sz`.
+    pub fn fit_to_size(&mut self, sz: usize) -> bool {
+        match &self.default {
+            Some(default) if self.values.len() <= sz => {
+                self.values.resize(sz, (**default).clone());
+                true
+            }
+            _ => self.values.len() == sz,
+        }
+    }
 }
 impl<'v> IntoIterator for &'v ArrayValue {
     type Item = &'v Value;

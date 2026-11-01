@@ -4638,6 +4638,32 @@ always_comb begin // combinatorial mul1
 end
 endmodule // example_md #()
 
+// GenUnsizedIntoSized205 #()
+module GenUnsizedIntoSized205(
+	/* clock */ input clk,
+	output /*mux_wire*/ logic[2:0] xx
+);
+
+always_comb begin // combinatorial xx
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	xx = 3'dx;
+	xx = 3'd7;
+end
+endmodule // GenUnsizedIntoSized205 #()
+
+// GenUnsizedOuterSizedInner205 #()
+module GenUnsizedOuterSizedInner205(
+	/* clock */ input clk,
+	output /*mux_wire*/ logic[2:0] xx
+);
+
+always_comb begin // combinatorial xx
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	xx = 3'dx;
+	xx = 3'd6;
+end
+endmodule // GenUnsizedOuterSizedInner205 #()
+
 // use_module_interface_shorthand #()
 module use_module_interface_shorthand(
 	/* clock */ input clk,

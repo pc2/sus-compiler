@@ -109,6 +109,11 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated Repeat #(T: type bool #(), SIZE: 5)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated module_interface_shorthand #(T: type bool #(), N: 5)
 [INFO  sus_compiler::instantiation::instantiator] Instantiated use_module_interface_shorthand #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate GenArraySizeMismatch205 #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate GenNestedArraySizeMismatch205 #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate GenUnsizedOuterSizedInnerMismatch205 #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated GenUnsizedOuterSizedInner205 #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated GenUnsizedIntoSized205 #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -276,6 +281,9 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate LocalFunctionInputReadOnly due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate LocalFunctionNoBinding due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate ActionsAreBoolsBadUses due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate GenArraySizeMismatch205 due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate GenNestedArraySizeMismatch205 due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate GenUnsizedOuterSizedInnerMismatch205 due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -1193,11 +1201,11 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:287:17 ]
+     ╭─[ test.sus:287:16 ]
      │
- 287 │     gen int[5][30] SUBSLICE = INTS[11..14][2..5]
-     │                    ────┬───  
-     │                        ╰───── Unused Variable: This variable does not affect the output ports of this module
+ 287 │     gen int[3][3] SUBSLICE = INTS[11..14][2..5]
+     │                   ────┬───  
+     │                       ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
      ╭─[ test.sus:289:6 ]
@@ -2910,6 +2918,94 @@ Error: This is not an array. Expected an array but found 'bool #()'
      │                       ─┬─  
      │                        ╰─── This is not an array. Expected an array but found 'bool #()'
 ─────╯
+Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+      ╭─[ test.sus:1005:8 ]
+      │
+ 1005 │ module GenArraySizeMismatch205 {
+      │        ───────────┬───────────  
+      │                   ╰───────────── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1006:14 ]
+      │
+ 1006 │     gen int[10] X = [1,2,3]
+      │                 ┬  
+      │                 ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Cannot assign an array of size 3 to an array of size 10
+      ╭─[ test.sus:1006:18 ]
+      │
+ 1006 │     gen int[10] X = [1,2,3]
+      │                     ───┬───  
+      │                        ╰───── Cannot assign an array of size 3 to an array of size 10
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1007:6 ]
+      │
+ 1007 │     int xx = X[5]
+      │         ─┬  
+      │          ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+      ╭─[ test.sus:1010:8 ]
+      │
+ 1010 │ module GenNestedArraySizeMismatch205 {
+      │        ──────────────┬──────────────  
+      │                      ╰──────────────── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1011:16 ]
+      │
+ 1011 │     gen int[3][2] X = [[1,2,3],[4,5]]
+      │                   ┬  
+      │                   ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Cannot assign an array of size 2 to an array of size 3
+      ╭─[ test.sus:1011:20 ]
+      │
+ 1011 │     gen int[3][2] X = [[1,2,3],[4,5]]
+      │                       ───────┬───────  
+      │                              ╰───────── Cannot assign an array of size 2 to an array of size 3
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1012:6 ]
+      │
+ 1012 │     int xx = X[1][1]
+      │         ─┬  
+      │          ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1016:15 ]
+      │
+ 1016 │     gen int[3][] A
+      │                  ┬  
+      │                  ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Cannot assign an array of size 2 to an array of size 3
+      ╭─[ test.sus:1017:9 ]
+      │
+ 1017 │     A[0] = [1,2]
+      │            ──┬──  
+      │              ╰──── Cannot assign an array of size 2 to an array of size 3
+──────╯
+Warning: xx is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1025:13 ]
+      │
+ 1025 │     output int xx = B[1][2]
+      │     ──────┬─────┬  
+      │           ╰──────── xx = 6
+      │                 │  
+      │                 ╰── xx is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
+Warning: xx is effectively constant. Declare this wire as `gen` to make this explicit.
+      ╭─[ test.sus:1033:13 ]
+      │
+ 1033 │     output int xx = B[1]
+      │     ──────┬─────┬  
+      │           ╰──────── xx = 7
+      │                 │  
+      │                 ╰── xx is effectively constant. Declare this wire as `gen` to make this explicit.
+──────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:24:6 ]
     │
@@ -5846,6 +5942,8 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for functions_example #() as "functions_example"
 [INFO  sus_compiler::codegen] Code generated for ActionsAreBools #() as "ActionsAreBools"
 [INFO  sus_compiler::codegen] Code generated for use_module_interface_shorthand #() as "use_module_interface_shorthand"
+[INFO  sus_compiler::codegen] Code generated for GenUnsizedOuterSizedInner205 #() as "GenUnsizedOuterSizedInner205"
+[INFO  sus_compiler::codegen] Code generated for GenUnsizedIntoSized205 #() as "GenUnsizedIntoSized205"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"
