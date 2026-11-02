@@ -44,7 +44,26 @@ impl UriExt for lsp_types::Uri {
     }
 }
 
+/// Percent-encodes a file path for use as the path component of a `file://` URI.
+///
+/// Everything except RFC 3986 unreserved characters and `/` is encoded, so spaces, non-ASCII
+/// characters, `#`, `?`, `%`, `[`, `]`, ... all become `%XX` escapes. This matches what editors
+/// (e.g. VS Code) send us, and [UriExt::to_file_path] decodes it again.
+fn percent_encode_path(path: &str) -> String {
+    let mut result = String::with_capacity(path.len());
+    for b in path.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~' | b'/') {
+            result.push(b as char);
+        } else {
+            result.push_str(&format!("%{b:02X}"));
+        }
+    }
+    result
+}
+
 pub fn uri_from_file_path(path: &Path) -> Option<Uri> {
+    use std::str::FromStr;
+
     let fragment = if !path.is_absolute() {
         Cow::from(strict_canonicalize(path).ok()?)
     } else {
@@ -55,13 +74,16 @@ pub fn uri_from_file_path(path: &Path) -> Option<Uri> {
     {
         // we want to parse a triple-slash path for Windows paths
         // it's a shorthand for `file://localhost/C:/Windows` with the `localhost` omitted
-        let raw = format!("file:///{}", fragment.to_string_lossy().replace("\\", "/"));
-        Uri::from_str(&raw).ok()
+        let path = fragment.to_string_lossy().replace("\\", "/");
+        Uri::from_str(&format!("file:///{}", percent_encode_path(&path))).ok()
     }
 
-    use std::str::FromStr;
     #[cfg(not(windows))]
-    Uri::from_str(&format!("file://{}", fragment.to_string_lossy())).ok()
+    Uri::from_str(&format!(
+        "file://{}",
+        percent_encode_path(&fragment.to_string_lossy())
+    ))
+    .ok()
 }
 
 #[cfg(not(windows))]
@@ -96,4 +118,35 @@ pub fn strict_canonicalize<P: AsRef<Path>>(path: P) -> anyhow::Result<PathBuf> {
     }
     let canon = std::fs::canonicalize(path)?;
     impl_(canon)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn special_characters_round_trip() {
+        for p in [
+            "/home/stacu/proj/dspfp32_dw_arith.sus",
+            "/home/stacu/my proj/a.sus",
+            "/home/stacu/Übung/a.sus",
+            "/home/stacu/proj#1/a.sus",
+            "/home/stacu/proj?/a.sus",
+            "/home/stacu/[x]/a.sus",
+            "/home/stacu/100%/a.sus",
+            "/home/stacu/a+b=c;d,e@f/a.sus",
+        ] {
+            let uri = uri_from_file_path(Path::new(p)).expect(p);
+            assert_eq!(uri.to_file_path().unwrap().as_ref(), Path::new(p), "{p}");
+        }
+    }
+
+    #[test]
+    fn encoding_matches_editor_convention() {
+        let uri = uri_from_file_path(Path::new("/home/stacu/my proj/Übung/a.sus")).unwrap();
+        assert_eq!(
+            uri.as_str(),
+            "file:///home/stacu/my%20proj/%C3%9Cbung/a.sus"
+        );
+    }
 }
