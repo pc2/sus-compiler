@@ -1111,3 +1111,147 @@ module ArrayDefaultNoContext {
 	int[] y = [v ...]
 	output int z = y[0]
 }
+
+// Secondary bindings: an action or function may be declared without a body and bound later with `when`.
+// Only one site may bind the outputs; the others bind only the inputs.
+module ActionSecondaryBindings #(T, int DEPTH) {
+	state T[DEPTH] mem
+	output bool wrote
+	output bool read_low
+
+	action write : int#(0..DEPTH) wr_addr, T wr_data
+	action read : int#(0..DEPTH) rd_addr -> T rd_data
+
+	when write : int#(0..DEPTH) a, T d {
+		mem[a] = d
+	}
+	when write : int#(0..DEPTH) a2, T d2 {
+		wrote = true
+	} else {
+		wrote = false
+	}
+	when read : int#(0..DEPTH) a -> T d {
+		d = mem[a]
+	}
+	when read : int#(0..DEPTH) a3 {
+		read_low = a3 < DEPTH / 2
+	}
+}
+module UseActionSecondaryBindings {
+	ActionSecondaryBindings#(T: type bool[4], DEPTH: 8) m
+	input bool do_write
+	input bool do_read
+	input int#(0..8) addr
+	input bool[4] data
+	output bool[4] result
+	when do_write {
+		m.write(addr, data)
+	}
+	when do_read {
+		result = m.read(addr)
+	}
+}
+
+module FunctionSecondaryBinding {
+	input int#(0..100) a
+	output int r
+
+	function add_one : int#(0..100) x -> int y
+
+	when add_one : int#(0..100) xx -> int yy {
+		yy = xx + 1
+	}
+
+	action go {
+		r = add_one(a)
+	}
+}
+
+module TriggerLeftBinding {
+	output bool fired_big
+	trigger t : int#(0..100) v
+
+	action fire : int#(0..100) x {
+		t(x)
+	}
+
+	when t : int#(0..100) vv {
+		fired_big = vv > 50
+	} else {
+		fired_big = false
+	}
+}
+
+module SubmodPartialBinding {
+	CallTrigger my_submod
+	output bool saw_dependency
+
+	when my_submod.request_dependency : bool d {
+		saw_dependency = d
+	} else {
+		saw_dependency = false
+	}
+
+	action do_req : bool ind -> bool outd {
+		outd = my_submod.do_req(ind)
+	}
+}
+
+module TwoOutputBindings {
+	action f : int x -> int y
+	when f : int a -> int b {
+		b = a
+	}
+	when f : int c -> int d {
+		d = c + 1
+	}
+}
+module BodyAndOutputBinding {
+	function f : int x -> int y {
+		y = x
+	}
+	when f : int a -> int b {
+		b = a
+	}
+}
+module TwoSubmodOutputBindings {
+	CallTrigger my_submod
+	when my_submod.request_dependency : bool a -> bool b {
+		b = a
+	}
+	when my_submod.request_dependency : bool c -> bool d {
+		d = !c
+	}
+}
+module BindLocalTriggerOutputs {
+	trigger t : int v -> int r
+	when t : int vv -> int rr {
+		rr = vv
+	}
+}
+module BindSubmodAction {
+	ActionSecondaryBindings#(T: type bool, DEPTH: 4) m
+	when m.write : int#(0..4) a, bool d {}
+}
+module PartialWritableMismatch {
+	action f : int x -> int y, int z
+	when f : int a -> int b {
+		b = a
+	}
+}
+module PartialReadOnlyMismatch {
+	action f : int x, int w -> int y
+	when f : int a {}
+}
+module RecursionThroughBinding {
+	function f : int x -> int y
+	when f : int a -> int b {
+		b = f(a)
+	}
+}
+module CallInsideWhenOnSelf {
+	function f
+	when f {
+		f()
+	}
+}

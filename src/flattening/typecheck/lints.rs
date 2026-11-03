@@ -1,5 +1,6 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
+use std::iter::zip;
 
 use sus_proc_macro::{get_builtin_const, get_builtin_type};
 
@@ -29,6 +30,7 @@ pub fn perform_lints(pass: &mut LinkerPass, errors: &ErrorCollector, linker_file
     ctx.no_duplicate_ports();
     ctx.check_unsynthesizeable_types();
     ctx.no_calling_local_actions();
+    ctx.one_output_binding_per_callee();
     ctx.splits_are_used_correctly();
     ctx.disallow_generative_latency_annotation();
 }
@@ -546,12 +548,30 @@ impl LintContext<'_> {
                     let condition = &self.working_on.instructions[stm.condition];
                     if let Instruction::Expression(cond_expr) = &condition
                         && let ExpressionSource::WireRef(cond_ref) = &cond_expr.source
-                        && let Some(local_submod) = cond_ref.root.get_root_flat()
-                        && let Instruction::SubModule(_) =
-                            &self.working_on.instructions[local_submod]
                     {
-                        for o in &stm.bindings_writable {
-                            instruction_fanins[local_submod].push(*o);
+                        match &cond_ref.root {
+                            WireReferenceRoot::LocalSubmodule(local_submod) => {
+                                for o in &stm.bindings_writable {
+                                    instruction_fanins[*local_submod].push(*o);
+                                }
+                            }
+                            // Bindings on a local action alias its parameters
+                            WireReferenceRoot::LocalTrigger(action_id) => {
+                                let action =
+                                    self.working_on.instructions[*action_id].unwrap_interface();
+                                for (port, binding) in zip(&action.inputs, &stm.bindings_read_only)
+                                {
+                                    instruction_fanins[*binding].push(*port);
+                                }
+                                for (port, binding) in zip(&action.outputs, &stm.bindings_writable)
+                                {
+                                    instruction_fanins[*port].push(*binding);
+                                }
+                            }
+                            WireReferenceRoot::LocalDecl(_)
+                            | WireReferenceRoot::NamedConstant(_)
+                            | WireReferenceRoot::NamedModule(_)
+                            | WireReferenceRoot::Error => {}
                         }
                     }
                 }
@@ -647,6 +667,88 @@ impl LintContext<'_> {
         }
     }
 
+    /// If `when_id` is a `when` statement whose condition directly names a local action, trigger or function, returns it
+    fn when_condition_names_action(&self, when_id: FlatID) -> Option<FlatID> {
+        let Instruction::IfStatement(stm) = &self.working_on.instructions[when_id] else {
+            return None;
+        };
+        let cond_expr = self.working_on.instructions[stm.condition].unwrap_expression();
+        let ExpressionSource::WireRef(cond_ref) = &cond_expr.source else {
+            return None;
+        };
+        let WireReferenceRoot::LocalTrigger(action_id) = &cond_ref.root else {
+            return None;
+        };
+        cond_ref.path.is_empty().then_some(*action_id)
+    }
+
+    /// The outputs of an action, trigger or function may be bound by at most one site: either the declaration's own body, or one
+    /// conditional binding `when x : T a -> T b {}`. Other bindings must be partial (inputs only). Otherwise every binding would be
+    /// another writer of the same outputs under the same condition.
+    fn one_output_binding_per_callee(&self) {
+        let GlobalObj::Module(md) = &self.working_on else {
+            return;
+        };
+        let instructions = &md.link_info.instructions;
+
+        // Keyed by the local action, or by (submodule, field) for a submodule's trigger
+        let mut output_binding_sites: HashMap<(FlatID, Option<FieldID>), Span> = HashMap::new();
+
+        for (instr_id, instr) in instructions {
+            let (key, span) = match instr {
+                Instruction::Action(action) => {
+                    if action.then_span.is_none() || action.outputs.is_empty() {
+                        continue;
+                    }
+                    ((instr_id, None), action.name_span)
+                }
+                Instruction::IfStatement(stm) => {
+                    if stm.conditional_bindings_span.is_none() || stm.bindings_writable.is_empty() {
+                        continue;
+                    }
+                    let cond_expr = instructions[stm.condition].unwrap_expression();
+                    let ExpressionSource::WireRef(cond_ref) = &cond_expr.source else {
+                        continue;
+                    };
+                    let key = match (&cond_ref.root, cond_ref.path.as_slice()) {
+                        (WireReferenceRoot::LocalTrigger(action_id), []) => (*action_id, None),
+                        (
+                            WireReferenceRoot::LocalSubmodule(submod_id),
+                            [WireReferencePathElement::FieldAccess { refers_to, .. }],
+                        ) => {
+                            let Some(PathElemRefersTo::Field(_, Some(field))) = refers_to.get()
+                            else {
+                                continue;
+                            };
+                            (*submod_id, Some(*field))
+                        }
+                        // Inline modules (`when Repeat : ...`) are a fresh instance per use. Everything else is a typing error
+                        _ => continue,
+                    };
+                    (key, cond_expr.span)
+                }
+                Instruction::Declaration(_)
+                | Instruction::Expression(_)
+                | Instruction::SubModule(_)
+                | Instruction::ForStatement(_) => continue,
+            };
+            match output_binding_sites.entry(key) {
+                Entry::Occupied(occupied) => {
+                    let name = &self.linker_files[span.file].file_text[span];
+                    self.errors
+                        .error(
+                            span,
+                            format!("The outputs of '{name}' are already bound. Only one binding may bind the outputs, the others must bind only the inputs"),
+                        )
+                        .info(*occupied.get(), "First bound here");
+                }
+                Entry::Vacant(vacant) => {
+                    vacant.insert(span);
+                }
+            }
+        }
+    }
+
     fn no_calling_local_actions(&self) {
         let GlobalObj::Module(md) = &self.working_on else {
             return;
@@ -689,10 +791,12 @@ impl LintContext<'_> {
                         );
                 }
                 ActionKind::Trigger(_) | ActionKind::Function => {
-                    // Calling from within its own body would require the condition wire before it exists
+                    // Calling from within its own body, or from within a `when` on itself, would make the condition depend on itself
                     let mut cur = expr_instr.parent_condition;
                     while let Some(parent) = cur {
-                        if parent.parent_when == *interf {
+                        if parent.parent_when == *interf
+                            || self.when_condition_names_action(parent.parent_when) == Some(*interf)
+                        {
                             self.errors
                                 .error(
                                     fc_func_wireref.root_span,

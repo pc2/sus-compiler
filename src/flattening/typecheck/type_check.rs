@@ -452,6 +452,9 @@ impl<'l> TypeCheckingContext<'l> {
     /// ```
     /// `a` and `b` are read_only_decls
     /// `c` is the only writable_decls
+    ///
+    /// The read-only bindings must match the interface's inputs exactly. The writable bindings are all-or-nothing:
+    /// a partial binding leaves them out entirely, so that only one binding site binds the outputs.
     fn report_errors_for_bad_binding(
         &self,
         read_only_decls: &[FlatID],
@@ -460,14 +463,19 @@ impl<'l> TypeCheckingContext<'l> {
         interface_name_span: Span,
     ) {
         let fn_decl = &interface.fn_decl;
-        for (bindings, interface_args, name) in [
-            (read_only_decls, &fn_decl.inputs, "read-only bindings"),
-            (writable_decls, &fn_decl.outputs, "writable bindings"),
+        for (bindings, interface_args, name, bindings_may_be_omitted) in [
+            (
+                read_only_decls,
+                &fn_decl.inputs,
+                "read-only bindings",
+                false,
+            ),
+            (writable_decls, &fn_decl.outputs, "writable bindings", true),
         ] {
             let arg_count = bindings.len();
             let expected_arg_count = interface_args.len();
 
-            if arg_count != expected_arg_count {
+            if arg_count != expected_arg_count && !(arg_count == 0 && bindings_may_be_omitted) {
                 if arg_count > expected_arg_count {
                     // Too many args, complain about excess args at the end
                     let excess_args_span = Span::new_overarching(
@@ -868,14 +876,45 @@ impl<'l> TypeCheckingContext<'l> {
         trig: RemoteFn<'l, &'l TVec<TemplateKind<AbstractRankedType, ()>>>,
     ) {
         let f = &trig.fn_decl;
-        // TODO: Allow conditional bindings on functions and actions "after the fact", as an alternative to their body
-        if !matches!(&f.action_kind, ActionKind::Trigger(_)) {
-            let interface_name = &f.name;
-            let kind_str = f.action_kind;
-            let err = format!(
-                "Can only use conditional bindings on triggers. '{interface_name}' is an {kind_str}"
-            );
-            self.errors.error(condition_expr.span, err).info_obj(&trig);
+        let interface_name = &f.name;
+        let kind_str = f.action_kind;
+        match (&trig.parent, &f.action_kind) {
+            // Local actions and functions are implemented by their bindings
+            (LocalOrRemoteParentModule::Local(_), ActionKind::Action(_) | ActionKind::Function) => {
+            }
+            // A local trigger can be observed, but its outputs are this module's input ports
+            (LocalOrRemoteParentModule::Local(_), ActionKind::Trigger(_)) => {
+                if let (Some(first), Some(last)) = (
+                    if_stm.bindings_writable.first(),
+                    if_stm.bindings_writable.last(),
+                ) {
+                    let span = Span::new_overarching(
+                        self.instructions[*first].unwrap_declaration().decl_span,
+                        self.instructions[*last].unwrap_declaration().decl_span,
+                    );
+                    let err = format!(
+                        "The outputs of trigger '{interface_name}' are inputs of this module and cannot be bound. Bind only its left-hand side"
+                    );
+                    self.errors.error(span, err).info_obj(&trig);
+                }
+            }
+            (LocalOrRemoteParentModule::Remote(_), ActionKind::Trigger(_)) => {}
+            (LocalOrRemoteParentModule::Local(_), ActionKind::MainInterface)
+            | (LocalOrRemoteParentModule::Remote(_), ActionKind::MainInterface) => {
+                let err = format!(
+                    "Cannot use conditional bindings on '{interface_name}': a main interface has no condition wire"
+                );
+                self.errors.error(condition_expr.span, err).info_obj(&trig);
+            }
+            (
+                LocalOrRemoteParentModule::Remote(_),
+                ActionKind::Action(_) | ActionKind::Function,
+            ) => {
+                let err = format!(
+                    "Can only bind a submodule's triggers. '{interface_name}' is an {kind_str}"
+                );
+                self.errors.error(condition_expr.span, err).info_obj(&trig);
+            }
         }
 
         self.report_errors_for_bad_binding(

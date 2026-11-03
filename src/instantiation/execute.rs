@@ -1114,8 +1114,8 @@ impl<'l> ExecutionContext<'l> {
                         interface.decl_span.debug();
                         unreachable!("Can't call interfaces locally")
                     }
-                    ActionKind::Action(_) => unreachable!("Can't call actions locally"),
-                    ActionKind::Trigger(_) | ActionKind::Function => {
+                    // Calling a local action is rejected by the lints, but binding it (`when my_action : T a {}`) is allowed
+                    ActionKind::Action(_) | ActionKind::Trigger(_) | ActionKind::Function => {
                         Some(self.generation_state[*interface_decl].unwrap_wire())
                     }
                 };
@@ -1694,19 +1694,23 @@ impl<'l> ExecutionContext<'l> {
                                 );
                             }
 
-                            for (port_wire, binding) in
-                                zip_eq(&trig_interface.outputs, &if_stm.bindings_writable)
-                            {
-                                let binding_span = self.link_info.instructions[*binding].get_span();
-                                let binding = self.generation_state[*binding].unwrap_wire();
-                                self.instantiate_write_to_wire(
-                                    *port_wire,
-                                    Vec::new(),
-                                    binding,
-                                    0,
-                                    0,
-                                    binding_span,
-                                );
+                            // A partial binding binds only the inputs
+                            if !if_stm.bindings_writable.is_empty() {
+                                for (port_wire, binding) in
+                                    zip_eq(&trig_interface.outputs, &if_stm.bindings_writable)
+                                {
+                                    let binding_span =
+                                        self.link_info.instructions[*binding].get_span();
+                                    let binding = self.generation_state[*binding].unwrap_wire();
+                                    self.instantiate_write_to_wire(
+                                        *port_wire,
+                                        Vec::new(),
+                                        binding,
+                                        0,
+                                        0,
+                                        binding_span,
+                                    );
+                                }
                             }
                         } else {
                             let condition_wire =

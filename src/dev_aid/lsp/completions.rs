@@ -3,8 +3,8 @@ use std::fmt::Display;
 use crate::{
     dev_aid::lsp::tree_walk::{LocationKind, MultiGlobalRef, get_selected_object},
     flattening::{
-        ActionKind, Declaration, Direction, FieldDeclKind, GlobalReference, Module,
-        PathElemRefersTo, SubModuleInstance,
+        ActionDeclaration, ActionKind, Declaration, Direction, FieldDeclKind, GlobalReference,
+        Module, PathElemRefersTo, SubModuleInstance,
     },
     linker::{FileData, GlobalObj, GlobalUUID, LinkInfo, LinkerGlobals},
     prelude::*,
@@ -36,7 +36,19 @@ fn completions_fallback(linker: &Linker, file: &FileData, position: usize) -> Ve
                     });
                 }
                 Instruction::Action(d) => match &d.action_kind {
-                    ActionKind::Action(_) | ActionKind::MainInterface => {}
+                    ActionKind::MainInterface => {}
+                    // A local action is implemented by binding it: `when name : T a -> T b {}`
+                    ActionKind::Action(_) => {
+                        let label = d.name.to_string();
+                        let insert_text = Some(suggest_binding(global, file, d));
+                        completions.push(CompletionItem {
+                            label,
+                            insert_text,
+                            detail: Some(d.action_kind.kind_uncapitalized().to_string()),
+                            kind: Some(CompletionItemKind::EVENT),
+                            ..Default::default()
+                        });
+                    }
                     ActionKind::Trigger(_) | ActionKind::Function => {
                         let trigger_params = suggest_funccall_ports(global, &d.inputs);
 
@@ -167,25 +179,7 @@ fn get_module_port_completions(linker: &Linker, md: &Module) -> Vec<CompletionIt
                 ActionKind::Function => unreachable!("Functions are not fields"),
                 ActionKind::Trigger(_) => {
                     let label = interf_decl.name.clone();
-                    let trigger_inputs =
-                        suggest_interface_ports_decls(&md.link_info, file, &interf_decl.inputs);
-                    let trigger_outputs =
-                        suggest_interface_ports_decls(&md.link_info, file, &interf_decl.outputs);
-                    let insert_text = Some(
-                        match (
-                            interf_decl.inputs.is_empty(),
-                            interf_decl.outputs.is_empty(),
-                        ) {
-                            (true, true) => label.to_string(),
-                            (true, false) => {
-                                format!("{label} : -> {trigger_outputs}")
-                            }
-                            (false, true) => format!("{label} : {trigger_inputs}"),
-                            (false, false) => {
-                                format!("{label} : {trigger_inputs} -> {trigger_outputs}")
-                            }
-                        },
-                    );
+                    let insert_text = Some(suggest_binding(&md.link_info, file, interf_decl));
 
                     completions.push(CompletionItem {
                         label,
@@ -222,6 +216,19 @@ fn suggest_interface_ports_decls(
         let typ_expr = &file.file_text[port.typ_expr.get_span()];
         write!(f, "{typ_expr} {}", port.name)
     })
+}
+
+/// The conditional-binding snippet for an action or trigger: `name : T a, T b -> T c`
+fn suggest_binding(link_info: &LinkInfo, file: &FileData, action: &ActionDeclaration) -> String {
+    let label = &action.name;
+    let inputs = suggest_interface_ports_decls(link_info, file, &action.inputs);
+    let outputs = suggest_interface_ports_decls(link_info, file, &action.outputs);
+    match (action.inputs.is_empty(), action.outputs.is_empty()) {
+        (true, true) => label.to_string(),
+        (true, false) => format!("{label} : -> {outputs}"),
+        (false, true) => format!("{label} : {inputs}"),
+        (false, false) => format!("{label} : {inputs} -> {outputs}"),
+    }
 }
 
 fn make_decl_detail(

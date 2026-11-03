@@ -123,6 +123,20 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate ArrayDefaultWiresTooMany #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate ArrayDefaultConstTooMany #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate ArrayDefaultNoContext #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated ActionSecondaryBindings #(T: type bool #()[4], DEPTH: 8)
+[INFO  sus_compiler::instantiation::instantiator] Instantiated UseActionSecondaryBindings #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated FunctionSecondaryBinding #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TriggerLeftBinding #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated SubmodPartialBinding #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TwoOutputBindings #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate BodyAndOutputBinding #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TwoSubmodOutputBindings #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate BindLocalTriggerOutputs #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate BindSubmodAction #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate PartialWritableMismatch #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate PartialReadOnlyMismatch #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate RecursionThroughBinding #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate CallInsideWhenOnSelf #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -300,6 +314,15 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate ArrayDefaultWiresTooMany due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate ArrayDefaultConstTooMany due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate ArrayDefaultNoContext due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TwoOutputBindings due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate BodyAndOutputBinding due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TwoSubmodOutputBindings due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate BindLocalTriggerOutputs due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate BindSubmodAction due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate PartialWritableMismatch due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate PartialReadOnlyMismatch due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate RecursionThroughBinding due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate CallInsideWhenOnSelf due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -2618,19 +2641,12 @@ Warning: ticked is effectively constant. Declare this wire as `gen` to make this
      │        ───┬──  
      │           ╰──── ticked = true
 ─────╯
-Warning: Not Instantiating LocalFunctionNoBlock #() due to abstract typing errors
-     ╭─[ test.sus:900:8 ]
-     │
- 900 │ module LocalFunctionNoBlock {
-     │        ──────────┬─────────  
-     │                  ╰─────────── Not Instantiating LocalFunctionNoBlock #() due to abstract typing errors
-─────╯
-Error: A function requires a block
-     ╭─[ test.sus:901:2 ]
+Error: Some parameters of 'x' were still unknown: int #(FROM: ?, TO: ?)
+     ╭─[ test.sus:901:25 ]
      │
  901 │     function no_body : int x -> int y
-     │     ────┬───  
-     │         ╰───── A function requires a block
+     │                            ┬  
+     │                            ╰── Some parameters of 'x' were still unknown: int #(FROM: ?, TO: ?)
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:901:25 ]
@@ -2638,6 +2654,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  901 │     function no_body : int x -> int y
      │                            ┬  
      │                            ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Some parameters of 'y' were still unknown: int #(FROM: ?, TO: ?)
+     ╭─[ test.sus:901:34 ]
+     │
+ 901 │     function no_body : int x -> int y
+     │                                     ┬  
+     │                                     ╰── Some parameters of 'y' were still unknown: int #(FROM: ?, TO: ?)
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:901:34 ]
@@ -2769,18 +2792,18 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                               ┬  
      │                               ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Can only use conditional bindings on triggers. 'f' is an function
+Error: The outputs of 'f' are already bound. Only one binding may bind the outputs, the others must bind only the inputs
      ╭─[ test.sus:922:7 ]
      │
  922 │     when f : int xx -> int yy {
      │          ┬  
-     │          ╰── Can only use conditional bindings on triggers. 'f' is an function
+     │          ╰── The outputs of 'f' are already bound. Only one binding may bind the outputs, the others must bind only the inputs
      │
      ├─[ test.sus:922:7 ]
      │
  919 │     function f : int x -> int y {
      │              ┬  
-     │              ╰── Interface 'f' defined here
+     │              ╰── First bound here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:922:15 ]
@@ -3156,6 +3179,381 @@ Error: Some parameters of '_2' were still unknown: int #(FROM: 0, TO: 10)[_]
  1111 │     int[] y = [v ...]
       │               ───┬───  
       │                  ╰───── Some parameters of '_2' were still unknown: int #(FROM: 0, TO: 10)[_]
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1128:30 ]
+      │
+ 1128 │     when write : int#(0..DEPTH) a2, T d2 {
+      │                                 ─┬  
+      │                                  ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1128:36 ]
+      │
+ 1128 │     when write : int#(0..DEPTH) a2, T d2 {
+      │                                       ─┬  
+      │                                        ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused port 'read_low'
+      ╭─[ test.sus:1141:54 ]
+      │
+ 1141 │     ActionSecondaryBindings#(T: type bool[4], DEPTH: 8) m
+      │                                                         ┬  
+      │                                                         ╰── Unused port 'read_low'
+      │
+      ├─[ test.sus:1141:54 ]
+      │
+ 1120 │     output bool read_low
+      │                 ────┬───  
+      │                     ╰───── Port 'read_low' declared here
+      │ 
+ 1141 │     ActionSecondaryBindings#(T: type bool[4], DEPTH: 8) m
+      │                                                         ┬  
+      │                                                         ╰── m declared here
+──────╯
+Warning: Unused port 'wrote'
+      ╭─[ test.sus:1141:54 ]
+      │
+ 1141 │     ActionSecondaryBindings#(T: type bool[4], DEPTH: 8) m
+      │                                                         ┬  
+      │                                                         ╰── Unused port 'wrote'
+      │
+      ├─[ test.sus:1141:54 ]
+      │
+ 1119 │     output bool wrote
+      │                 ──┬──  
+      │                   ╰──── Port 'wrote' declared here
+      │ 
+ 1141 │     ActionSecondaryBindings#(T: type bool[4], DEPTH: 8) m
+      │                                                         ┬  
+      │                                                         ╰── m declared here
+──────╯
+Warning: _my_submod_dout is never written to.
+      ╭─[ test.sus:1186:14 ]
+      │
+ 1186 │     CallTrigger my_submod
+      │                 ────┬────  
+      │                     ╰────── _my_submod_dout is never written to.
+──────╯
+Warning: Not Instantiating TwoOutputBindings #() due to abstract typing errors
+      ╭─[ test.sus:1200:8 ]
+      │
+ 1200 │ module TwoOutputBindings {
+      │        ────────┬────────  
+      │                ╰────────── Not Instantiating TwoOutputBindings #() due to abstract typing errors
+──────╯
+Error: The outputs of 'f' are already bound. Only one binding may bind the outputs, the others must bind only the inputs
+      ╭─[ test.sus:1205:7 ]
+      │
+ 1205 │     when f : int c -> int d {
+      │          ┬  
+      │          ╰── The outputs of 'f' are already bound. Only one binding may bind the outputs, the others must bind only the inputs
+      │
+      ├─[ test.sus:1205:7 ]
+      │
+ 1202 │     when f : int a -> int b {
+      │          ┬  
+      │          ╰── First bound here
+──────╯
+Warning: Not Instantiating BodyAndOutputBinding #() due to abstract typing errors
+      ╭─[ test.sus:1209:8 ]
+      │
+ 1209 │ module BodyAndOutputBinding {
+      │        ──────────┬─────────  
+      │                  ╰─────────── Not Instantiating BodyAndOutputBinding #() due to abstract typing errors
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1210:19 ]
+      │
+ 1210 │     function f : int x -> int y {
+      │                      ┬  
+      │                      ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1210:28 ]
+      │
+ 1210 │     function f : int x -> int y {
+      │                               ┬  
+      │                               ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: The outputs of 'f' are already bound. Only one binding may bind the outputs, the others must bind only the inputs
+      ╭─[ test.sus:1213:7 ]
+      │
+ 1213 │     when f : int a -> int b {
+      │          ┬  
+      │          ╰── The outputs of 'f' are already bound. Only one binding may bind the outputs, the others must bind only the inputs
+      │
+      ├─[ test.sus:1213:7 ]
+      │
+ 1210 │     function f : int x -> int y {
+      │              ┬  
+      │              ╰── First bound here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1213:15 ]
+      │
+ 1213 │     when f : int a -> int b {
+      │                  ┬  
+      │                  ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1213:24 ]
+      │
+ 1213 │     when f : int a -> int b {
+      │                           ┬  
+      │                           ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Not Instantiating TwoSubmodOutputBindings #() due to abstract typing errors
+      ╭─[ test.sus:1217:8 ]
+      │
+ 1217 │ module TwoSubmodOutputBindings {
+      │        ───────────┬───────────  
+      │                   ╰───────────── Not Instantiating TwoSubmodOutputBindings #() due to abstract typing errors
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1219:43 ]
+      │
+ 1219 │     when my_submod.request_dependency : bool a -> bool b {
+      │                                              ┬  
+      │                                              ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1219:53 ]
+      │
+ 1219 │     when my_submod.request_dependency : bool a -> bool b {
+      │                                                        ┬  
+      │                                                        ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: The outputs of 'my_submod.request_dependency' are already bound. Only one binding may bind the outputs, the others must bind only the inputs
+      ╭─[ test.sus:1222:7 ]
+      │
+ 1222 │     when my_submod.request_dependency : bool c -> bool d {
+      │          ──────────────┬─────────────  
+      │                        ╰─────────────── The outputs of 'my_submod.request_dependency' are already bound. Only one binding may bind the outputs, the others must bind only the inputs
+      │
+      ├─[ test.sus:1222:7 ]
+      │
+ 1219 │     when my_submod.request_dependency : bool a -> bool b {
+      │          ──────────────┬─────────────  
+      │                        ╰─────────────── First bound here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1222:43 ]
+      │
+ 1222 │     when my_submod.request_dependency : bool c -> bool d {
+      │                                              ┬  
+      │                                              ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1222:53 ]
+      │
+ 1222 │     when my_submod.request_dependency : bool c -> bool d {
+      │                                                        ┬  
+      │                                                        ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Not Instantiating BindLocalTriggerOutputs #() due to abstract typing errors
+      ╭─[ test.sus:1226:8 ]
+      │
+ 1226 │ module BindLocalTriggerOutputs {
+      │        ───────────┬───────────  
+      │                   ╰───────────── Not Instantiating BindLocalTriggerOutputs #() due to abstract typing errors
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1227:27 ]
+      │
+ 1227 │     trigger t : int v -> int r
+      │                              ┬  
+      │                              ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1228:15 ]
+      │
+ 1228 │     when t : int vv -> int rr {
+      │                  ─┬  
+      │                   ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: The outputs of trigger 't' are inputs of this module and cannot be bound. Bind only its left-hand side
+      ╭─[ test.sus:1228:21 ]
+      │
+ 1228 │     when t : int vv -> int rr {
+      │                        ───┬──  
+      │                           ╰──── The outputs of trigger 't' are inputs of this module and cannot be bound. Bind only its left-hand side
+      │
+      ├─[ test.sus:1228:21 ]
+      │
+ 1227 │     trigger t : int v -> int r
+      │             ┬  
+      │             ╰── Interface 't' defined here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1228:25 ]
+      │
+ 1228 │     when t : int vv -> int rr {
+      │                            ─┬  
+      │                             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Not Instantiating BindSubmodAction #() due to abstract typing errors
+      ╭─[ test.sus:1232:8 ]
+      │
+ 1232 │ module BindSubmodAction {
+      │        ────────┬───────  
+      │                ╰───────── Not Instantiating BindSubmodAction #() due to abstract typing errors
+──────╯
+Error: Can only bind a submodule's triggers. 'write' is an action
+      ╭─[ test.sus:1234:7 ]
+      │
+ 1234 │     when m.write : int#(0..4) a, bool d {}
+      │          ───┬───  
+      │             ╰───── Can only bind a submodule's triggers. 'write' is an action
+      │
+      ├─[ test.sus:1234:7 ]
+      │
+ 1122 │     action write : int#(0..DEPTH) wr_addr, T wr_data
+      │            ──┬──  
+      │              ╰──── Interface 'write' defined here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1234:28 ]
+      │
+ 1234 │     when m.write : int#(0..4) a, bool d {}
+      │                               ┬  
+      │                               ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1234:36 ]
+      │
+ 1234 │     when m.write : int#(0..4) a, bool d {}
+      │                                       ┬  
+      │                                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Not Instantiating PartialWritableMismatch #() due to abstract typing errors
+      ╭─[ test.sus:1236:8 ]
+      │
+ 1236 │ module PartialWritableMismatch {
+      │        ───────────┬───────────  
+      │                   ╰───────────── Not Instantiating PartialWritableMismatch #() due to abstract typing errors
+──────╯
+Error: Too few bindings. This interface provides 2 writable bindings, but 1 were provided.
+      ╭─[ test.sus:1238:25 ]
+      │
+ 1238 │     when f : int a -> int b {
+      │                            │ 
+      │                            ╰─ Too few bindings. This interface provides 2 writable bindings, but 1 were provided.
+      │
+      ├─[ test.sus:1238:25 ]
+      │
+ 1237 │     action f : int x -> int y, int z
+      │            ┬  
+      │            ╰── Interface 'f' defined here
+──────╯
+Warning: Not Instantiating PartialReadOnlyMismatch #() due to abstract typing errors
+      ╭─[ test.sus:1242:8 ]
+      │
+ 1242 │ module PartialReadOnlyMismatch {
+      │        ───────────┬───────────  
+      │                   ╰───────────── Not Instantiating PartialReadOnlyMismatch #() due to abstract typing errors
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1243:17 ]
+      │
+ 1243 │     action f : int x, int w -> int y
+      │                    ┬  
+      │                    ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1243:24 ]
+      │
+ 1243 │     action f : int x, int w -> int y
+      │                           ┬  
+      │                           ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1244:15 ]
+      │
+ 1244 │     when f : int a {}
+      │                  ┬  
+      │                  ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Too few bindings. This interface provides 2 read-only bindings, but 1 were provided.
+      ╭─[ test.sus:1244:16 ]
+      │
+ 1244 │     when f : int a {}
+      │                   │ 
+      │                   ╰─ Too few bindings. This interface provides 2 read-only bindings, but 1 were provided.
+      │
+      ├─[ test.sus:1244:16 ]
+      │
+ 1243 │     action f : int x, int w -> int y
+      │            ┬  
+      │            ╰── Interface 'f' defined here
+──────╯
+Warning: Not Instantiating RecursionThroughBinding #() due to abstract typing errors
+      ╭─[ test.sus:1246:8 ]
+      │
+ 1246 │ module RecursionThroughBinding {
+      │        ───────────┬───────────  
+      │                   ╰───────────── Not Instantiating RecursionThroughBinding #() due to abstract typing errors
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1247:19 ]
+      │
+ 1247 │     function f : int x -> int y
+      │                      ┬  
+      │                      ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1247:28 ]
+      │
+ 1247 │     function f : int x -> int y
+      │                               ┬  
+      │                               ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1248:15 ]
+      │
+ 1248 │     when f : int a -> int b {
+      │                  ┬  
+      │                  ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1248:24 ]
+      │
+ 1248 │     when f : int a -> int b {
+      │                           ┬  
+      │                           ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Cannot call 'f' from inside its own body
+      ╭─[ test.sus:1249:7 ]
+      │
+ 1249 │        b = f(a)
+      │            ┬  
+      │            ╰── Cannot call 'f' from inside its own body
+      │
+      ├─[ test.sus:1249:7 ]
+      │
+ 1247 │     function f : int x -> int y
+      │              ┬  
+      │              ╰── 'f' declared here
+──────╯
+Warning: Not Instantiating CallInsideWhenOnSelf #() due to abstract typing errors
+      ╭─[ test.sus:1252:8 ]
+      │
+ 1252 │ module CallInsideWhenOnSelf {
+      │        ──────────┬─────────  
+      │                  ╰─────────── Not Instantiating CallInsideWhenOnSelf #() due to abstract typing errors
+──────╯
+Error: Cannot call 'f' from inside its own body
+      ╭─[ test.sus:1255:3 ]
+      │
+ 1255 │        f()
+      │        ┬  
+      │        ╰── Cannot call 'f' from inside its own body
+      │
+      ├─[ test.sus:1255:3 ]
+      │
+ 1253 │     function f
+      │              ┬  
+      │              ╰── 'f' declared here
 ──────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:24:6 ]
@@ -4433,26 +4831,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                ─┬  
      │                                 ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: An action requires a block
-     ╭─[ test_old.sus:744:3 ]
-     │
- 744 │        action next_state'II : T next_state_value
-     │        ───┬──  
-     │           ╰──── An action requires a block
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test_old.sus:744:28 ]
      │
  744 │        action next_state'II : T next_state_value
      │                                 ────────┬───────  
      │                                         ╰───────── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: An action requires a block
-     ╭─[ test_old.sus:747:2 ]
-     │
- 747 │     action request_output : -> trigger output_valid : T result
-     │     ───┬──  
-     │        ╰──── An action requires a block
 ─────╯
 Error: While parsing 'action_statement', parser found a syntax error in a node of type 'ERROR'
      ╭─[ test_old.sus:747:24 ]
@@ -4476,13 +4860,6 @@ Warning: Not Instantiating use_MultiStateLoop #() due to abstract typing errors
  750 │ module use_MultiStateLoop {
      │        ─────────┬────────  
      │                 ╰────────── Not Instantiating use_MultiStateLoop #() due to abstract typing errors
-─────╯
-Error: An action requires a block
-     ╭─[ test_old.sus:754:3 ]
-     │
- 754 │        action input_valid : float new_input
-     │        ───┬──  
-     │           ╰──── An action requires a block
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test_old.sus:754:30 ]
@@ -6099,6 +6476,10 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for ArrayDefaultGen #() as "ArrayDefaultGen"
 [INFO  sus_compiler::codegen] Code generated for ArrayDefaultWires #() as "ArrayDefaultWires"
 [INFO  sus_compiler::codegen] Code generated for ArrayDefaultState #() as "ArrayDefaultState"
+[INFO  sus_compiler::codegen] Code generated for UseActionSecondaryBindings #() as "UseActionSecondaryBindings"
+[INFO  sus_compiler::codegen] Code generated for FunctionSecondaryBinding #() as "FunctionSecondaryBinding"
+[INFO  sus_compiler::codegen] Code generated for TriggerLeftBinding #() as "TriggerLeftBinding"
+[INFO  sus_compiler::codegen] Code generated for SubmodPartialBinding #() as "SubmodPartialBinding"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"

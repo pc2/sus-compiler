@@ -1839,6 +1839,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 let (inputs, outputs) =
                     slf.flatten_interface_ports(left_direction, &param_decl_kind, cursor);
 
+                // The body is optional: a body-less action or function is bound later with `when name : T a -> T b {}`
                 let (then_block, else_block, then_span, else_span) =
                     slf.flatten_then_else_blocks(cursor, true);
 
@@ -1855,25 +1856,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 interface.else_block = else_block;
                 interface.then_span = then_span;
                 interface.else_span = else_span;
-
-                match action_kind {
-                    ActionKind::MainInterface => {
-                        unreachable!("Only declared in the module header")
-                    }
-                    ActionKind::Action(_) => {
-                        if then_span.is_none() {
-                            slf.errors
-                                .error(interface_kw_span, "An action requires a block");
-                        }
-                    }
-                    ActionKind::Function => {
-                        if then_span.is_none() {
-                            slf.errors
-                                .error(interface_kw_span, "A function requires a block");
-                        }
-                    }
-                    ActionKind::Trigger(_) => {}
-                }
             });
         });
     }
