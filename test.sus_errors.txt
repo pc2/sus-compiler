@@ -137,6 +137,7 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate PartialReadOnlyMismatch #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate RecursionThroughBinding #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate CallInsideWhenOnSelf #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestFunctions #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -323,6 +324,7 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate PartialReadOnlyMismatch due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate RecursionThroughBinding due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate CallInsideWhenOnSelf due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TestFunctions due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -3554,6 +3556,76 @@ Error: Cannot call 'f' from inside its own body
  1253 │     function f
       │              ┬  
       │              ╰── 'f' declared here
+──────╯
+Warning: Not Instantiating TestFunctions #() due to abstract typing errors
+      ╭─[ test.sus:1259:8 ]
+      │
+ 1259 │ module TestFunctions {
+      │        ──────┬──────  
+      │              ╰──────── Not Instantiating TestFunctions #() due to abstract typing errors
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1261:23 ]
+      │
+ 1261 │     action do_x : int y
+      │                       ┬  
+      │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1263:13 ]
+      │
+ 1263 │     for int Y in 0..=5 {
+      │             ┬  
+      │             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1274:36 ]
+      │
+ 1274 │     function run_instruction : int addr {
+      │                                    ──┬─  
+      │                                      ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: No write modifiers are allowed on non-assigned to declarations or expressions
+      ╭─[ test.sus:1279:9 ]
+      │
+ 1279 │         reg(5) run_instruction(5)
+      │         ───┬──  
+      │            ╰──── No write modifiers are allowed on non-assigned to declarations or expressions
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1282:21 ]
+      │
+ 1282 │     when do_x : int y {
+      │                     ┬  
+      │                     ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1286:10 ]
+      │
+ 1286 │     bool z = do_x
+      │          ┬  
+      │          ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: No Global 'instruction' was found.
+      ╭─[ test.sus:1288:23 ]
+      │
+ 1288 │     when x.may_push & instruction < last & y.may {
+      │                       ─────┬─────  
+      │                            ╰─────── No Global 'instruction' was found.
+──────╯
+Error: No Global 'last' was found.
+      ╭─[ test.sus:1288:37 ]
+      │
+ 1288 │     when x.may_push & instruction < last & y.may {
+      │                                     ──┬─  
+      │                                       ╰─── No Global 'last' was found.
+──────╯
+Error: No Global 'y' was found.
+      ╭─[ test.sus:1288:44 ]
+      │
+ 1288 │     when x.may_push & instruction < last & y.may {
+      │                                            ┬  
+      │                                            ╰── No Global 'y' was found.
 ──────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:24:6 ]

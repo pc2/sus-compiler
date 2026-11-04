@@ -545,7 +545,8 @@ module MultiReduction#(T, T NEUTRAL_ELEMENT, int OPERATOR_LATENCY, int DATA_IN_L
 
 
     state bool is_initial_wave
-    state T[MAX_DATAS] store'DATA_IN_LATENCY-1
+    gen int T_WIDTH = sizeof#(T)
+    state bool[T_WIDTH][MAX_DATAS] store'DATA_IN_LATENCY-1
 
     domain operator_dom
     trigger reduction_operator'DATA_IN_LATENCY : T op_left'DATA_IN_LATENCY, T op_right'DATA_IN_LATENCY -> T op_result'DATA_IN_LATENCY+OPERATOR_LATENCY
@@ -557,11 +558,11 @@ module MultiReduction#(T, T NEUTRAL_ELEMENT, int OPERATOR_LATENCY, int DATA_IN_L
         when is_initial_wave {
             reg existing_data = NEUTRAL_ELEMENT
         } else {
-            reg existing_data = store[cur_data_idx]
+            reg existing_data = FromBits(store[cur_data_idx])
         }
 
         T combined = reduction_operator(existing_data, value_to_reduce)
-        next(OPERATOR_LATENCY+1) store[cur_data_idx] = combined
+        next(OPERATOR_LATENCY+1) store[cur_data_idx] = ToBits(combined)
         
         increment_num_reductions_in_flight = 1
         next(OPERATOR_LATENCY+2) decrement_num_reductions_in_flight = 1

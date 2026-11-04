@@ -1255,3 +1255,38 @@ module CallInsideWhenOnSelf {
 		f()
 	}
 }
+
+module TestFunctions {
+
+    action do_x : int y
+
+    for int Y in 0..=5 {
+
+    }
+
+    trigger on_event : bool hello
+
+    bool t = true
+    when t {
+        on_event(true)
+    }
+
+    function run_instruction : int addr {
+
+    }
+
+    when t {
+        reg(5) run_instruction(5)
+    }
+
+    when do_x : int y {
+
+    }
+    FIFO x
+    bool z = do_x
+
+    when x.may_push & instruction < last & y.may {
+        
+    }
+}
+
