@@ -2085,23 +2085,17 @@ ReceiveZerosArray ReceiveZerosArray(
 always_comb begin // combinatorial vs
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	vs = '{4'sdx, 4'sdx};
-	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
-vs[_v0] = 1'd0;
-end
+	vs = '{1'd0, 1'd0};
 end
 always_comb begin // combinatorial nums
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	nums = '{4'dx, 4'dx};
-	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
-nums[_v0] = _5[_v0];
-end
+	nums = _5;
 end
 always_comb begin // combinatorial sums
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	sums = '{4'dx, 4'dx};
-	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
-sums[_v0] = _12[_v0];
-end
+	sums = _12;
 end
 endmodule // TestZerosArrays #()
 
@@ -2316,30 +2310,22 @@ endgenerate
 always_comb begin // combinatorial slice
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	slice = '{20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx};
-	for(int _v0 = 0; _v0 < 9; _v0 = _v0 + 1) begin
-slice[_v0] = _1[_v0];
-end
+	slice = _1;
 end
 always_comb begin // combinatorial slice2
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	slice2 = '{2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx};
-	for(int _v0 = 0; _v0 < 27; _v0 = _v0 + 1) begin
-slice2[_v0] = _2[_v0];
-end
+	slice2 = _2;
 end
 always_comb begin // combinatorial gen_partselect
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	gen_partselect = '{5'bxxxxx, 5'bxxxxx, 5'bxxxxx, 5'bxxxxx, 5'bxxxxx, 5'bxxxxx, 5'bxxxxx, 5'bxxxxx, 5'bxxxxx};
-	for(int _v0 = 0; _v0 < 9; _v0 = _v0 + 1) begin
-gen_partselect[_v0] = _3[_v0];
-end
+	gen_partselect = _3;
 end
 always_comb begin // combinatorial partselect
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	partselect = '{2'bxx, 2'bxx, 2'bxx};
-	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
-partselect[_v0] = _6[_v0];
-end
+	partselect = _6;
 end
 endmodule // multi_slice #()
 
@@ -2350,16 +2336,7 @@ module testArrayWrite(
 	output /*mux_wire*/ logic signed[3:0] out_arr[0:5][0:9]
 );
 
-genvar _g0;
-genvar _g1;
-wire signed[3:0] _1[0:5][0:9];
-generate
-for(_g0 = 0; _g0 < 6; _g0 = _g0 + 1) begin
-for(_g1 = 0; _g1 < 10; _g1 = _g1 + 1) begin
-assign _1[_g0][_g1] = in_arr[0][_g0][_g1];
-end
-end
-endgenerate
+wire signed[3:0] _1[0:5][0:9] = in_arr[0];
 wire signed[3:0] _2 = in_arr[0][5][9];
 wire signed[3:0] _3 = in_arr[0][0][0];
 wire signed[3:0] _4 = in_arr[0][1][0];
@@ -2424,11 +2401,7 @@ wire signed[3:0] _62 = in_arr[0][5][9];
 always_comb begin // combinatorial out_arr
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	out_arr = '{'{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}, '{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}, '{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}, '{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}, '{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}, '{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}};
-	for(int _v0 = 0; _v0 < 6; _v0 = _v0 + 1) begin
-for(int _v1 = 0; _v1 < 10; _v1 = _v1 + 1) begin
-out_arr[_v0][_v1] = _1[_v0][_v1];
-end
-end
+	out_arr = _1;
 	out_arr[5][9] = _2;
 	out_arr[0][0] = _3;
 	out_arr[1][0] = _4;
@@ -2568,16 +2541,12 @@ end
 always_comb begin // combinatorial beep
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	beep = '{3'dx, 3'dx, 3'dx, 3'dx, 3'dx, 3'dx, 3'dx, 3'dx};
-	for(int _v0 = 0; _v0 < 8; _v0 = _v0 + 1) begin
-beep[_v0] = _permut_d_out[_v0];
-end
+	beep = _permut_d_out;
 end
 always_comb begin // combinatorial _permut_d_in
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	_permut_d_in = '{3'dx, 3'dx, 3'dx, 3'dx, 3'dx, 3'dx, 3'dx, 3'dx};
-	for(int _v0 = 0; _v0 < 8; _v0 = _v0 + 1) begin
-_permut_d_in[_v0] = SOURCES[_v0];
-end
+	_permut_d_in = SOURCES;
 end
 endmodule // use_permute #()
 
@@ -2814,9 +2783,7 @@ end
 always_comb begin // combinatorial _cr_m_i
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	_cr_m_i = '{20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx};
-	for(int _v0 = 0; _v0 < 512; _v0 = _v0 + 1) begin
-_cr_m_i[_v0] = mem[_v0];
-end
+	_cr_m_i = mem;
 end
 always_comb begin // combinatorial rd_data
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -5003,16 +4970,12 @@ assign _6[3] = v;
 always_comb begin // combinatorial d
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	d = '{4'dx, 4'dx, 4'dx};
-	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
-d[_v0] = _2[_v0];
-end
+	d = _2;
 end
 always_comb begin // combinatorial e
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	e = '{4'dx, 4'dx, 4'dx, 4'dx};
-	for(int _v0 = 0; _v0 < 4; _v0 = _v0 + 1) begin
-e[_v0] = _6[_v0];
-end
+	e = _6;
 end
 endmodule // ArrayDefaultWires #()
 
@@ -5035,9 +4998,7 @@ end
 always_comb begin // combinatorial b
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	b = '{2'dx, 2'dx, 2'dx, 2'dx};
-	for(int _v0 = 0; _v0 < 4; _v0 = _v0 + 1) begin
-b[_v0] = _2[_v0];
-end
+	b = _2;
 end
 always_comb begin // combinatorial g3
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -5155,9 +5116,7 @@ module_interface_shorthand_T_type_bool_N_5 sub(
 always_comb begin // combinatorial x
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	x = '{7'dx, 7'dx, 7'dx};
-	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
-x[_v0] = _module_interface_shorthand_result[_v0];
-end
+	x = _module_interface_shorthand_result;
 end
 always_comb begin // combinatorial y
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -5262,9 +5221,7 @@ assign _4 = ~invert;
 always_comb begin // combinatorial result
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	result = '{7'dx, 7'dx, 7'dx};
-	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
-result[_v0] = _2[_v0];
-end
+	result = _2;
 end
 always_comb begin // combinatorial inverted
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -6350,9 +6307,7 @@ wire[31:0] _3 = floats_2[y];
 always_comb begin // combinatorial fs
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	fs = '{'x, 'x, 'x, 'x, 'x};
-	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
-fs[_v0] = floats[_v0];
-end
+	fs = floats;
 end
 always_comb begin // combinatorial y
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -6388,9 +6343,7 @@ end
 always_comb begin // combinatorial many_floats
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	many_floats = '{'x, 'x, 'x, 'x, 'x};
-	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
-many_floats[_v0] = _2[_v0];
-end
+	many_floats = _2;
 end
 endmodule // float_literal #()
 
@@ -6481,9 +6434,7 @@ localparam[2:0] _1[0:4] = '{3'd1, 3'd2, 3'd3, 3'd4, 3'd5};
 always_comb begin // combinatorial vs
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	vs = '{3'dx, 3'dx, 3'dx, 3'dx, 3'dx};
-	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
-vs[_v0] = _1[_v0];
-end
+	vs = _1;
 end
 endmodule // testInts #()
 
@@ -6528,9 +6479,7 @@ end
 always_comb begin // combinatorial _adder_values
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	_adder_values = '{2'dx, 2'dx, 2'dx, 2'dx, 2'dx};
-	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
-_adder_values[_v0] = arr[_v0];
-end
+	_adder_values = arr;
 end
 endmodule // numbersToAddUp #()
 
@@ -6586,28 +6535,16 @@ end
 always_comb begin // combinatorial inter_sums_split_0
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	inter_sums_split_0 = '{2'dx, 2'dx, 2'dx, 2'dx, 2'dx};
-	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
-if(TreeAdd) inter_sums_split_0[_v0] = values[_v0];
-end
-	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
-if(TreeAdd) inter_sums_split_0[_v0] = values[_v0];
-end
-	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
-if(TreeAdd) inter_sums_split_0[_v0] = values[_v0];
-end
-	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
-if(TreeAdd) inter_sums_split_0[_v0] = values[_v0];
-end
-	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
-if(TreeAdd) inter_sums_split_0[_v0] = values[_v0];
-end
+	if(TreeAdd) inter_sums_split_0 = values;
+	if(TreeAdd) inter_sums_split_0 = values;
+	if(TreeAdd) inter_sums_split_0 = values;
+	if(TreeAdd) inter_sums_split_0 = values;
+	if(TreeAdd) inter_sums_split_0 = values;
 end
 always_comb begin // combinatorial cur_sums
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	cur_sums = '{2'dx, 2'dx, 2'dx, 2'dx, 2'dx};
-	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
-cur_sums[_v0] = inter_sums_split_0[_v0];
-end
+	cur_sums = inter_sums_split_0;
 end
 always_comb begin // combinatorial next_sums
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -6619,16 +6556,12 @@ end
 always_comb begin // combinatorial inter_sums_split_1
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	inter_sums_split_1 = '{3'dx, 3'dx, 3'dx};
-	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
-inter_sums_split_1[_v0] = next_sums[_v0];
-end
+	inter_sums_split_1 = next_sums;
 end
 always_comb begin // combinatorial cur_sums_2
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	cur_sums_2 = '{3'dx, 3'dx, 3'dx};
-	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
-cur_sums_2[_v0] = inter_sums_split_1[_v0];
-end
+	cur_sums_2 = inter_sums_split_1;
 end
 always_comb begin // combinatorial next_sums_2
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -6639,16 +6572,12 @@ end
 always_comb begin // combinatorial inter_sums_split_2
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	inter_sums_split_2 = '{4'dx, 4'dx};
-	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
-inter_sums_split_2[_v0] = next_sums_2[_v0];
-end
+	inter_sums_split_2 = next_sums_2;
 end
 always_comb begin // combinatorial cur_sums_3
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	cur_sums_3 = '{4'dx, 4'dx};
-	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
-cur_sums_3[_v0] = inter_sums_split_2[_v0];
-end
+	cur_sums_3 = inter_sums_split_2;
 end
 always_comb begin // combinatorial next_sums_3
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
@@ -6658,16 +6587,12 @@ end
 always_comb begin // combinatorial inter_sums_split_3
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	inter_sums_split_3 = '{5'dx};
-	for(int _v0 = 0; _v0 < 1; _v0 = _v0 + 1) begin
-inter_sums_split_3[_v0] = next_sums_3[_v0];
-end
+	inter_sums_split_3 = next_sums_3;
 end
 always_comb begin // combinatorial last
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	last = '{5'dx};
-	for(int _v0 = 0; _v0 < 1; _v0 = _v0 + 1) begin
-last[_v0] = inter_sums_split_3[_v0];
-end
+	last = inter_sums_split_3;
 end
 endmodule // TreeAdd #(SIZE: 5, FROM: 3, TO: 4)
 
