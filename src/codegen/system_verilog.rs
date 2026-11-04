@@ -492,11 +492,12 @@ impl<'g> CodeGenerationContext<'g> {
                     path,
                     w.absolute_latency,
                     false,
-                    |_slf, source_path, target_path, _result_typ| {
-                        // Assigns support unpacked assignments
-                        let source = root_name.with_path(source_path);
-                        let target = output_name.with_path(target_path);
-                        format!("assign {target} = {source};\n")
+                    |slf, source_path, target_path, result_typ| {
+                        slf.foreach_for_copy_unpacked(result_typ, false, |path, _| {
+                            let source = root_name.with_paths([source_path, path]);
+                            let target = output_name.with_paths([target_path, path]);
+                            format!("assign {target} = {source};\n")
+                        })
                     },
                 );
 
@@ -704,10 +705,12 @@ impl<'g> CodeGenerationContext<'g> {
                     let idx_path = [PathElem::Array {
                         idx: arr_idx.to_string(),
                     }];
-                    self.in_generate(|_slf| {
-                        // Assigns support unpacked assignments
-                        let target = output_name.with_path(&idx_path);
-                        format!("assign {target} = {element_wire_name};\n")
+                    self.in_generate(|slf| {
+                        slf.foreach_for_copy_unpacked(&elem.typ, false, |path, _| {
+                            let elem_with_path = element_wire_name.with_path(path);
+                            let output_with_path = output_name.with_paths([&idx_path, path]);
+                            format!("assign {output_with_path} = {elem_with_path};\n")
+                        })
                     });
                 }
             }
@@ -833,11 +836,12 @@ impl<'g> CodeGenerationContext<'g> {
             &s.to_path,
             computed_target_latency,
             true,
-            |_slf, source_path, target_path, _copy_typ| {
-                // Assigns support unpacked assignments
-                let output_with_path = output_name.with_path(source_path);
-                let from_with_path = from_name.with_path(target_path);
-                format!("{if_stack}{output_with_path} {arrow_str} {from_with_path};\n")
+            |slf, source_path, target_path, copy_typ| {
+                slf.foreach_for_copy_unpacked(copy_typ, true, |path, _| {
+                    let output_with_path = output_name.with_paths([source_path, path]);
+                    let from_with_path = from_name.with_paths([target_path, path]);
+                    format!("{if_stack}{output_with_path} {arrow_str} {from_with_path};\n")
+                })
             },
         );
         self.program_text.write_str(&content).unwrap();
@@ -1155,20 +1159,20 @@ impl ConcreteType {
                     get_builtin_type!("int") => write!(f, "1'd0"),
                     _ => unreachable!("Unknown zero-sized type {:?}", global_ref.id),
                 },
-                /*ConcreteType::Array(_) => unreachable!(
+                ConcreteType::Array(_) => unreachable!(
                     "Since this is for inline values, and arrays cannot be used inline, they cannot appear in [zero_sized_inline_value]"
-                ),*/
-                // Turns out, totally possible: myFunc([0, 0, 0])
+                ),
+                /*// Turns out, totally possible: myFunc([0, 0, 0])
                 ConcreteType::Array(arr_typ) => {
                     let (content, sz) = arr_typ.deref();
 
-                    let content_str = content.zero_sized_inline_value().to_string();
+                    let content_str = display_zero_sized_type_inline_value(content);
 
                     let content_repeats = display_join(", ", 0..sz.unwrap_int(), |f, _| {
                         f.write_str(content_str.as_ref())
                     });
                     write!(f, "'{{{content_repeats}}}")
-                }
+                }*/
             }
         })
     }
