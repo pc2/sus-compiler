@@ -10,7 +10,7 @@ module LocalFunctionCalledFromTwoLatencies(
 /*mux_wire*/ logic[6:0] x;
 /*mux_wire*/ logic[6:0] y;
 /*mux_wire*/ logic[6:0] a_delayed;
-/*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
+/*latency*/ (* shreg_extract = "no" *) logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
 wire[6:0] _4;
 assign _4 = x + 1'd1;
 always_comb begin // combinatorial r1
@@ -62,10 +62,10 @@ module LocalFunctionLatency(
 /*mux_wire*/ logic[6:0] x;
 /*mux_wire*/ logic[6:0] y;
 /*mux_wire*/ logic[6:0] a_delayed;
-/*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
+/*latency*/ (* shreg_extract = "no" *) logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
 wire[6:0] _4;
 assign _4 = x + 1'd1;
-/*latency*/ logic[6:0] __4_D1; always_ff @(posedge clk) begin __4_D1 <= _4; end
+/*latency*/ (* shreg_extract = "no" *) logic[6:0] __4_D1; always_ff @(posedge clk) begin __4_D1 <= _4; end
 wire[7:0] _10;
 assign _10 = r1 + a_delayed;
 always_comb begin // combinatorial r1
@@ -159,11 +159,11 @@ module ParametrizeableRegs(
 
 /*mux_wire*/ logic[2:0] x;
 /*mux_wire*/ logic[2:0] y;
-/*latency*/ logic[2:0] _x_D1; always_ff @(posedge clk) begin _x_D1 <= x; end
-/*latency*/ logic[2:0] _x_D2; always_ff @(posedge clk) begin _x_D2 <= _x_D1; end
-/*latency*/ logic[2:0] _x_D3; always_ff @(posedge clk) begin _x_D3 <= _x_D2; end
-/*latency*/ logic[2:0] _x_D4; always_ff @(posedge clk) begin _x_D4 <= _x_D3; end
-/*latency*/ logic[2:0] _x_D5; always_ff @(posedge clk) begin _x_D5 <= _x_D4; end
+/*latency*/ (* shreg_extract = "no" *) logic[2:0] _x_D1; always_ff @(posedge clk) begin _x_D1 <= x; end
+/*latency*/ (* shreg_extract = "no" *) logic[2:0] _x_D2; always_ff @(posedge clk) begin _x_D2 <= _x_D1; end
+/*latency*/ (* shreg_extract = "no" *) logic[2:0] _x_D3; always_ff @(posedge clk) begin _x_D3 <= _x_D2; end
+/*latency*/ (* shreg_extract = "no" *) logic[2:0] _x_D4; always_ff @(posedge clk) begin _x_D4 <= _x_D3; end
+/*latency*/ (* shreg_extract = "no" *) logic[2:0] _x_D5; always_ff @(posedge clk) begin _x_D5 <= _x_D4; end
 always_comb begin // combinatorial x
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	x = 3'dx;
@@ -210,9 +210,9 @@ module TwoDomainsWithLatRegs(
 	output /*mux_wire*/ logic b_o
 );
 
-/*latency*/ logic _a_i_D10; always_ff @(posedge clk) begin _a_i_D10 <= a_i; end
-/*latency*/ logic _a_i_D11; always_ff @(posedge clk) begin _a_i_D11 <= _a_i_D10; end
-/*latency*/ logic _a_i_D12; always_ff @(posedge clk) begin _a_i_D12 <= _a_i_D11; end
+/*latency*/ (* shreg_extract = "no" *) logic _a_i_D10; always_ff @(posedge clk) begin _a_i_D10 <= a_i; end
+/*latency*/ (* shreg_extract = "no" *) logic _a_i_D11; always_ff @(posedge clk) begin _a_i_D11 <= _a_i_D10; end
+/*latency*/ (* shreg_extract = "no" *) logic _a_i_D12; always_ff @(posedge clk) begin _a_i_D12 <= _a_i_D11; end
 /*latency*/ logic _a_i_D13; always_ff @(posedge clk) begin _a_i_D13 <= _a_i_D12; end
 /*latency*/ logic _a_i_D14; always_ff @(posedge clk) begin _a_i_D14 <= _a_i_D13; end
 /*latency*/ logic _a_i_D15; always_ff @(posedge clk) begin _a_i_D15 <= _a_i_D14; end
@@ -739,14 +739,14 @@ module TestSplits(
 /*mux_wire*/ logic x_split_4;
 /*mux_wire*/ logic x_unknowns_split_4;
 /*mux_wire*/ logic x_with_latency_split_4;
-/*latency*/ logic _x_split_0_D5; always_ff @(posedge clk) begin _x_split_0_D5 <= x_split_0; end
-/*latency*/ logic _x_unknowns_split_0_D5; always_ff @(posedge clk) begin _x_unknowns_split_0_D5 <= x_unknowns_split_0; end
-/*latency*/ logic _x_split_1_D6; always_ff @(posedge clk) begin _x_split_1_D6 <= x_split_1; end
-/*latency*/ logic _x_unknowns_split_1_D6; always_ff @(posedge clk) begin _x_unknowns_split_1_D6 <= x_unknowns_split_1; end
-/*latency*/ logic _x_split_2_D7; always_ff @(posedge clk) begin _x_split_2_D7 <= x_split_2; end
-/*latency*/ logic _x_unknowns_split_2_D7; always_ff @(posedge clk) begin _x_unknowns_split_2_D7 <= x_unknowns_split_2; end
-/*latency*/ logic _x_split_3_D8; always_ff @(posedge clk) begin _x_split_3_D8 <= x_split_3; end
-/*latency*/ logic _x_unknowns_split_3_D8; always_ff @(posedge clk) begin _x_unknowns_split_3_D8 <= x_unknowns_split_3; end
+/*latency*/ (* shreg_extract = "no" *) logic _x_split_0_D5; always_ff @(posedge clk) begin _x_split_0_D5 <= x_split_0; end
+/*latency*/ (* shreg_extract = "no" *) logic _x_unknowns_split_0_D5; always_ff @(posedge clk) begin _x_unknowns_split_0_D5 <= x_unknowns_split_0; end
+/*latency*/ (* shreg_extract = "no" *) logic _x_split_1_D6; always_ff @(posedge clk) begin _x_split_1_D6 <= x_split_1; end
+/*latency*/ (* shreg_extract = "no" *) logic _x_unknowns_split_1_D6; always_ff @(posedge clk) begin _x_unknowns_split_1_D6 <= x_unknowns_split_1; end
+/*latency*/ (* shreg_extract = "no" *) logic _x_split_2_D7; always_ff @(posedge clk) begin _x_split_2_D7 <= x_split_2; end
+/*latency*/ (* shreg_extract = "no" *) logic _x_unknowns_split_2_D7; always_ff @(posedge clk) begin _x_unknowns_split_2_D7 <= x_unknowns_split_2; end
+/*latency*/ (* shreg_extract = "no" *) logic _x_split_3_D8; always_ff @(posedge clk) begin _x_split_3_D8 <= x_split_3; end
+/*latency*/ (* shreg_extract = "no" *) logic _x_unknowns_split_3_D8; always_ff @(posedge clk) begin _x_unknowns_split_3_D8 <= x_unknowns_split_3; end
 always_comb begin // combinatorial x_split_0
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	x_split_0 = 1'bx;
@@ -1135,11 +1135,11 @@ module instantiate_fifo(
 );
 
 /*mux_wire*/ logic[2:0] heavy_computation;
-/*latency*/ logic[2:0] _data_received_D4; always_ff @(posedge clk) begin _data_received_D4 <= data_received; end
-/*latency*/ logic[2:0] _data_received_D5; always_ff @(posedge clk) begin _data_received_D5 <= _data_received_D4; end
-/*latency*/ logic[2:0] _data_received_D6; always_ff @(posedge clk) begin _data_received_D6 <= _data_received_D5; end
-/*latency*/ logic[2:0] _data_received_D7; always_ff @(posedge clk) begin _data_received_D7 <= _data_received_D6; end
-/*latency*/ logic[2:0] _data_received_D8; always_ff @(posedge clk) begin _data_received_D8 <= _data_received_D7; end
+/*latency*/ (* shreg_extract = "no" *) logic[2:0] _data_received_D4; always_ff @(posedge clk) begin _data_received_D4 <= data_received; end
+/*latency*/ (* shreg_extract = "no" *) logic[2:0] _data_received_D5; always_ff @(posedge clk) begin _data_received_D5 <= _data_received_D4; end
+/*latency*/ (* shreg_extract = "no" *) logic[2:0] _data_received_D6; always_ff @(posedge clk) begin _data_received_D6 <= _data_received_D5; end
+/*latency*/ (* shreg_extract = "no" *) logic[2:0] _data_received_D7; always_ff @(posedge clk) begin _data_received_D7 <= _data_received_D6; end
+/*latency*/ (* shreg_extract = "no" *) logic[2:0] _data_received_D8; always_ff @(posedge clk) begin _data_received_D8 <= _data_received_D7; end
 wire _fifo_may_push;
 /*latency*/ logic __fifo_may_push_D1; always_ff @(posedge clk) begin __fifo_may_push_D1 <= _fifo_may_push; end
 /*latency*/ logic __fifo_may_push_D2; always_ff @(posedge clk) begin __fifo_may_push_D2 <= __fifo_may_push_D1; end
@@ -1214,7 +1214,7 @@ wire[4:0] _6;
 assign _6 = _5 + ((_5 < 0) ? 30 : 0); // == mod 30
 wire _9;
 assign _9 = space_remaining > 4'd9;
-/*latency*/ logic __9_D1; always_ff @(posedge clk) begin __9_D1 <= _9; end
+/*latency*/ (* shreg_extract = "no" *) logic __9_D1; always_ff @(posedge clk) begin __9_D1 <= _9; end
 /*mux_wire*/ logic[2:0] _ToBits_value;
 wire[2:0] _ToBits_bits;
 wire[4:0] _14;
@@ -1224,7 +1224,7 @@ assign _15 = (_14 == 30) ? 0 : _14; // == mod 30
 wire _18;
 assign _18 = read_addr != write_addr;
 wire[2:0] _20 = mem[read_addr];
-/*latency*/ logic[2:0] __20_D1; always_ff @(posedge clk) begin __20_D1 <= _20; end
+/*latency*/ (* shreg_extract = "no" *) logic[2:0] __20_D1; always_ff @(posedge clk) begin __20_D1 <= _20; end
 /*mux_wire*/ logic[2:0] _FromBits_bits;
 wire[2:0] _FromBits_value;
 wire[4:0] _24;
@@ -1321,11 +1321,11 @@ module infer_from_local_context(
 );
 
 /*mux_wire*/ logic heavily_pipelined_computation;
-/*latency*/ logic _in_val_D1; always_ff @(posedge clk) begin _in_val_D1 <= in_val; end
-/*latency*/ logic _in_val_D2; always_ff @(posedge clk) begin _in_val_D2 <= _in_val_D1; end
-/*latency*/ logic _in_val_D3; always_ff @(posedge clk) begin _in_val_D3 <= _in_val_D2; end
-/*latency*/ logic _in_val_D4; always_ff @(posedge clk) begin _in_val_D4 <= _in_val_D3; end
-/*latency*/ logic _in_val_D5; always_ff @(posedge clk) begin _in_val_D5 <= _in_val_D4; end
+/*latency*/ (* shreg_extract = "no" *) logic _in_val_D1; always_ff @(posedge clk) begin _in_val_D1 <= in_val; end
+/*latency*/ (* shreg_extract = "no" *) logic _in_val_D2; always_ff @(posedge clk) begin _in_val_D2 <= _in_val_D1; end
+/*latency*/ (* shreg_extract = "no" *) logic _in_val_D3; always_ff @(posedge clk) begin _in_val_D3 <= _in_val_D2; end
+/*latency*/ (* shreg_extract = "no" *) logic _in_val_D4; always_ff @(posedge clk) begin _in_val_D4 <= _in_val_D3; end
+/*latency*/ (* shreg_extract = "no" *) logic _in_val_D5; always_ff @(posedge clk) begin _in_val_D5 <= _in_val_D4; end
 /*mux_wire*/ logic _infer_me_x;
 wire _infer_me_y;
 wire _4;
@@ -1426,8 +1426,8 @@ module multiple_outputs_only(
 );
 
 /*state*/ logic loop = 1'b0;
-/*latency*/ logic _loop_N1; always_ff @(posedge clk) begin _loop_N1 <= loop; end
-/*latency*/ logic _loop_D0; always_ff @(posedge clk) begin _loop_D0 <= _loop_N1; end
+/*latency*/ (* shreg_extract = "no" *) logic _loop_N1; always_ff @(posedge clk) begin _loop_N1 <= loop; end
+/*latency*/ (* shreg_extract = "no" *) logic _loop_D0; always_ff @(posedge clk) begin _loop_D0 <= _loop_N1; end
 wire _2;
 assign _2 = ~loop;
 always_comb begin // combinatorial o
@@ -1456,7 +1456,7 @@ module output_only(
 );
 
 /*state*/ logic loop = 1'b0;
-/*latency*/ logic _loop_D0; always_ff @(posedge clk) begin _loop_D0 <= loop; end
+/*latency*/ (* shreg_extract = "no" *) logic _loop_D0; always_ff @(posedge clk) begin _loop_D0 <= loop; end
 wire _2;
 assign _2 = ~loop;
 always_comb begin // combinatorial o
@@ -1776,10 +1776,10 @@ module determinable_because_no_input_output_ports(
 /*mux_wire*/ logic[6:0] t;
 /*mux_wire*/ logic[6:0] a_dd;
 /*mux_wire*/ logic[6:0] t_d;
-/*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
-/*latency*/ logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
-/*latency*/ logic[6:0] _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
-/*latency*/ logic[6:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
+/*latency*/ (* shreg_extract = "no" *) logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
+/*latency*/ (* shreg_extract = "no" *) logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
+/*latency*/ (* shreg_extract = "no" *) logic[6:0] _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
+/*latency*/ (* shreg_extract = "no" *) logic[6:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
 /*latency*/ logic[6:0] _t_d_D3; always_ff @(posedge clk) begin _t_d_D3 <= t_d; end
 wire[7:0] _7;
 assign _7 = _t_d_D3 + a_dd;
@@ -1823,9 +1823,9 @@ module determinable_input_latency(
 /*mux_wire*/ logic[7:0] t;
 /*mux_wire*/ logic[6:0] a_dd;
 /*mux_wire*/ logic[7:0] t_d;
-/*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
-/*latency*/ logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
-/*latency*/ logic[7:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
+/*latency*/ (* shreg_extract = "no" *) logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
+/*latency*/ (* shreg_extract = "no" *) logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
+/*latency*/ (* shreg_extract = "no" *) logic[7:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
 wire[7:0] _4;
 assign _4 = a_d + b;
 wire[8:0] _9;
@@ -1875,10 +1875,10 @@ module specified_input_latency(
 /*mux_wire*/ logic[7:0] t;
 /*mux_wire*/ logic[6:0] a_dd;
 /*mux_wire*/ logic[7:0] t_d;
-/*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
-/*latency*/ logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
-/*latency*/ logic[6:0] _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
-/*latency*/ logic[7:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
+/*latency*/ (* shreg_extract = "no" *) logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
+/*latency*/ (* shreg_extract = "no" *) logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
+/*latency*/ (* shreg_extract = "no" *) logic[6:0] _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
+/*latency*/ (* shreg_extract = "no" *) logic[7:0] _t_D2; always_ff @(posedge clk) begin _t_D2 <= t; end
 /*latency*/ logic[7:0] _t_d_D3; always_ff @(posedge clk) begin _t_d_D3 <= t_d; end
 wire[7:0] _4;
 assign _4 = a_d + b;
@@ -4345,9 +4345,9 @@ module blur(
 /*state*/ logic[6:0] prev;
 wire[7:0] _4;
 assign _4 = prev + a;
-/*latency*/ logic[7:0] __4_D1; always_ff @(posedge clk) begin __4_D1 <= _4; end
-/*latency*/ logic[7:0] __4_D2; always_ff @(posedge clk) begin __4_D2 <= __4_D1; end
-/*latency*/ logic[7:0] __4_D3; always_ff @(posedge clk) begin __4_D3 <= __4_D2; end
+/*latency*/ (* shreg_extract = "no" *) logic[7:0] __4_D1; always_ff @(posedge clk) begin __4_D1 <= _4; end
+/*latency*/ (* shreg_extract = "no" *) logic[7:0] __4_D2; always_ff @(posedge clk) begin __4_D2 <= __4_D1; end
+/*latency*/ (* shreg_extract = "no" *) logic[7:0] __4_D3; always_ff @(posedge clk) begin __4_D3 <= __4_D2; end
 wire _7;
 assign _7 = ~done;
 always_comb begin // combinatorial result
@@ -4373,7 +4373,7 @@ module Accumulator(
 
 /*state*/ logic[6:0] tot = 7'd0;
 /*mux_wire*/ logic[6:0] new_tot;
-/*latency*/ logic[6:0] _new_tot_D1; always_ff @(posedge clk) begin _new_tot_D1 <= new_tot; end
+/*latency*/ (* shreg_extract = "no" *) logic[6:0] _new_tot_D1; always_ff @(posedge clk) begin _new_tot_D1 <= new_tot; end
 wire[7:0] _3;
 assign _3 = tot + term;
 wire[6:0] _5;
@@ -4407,15 +4407,15 @@ wire[6:0] _1 = values[0];
 wire[6:0] _2 = values[1];
 wire[13:0] _3;
 assign _3 = _1 * _2;
-/*latency*/ logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
+/*latency*/ (* shreg_extract = "no" *) logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
 wire[6:0] _4 = values[2];
 wire[6:0] _5 = values[3];
 wire[13:0] _6;
 assign _6 = _4 * _5;
-/*latency*/ logic[13:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
+/*latency*/ (* shreg_extract = "no" *) logic[13:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
 wire[26:0] _9;
 assign _9 = a * b;
-/*latency*/ logic[26:0] __9_D2; always_ff @(posedge clk) begin __9_D2 <= _9; end
+/*latency*/ (* shreg_extract = "no" *) logic[26:0] __9_D2; always_ff @(posedge clk) begin __9_D2 <= _9; end
 always_comb begin // combinatorial total
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	total = 27'dx;
@@ -4527,12 +4527,12 @@ wire[13:0] _3;
 assign _3 = i * i;
 wire[26:0] _6;
 assign _6 = i2 * i2;
-/*latency*/ logic[26:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
+/*latency*/ (* shreg_extract = "no" *) logic[26:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
 wire[53:0] _9;
 assign _9 = i4 * i4;
 wire[106:0] _12;
 assign _12 = i8 * i8;
-/*latency*/ logic[106:0] __12_D2; always_ff @(posedge clk) begin __12_D2 <= _12; end
+/*latency*/ (* shreg_extract = "no" *) logic[106:0] __12_D2; always_ff @(posedge clk) begin __12_D2 <= _12; end
 wire[112:0] _15;
 assign _15 = i16 * _i_D2;
 always_comb begin // combinatorial o
@@ -4574,7 +4574,7 @@ module multiply_add(
 /*mux_wire*/ logic[13:0] tmp;
 wire[13:0] _3;
 assign _3 = a * b;
-/*latency*/ logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
+/*latency*/ (* shreg_extract = "no" *) logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
 wire[13:0] _6;
 assign _6 = tmp + c;
 always_comb begin // combinatorial total
@@ -4604,18 +4604,18 @@ wire[6:0] _1 = factors[0];
 wire[6:0] _2 = factors[1];
 wire[13:0] _3;
 assign _3 = _1 * _2;
-/*latency*/ logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
+/*latency*/ (* shreg_extract = "no" *) logic[13:0] __3_D1; always_ff @(posedge clk) begin __3_D1 <= _3; end
 wire[6:0] _4 = factors[2];
 wire[6:0] _5 = factors[3];
 wire[13:0] _6;
 assign _6 = _4 * _5;
-/*latency*/ logic[13:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
+/*latency*/ (* shreg_extract = "no" *) logic[13:0] __6_D1; always_ff @(posedge clk) begin __6_D1 <= _6; end
 wire[26:0] _9;
 assign _9 = mul0 * mul1;
-/*latency*/ logic[26:0] __9_D2; always_ff @(posedge clk) begin __9_D2 <= _9; end
+/*latency*/ (* shreg_extract = "no" *) logic[26:0] __9_D2; always_ff @(posedge clk) begin __9_D2 <= _9; end
 wire[26:0] _12;
 assign _12 = product + add_to;
-/*latency*/ logic[26:0] __12_D3; always_ff @(posedge clk) begin __12_D3 <= _12; end
+/*latency*/ (* shreg_extract = "no" *) logic[26:0] __12_D3; always_ff @(posedge clk) begin __12_D3 <= _12; end
 always_comb begin // combinatorial product
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
 	product = 27'dx;
@@ -4637,6 +4637,31 @@ always_comb begin // combinatorial mul1
 	mul1 = __6_D1;
 end
 endmodule // example_md #()
+
+// TestExplicitRegNoSRL #()
+module TestExplicitRegNoSRL(
+	/* clock */ input clk,
+	input wire[7:0] a,
+	input wire[7:0] b,
+	output /*mux_wire*/ logic[8:0] sum
+);
+
+/*mux_wire*/ logic[7:0] a_delayed;
+/*latency*/ (* shreg_extract = "no" *) logic[7:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
+/*latency*/ (* shreg_extract = "no" *) logic[7:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
+wire[8:0] _4;
+assign _4 = a_delayed + b;
+always_comb begin // combinatorial sum
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	sum = 9'dx;
+	sum = _4;
+end
+always_comb begin // combinatorial a_delayed
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	a_delayed = 8'dx;
+	a_delayed = _a_D2;
+end
+endmodule // TestExplicitRegNoSRL #()
 
 // SubmodPartialBinding #()
 module SubmodPartialBinding(
@@ -6557,26 +6582,26 @@ wire[1:0] _7 = cur_sums[0];
 wire[1:0] _8 = cur_sums[1];
 wire[2:0] _9;
 assign _9 = _7 + _8;
-/*latency*/ logic[2:0] __9_D1; always_ff @(posedge clk) begin __9_D1 <= _9; end
+/*latency*/ (* shreg_extract = "no" *) logic[2:0] __9_D1; always_ff @(posedge clk) begin __9_D1 <= _9; end
 wire[1:0] _10 = cur_sums[2];
 wire[1:0] _11 = cur_sums[3];
 wire[2:0] _12;
 assign _12 = _10 + _11;
-/*latency*/ logic[2:0] __12_D1; always_ff @(posedge clk) begin __12_D1 <= _12; end
+/*latency*/ (* shreg_extract = "no" *) logic[2:0] __12_D1; always_ff @(posedge clk) begin __12_D1 <= _12; end
 wire[1:0] _13 = cur_sums[4];
-/*latency*/ logic[1:0] __13_D1; always_ff @(posedge clk) begin __13_D1 <= _13; end
+/*latency*/ (* shreg_extract = "no" *) logic[1:0] __13_D1; always_ff @(posedge clk) begin __13_D1 <= _13; end
 wire[2:0] _16 = cur_sums_2[0];
 wire[2:0] _17 = cur_sums_2[1];
 wire[3:0] _18;
 assign _18 = _16 + _17;
-/*latency*/ logic[3:0] __18_D2; always_ff @(posedge clk) begin __18_D2 <= _18; end
+/*latency*/ (* shreg_extract = "no" *) logic[3:0] __18_D2; always_ff @(posedge clk) begin __18_D2 <= _18; end
 wire[2:0] _19 = cur_sums_2[2];
-/*latency*/ logic[2:0] __19_D2; always_ff @(posedge clk) begin __19_D2 <= _19; end
+/*latency*/ (* shreg_extract = "no" *) logic[2:0] __19_D2; always_ff @(posedge clk) begin __19_D2 <= _19; end
 wire[3:0] _22 = cur_sums_3[0];
 wire[3:0] _23 = cur_sums_3[1];
 wire[4:0] _24;
 assign _24 = _22 + _23;
-/*latency*/ logic[4:0] __24_D3; always_ff @(posedge clk) begin __24_D3 <= _24; end
+/*latency*/ (* shreg_extract = "no" *) logic[4:0] __24_D3; always_ff @(posedge clk) begin __24_D3 <= _24; end
 wire[4:0] _27 = last[0];
 always_comb begin // combinatorial sum
 	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches

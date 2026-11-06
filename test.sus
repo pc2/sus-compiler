@@ -1290,3 +1290,15 @@ module TestFunctions {
     }
 }
 
+
+module TestExplicitRegNoSRL {
+	input int#(0..256) a
+	input int#(0..256) b
+	output int#(0..512) sum
+
+	// a's delay chain stages are requested by this reg(2), so codegen marks them to not be turned into SRLs
+	reg(2) int#(0..256) a_delayed = a
+
+	// b must be delayed 2 cycles to stay in sync with a_delayed. These are balancing registers and get no attribute
+	sum = a_delayed + b
+}

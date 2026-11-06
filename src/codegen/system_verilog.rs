@@ -39,6 +39,7 @@ pub fn generate_systemverilog(instance: &InstantiatedModule, linker: &Linker) ->
         genvars: VariableAlloc::new("_g"),
         for_vars: VariableAlloc::new("_v"),
         needed_untils: instance.compute_needed_untils(),
+        explicit_reg_stages: instance.compute_explicit_reg_stages(),
     };
 
     crate::debug::debug_context("codegen", instance.name.clone(), || {
@@ -57,6 +58,7 @@ pub fn generate_testbench_stub(instance: &InstantiatedModule, linker: &Linker) -
         genvars: VariableAlloc::new("_g"),
         for_vars: VariableAlloc::new("_v"),
         needed_untils: instance.compute_needed_untils(),
+        explicit_reg_stages: instance.compute_explicit_reg_stages(),
     };
 
     crate::debug::debug_context("codegen_testbench", instance.name.clone(), || {
@@ -76,6 +78,8 @@ struct CodeGenerationContext<'g> {
     linker: &'g Linker,
 
     needed_untils: FlatAlloc<i64, WireIDMarker>,
+    /// See [InstantiatedModule::compute_explicit_reg_stages]
+    explicit_reg_stages: FlatAlloc<Vec<(i64, i64)>, WireIDMarker>,
 }
 
 impl<'g> CodeGenerationContext<'g> {
@@ -191,10 +195,11 @@ impl<'g> CodeGenerationContext<'g> {
 
     fn add_latency_registers(
         &mut self,
-        w: &RealWire,
+        wire_id: WireID,
         needed_until: i64,
         indent: &str,
     ) -> Result<(), std::fmt::Error> {
+        let w = &self.instance.wires[wire_id];
         if w.typ.is_zero_sized() || can_inline(w) {
             return Ok(());
         }
@@ -206,10 +211,15 @@ impl<'g> CodeGenerationContext<'g> {
 
             let to_decl = to.codegen_declaration();
 
+            let is_explicit_reg = self.explicit_reg_stages[wire_id]
+                .iter()
+                .any(|(first, last)| (*first..=*last).contains(&(i + 1)));
+            let attributes = super::patches::patch_explicit_reg_no_srl(is_explicit_reg);
+
             let clk_name = &self.instance.clocks[w.clock].name;
             writeln!(
                 self.program_text,
-                "{indent}/*latency*/ logic{to_decl}; always_ff @(posedge {clk_name}) begin {to} <= {from}; end"
+                "{indent}/*latency*/ {attributes}logic{to_decl}; always_ff @(posedge {clk_name}) begin {to} <= {from}; end"
             ).unwrap();
         }
         Ok(())
@@ -446,7 +456,7 @@ impl<'g> CodeGenerationContext<'g> {
         // Add latency regs for named wires after all have been declared, because named wires are guaranteed to be Multiplexers
         for (wire_id, w) in &self.instance.wires {
             if !w.name.starts_with("_") {
-                self.add_latency_registers(w, self.needed_untils[wire_id], "")
+                self.add_latency_registers(wire_id, self.needed_untils[wire_id], "")
                     .unwrap();
             }
         }
@@ -455,7 +465,7 @@ impl<'g> CodeGenerationContext<'g> {
             if w.name.starts_with("_") {
                 self.write_wire_declaration(w);
                 // Add latency regs for temporaries immediately, because they may immediately depend on each other
-                self.add_latency_registers(w, self.needed_untils[wire_id], "")
+                self.add_latency_registers(wire_id, self.needed_untils[wire_id], "")
                     .unwrap();
             }
         }
@@ -1121,9 +1131,8 @@ impl<'g> CodeGenerationContext<'g> {
         for (_, port) in &self.instance.interface_ports {
             let Some(port) = port else { continue };
 
-            let port_wire = &self.instance.wires[port.wire];
             let needed_until = max_latency_per_domain[port.latency_domain];
-            self.add_latency_registers(port_wire, needed_until, "\t")
+            self.add_latency_registers(port.wire, needed_until, "\t")
                 .unwrap();
         }
 

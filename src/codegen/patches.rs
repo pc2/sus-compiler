@@ -35,3 +35,14 @@ pub fn patch_empty_modules_should_have_content(module_content: &mut String) {
         .unwrap();
     }
 }
+
+/// Not a simulator bug, but Vivado-specific: Vivado synthesis turns chains of registers into SRL shift-register LUTs,
+/// which are slow and can't be retimed or spread across SLRs. Latency registers the user explicitly asked for with `reg`
+/// are marked so they stay real registers. Balancing registers inserted by latency counting are left alone.
+pub fn patch_explicit_reg_no_srl(is_explicit_reg: bool) -> &'static str {
+    if is_explicit_reg {
+        "(* shreg_extract = \"no\" *) "
+    } else {
+        ""
+    }
+}

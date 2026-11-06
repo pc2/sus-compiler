@@ -138,6 +138,7 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate RecursionThroughBinding #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate CallInsideWhenOnSelf #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestFunctions #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TestExplicitRegNoSRL #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -6552,6 +6553,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for FunctionSecondaryBinding #() as "FunctionSecondaryBinding"
 [INFO  sus_compiler::codegen] Code generated for TriggerLeftBinding #() as "TriggerLeftBinding"
 [INFO  sus_compiler::codegen] Code generated for SubmodPartialBinding #() as "SubmodPartialBinding"
+[INFO  sus_compiler::codegen] Code generated for TestExplicitRegNoSRL #() as "TestExplicitRegNoSRL"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"

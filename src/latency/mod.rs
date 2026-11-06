@@ -367,6 +367,35 @@ impl InstantiatedModule {
 
         result
     }
+
+    /// For each wire, the inclusive ranges of absolute latencies whose delay-chain stage was requested by an explicit `reg` on a write.
+    ///
+    /// A write `t = reg s` is emitted by reading `s` at `t`'s latency, so the registers it asks for are the stages of `s`'s delay chain
+    /// from `lat(s) + 1` up to and including `lat(t) + num_nexts`. Stages shared with other readers are included. See [Self::compute_needed_untils].
+    pub fn compute_explicit_reg_stages(&self) -> FlatAlloc<Vec<(i64, i64)>, WireIDMarker> {
+        let mut result = self.wires.map(|_| Vec::new());
+
+        for (_id, w) in &self.wires {
+            let RealWireDataSource::Multiplexer { sources, .. } = &w.source else {
+                continue;
+            };
+            for s in sources {
+                if s.num_regs == 0 {
+                    continue;
+                }
+                let from = match &self.wires[s.from].source {
+                    // For inlining path-less Selects
+                    RealWireDataSource::Select { root, path } if path.is_empty() => *root,
+                    _ => s.from,
+                };
+                let first = self.wires[from].absolute_latency.unwrap() + 1;
+                let last = w.absolute_latency.unwrap() + s.num_nexts;
+                result[from].push((first, last));
+            }
+        }
+
+        result
+    }
 }
 
 impl ModuleTypingContext<'_> {
