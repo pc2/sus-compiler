@@ -436,24 +436,6 @@ Error: Attempting to write a runtime value to a generative target
     │         │  
     │         ╰── Attempting to write a runtime value to a generative target
 ────╯
-Warning: o is effectively constant. Declare this wire as `gen` to make this explicit.
-    ╭─[ test.sus:26:13 ]
-    │
- 26 │     output int o = beep
-    │     ──────┬────┬  
-    │           ╰─────── o = 3
-    │                │  
-    │                ╰── o is effectively constant. Declare this wire as `gen` to make this explicit.
-────╯
-Warning: o is effectively constant. Declare this wire as `gen` to make this explicit.
-    ╭─[ test.sus:26:13 ]
-    │
- 26 │     output int o = beep
-    │     ──────┬────┬  
-    │           ╰─────── o = 4
-    │                │  
-    │                ╰── o is effectively constant. Declare this wire as `gen` to make this explicit.
-────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test.sus:31:25 ]
     │
@@ -2280,36 +2262,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │         ───┬──  
      │            ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Warning: values_nointersect is effectively constant. Declare this wire as `gen` to make this explicit.
-     ╭─[ test.sus:577:16 ]
-     │
- 577 │     output int[2] values_nointersect
-     │                   ─────────┬────────  
-     │                            ╰────────── values_nointersect is effectively constant. Declare this wire as `gen` to make this explicit.
-     │ 
- 582 │        values_nointersect[0] = 0
-     │        ──────────┬──────────  
-     │                  ╰──────────── values_nointersect[0] = 0
-     │ 
- 587 │        values_nointersect[1] = 1
-     │        ──────────┬──────────  
-     │                  ╰──────────── values_nointersect[1] = 1
-─────╯
-Warning: state_values_nointersect is effectively constant. Declare this wire as `gen` to make this explicit.
-     ╭─[ test.sus:578:22 ]
-     │
- 578 │     output state int[2] state_values_nointersect
-     │                         ────────────┬───────────  
-     │                                     ╰───────────── state_values_nointersect is effectively constant. Declare this wire as `gen` to make this explicit.
-     │ 
- 583 │        state_values_nointersect[0] = 0
-     │        ─────────────┬─────────────  
-     │                     ╰─────────────── state_values_nointersect[0] = 0
-     │ 
- 588 │        state_values_nointersect[1] = 1
-     │        ─────────────┬─────────────  
-     │                     ╰─────────────── state_values_nointersect[1] = 1
-─────╯
 Error: This array contains multiple arrays of different sizes. This is not allowed! gen_b[2] has size 3, but gen_b[0] has size 2
      ╭─[ test.sus:614:28 ]
      │
@@ -2632,17 +2584,6 @@ Error: A range requires both a lower and an upper bound: `for int I in FROM..TO`
  865 │     for int I in ..4 {
      │                  ─┬─  
      │                   ╰─── A range requires both a lower and an upper bound: `for int I in FROM..TO`
-─────╯
-Warning: ticked is effectively constant. Declare this wire as `gen` to make this explicit.
-     ╭─[ test.sus:876:14 ]
-     │
- 876 │     output bool ticked
-     │                 ───┬──  
-     │                    ╰──── ticked is effectively constant. Declare this wire as `gen` to make this explicit.
-     │ 
- 882 │        ticked = true
-     │        ───┬──  
-     │           ╰──── ticked = true
 ─────╯
 Error: Some parameters of 'x' were still unknown: int #(FROM: ?, TO: ?)
      ╭─[ test.sus:901:25 ]
@@ -3057,24 +2998,6 @@ Error: Cannot assign an array of size 2 to an array of size 3
       │            ──┬──  
       │              ╰──── Cannot assign an array of size 2 to an array of size 3
 ──────╯
-Warning: xx is effectively constant. Declare this wire as `gen` to make this explicit.
-      ╭─[ test.sus:1025:13 ]
-      │
- 1025 │     output int xx = B[1][2]
-      │     ──────┬─────┬  
-      │           ╰──────── xx = 6
-      │                 │  
-      │                 ╰── xx is effectively constant. Declare this wire as `gen` to make this explicit.
-──────╯
-Warning: xx is effectively constant. Declare this wire as `gen` to make this explicit.
-      ╭─[ test.sus:1033:13 ]
-      │
- 1033 │     output int xx = B[1]
-      │     ──────┬─────┬  
-      │           ╰──────── xx = 7
-      │                 │  
-      │                 ╰── xx is effectively constant. Declare this wire as `gen` to make this explicit.
-──────╯
 Error: Cannot assign an array of size 1 to an array of size 4
       ╭─[ test.sus:1037:36 ]
       │
@@ -3089,57 +3012,12 @@ Error: Cannot assign an array of size 3 to an array of size 4
       │                                    ────┬───  
       │                                        ╰───── Cannot assign an array of size 3 to an array of size 4
 ──────╯
-Warning: x is effectively constant. Declare this wire as `gen` to make this explicit.
-      ╭─[ test.sus:1038:13 ]
-      │
- 1038 │     output int x = V[0]
-      │     ──────┬────┬  
-      │           ╰─────── x = 1
-      │                │  
-      │                ╰── x is effectively constant. Declare this wire as `gen` to make this explicit.
-──────╯
 Error: Template arguments must be arrays of known size
       ╭─[ test.sus:1054:31 ]
       │
  1054 │     TemplateArrayParam#(N: 4, V: [1 ...]) m
       │                                  ───┬───  
       │                                     ╰───── Template arguments must be arrays of known size
-──────╯
-Warning: a is effectively constant. Declare this wire as `gen` to make this explicit.
-      ╭─[ test.sus:1066:17 ]
-      │
- 1066 │     output bool[4] a'0 = [false ...]
-      │     ─────────┬─────┬──  
-      │              ╰────────── a = 4'b0000
-      │                    │    
-      │                    ╰──── a is effectively constant. Declare this wire as `gen` to make this explicit.
-──────╯
-Warning: b is effectively constant. Declare this wire as `gen` to make this explicit.
-      ╭─[ test.sus:1067:16 ]
-      │
- 1067 │     output int[4] b'0 = [1, 2, 0 ...]
-      │     ────────┬─────┬──  
-      │             ╰────────── b = [1, 2, 0, 0]
-      │                   │    
-      │                   ╰──── b is effectively constant. Declare this wire as `gen` to make this explicit.
-──────╯
-Warning: g3 is effectively constant. Declare this wire as `gen` to make this explicit.
-      ╭─[ test.sus:1069:13 ]
-      │
- 1069 │     output int g3'0 = G[3]
-      │     ───────┬────┬──  
-      │            ╰───────── g3 = 4
-      │                 │    
-      │                 ╰──── g3 is effectively constant. Declare this wire as `gen` to make this explicit.
-──────╯
-Warning: n11 is effectively constant. Declare this wire as `gen` to make this explicit.
-      ╭─[ test.sus:1071:13 ]
-      │
- 1071 │     output int n11'0 = N[1][1]
-      │     ────────┬───┬───  
-      │             ╰───────── n11 = 3
-      │                 │     
-      │                 ╰───── n11 is effectively constant. Declare this wire as `gen` to make this explicit.
 ──────╯
 Warning: cool[0:2] is never written to.
       ╭─[ test.sus:1082:16 ]
@@ -4053,32 +3931,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                ┬  
      │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Warning: o is effectively constant. Declare this wire as `gen` to make this explicit.
-     ╭─[ test_old.sus:437:14 ]
-     │
- 437 │     output bool o'0
-     │                 ┬  
-     │                 ╰── o is effectively constant. Declare this wire as `gen` to make this explicit.
- 438 │     o = true
-     │     ┬  
-     │     ╰── o = true
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test_old.sus:441:21 ]
      │
  441 │     input int#(0..100) i'0
      │                        ┬  
      │                        ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: o is effectively constant. Declare this wire as `gen` to make this explicit.
-     ╭─[ test_old.sus:442:13 ]
-     │
- 442 │     output int o'0
-     │                ┬  
-     │                ╰── o is effectively constant. Declare this wire as `gen` to make this explicit.
- 443 │     o = 1
-     │     ┬  
-     │     ╰── o = 1
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test_old.sus:447:22 ]
@@ -4093,16 +3951,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  452 │ module offset_backwards : bool i'0 -> bool o'-5 {
      │                                ┬  
      │                                ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: o is effectively constant. Declare this wire as `gen` to make this explicit.
-     ╭─[ test_old.sus:452:44 ]
-     │
- 452 │ module offset_backwards : bool i'0 -> bool o'-5 {
-     │                                            ┬  
-     │                                            ╰── o is effectively constant. Declare this wire as `gen` to make this explicit.
- 453 │     o = true
-     │     ┬  
-     │     ╰── o = true
 ─────╯
 Warning: Not Instantiating use_fifo #() due to abstract typing errors
      ╭─[ test_old.sus:470:8 ]

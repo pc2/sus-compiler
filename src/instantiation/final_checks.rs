@@ -337,10 +337,13 @@ impl<'l> ModuleTypingContext<'l> {
         mux_inputs: &[MultiplexerSource],
         slots_are_written_to: PathRange<usize>,
     ) {
-        if matches!(&w.is_port, IsPort::SubmodulePort(..)) {
-            // It may be unavoidable to write a constant to a submodule port if that's what you need.
-            // This warning is more meant to catch local wires being effectively constant, as that has an obvious resolution. (Mark as 'gen')
-            return;
+        match &w.is_port {
+            IsPort::PlainWire => {}
+            IsPort::Port(..) | IsPort::SubmodulePort(..) => {
+                // It may be unavoidable to write a constant to a (submodule) port if that's what you need.
+                // This warning is more meant to catch local wires being effectively constant, as that has an obvious resolution. (Mark as 'gen')
+                return;
+            }
         }
         if slots_are_written_to.all(&mut |v| *v == 1)
             && mux_inputs.iter().all(|input| {
