@@ -16,6 +16,8 @@ module ToOneHot #(int SIZE) : int#(0..SIZE - 1) selection'0 -> bool[SIZE] bits'0
 /// If the whole bitstring is `false`, then `is_nonzero` is not fired. 
 /// If there is at least one set ('1') bit, `is_nonzero` triggers with the index of the first '1' bit. 
 ///
+/// For all valid values `fire` produces as the same value as [CountStartingZeros]. 
+///
 /// Usage:
 /// ```sus
 /// FirstSetBit find_first_bit
@@ -56,6 +58,31 @@ module FirstSetBit #(int SIZE) {
                 is_nonzero(right_first_nonzero + LEFT_SIZE)
             }
         }
+    }
+}
+
+/// This module returns the number of the first `false` values in the array. 
+/// As opposed to [FirstSetBit] this module always returns a valid value.
+/// In the case no bits set it returns the length of the array. 
+///
+/// For any arrays with set bits returns the same as [FirstSetBit].
+///
+/// Usage:
+/// ```sus
+/// NumStartingZeros([false, false, true, false, true]) == 2
+/// NumStartingZeros([true, false, false, false]) == 0
+/// NumStartingZeros([false, false, false, false, false]) == 5
+/// NumStartingZeros([false, false, false, false, true]) == 4
+/// ```
+module CountStartingZeros #(int SIZE) : bool[SIZE] bits'0 -> int#(0..=SIZE) num_zeros'0 {
+    FirstSetBit first_bit
+
+    first_bit.find(bits)
+
+    when first_bit.is_nonzero : int#(0..SIZE) first_nonzero {
+        num_zeros = first_nonzero
+    } else {
+        num_zeros = SIZE
     }
 }
 
