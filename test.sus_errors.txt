@@ -139,6 +139,12 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate CallInsideWhenOnSelf #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestFunctions #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestExplicitRegNoSRL #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated SinkAction #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated AddFn #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated SinkFn #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TestCallWriteModifiers #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TestCallNextModifier #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestCallWriteModifiersErrors #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -326,6 +332,7 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate RecursionThroughBinding due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate CallInsideWhenOnSelf due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate TestFunctions due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TestCallWriteModifiersErrors due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -3464,13 +3471,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                                    ──┬─  
       │                                      ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: No write modifiers are allowed on non-assigned to declarations or expressions
-      ╭─[ test.sus:1279:9 ]
-      │
- 1279 │         reg(5) run_instruction(5)
-      │         ───┬──  
-      │            ╰──── No write modifiers are allowed on non-assigned to declarations or expressions
-──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1282:21 ]
       │
@@ -3505,6 +3505,82 @@ Error: No Global 'y' was found.
  1288 │     when x.may_push & instruction < last & y.may {
       │                                            ┬  
       │                                            ╰── No Global 'y' was found.
+──────╯
+Warning: Not Instantiating TestCallWriteModifiersErrors #() due to abstract typing errors
+      ╭─[ test.sus:1339:8 ]
+      │
+ 1339 │ module TestCallWriteModifiersErrors {
+      │        ──────────────┬─────────────  
+      │                      ╰─────────────── Not Instantiating TestCallWriteModifiersErrors #() due to abstract typing errors
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1340:21 ]
+      │
+ 1340 │     input int#(0..256) x
+      │                        ┬  
+      │                        ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1341:21 ]
+      │
+ 1341 │     input int#(0..256) y
+      │                        ┬  
+      │                        ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: 'initial' is not allowed on a function call. Only 'reg' and 'next' can be used here
+      ╭─[ test.sus:1343:2 ]
+      │
+ 1343 │     initial s.take(x, y)
+      │     ───┬───  
+      │        ╰───── 'initial' is not allowed on a function call. Only 'reg' and 'next' can be used here
+──────╯
+Error: Write modifiers on a standalone expression are only allowed on function calls
+      ╭─[ test.sus:1344:2 ]
+      │
+ 1344 │     reg x + y
+      │     ─┬─  
+      │      ╰─── Write modifiers on a standalone expression are only allowed on function calls
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1344:6 ]
+      │
+ 1344 │     reg x + y
+      │         ──┬──  
+      │           ╰──── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Error: No write modifiers are allowed on non-assigned to declarations
+      ╭─[ test.sus:1345:2 ]
+      │
+ 1345 │     reg int#(0..5) z
+      │     ─┬─  
+      │      ╰─── No write modifiers are allowed on non-assigned to declarations
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1345:17 ]
+      │
+ 1345 │     reg int#(0..5) z
+      │                    ┬  
+      │                    ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: the number of pipeline regs parameter must be a compile-time expression
+      ╭─[ test.sus:1346:6 ]
+      │
+ 1346 │     reg(x) s.take(x, y)
+      │         ┬  
+      │         ╰── the number of pipeline regs parameter must be a compile-time expression
+──────╯
+Error: Too few output targets. Function returns 1 results, but 0 targets were given.
+      ╭─[ test.sus:1348:7 ]
+      │
+ 1348 │     next AddFn(x, y)
+      │          ─────┬─────  
+      │               ╰─────── Too few output targets. Function returns 1 results, but 0 targets were given.
+      │
+      ├─[ test.sus:1348:7 ]
+      │
+ 1311 │ module AddFn : int#(0..256) a, int#(0..256) b -> int#(0..512) sum {
+      │        ──┬──  
+      │          ╰──── Interface 'AddFn' defined here
 ──────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:24:6 ]
@@ -6402,6 +6478,11 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for TriggerLeftBinding #() as "TriggerLeftBinding"
 [INFO  sus_compiler::codegen] Code generated for SubmodPartialBinding #() as "SubmodPartialBinding"
 [INFO  sus_compiler::codegen] Code generated for TestExplicitRegNoSRL #() as "TestExplicitRegNoSRL"
+[INFO  sus_compiler::codegen] Code generated for SinkAction #() as "SinkAction"
+[INFO  sus_compiler::codegen] Code generated for AddFn #() as "AddFn"
+[INFO  sus_compiler::codegen] Code generated for SinkFn #() as "SinkFn"
+[INFO  sus_compiler::codegen] Code generated for TestCallWriteModifiers #() as "TestCallWriteModifiers"
+[INFO  sus_compiler::codegen] Code generated for TestCallNextModifier #() as "TestCallNextModifier"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"

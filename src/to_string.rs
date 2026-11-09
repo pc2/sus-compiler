@@ -908,10 +908,11 @@ impl LinkInfo {
                         ExpressionSource::FuncCall(FuncCall {
                             func_wire_ref,
                             arguments,
+                            write_modifiers,
                             ..
                         }) => {
                             let args = display_join(", ", arguments, |f, arg| write!(f, "{arg:?}"));
-                            write!(f, "{func_wire_ref:?}({args})")?;
+                            write!(f, "{write_modifiers}{func_wire_ref:?}({args})")?;
                         }
                         ExpressionSource::UnaryOp { op, right, rank: _ } => {
                             let op_text = op.op_text();

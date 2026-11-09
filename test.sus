@@ -1302,3 +1302,48 @@ module TestExplicitRegNoSRL {
 	// b must be delayed 2 cycles to stay in sync with a_delayed. These are balancing registers and get no attribute
 	sum = a_delayed + b
 }
+
+module SinkAction {
+	action take: int#(0..256) a, int#(0..256) b {
+		reg output int#(0..512) sum = a + b
+	}
+}
+module AddFn : int#(0..256) a, int#(0..256) b -> int#(0..512) sum {
+	sum = a + b
+}
+module SinkFn : int#(0..256) a, int#(0..256) b {
+	reg output int#(0..512) sum = a + b
+}
+// Write modifiers on a standalone function call apply to the writes to the call's inputs (and valid wire)
+module TestCallWriteModifiers {
+	input int#(0..256) x'0
+	input int#(0..256) y
+	input bool c
+	SinkAction s
+	when c {
+		reg reg s.take(x, y)
+	}
+	output int#(0..512) o = s.sum
+
+	SinkFn adder
+	reg(2) adder(x, y)
+	output int#(0..512) o2 = adder.sum
+}
+module TestCallNextModifier {
+	input int#(0..256) x'0
+	input int#(0..256) y
+	SinkAction s
+	next s.take(x, y)
+	output int#(0..512) o = s.sum
+}
+module TestCallWriteModifiersErrors {
+	input int#(0..256) x
+	input int#(0..256) y
+	SinkAction s
+	initial s.take(x, y)
+	reg x + y
+	reg int#(0..5) z
+	reg(x) s.take(x, y)
+	// A 'next' call cannot have outputs
+	next AddFn(x, y)
+}

@@ -1059,7 +1059,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
     fn flatten_assign_to_expr(&mut self, writes: Vec<WriteTo>, cursor: &mut Cursor<'c>) {
         let (source, span) = self.flatten_expr_source(cursor);
+        self.alloc_expr_with_output(source, span, writes);
+    }
 
+    /// Allocates the [Expression] for a statement. Function calls and assignments become [ExpressionOutput::MultiWrite],
+    /// anything else is an unused [ExpressionOutput::SubExpression].
+    fn alloc_expr_with_output(
+        &mut self,
+        source: ExpressionSource,
+        span: Span,
+        writes: Vec<WriteTo>,
+    ) {
         let output = match (&source, writes.is_empty()) {
             (ExpressionSource::FuncCall(_), _) | (_, false) => ExpressionOutput::MultiWrite(writes),
             (
@@ -1315,6 +1325,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     func_wire_ref,
                     arguments,
                     arguments_span,
+                    write_modifiers: WriteModifiers::NONE,
                 })
             }),
             kind!("parenthesis_expression") => {
@@ -2000,10 +2011,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 WriteModifiers::Connection { regs, nexts }
             }
         } else {
-            WriteModifiers::Connection {
-                regs: Vec::new(),
-                nexts: Vec::new(),
-            }
+            WriteModifiers::NONE
         }
     }
 
@@ -2047,30 +2055,80 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
     /// See [Self::flatten_assignment_left_side]
     /// Standalone declarations:
-    ///   Yes modules, No write modifiers, Yes expressions (-> single expressions)
+    ///   Yes modules, Write modifiers only on function calls, Yes expressions (-> single expressions)
     fn flatten_standalone_decls(&mut self, cursor: &mut Cursor<'c>) {
         let mut is_first_item = true;
         cursor.list(kind!("assign_left_side"), |cursor| {
             cursor.go_down(kind!("assign_to"), |cursor| {
                 if !is_first_item {
-                    self.errors.warn(cursor.span(), "Standalone declarations and expressions should be on their own line.");
+                    self.errors.warn(
+                        cursor.span(),
+                        "Standalone declarations and expressions should be on their own line.",
+                    );
                 }
                 is_first_item = false;
 
-                if let Some(span) = cursor.optional_field_span(field!("write_modifiers"), kind!("write_modifiers")) {
-                    self.errors.error(span, "No write modifiers are allowed on non-assigned to declarations or expressions");
-                }
+                let write_modifiers = self.flatten_write_modifiers(cursor);
 
                 cursor.field(field!("expr_or_decl"));
                 let kind = cursor.kind();
 
                 if kind == kind!("declaration") {
-                    let _ = self.flatten_declaration::<true>(self.default_decl_kind, false, true, cursor);
-                } else { // It's _expression
-                    self.flatten_assign_to_expr(Vec::new(), cursor);
+                    if let Some(span) = write_modifiers.span() {
+                        self.errors.error(
+                            span,
+                            "No write modifiers are allowed on non-assigned to declarations",
+                        );
+                    }
+                    let _ = self.flatten_declaration::<true>(
+                        self.default_decl_kind,
+                        false,
+                        true,
+                        cursor,
+                    );
+                } else {
+                    // It's _expression
+                    self.flatten_standalone_expr(write_modifiers, cursor);
                 }
             });
         })
+    }
+
+    /// A standalone expression statement. If it is a function call, the write modifiers are applied to the call's inputs:
+    /// ```sus
+    /// reg reg my_fifo.push(true, 3)
+    /// ```
+    fn flatten_standalone_expr(
+        &mut self,
+        write_modifiers: WriteModifiers,
+        cursor: &mut Cursor<'c>,
+    ) {
+        let (mut source, span) = self.flatten_expr_source(cursor);
+
+        match (&mut source, write_modifiers) {
+            (ExpressionSource::FuncCall(_), WriteModifiers::Initial { initial_kw_span }) => {
+                self.errors.error(
+                    initial_kw_span,
+                    "'initial' is not allowed on a function call. Only 'reg' and 'next' can be used here",
+                );
+            }
+            (
+                ExpressionSource::FuncCall(fc),
+                write_modifiers @ WriteModifiers::Connection { .. },
+            ) => {
+                fc.write_modifiers = write_modifiers;
+            }
+            (_, write_modifiers) => {
+                if let Some(span) = write_modifiers.span() {
+                    self.errors.error(
+                        span,
+                        "Write modifiers on a standalone expression are only allowed on function calls",
+                    );
+                }
+            }
+        }
+
+        self.alloc_expr_with_output(source, span, Vec::new());
     }
 
     fn flatten_declaration_list(

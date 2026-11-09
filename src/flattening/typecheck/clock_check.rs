@@ -62,6 +62,11 @@ impl<'l> TypeCheckingContext<'l> {
 
                 // Function call "writes" also require the condition domain
                 if let ExpressionSource::FuncCall(fc) = &expr.source {
+                    let_unwrap!(
+                        WriteModifiers::Connection { regs, nexts },
+                        &fc.write_modifiers
+                    );
+                    self.write_modifier_params_must_be_generative(regs, nexts);
                     let call_expr = self.instructions[fc.func_wire_ref].unwrap_subexpression();
                     if !call_expr.domain.unwrap().is_generative() {
                         if let Some(condition_domain) =
@@ -107,22 +112,7 @@ impl<'l> TypeCheckingContext<'l> {
                                         "the runtime condition",
                                     );
                                 }
-                                for r in regs {
-                                    if let Some(param) = r.reg_parameter {
-                                        self.must_be_generative(
-                                            param.0,
-                                            "the number of pipeline regs parameter",
-                                        );
-                                    }
-                                }
-                                for n in nexts {
-                                    if let Some(param) = n.next_parameter {
-                                        self.must_be_generative(
-                                            param.0,
-                                            "the next offset parameter",
-                                        );
-                                    }
-                                }
+                                self.write_modifier_params_must_be_generative(regs, nexts);
                             }
                             WriteModifiers::Initial { initial_kw_span } => {
                                 target_domain = Generative;
@@ -384,6 +374,23 @@ impl<'l> TypeCheckingContext<'l> {
                 expr.span,
                 format!("{context} must be a compile-time expression"),
             );
+        }
+    }
+
+    fn write_modifier_params_must_be_generative(
+        &self,
+        regs: &[RegExpression],
+        nexts: &[NextExpression],
+    ) {
+        for r in regs {
+            if let Some(param) = r.reg_parameter {
+                self.must_be_generative(param.0, "the number of pipeline regs parameter");
+            }
+        }
+        for n in nexts {
+            if let Some(param) = n.next_parameter {
+                self.must_be_generative(param.0, "the next offset parameter");
+            }
         }
     }
 

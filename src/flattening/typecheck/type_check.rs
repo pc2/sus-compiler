@@ -717,28 +717,32 @@ impl<'l> TypeCheckingContext<'l> {
             },
         }
     }
+    /// The `reg(N)` and `next(N)` parameters must be integers
+    fn typecheck_write_modifiers(&self, write_modifiers: &WriteModifiers) {
+        match write_modifiers {
+            WriteModifiers::Connection { regs, nexts } => {
+                for r in regs {
+                    if let Some((r_id, _)) = r.reg_parameter {
+                        self.must_be_int(r_id);
+                    }
+                }
+                for n in nexts {
+                    if let Some((r_id, _)) = n.next_parameter {
+                        self.must_be_int(r_id);
+                    }
+                }
+            }
+            WriteModifiers::Initial { .. } => {}
+        }
+    }
     fn typecheck_multi_output_expr(&self, expr: &'l Expression, multi_write: &'l [WriteTo]) {
         for wr in multi_write {
             self.typecheck_wire_reference(&wr.to);
-
-            match &wr.write_modifiers {
-                WriteModifiers::Connection { regs, nexts } => {
-                    for r in regs {
-                        if let Some((r_id, _)) = r.reg_parameter {
-                            self.must_be_int(r_id);
-                        }
-                    }
-                    for n in nexts {
-                        if let Some((r_id, _)) = n.next_parameter {
-                            self.must_be_int(r_id);
-                        }
-                    }
-                }
-                WriteModifiers::Initial { .. } => {}
-            }
+            self.typecheck_write_modifiers(&wr.write_modifiers);
         }
         match &expr.source {
             ExpressionSource::FuncCall(func_call) => {
+                self.typecheck_write_modifiers(&func_call.write_modifiers);
                 if let Some(interface) =
                     self.get_callable_func(func_call.func_wire_ref, "A function call")
                 {

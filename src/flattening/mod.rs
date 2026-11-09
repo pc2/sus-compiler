@@ -463,6 +463,29 @@ pub enum WriteModifiers {
 }
 
 impl WriteModifiers {
+    /// A plain write: no `reg`, `next` or `initial`
+    pub const NONE: WriteModifiers = WriteModifiers::Connection {
+        regs: Vec::new(),
+        nexts: Vec::new(),
+    };
+
+    /// The span covering all modifier keywords, or `None` if there are none
+    pub fn span(&self) -> Option<Span> {
+        match self {
+            Self::Connection { regs, nexts } => {
+                let mut spans = regs
+                    .iter()
+                    .map(|r| r.whole_span)
+                    .chain(nexts.iter().map(|n| n.whole_span));
+                let first = spans.next()?;
+                Some(spans.fold(first, |total, s| {
+                    Span::new_overarching(total.min(s), total.max(s))
+                }))
+            }
+            Self::Initial { initial_kw_span } => Some(*initial_kw_span),
+        }
+    }
+
     pub fn requires_generative(&self) -> bool {
         match self {
             Self::Connection { .. } => false,
@@ -857,6 +880,9 @@ pub struct SubModuleInstance {
 ///
 ///     // Finally, if a function returns a single argument, we can call it inline in an expression:
 ///     bool w = true | xor(true, false)
+///
+///     // A standalone call can carry write modifiers, which apply to the writes to the function's inputs:
+///     reg reg my_fifo.push(true, 3)
 /// }
 /// ```
 #[derive(Debug)]
@@ -867,6 +893,12 @@ pub struct FuncCall {
     pub arguments: Vec<FlatID>,
 
     pub arguments_span: BracketSpan,
+
+    /// Applied to the writes to the interface's condition wire and input ports.
+    ///
+    /// Only standalone calls (`reg reg f(a, b)`) can have modifiers; for calls within expressions this is [WriteModifiers::NONE].
+    /// Never [WriteModifiers::Initial], flattening rejects that.
+    pub write_modifiers: WriteModifiers,
 }
 
 impl FuncCall {

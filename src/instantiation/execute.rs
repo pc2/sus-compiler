@@ -734,18 +734,12 @@ impl<'l> ExecutionContext<'l> {
         });
     }
 
-    fn write_non_generative(
-        &mut self,
-        write_to: &'l WriteTo,
-        original_instruction: FlatID,
-        from: WireID,
-        write_span: Span,
-        domain: ClockID,
-    ) -> ExecutionResult<()> {
-        let_unwrap!(
-            WriteModifiers::Connection { regs, nexts },
-            &write_to.write_modifiers
-        );
+    /// Evaluates the `reg` and `next` modifiers of a write to `(num_regs, num_nexts)`
+    fn count_write_modifiers(
+        &self,
+        write_modifiers: &'l WriteModifiers,
+    ) -> ExecutionResult<(i64, i64)> {
+        let_unwrap!(WriteModifiers::Connection { regs, nexts }, write_modifiers);
 
         let mut num_regs = 0;
         for r in regs {
@@ -778,6 +772,18 @@ impl<'l> ExecutionContext<'l> {
                 num_nexts += 1;
             }
         }
+        Ok((num_regs, num_nexts))
+    }
+
+    fn write_non_generative(
+        &mut self,
+        write_to: &'l WriteTo,
+        original_instruction: FlatID,
+        from: WireID,
+        write_span: Span,
+        domain: ClockID,
+    ) -> ExecutionResult<()> {
+        let (num_regs, num_nexts) = self.count_write_modifiers(&write_to.write_modifiers)?;
 
         let (target_wire, path) =
             self.wire_ref_to_real_path(&write_to.to, original_instruction, domain)?;
@@ -1192,6 +1198,7 @@ impl<'l> ExecutionContext<'l> {
                     self.link_info.instructions[fc.func_wire_ref].unwrap_subexpression();
                 let_unwrap!(ExpressionSource::WireRef(f_wr), &func_expr.source);
                 let func_interface = self.get_interface(f_wr, fc.func_wire_ref, clock)?;
+                let (num_regs, num_nexts) = self.count_write_modifiers(&fc.write_modifiers)?;
 
                 if let Some(condition) = func_interface.condition_wire {
                     let true_wire = self.alloc_bool(true, original_instruction, clock);
@@ -1200,8 +1207,8 @@ impl<'l> ExecutionContext<'l> {
                         condition,
                         Vec::new(),
                         true_wire,
-                        0,
-                        0,
+                        num_regs,
+                        num_nexts,
                         func_interface.interface_span,
                     );
                 }
@@ -1209,7 +1216,14 @@ impl<'l> ExecutionContext<'l> {
                 for (port_wire, arg) in zip_eq(&func_interface.inputs, &fc.arguments) {
                     let arg_span = self.link_info.instructions[*arg].get_span();
                     let from = self.get_wire_or_constant_as_wire(*arg, clock)?;
-                    self.instantiate_write_to_wire(*port_wire, Vec::new(), from, 0, 0, arg_span);
+                    self.instantiate_write_to_wire(
+                        *port_wire,
+                        Vec::new(),
+                        from,
+                        num_regs,
+                        num_nexts,
+                        arg_span,
+                    );
                 }
 
                 return Ok(func_interface.outputs);
