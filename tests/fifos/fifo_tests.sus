@@ -19,7 +19,7 @@ module TestFIFO {
         }
     }
 
-    trigger pop_success'0 : int pop_v'0
+    trigger pop_success'1 : int pop_v'1
     action try_pop'0 {
         when fifo.may_pop {
             int v = fifo.pop()

@@ -198,9 +198,11 @@ always @(posedge clk) begin
         $fatal(1, "push_success without try_push at %t", $time);
 end
 
-// Pop success must correspond to try_pop
+// Pop success must correspond to try_pop one cycle earlier (FIFO pop data has a latency of 1)
+logic try_pop_d = 0;
 always @(posedge clk) begin
-    if (!rst && pop_success && !try_pop)
+    try_pop_d <= try_pop;
+    if (!rst && pop_success && !try_pop_d)
         $fatal(1, "pop_success without try_pop at %t", $time);
 end
 
