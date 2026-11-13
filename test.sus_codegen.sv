@@ -3808,7 +3808,7 @@ module use_xor(
 /*mux_wire*/ logic _xor_1_x1;
 /*mux_wire*/ logic _xor_1_x2;
 wire _xor_1_y;
-xor xor_1(
+xor_deconflict xor_1(
 	.clk(clk),
 	.x1(_xor_1_x1),
 	.x2(_xor_1_x2),
@@ -3838,7 +3838,7 @@ end
 endmodule // use_xor #()
 
 // xor #()
-module xor(
+module xor_deconflict(
 	/* clock */ input clk,
 	input wire x1,
 	input wire x2,

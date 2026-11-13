@@ -263,3 +263,10 @@ impl UniqueNames {
         }
     }
 }
+
+pub fn deconflict_module_name(name: &mut String) {
+    // A module named after a SystemVerilog keyword (`module xor {}`) would produce invalid SystemVerilog
+    if RESERVED_KEYWORDS.contains(&name.as_str()) {
+        name.push_str("_deconflict");
+    }
+}

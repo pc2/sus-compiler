@@ -7,7 +7,7 @@ use std::rc::Rc;
 use crate::{
     config::config,
     errors::ErrorLevel,
-    instantiation::clocks::process_clocks,
+    instantiation::{clocks::process_clocks, unique_names::deconflict_module_name},
     linker::{LinkerFiles, LinkerGlobals},
     to_string::FmtWrapper,
     typing::concrete_type::ConcreteGlobalReference,
@@ -80,6 +80,9 @@ impl Instantiator {
             }
         }
         result = result.trim_matches('_').to_owned();
+
+        // A module named after a SystemVerilog keyword (`module xor {}`) would produce invalid SystemVerilog
+        deconflict_module_name(&mut result);
 
         if self.mangled_name_deconflicter.insert(result.clone()) {
             // Try the non-deduplicated version first

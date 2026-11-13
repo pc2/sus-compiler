@@ -6523,7 +6523,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for matrix_vector_mul #() as "matrix_vector_mul"
 [INFO  sus_compiler::codegen] Code generated for submodule #() as "submodule"
 [INFO  sus_compiler::codegen] Code generated for doNothing #() as "doNothing"
-[INFO  sus_compiler::codegen] Code generated for xor #() as "xor"
+[INFO  sus_compiler::codegen] Code generated for xor #() as "xor_deconflict"
 [INFO  sus_compiler::codegen] Code generated for use_xor #() as "use_xor"
 [INFO  sus_compiler::codegen] Code generated for fizz_buzz #() as "fizz_buzz"
 [INFO  sus_compiler::codegen] Code generated for mbf_dual #() as "mbf_dual"
