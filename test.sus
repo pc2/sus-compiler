@@ -1347,3 +1347,13 @@ module TestCallWriteModifiersErrors {
 	// A 'next' call cannot have outputs
 	next AddFn(x, y)
 }
+
+// A negative array size is an error, it used to be an ICE for generative arrays
+module NegativeArraySize #(int N) {
+	gen int[N] G
+	output int o = 3
+}
+module UseNegativeArraySize {
+	NegativeArraySize#(N: -1) m
+	output int o = m.o
+}

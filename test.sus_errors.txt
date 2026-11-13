@@ -145,6 +145,8 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestCallWriteModifiers #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestCallNextModifier #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestCallWriteModifiersErrors #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate NegativeArraySize #(N: -1)
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate UseNegativeArraySize #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -333,6 +335,7 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate CallInsideWhenOnSelf due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate TestFunctions due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate TestCallWriteModifiersErrors due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate UseNegativeArraySize due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -3581,6 +3584,27 @@ Error: Too few output targets. Function returns 1 results, but 0 targets were gi
  1311 │ module AddFn : int#(0..256) a, int#(0..256) b -> int#(0..512) sum {
       │        ──┬──  
       │          ╰──── Interface 'AddFn' defined here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1352:32 ]
+      │
+ 1352 │ module NegativeArraySize #(int N) {
+      │                                ┬  
+      │                                ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Array size must not be negative! It was -1
+      ╭─[ test.sus:1353:10 ]
+      │
+ 1353 │     gen int[N] G
+      │             ┬  
+      │             ╰── Array size must not be negative! It was -1
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1353:13 ]
+      │
+ 1353 │     gen int[N] G
+      │                ┬  
+      │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:24:6 ]

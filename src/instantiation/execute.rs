@@ -422,10 +422,15 @@ impl<'l> ExecutionContext<'l> {
                     Some(WrittenType::Array(_span, arr)) => {
                         let (content, arr_size, _) = arr.deref();
                         let sz = if let Some(arr_size) = arr_size {
-                            self.generation_state
-                                .get_generation_value(*arr_size)
-                                .clone()
-                                .into()
+                            let sz = self.generation_state.get_generation_value(*arr_size);
+                            let sz_int = sz.unwrap_integer();
+                            if sz_int < &IBig::from(0) {
+                                return Err(CompileError::error(
+                                    self.generation_state.span_of(*arr_size),
+                                    format!("Array size must not be negative! It was {sz_int}"),
+                                ));
+                            }
+                            sz.clone().into()
                         } else {
                             Value::UNKNOWN
                         };
