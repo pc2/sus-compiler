@@ -1,8 +1,7 @@
 use crate::prelude::*;
+use std::fmt::from_fn;
 
-use crate::{
-    dev_aid::ariadne_interface::pretty_print_many_spans, linker::LinkerFiles, to_string::FmtWrapper,
-};
+use crate::{dev_aid::ariadne_interface::pretty_print_many_spans, linker::LinkerFiles};
 
 use std::{
     cell::{Cell, RefCell},
@@ -13,7 +12,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use circular_buffer::CircularBuffer;
+use circular_buffer::FixedCircularBuffer;
 use colored::Colorize;
 
 use crate::{
@@ -28,7 +27,8 @@ const NUM_SPANS_TO_PRINT: usize = 10;
 
 struct PerThreadDebugInfo {
     debug_stack: Vec<SpanDebuggerStackElement>,
-    recent_debug_options: CircularBuffer<RECENT_DEBUG_FLAG_SIZE, (Option<String>, &'static str)>,
+    recent_debug_options:
+        FixedCircularBuffer<(Option<String>, &'static str), RECENT_DEBUG_FLAG_SIZE>,
 }
 
 #[derive(Debug)]
@@ -36,11 +36,11 @@ struct SpanDebuggerStackElement {
     stage: &'static str,
     global_obj_name: String,
     debugging_enabled: bool,
-    span_history: CircularBuffer<SPAN_TOUCH_HISTORY_SIZE, Span>,
+    span_history: FixedCircularBuffer<Span, SPAN_TOUCH_HISTORY_SIZE>,
 }
 
 thread_local! {
-    static DEBUG_STACK : RefCell<PerThreadDebugInfo> = const { RefCell::new(PerThreadDebugInfo{debug_stack: Vec::new(), recent_debug_options: CircularBuffer::new()}) };
+    static DEBUG_STACK : RefCell<PerThreadDebugInfo> = const { RefCell::new(PerThreadDebugInfo{debug_stack: Vec::new(), recent_debug_options: FixedCircularBuffer::new()}) };
     static FILES_FOR_DEBUG: Cell<*mut LinkerFiles> = const { Cell::new(std::ptr::null_mut()) };
 }
 
@@ -137,7 +137,7 @@ pub fn debug_context<R>(stage: &'static str, global_obj_name: String, f: impl Fn
             stage,
             global_obj_name,
             debugging_enabled,
-            span_history: CircularBuffer::new(),
+            span_history: FixedCircularBuffer::new(),
         });
     });
     print_stack_top("Enter ");
@@ -148,7 +148,7 @@ pub fn debug_context<R>(stage: &'static str, global_obj_name: String, f: impl Fn
     let result = f(); // On panic, skips the following code (of course _out_of_time_killer is still Dropped)
 
     let time_taken = std::time::Instant::now() - started_at;
-    print_stack_top(FmtWrapper(|f| {
+    print_stack_top(from_fn(|f| {
         write!(f, "Exit (Took {:.2}s)", time_taken.as_secs_f64())
     }));
 

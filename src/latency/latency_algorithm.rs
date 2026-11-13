@@ -15,11 +15,11 @@
 //!   From here it keeps all the found latencies, such that the resulting latencies are all as early as possible.
 
 use std::collections::VecDeque;
+use std::fmt::from_fn;
 
 use crate::{
     flattening::Direction,
     latency::{CALCULATE_LATENCY_LATER, InferenceFailure},
-    to_string::FmtWrapper,
     util::partition_in_place,
 };
 
@@ -566,7 +566,7 @@ fn print_latency_test_case(
 ) {
     eprintln!(
         "{}",
-        FmtWrapper(|f| {
+        from_fn(|f| {
             writeln!(f, "==== BEGIN LATENCY TEST CASE ====")?;
             writeln!(f, "#[test]")?;
             writeln!(f, "fn new_test_case() {{")?;

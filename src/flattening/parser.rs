@@ -6,6 +6,10 @@ use tree_sitter::TreeCursor;
 use crate::{file_position::FileText, linker::Documentation};
 
 use std::num::NonZeroU16;
+use std::sync::LazyLock;
+
+/// [tree_sitter::Language::node_kind_for_id] borrows from the [tree_sitter::Language], so to hand out node names we need one that lives forever.
+static SUS_LANGUAGE: LazyLock<tree_sitter::Language> = LazyLock::new(tree_sitter_sus::language);
 
 pub fn get_readable_node_name(file_text: &FileText, kind: u16, span: Span) -> &str {
     if kind == kind!("identifier") {
@@ -13,7 +17,7 @@ pub fn get_readable_node_name(file_text: &FileText, kind: u16, span: Span) -> &s
     } else if kind == kw!("\n") {
         "\\n"
     } else {
-        tree_sitter_sus::language().node_kind_for_id(kind).unwrap()
+        SUS_LANGUAGE.node_kind_for_id(kind).unwrap()
     }
 }
 

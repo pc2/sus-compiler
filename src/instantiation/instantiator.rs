@@ -1,4 +1,5 @@
 use super::*;
+use std::fmt::from_fn;
 
 use std::collections::BTreeMap;
 use std::fmt::Display;
@@ -9,7 +10,6 @@ use crate::{
     errors::ErrorLevel,
     instantiation::{clocks::process_clocks, unique_names::deconflict_module_name},
     linker::{LinkerFiles, LinkerGlobals},
-    to_string::FmtWrapper,
     typing::concrete_type::ConcreteGlobalReference,
 };
 
@@ -103,7 +103,7 @@ impl Instantiator {
     }
 
     pub fn display_cur_stack(&self, globals: &LinkerGlobals) -> impl Display {
-        FmtWrapper(|f| {
+        from_fn(|f| {
             write!(f, "Current Instantiation Stack:")?;
             for e in &self.stack {
                 write!(f, "\n- {}", e.display(globals))?;

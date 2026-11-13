@@ -10,7 +10,7 @@ readme = "README.md"
 keywords = ["sus", "fpga", "vlsi", "hdl", "verilog"]
 categories = ["compilers", "text-processing"]
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.94"
 
 include = ["/src", "/std/*", "/README.md", "/LICENSE", "/CHANGELOG.md", "/build.rs", "/rustfmt.toml"]
 
@@ -26,7 +26,7 @@ members = [
 ariadne = "0.6.0" # for nice errors
 ibig = { version = "0.3.6", default-features = false, features = ["std"] }
 clap = { version = "4.5.21", features = ["derive", "wrap_help"] }
-circular-buffer = "1.2.0"
+circular-buffer = "2.0.1"
 chrono = "0.4.19"
 colored = "3.0.0"
 replace_with = "0.1.8"
@@ -41,7 +41,7 @@ same-file = "1.0.6"
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 
 # Tree sitter
-tree-sitter = "0.26.9"
+tree-sitter = "0.27.2"
 tree-sitter-sus = {version = "~0.6.0-dev", path = "./tree-sitter-sus"}
 
 sus-proc-macro = {version = "~0.6.0-dev", path = "./sus-proc-macro"}
@@ -56,14 +56,14 @@ sus-proc-macro = {version = "~0.6.0-dev", path = "./sus-proc-macro"}
 # moore-circt-sys = {version = "0.14.0", optional = true}
 
 #lsp
-lsp-server = {version = "0.7.1", optional = true}
+lsp-server = {version = "0.10.0", optional = true}
 lsp-types = {version = "0.97.0", optional = true}
 crossbeam-channel = {version = "0.5.15", optional = true}
 serde_json = {version = "1.0.97", optional = true}
 serde = {version = "1.0.156", optional = true}
 
 [build-dependencies]
-dirs = "6.0.0"
+dirs = "7.0.0"
 chrono = "0.4.19"
 
 [dev-dependencies]

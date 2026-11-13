@@ -1,5 +1,6 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
+use std::fmt::from_fn;
 use std::iter::zip;
 
 use sus_proc_macro::{get_builtin_const, get_builtin_type};
@@ -11,7 +12,6 @@ use crate::{
     dev_aid::ariadne_interface::pretty_print_many_spans,
     flattening::WriteModifiers,
     linker::{GlobalRef, IsExtern, LinkerFiles},
-    to_string::FmtWrapper,
     typing::{abstract_type::AbstractInnerType, template::TemplateKind},
 };
 
@@ -394,7 +394,7 @@ impl LintContext<'_> {
         if crate::debug::is_enabled("print-unused-vars-map") {
             eprintln!(
                 "Find Unused Variables Fanins:\n{}",
-                FmtWrapper(|f| {
+                from_fn(|f| {
                     for (to, fanins) in &instruction_fanins {
                         let is_target = if is_instance_used_map[to] {
                             " target"

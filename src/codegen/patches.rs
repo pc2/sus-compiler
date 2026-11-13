@@ -1,15 +1,16 @@
 //! This file patches various simulator bugs as shown in [KNOWN_SIMULATOR_BUGS.md](../../KNOWN_SIMULATOR_BUGS.md)
 
 use std::fmt::Display;
+use std::fmt::from_fn;
 
-use crate::{to_string::FmtWrapper, typing::concrete_type::ConcreteType, value::Value};
+use crate::{typing::concrete_type::ConcreteType, value::Value};
 
 pub fn patch_combinatorial_write_one_bit_dont_care(
     is_state: &Option<Value>,
     name: impl Display,
     w_typ: &ConcreteType,
 ) -> impl Display {
-    FmtWrapper(move |f| {
+    from_fn(move |f| {
         if is_state.is_none() && w_typ.sizeof() == ibig::ubig!(1) {
             writeln!(
                 f,

@@ -5,6 +5,7 @@
 //! As for typing, it only instantiates written types and leaves the rest for further typechecking.
 
 use std::borrow::Cow;
+use std::fmt::from_fn;
 use std::ops::{Deref, Index, IndexMut};
 
 use crate::errors::CompileError;
@@ -16,7 +17,6 @@ use crate::{
     instantiation::*,
     latency::port_latency_inference::ValueInferStrategy,
     linker::{GlobalUUID, IsExtern, LinkInfo},
-    to_string::FmtWrapper,
     typing::{
         abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType},
         concrete_type::{ConcreteTemplateArg, ConcreteType},
@@ -1863,7 +1863,7 @@ impl<'l> ExecutionContext<'l> {
             if crate::debug::is_enabled("print-execution-state") {
                 eprintln!(
                     "After running {original_instruction:?}:\n{}",
-                    FmtWrapper(|f| {
+                    from_fn(|f| {
                         for (id, g) in &self.generation_state.generation_state {
                             writeln!(f, "{id:?}: {g:?}")?;
                         }

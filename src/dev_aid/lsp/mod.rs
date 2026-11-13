@@ -11,8 +11,8 @@ use crate::{
     file_position::{FileText, LineCol},
     linker::UniqueFileID,
     prelude::*,
-    to_string::FmtWrapper,
 };
+use std::fmt::from_fn;
 
 use crossbeam_channel::{RecvError, TryRecvError};
 use hover_info::hover;
@@ -123,21 +123,13 @@ fn main_loop(
 
                     let response_value =
                         handle_request(&req.method, req.params, linker, &mut should_recompile);
-                    let response = match response_value {
-                        Ok(result) => lsp_server::Response {
-                            id: req.id,
-                            result: Some(result),
-                            error: None,
-                        },
-                        Err(message) => lsp_server::Response {
-                            id: req.id,
-                            result: None,
-                            error: Some(ResponseError {
-                                code: ErrorCode::RequestFailed as i32,
-                                message,
-                                data: None,
-                            }),
-                        },
+                    let response = lsp_server::Response {
+                        id: req.id,
+                        response_result: response_value.map_err(|message| ResponseError {
+                            code: ErrorCode::RequestFailed as i32,
+                            message,
+                            data: None,
+                        }),
                     };
                     connection
                         .sender
@@ -616,7 +608,7 @@ fn handle_request(
 fn display_text_position(
     text_doc_position: &lsp_types::TextDocumentPositionParams,
 ) -> impl Display {
-    FmtWrapper(move |f| {
+    from_fn(move |f| {
         let file = text_doc_position.text_document.uri.as_str();
         let line = text_doc_position.position.line;
         let col = text_doc_position.position.character;

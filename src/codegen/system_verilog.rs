@@ -1,3 +1,4 @@
+use std::fmt::from_fn;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -20,7 +21,7 @@ use crate::{
     latency::AbsLat,
     linker::{IsExtern, LinkInfo},
     prelude::*,
-    to_string::{FmtWrapper, display_join},
+    to_string::display_join,
     typing::{
         concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg, ConcreteType, IntBounds},
         template::{TVec, TemplateKind},
@@ -740,7 +741,7 @@ impl<'g> CodeGenerationContext<'g> {
         wire_decl: String,
         is_state: &Option<Value>,
     ) -> impl Display {
-        FmtWrapper(move |f| {
+        from_fn(move |f| {
             write!(f, "{wire_or_reg}{wire_decl}")?;
             match is_state {
                 Some(initial_val) if !initial_val.is_unset() => {
@@ -1162,7 +1163,7 @@ impl ConcreteType {
     fn zero_sized_inline_value(&self) -> impl Display {
         assert_eq!(self.sizeof(), ibig::ubig!(0));
 
-        FmtWrapper(move |f| {
+        from_fn(move |f| {
             match self {
                 ConcreteType::Named(global_ref) => match global_ref.id {
                     get_builtin_type!("int") => write!(f, "1'd0"),
@@ -1273,7 +1274,7 @@ impl MultiplexerSource {
 
 impl RealWire {
     fn codegen_name_with_latency(&self, target_abs_lat: AbsLat) -> impl Display {
-        FmtWrapper(move |f| {
+        from_fn(move |f| {
             let wire_abs_lat = self.absolute_latency.unwrap();
             let target_abs_lat = target_abs_lat.unwrap();
             assert!(wire_abs_lat <= target_abs_lat);
@@ -1295,7 +1296,7 @@ fn wrap_in_signed_if_needed(
     require_signed: bool,
     bounds: IntBounds<&IBig>,
 ) -> impl Display {
-    FmtWrapper(move |f| {
+    from_fn(move |f| {
         if require_signed && !bounds.is_signed() {
             write!(f, "$signed({{1'b0, {name_with_path}}})")
         } else {
@@ -1394,7 +1395,7 @@ enum PathElem {
 
 impl PathElem {
     fn display_path(path: &[PathElem]) -> impl Display {
-        FmtWrapper(move |f| {
+        from_fn(move |f| {
             for p in path {
                 match p {
                     PathElem::Array { idx } => {
@@ -1470,7 +1471,7 @@ impl<'g> Display for WireName<'g> {
 impl<'g> WireName<'g> {
     /// Same as [Self::with_path], but with multiple
     fn with_paths<const N: usize>(&self, paths: [&[PathElem]; N]) -> impl Display {
-        FmtWrapper(move |f| {
+        from_fn(move |f| {
             let wire = self.wire;
             let mut final_value_typ = &wire.typ;
             for path in paths {
@@ -1530,7 +1531,7 @@ fn can_inline(wire: &RealWire) -> bool {
 }
 
 fn codegen_constant(typ: &ConcreteType, cst: &Value) -> impl Display {
-    FmtWrapper(move |f| match typ {
+    from_fn(move |f| match typ {
         ConcreteType::Named(global_ref) => match global_ref.id {
             get_builtin_type!("bool") => {
                 let b = match cst {

@@ -3,6 +3,7 @@ mod list_of_lists;
 
 pub mod port_latency_inference;
 
+use std::fmt::from_fn;
 use std::fmt::{Debug, Display, Write};
 use std::{cmp::max, iter::zip};
 
@@ -11,7 +12,7 @@ use crate::dev_aid::dot_graphs::display_latency_count_graph;
 use crate::errors::{ErrorInfo, ErrorInfoObject};
 use crate::latency::latency_algorithm::IndeterminablePort;
 use crate::prelude::*;
-use crate::to_string::{FmtWrapper, display_join};
+use crate::to_string::display_join;
 
 use latency_algorithm::{
     FanInOut, LatencyCountingError, LatencyCountingPorts, SpecifiedLatency,
@@ -82,7 +83,7 @@ fn display_latency_difference(
     to_absolute_latency: i64,
     prev_absolute_latency: i64,
 ) -> impl Display {
-    FmtWrapper(move |f| {
+    from_fn(move |f| {
         let delta_latency = to_absolute_latency - prev_absolute_latency;
 
         let plus_sign = if delta_latency >= 0 { "+" } else { "" };
@@ -99,7 +100,7 @@ fn display_latency_difference_path(
     from_latency: i64,
     from_name: &str,
 ) -> impl Display {
-    FmtWrapper(move |f| {
+    from_fn(move |f| {
         let mut prev_decl_absolute_latency = from_latency;
         writeln!(f, "{from_name}'{prev_decl_absolute_latency}")?;
 

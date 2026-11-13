@@ -1,12 +1,12 @@
 use super::*;
 use crate::{
     prelude::*,
-    to_string::FmtWrapper,
     typing::{
         abstract_type::BOOL_SCALAR_FOR_REF,
         unifyable_cell::{SubstituteRecurse, UnifyRecurse},
     },
 };
+use std::fmt::from_fn;
 
 use std::{fmt::Display, ops::Deref};
 
@@ -1219,7 +1219,7 @@ impl<'l> TypeCheckingContext<'l> {
             match arg {
                 TemplateKind::Type(arg) => {
                     let param = &global_ref_global.parameters[template_id];
-                    let info = FmtWrapper(|f| write!(f, "parameter {}", param.name));
+                    let info = from_fn(|f| write!(f, "parameter {}", param.name));
                     self.finalize_abstract_type(info, arg, global_ref_span, report_errors);
                 }
                 TemplateKind::Value(()) => {}

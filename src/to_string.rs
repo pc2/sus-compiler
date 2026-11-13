@@ -22,7 +22,7 @@ use crate::{
     value::Value,
 };
 
-use std::fmt::{Display, Formatter, Write};
+use std::fmt::{Display, Formatter, Write, from_fn};
 
 use std::ops::Deref;
 
@@ -32,7 +32,7 @@ impl WrittenType {
         globals: &'a LinkerGlobals,
         template_names: &'a TVec<Parameter>,
     ) -> impl Display + 'a {
-        FmtWrapper(move |f| match self {
+        from_fn(move |f| match self {
             WrittenType::Error(_) => f.write_str("{error}"),
             WrittenType::TemplateVariable(_, id) => f.write_str(&template_names[*id].name),
             WrittenType::Named(named_type) => globals.types[named_type.id]
@@ -52,7 +52,7 @@ impl AbstractRankedType {
         globals: &'a LinkerGlobals,
         link_info: &'a LinkInfo,
     ) -> impl Display + 'a {
-        FmtWrapper(move |f| write!(f, "{}{}", self.inner.display(globals, link_info), self.rank))
+        from_fn(move |f| write!(f, "{}{}", self.inner.display(globals, link_info), self.rank))
     }
 }
 impl UniCell<AbstractInnerType> {
@@ -61,7 +61,7 @@ impl UniCell<AbstractInnerType> {
         globals: &'a LinkerGlobals,
         link_info: &'a LinkInfo,
     ) -> impl Display + 'a {
-        FmtWrapper(move |f| match self.get() {
+        from_fn(move |f| match self.get() {
             Some(AbstractInnerType::Template(id)) => f.write_str(&link_info.parameters[*id].name),
             Some(AbstractInnerType::Named(name)) => {
                 write!(f, "{}", name.display(globals, link_info))
@@ -100,7 +100,7 @@ impl LinkInfo {
         file_text: &'s FileText,
         param: &'s Parameter,
     ) -> impl Display + 's {
-        FmtWrapper(|f| match &param.kind {
+        from_fn(|f| match &param.kind {
             TemplateKind::Type(TypeParameterKind {}) => f.write_str(&param.name),
             TemplateKind::Value(GenerativeParameterKind {
                 decl_span,
@@ -113,7 +113,7 @@ impl LinkInfo {
         &'s self,
         file_text: &'s FileText,
     ) -> impl Display + 's {
-        FmtWrapper(|f| {
+        from_fn(|f| {
             if self.parameters.is_empty() && TIDY {
                 self.display_full_name().fmt(f)
             } else {
@@ -131,7 +131,7 @@ impl LinkInfo {
     ) -> impl Display + 's {
         let template_args = display_join(", ", iter, func);
         let full_name = self.display_full_name();
-        FmtWrapper(move |f| write!(f, "{full_name} #({template_args})"))
+        from_fn(move |f| write!(f, "{full_name} #({template_args})"))
     }
 }
 
@@ -219,7 +219,7 @@ impl WireReference {
         globals: &'s LinkerGlobals,
         link_info: &'s LinkInfo,
     ) -> impl Display + 's {
-        FmtWrapper(|f| {
+        from_fn(|f| {
             match &self.root {
                 WireReferenceRoot::LocalDecl(decl_id)
                 | WireReferenceRoot::LocalSubmodule(decl_id)
@@ -297,7 +297,7 @@ impl WireReference {
 
 impl ConcreteType {
     pub fn display<'a>(&'a self, globals: &'a LinkerGlobals) -> impl Display + 'a {
-        FmtWrapper(move |f| match self {
+        from_fn(move |f| match self {
             ConcreteType::Named(global_ref) => {
                 // Avoid ambiguity: call display() directly on ConcreteGlobalReference
                 ConcreteGlobalReference::display(global_ref, globals).fmt(f)
@@ -376,7 +376,7 @@ impl ClockID {
         &'d self,
         domains: &'d FlatAlloc<ClockInfo, ClockIDMarker>,
     ) -> impl Display + 'd {
-        FmtWrapper(move |f| {
+        from_fn(move |f| {
             if let Some(physical_domain) = domains.get(*self) {
                 write!(f, "{{{}}}", physical_domain.name)
             } else {
@@ -390,7 +390,7 @@ impl UniCell<ClockID> {
         &'d self,
         domains: &'d FlatAlloc<ClockInfo, ClockIDMarker>,
     ) -> impl Display + 'd {
-        FmtWrapper(move |f| match self.get() {
+        from_fn(move |f| match self.get() {
             Some(d) => d.display(domains).fmt(f),
             None => f.write_str("?"),
         })
@@ -401,7 +401,7 @@ impl ClockDomain {
         &'d self,
         domains: &'d FlatAlloc<ClockInfo, ClockIDMarker>,
     ) -> impl Display + 'd {
-        FmtWrapper(move |f| match self {
+        from_fn(move |f| match self {
             ClockDomain::Generative => f.write_str("gen"),
             ClockDomain::Physical(physical_id) => physical_id.display(domains).fmt(f),
         })
@@ -412,7 +412,7 @@ impl UniCell<ClockDomain> {
         &'d self,
         domains: &'d FlatAlloc<ClockInfo, ClockIDMarker>,
     ) -> impl Display + 'd {
-        FmtWrapper(move |f| match self.get() {
+        from_fn(move |f| match self.get() {
             Some(d) => d.display(domains).fmt(f),
             None => f.write_str("?"),
         })
@@ -558,7 +558,7 @@ impl Display for ActionKind {
 /// port: int#(MIN: {*})
 impl InferenceTargetPath {
     pub fn display(&self, md: &Module, globals: &LinkerGlobals) -> impl Display {
-        FmtWrapper(|f| {
+        from_fn(|f| {
             let port = &md.ports[self.port];
             let port_decl =
                 md.link_info.instructions[port.declaration_instruction].unwrap_declaration();
@@ -614,7 +614,7 @@ impl InferenceTargetPath {
 
 impl InferenceCandidate {
     pub fn display_formula<'p>(&'p self, candidate_name: &'p str) -> impl Display + 'p {
-        FmtWrapper(move |f| {
+        from_fn(move |f| {
             if self.mul_by == IBig::from(1) {
                 f.write_str(candidate_name)?;
             } else if self.mul_by == IBig::from(-1) {
@@ -640,7 +640,7 @@ impl InferenceCandidate {
         md: &Module,
         globals: &LinkerGlobals,
     ) -> impl Display {
-        FmtWrapper(|f| {
+        from_fn(|f| {
             let formula = self.display_formula(candidate_name);
             let relation = match self.relation {
                 SubtypeRelation::Exact => "==",
@@ -673,7 +673,7 @@ impl InferenceResult {
         submodules: &FlatAlloc<SubModule, SubModuleIDMarker>,
         globals: &LinkerGlobals,
     ) -> impl Display {
-        FmtWrapper(move |f| match self {
+        from_fn(move |f| match self {
             InferenceResult::PortNotUsed => f.write_str("N/C"),
             InferenceResult::NotFound => f.write_str("?"),
             InferenceResult::LatencyBadProblem => f.write_str("? bad problem"),
@@ -709,7 +709,7 @@ pub fn display_infer_param_info(
         &FlatAlloc<SubModule, SubModuleIDMarker>,
     )>,
 ) -> impl Display {
-    FmtWrapper(move |f| {
+    from_fn(move |f| {
         let arg_name = &md.link_info.parameters[template_id].name;
         match &md.inference_info.parameter_inference_candidates[template_id] {
             TemplateKind::Type(t_info) => {
@@ -778,7 +778,7 @@ pub fn display_all_infer_params(
     submodules: &FlatAlloc<SubModule, SubModuleIDMarker>,
     sm: &SubModule,
 ) -> impl Display {
-    FmtWrapper(|f| {
+    from_fn(|f| {
         let md = &globals.modules[sm.refers_to.id];
         for (template_id, known_values) in sm.last_infer_values.borrow().iter() {
             display_infer_param_info(globals, md, template_id, Some((known_values, submodules)))
@@ -791,14 +791,14 @@ pub fn display_all_infer_params(
 impl LinkInfo {
     fn debug_name<'s>(&'s self, globals: &'s LinkerGlobals, instr_id: FlatID) -> impl Display + 's {
         let name = self.get_instruction_name_best_effort(globals, instr_id);
-        FmtWrapper(move |f| write!(f, "{instr_id:?}={name}"))
+        from_fn(move |f| write!(f, "{instr_id:?}={name}"))
     }
     fn display_domain_of<'s>(
         &'s self,
         instr_id: FlatID,
         domains: &'s FlatAlloc<ClockInfo, ClockIDMarker>,
     ) -> impl Display + 's {
-        FmtWrapper(move |f| match &self.instructions[instr_id] {
+        from_fn(move |f| match &self.instructions[instr_id] {
             Instruction::Declaration(decl) => decl.clock_domain.display(domains).fmt(f),
             Instruction::Action(interface) => interface.clock_domain.display(domains).fmt(f),
             Instruction::Expression(expr) => expr.clock_domain.display(domains).fmt(f),
@@ -820,7 +820,7 @@ impl LinkInfo {
             let span = self.get_instruction_span(id);
             spans_print.push((span, format!("{id:?} {domain}")));
 
-            let parent = FmtWrapper(|f| {
+            let parent = from_fn(|f| {
                 if let Some(p) = instr.get_parent_condition() {
                     let p_when = p.parent_when;
                     if p.is_else_branch {
@@ -1004,7 +1004,7 @@ fn display_latency_domain(
     latency_domains: Option<&FlatAlloc<LatencyDomainInfo, LatDomIDMarker>>,
     latency_domain: LatDomID,
 ) -> impl Display {
-    FmtWrapper(move |f| {
+    from_fn(move |f| {
         if let Some(latency_domains) = latency_domains {
             write!(f, "{{{}}} ", latency_domains[latency_domain].name)?;
         }
@@ -1025,7 +1025,7 @@ impl LinkInfo {
         decl: &Declaration,
         file_text: &FileText,
     ) -> impl Display {
-        FmtWrapper(move |f| {
+        from_fn(move |f| {
             if let DeclarationKind::Port {
                 direction,
                 latency_domain,
@@ -1067,7 +1067,7 @@ impl Module {
         let lat_spec = self
             .link_info
             .display_latency(&interface.latency_specifier, file_text);
-        FmtWrapper(move |f| {
+        from_fn(move |f| {
             write!(f, "{domain}{action_kind} {name}{lat_spec}:")?;
             for decl_id in &interface.inputs {
                 let port_decl = self.link_info.instructions[*decl_id].unwrap_declaration();
@@ -1091,7 +1091,7 @@ impl Module {
             .link_info
             .display_full_name_and_args::<false>(file_text);
 
-        FmtWrapper(move |f| {
+        from_fn(move |f| {
             write!(f, "module {full_name_with_args}:")?;
 
             for (domain_id, domain) in &self.latency_domains {
@@ -1122,7 +1122,7 @@ impl Module {
     }
 
     pub fn print_flattened_module(&self, linker_files: &LinkerFiles, globals: &LinkerGlobals) {
-        let disp = FmtWrapper(|f| {
+        let disp = from_fn(|f| {
             writeln!(f, "[[{}]]:", self.link_info.name)?;
             writeln!(f, "Interface:")?;
             writeln!(
@@ -1144,7 +1144,7 @@ impl RealWire {
     ///
     /// Something like: "int#(FROM: -2, TO: 17) beep'12"
     pub fn display_decl(&self, globals: &LinkerGlobals) -> impl Display {
-        FmtWrapper(|f| {
+        from_fn(|f| {
             let typ = self.typ.display(globals);
             let name = &self.name;
             let abs_lat = &self.absolute_latency;
@@ -1161,7 +1161,7 @@ impl InstantiatedModule {
         interf_id: FlatID,
         globals: &LinkerGlobals,
     ) -> impl Display {
-        FmtWrapper(move |f| {
+        from_fn(move |f| {
             let interf = md.link_info.instructions[interf_id].unwrap_interface();
             // If an execution error occurred, interface may only be half-finished. Just abort if any port is invalid
             let interf_is_valid = interf
@@ -1208,7 +1208,7 @@ impl InstantiatedModule {
         })
     }
     pub fn display_all_ports(&self, globals: &LinkerGlobals) -> impl Display {
-        FmtWrapper(|f| {
+        from_fn(|f| {
             let md = &globals.modules[self.global_ref.id];
 
             if let Some(FieldDeclKind::Action(main_interface)) =
@@ -1248,7 +1248,7 @@ impl ModuleTypingContext<'_> {
         self.wires[wire_id].name.green()
     }
     pub fn display_path(&self, path: &[RealWirePathElem]) -> impl Display {
-        FmtWrapper(move |f| {
+        from_fn(move |f| {
             for p in path {
                 match p {
                     RealWirePathElem::Index { idx_wire, .. } => {
@@ -1278,7 +1278,7 @@ impl ModuleTypingContext<'_> {
         })
     }
     fn display_rank(&self, rank: &[UniCell<Value>]) -> impl Display {
-        FmtWrapper(move |f| {
+        from_fn(move |f| {
             for r in rank {
                 write!(f, "[{r}]")?;
             }
@@ -1452,13 +1452,13 @@ impl ModuleTypingContext<'_> {
     }
 
     pub fn print_instantiated_module(&self) {
-        eprintln!("{}", FmtWrapper(|f| { self.fmt_instantiated_module(f) }))
+        eprintln!("{}", from_fn(|f| { self.fmt_instantiated_module(f) }))
     }
 }
 
 impl SubModule {
     pub fn display_interface(&self, globals: &LinkerGlobals) -> impl Display {
-        FmtWrapper(|f| {
+        from_fn(|f| {
             if let Some(instance) = self.instance.get() {
                 instance.display_all_ports(globals).fmt(f)
             } else {
@@ -1513,18 +1513,10 @@ pub fn display_maybe<T>(
     v: Option<&T>,
     func: impl Fn(&mut Formatter<'_>, &T) -> std::fmt::Result,
 ) -> impl Display {
-    FmtWrapper(move |f| if let Some(v) = v { func(f, v) } else { Ok(()) })
+    from_fn(move |f| if let Some(v) = v { func(f, v) } else { Ok(()) })
 }
 
 #[allow(unused)]
 pub fn display_if(b: bool, func: impl Fn(&mut Formatter<'_>) -> std::fmt::Result) -> impl Display {
-    FmtWrapper(move |f| if b { func(f) } else { Ok(()) })
-}
-
-pub struct FmtWrapper<F: Fn(&mut Formatter<'_>) -> std::fmt::Result>(pub F);
-
-impl<F: Fn(&mut Formatter<'_>) -> std::fmt::Result> Display for FmtWrapper<F> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        (self.0)(f)
-    }
+    from_fn(move |f| if b { func(f) } else { Ok(()) })
 }

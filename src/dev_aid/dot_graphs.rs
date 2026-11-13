@@ -1,6 +1,7 @@
 use crate::codegen::sanitize_filename;
 use crate::linker::LinkerGlobals;
 use crate::prelude::*;
+use std::fmt::from_fn;
 
 use std::fmt::Display;
 use std::fs::{self, File};
@@ -9,7 +10,6 @@ use std::path::{Path, PathBuf};
 
 use crate::alloc::UUID;
 use crate::instantiation::IsPort;
-use crate::to_string::FmtWrapper;
 use crate::{
     alloc::FlatAlloc,
     flattening::Direction,
@@ -105,7 +105,7 @@ pub fn write_dot_file(module_name: &str, dot_type: &str, content: impl Display) 
 fn custom_render_hardware_structure<'a>(
     md_instance: &'a ModuleTypingContext<'a>,
 ) -> impl std::fmt::Display + 'a {
-    FmtWrapper(move |f| {
+    from_fn(move |f| {
         writeln!(f, "digraph \"{}\" {{", md_instance.mangled_name)?;
         writeln!(f, "    rankdir=LR;")?;
         writeln!(f, "    ranksep=1.5;")?;
@@ -217,7 +217,7 @@ fn custom_render_latency_count_graph(
     solution: Option<&[i64]>,
     graph_name: &str,
 ) -> impl Display {
-    FmtWrapper(move |f| {
+    from_fn(move |f| {
         let digraph_name = graph_name;
         writeln!(f, "digraph \"{digraph_name}\" {{")?;
         writeln!(f, "    rankdir=LR;")?;
@@ -421,7 +421,7 @@ fn custom_render_latency_count_graph(
 }
 
 fn display_port_list<'l>(list: &'l [&'l RealWire]) -> impl Display + 'l {
-    FmtWrapper(move |f| {
+    from_fn(move |f| {
         write!(f, "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\">")?;
         if list.is_empty() {
             // Need to have at least one element, seemingly because some dot visualizers need the table to be balanced
@@ -443,7 +443,7 @@ fn display_submodule(
     sm_name: &String,
     inputs_outputs_per_domain: FlatAlloc<(Vec<&RealWire>, Vec<&RealWire>, &String), LatDomIDMarker>,
 ) -> impl Display {
-    FmtWrapper(move |f| {
+    from_fn(move |f| {
         if let Some([(inputs, outputs, domain)]) = &inputs_outputs_per_domain.try_cast_to_array() {
             // Just a single domain, simplify print
             let inputs = display_port_list(inputs);

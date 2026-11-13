@@ -1,3 +1,4 @@
+use std::fmt::from_fn;
 use std::{
     fmt::Display,
     ops::{Deref as _, Range},
@@ -6,11 +7,7 @@ use std::{
 use ibig::error::OutOfBoundsError;
 
 use super::*;
-use crate::{
-    instantiation::execute::ExecutionResult,
-    to_string::{FmtWrapper, display_maybe},
-    util::zip_eq,
-};
+use crate::{instantiation::execute::ExecutionResult, to_string::display_maybe, util::zip_eq};
 
 #[derive(Debug, Clone)]
 /// Describes all "slots" of a wire.
@@ -203,7 +200,7 @@ pub enum GenerativeWireRefPathElem {
 }
 impl GenerativeWireRefPathElem {
     pub fn display_path(path: &[GenerativeWireRefPathElem]) -> impl Display {
-        FmtWrapper(move |f| {
+        from_fn(move |f| {
             for p in path {
                 match p {
                     GenerativeWireRefPathElem::ArrayAccess { idx, span: _ } => {

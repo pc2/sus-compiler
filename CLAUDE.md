@@ -33,7 +33,7 @@ RUSTFLAGS="-A unused" cargo clippy -- -Dwarnings   # CI enforces (exactly this i
 cargo run -- myFile.sus -o out.sv --top MyTop
 ```
 
-CI pins Rust 1.88 (`rust-version` in Cargo.toml); edition is 2024 and `let ... && let` chains are used.
+CI pins Rust 1.94.1 (`rust-version = "1.94"` in Cargo.toml); edition is 2024 and `let ... && let` chains are used.
 
 ### Regression test (required for behavior changes)
 

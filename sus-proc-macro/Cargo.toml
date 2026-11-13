@@ -14,12 +14,12 @@ edition = "2024"
 [dependencies]
 
 # Tree sitter
-tree-sitter = "0.26.9"
+tree-sitter = "0.27.2"
 tree-sitter-sus = {version = "~0.6.0-dev", path = "../tree-sitter-sus"}
 regex = "1.11.1"
 
 # proc_macro utils
-syn = "2.0"
+syn = "3.0"
 quote = "1.0"
 
 [lib]
