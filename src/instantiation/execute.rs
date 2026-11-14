@@ -1157,7 +1157,10 @@ impl<'l> ExecutionContext<'l> {
     }
 
     fn alloc_array_dimensions_stack(&mut self, peano_type: &PeanoType) -> Vec<UniCell<Value>> {
-        vec![Value::UNKNOWN; peano_type.count_unwrap()]
+        // Not vec![Value::UNKNOWN; n], since unknown cells can't be cloned
+        (0..peano_type.count_unwrap())
+            .map(|_| Value::UNKNOWN)
+            .collect()
     }
     fn expression_to_real_wire(
         &mut self,

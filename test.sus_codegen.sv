@@ -4638,6 +4638,93 @@ always_comb begin // combinatorial mul1
 end
 endmodule // example_md #()
 
+// HigherRankOperators #()
+module HigherRankOperators(
+	/* clock */ input clk,
+	input wire[2:0] a[0:1],
+	input wire[2:0] b[0:1],
+	input wire[2:0] c[0:1][0:2],
+	input wire[2:0] d[0:1][0:2],
+	output /*mux_wire*/ logic[2:0] o[0:1]
+);
+
+genvar _g0;
+genvar _g1;
+wire[2:0] _3[0:1];
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+assign _3[_g0] = a[_g0] & b[_g0];
+end
+endgenerate
+wire[2:0] _6[0:1];
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+for(_g1 = 0; _g1 < 3; _g1 = _g1 + 1) begin
+assign _6[_g0][_g1] = c[_g0][_g1] >= d[_g0][_g1];
+end
+end
+endgenerate
+wire[2:0] _7[0:1];
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+assign _7[_g0] = _3[_g0] & _6[_g0];
+end
+endgenerate
+always_comb begin // combinatorial o
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	o = '{3'bxxx, 3'bxxx};
+	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
+o[_v0] = _7[_v0];
+end
+end
+endmodule // HigherRankOperators #()
+
+// CompareIntArrays #()
+module CompareIntArrays(
+	/* clock */ input clk,
+	input wire[2:0] a[0:4],
+	input wire signed[5:0] b[0:4],
+	output /*mux_wire*/ logic[4:0] eq,
+	output /*mux_wire*/ logic[4:0] neq,
+	output /*mux_wire*/ logic[4:0] lt
+);
+
+genvar _g0;
+wire[4:0] _3;
+generate
+for(_g0 = 0; _g0 < 5; _g0 = _g0 + 1) begin
+assign _3[_g0] = $signed({1'b0, a[_g0]}) == b[_g0];
+end
+endgenerate
+wire[4:0] _6;
+generate
+for(_g0 = 0; _g0 < 5; _g0 = _g0 + 1) begin
+assign _6[_g0] = $signed({1'b0, a[_g0]}) != b[_g0];
+end
+endgenerate
+wire[4:0] _9;
+generate
+for(_g0 = 0; _g0 < 5; _g0 = _g0 + 1) begin
+assign _9[_g0] = $signed({1'b0, a[_g0]}) < b[_g0];
+end
+endgenerate
+always_comb begin // combinatorial eq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	eq = 5'bxxxxx;
+	eq = _3;
+end
+always_comb begin // combinatorial neq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	neq = 5'bxxxxx;
+	neq = _6;
+end
+always_comb begin // combinatorial lt
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	lt = 5'bxxxxx;
+	lt = _9;
+end
+endmodule // CompareIntArrays #()
+
 // TestCallNextModifier #()
 module TestCallNextModifier(
 	/* clock */ input clk,

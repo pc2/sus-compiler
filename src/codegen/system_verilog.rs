@@ -329,6 +329,31 @@ impl<'g> CodeGenerationContext<'g> {
         foreach_for_copy_unpacked_recurse(self, typ, in_always, Vec::new(), &mut operation)
     }
 
+    /// Like [Self::foreach_for_copy_unpacked], but walks exactly the outer `rank` array levels of `typ`.
+    ///
+    /// Used for higher-rank operators, where the shape of the operands below `rank` may differ from the shape of the output.
+    fn foreach_for_rank(
+        &mut self,
+        mut typ: &ConcreteType,
+        rank: usize,
+        operation: impl FnOnce(&mut Self, &[PathElem]) -> String,
+    ) -> String {
+        let mut path = Vec::new();
+        let mut for_stack = String::new();
+        for _ in 0..rank {
+            let (content_typ, sz) = typ.unwrap_array();
+            let (for_stm, idx) = self.mk_for(sz.unwrap_integer(), false);
+            writeln!(for_stack, "{for_stm} begin").unwrap();
+            path.push(PathElem::Array {
+                idx: idx.to_string(),
+            });
+            typ = content_typ;
+        }
+        let content = operation(self, &path);
+        let ends_stack = "end\n".repeat(rank);
+        format!("{for_stack}{content}{ends_stack}")
+    }
+
     /// Convert array accesses and slices
     ///
     /// `a = b[5][n+:3][3:8]` becomes
@@ -576,7 +601,10 @@ impl<'g> CodeGenerationContext<'g> {
                 })
             }
             RealWireDataSource::BinaryOp {
-                op, left, right, ..
+                op,
+                rank,
+                left,
+                right,
             } => {
                 writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
 
@@ -584,105 +612,118 @@ impl<'g> CodeGenerationContext<'g> {
                 let right = &self.instance.wires[*right];
                 let left_name = self.wire_name(left, w.absolute_latency);
                 let right_name = self.wire_name(right, w.absolute_latency);
-                self.in_generate(|slf| {
-                    slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| {
-                        let left_typ =  left.typ.walk_path(path);
-                        let right_typ = right.typ.walk_path(path);
+                let codegen_at = |path: &[PathElem]| {
+                    let left_typ = left.typ.walk_path(path);
+                    let right_typ = right.typ.walk_path(path);
 
-                        let output_with_path = output_name.with_path(path);
-                        let left_with_path = left_name.with_path(path);
-                        let right_with_path = right_name.with_path(path);
+                    let output_with_path = output_name.with_path(path);
+                    let left_with_path = left_name.with_path(path);
+                    let right_with_path = right_name.with_path(path);
 
-                        match *op {
-                            BinaryOperator::ShiftLeft | BinaryOperator::ShiftRight => {
-                                let left_int_range = left_typ.unwrap_int_bounds();
-                                let right_int_range = right_typ.unwrap_int_bounds();
+                    match *op {
+                        BinaryOperator::ShiftLeft | BinaryOperator::ShiftRight => {
+                            let left_int_range = left_typ.unwrap_int_bounds();
+                            let right_int_range = right_typ.unwrap_int_bounds();
 
-                                let shift_op = match (*op, left_int_range.is_signed()) {
-                                    (BinaryOperator::ShiftLeft, true) => "<<<",
-                                    (BinaryOperator::ShiftLeft, false) => "<<",
-                                    (BinaryOperator::ShiftRight, true) => ">>>",
-                                    (BinaryOperator::ShiftRight, false) => ">>",
-                                    _ => unreachable!()
-                                };
+                            let shift_op = match (*op, left_int_range.is_signed()) {
+                                (BinaryOperator::ShiftLeft, true) => "<<<",
+                                (BinaryOperator::ShiftLeft, false) => "<<",
+                                (BinaryOperator::ShiftRight, true) => ">>>",
+                                (BinaryOperator::ShiftRight, false) => ">>",
+                                _ => unreachable!(),
+                            };
 
-                                assert!(!right_int_range.is_signed());
+                            assert!(!right_int_range.is_signed());
 
-                                format!("assign {output_with_path} = {left_with_path} {shift_op} {right_with_path};\n")
-                            }
-                            BinaryOperator::And |
-                            BinaryOperator::Or |
-                            BinaryOperator::Xor => {
-                                let op_sv = match op {
-                                    BinaryOperator::And => "&",
-                                    BinaryOperator::Or => "|",
-                                    BinaryOperator::Xor => "^",
-                                    _ => unreachable!()
-                                };
-                                format!("assign {output_with_path} = {left_with_path} {op_sv} {right_with_path};\n")
-                            }
-                            BinaryOperator::Add |
-                            BinaryOperator::Subtract |
-                            BinaryOperator::Multiply |
-                            BinaryOperator::Remainder |
-                            BinaryOperator::Equals |
-                            BinaryOperator::NotEquals |
-                            BinaryOperator::Greater |
-                            BinaryOperator::GreaterEq |
-                            BinaryOperator::Lesser |
-                            BinaryOperator::LesserEq => {
-                                let op_sv = match op {
-                                    BinaryOperator::Add => "+",
-                                    BinaryOperator::Subtract => "-",
-                                    BinaryOperator::Multiply => "*",
-                                    BinaryOperator::Remainder => "%",
-                                    BinaryOperator::Equals => "==",
-                                    BinaryOperator::NotEquals => "!=",
-                                    BinaryOperator::Greater => ">",
-                                    BinaryOperator::GreaterEq => ">=",
-                                    BinaryOperator::Lesser => "<",
-                                    BinaryOperator::LesserEq => "<=",
-                                    _ => unreachable!()
-                                };
-                                let left_int_range = left_typ.unwrap_int_bounds();
-                                let right_int_range = right_typ.unwrap_int_bounds();
-
-                                let op_is_signed = left_int_range.is_signed() | right_int_range.is_signed();
-                                let left_arg = wrap_in_signed_if_needed(left_with_path, op_is_signed, left_int_range);
-                                let right_arg = wrap_in_signed_if_needed(right_with_path, op_is_signed, right_int_range);
-
-                                format!("assign {output_with_path} = {left_arg} {op_sv} {right_arg};\n")
-                            }
-                            BinaryOperator::Modulo => {
-                                let left_int_range =
-                                    left.typ.walk_path(path).unwrap_int_bounds();
-                                let right_int_range =
-                                    right.typ.walk_path(path).unwrap_int_bounds();
-
-                                let content = codegen_optimized_modulo(
-                                    left_int_range,
-                                    right_int_range,
-                                    &format!("{left_with_path}"),
-                                    &format!("{right_with_path}"),
-                                );
-                                format!("assign {output_with_path} = {content}\n")
-                            }
-                            BinaryOperator::Divide => {
-                                let left_int_range =
-                                    left.typ.walk_path(path).unwrap_int_bounds();
-                                let right_int_range =
-                                    right.typ.walk_path(path).unwrap_int_bounds();
-
-                                let content = codegen_optimized_divide(
-                                    left_int_range,
-                                    right_int_range,
-                                    &format!("{left_with_path}"),
-                                    &format!("{right_with_path}"),
-                                );
-                                format!("assign {output_with_path} = {content}\n")
-                            }
+                            format!(
+                                "assign {output_with_path} = {left_with_path} {shift_op} {right_with_path};\n"
+                            )
                         }
-                    })
+                        BinaryOperator::And | BinaryOperator::Or | BinaryOperator::Xor => {
+                            let op_sv = match op {
+                                BinaryOperator::And => "&",
+                                BinaryOperator::Or => "|",
+                                BinaryOperator::Xor => "^",
+                                _ => unreachable!(),
+                            };
+                            format!(
+                                "assign {output_with_path} = {left_with_path} {op_sv} {right_with_path};\n"
+                            )
+                        }
+                        BinaryOperator::Add
+                        | BinaryOperator::Subtract
+                        | BinaryOperator::Multiply
+                        | BinaryOperator::Remainder
+                        | BinaryOperator::Equals
+                        | BinaryOperator::NotEquals
+                        | BinaryOperator::Greater
+                        | BinaryOperator::GreaterEq
+                        | BinaryOperator::Lesser
+                        | BinaryOperator::LesserEq => {
+                            let op_sv = match op {
+                                BinaryOperator::Add => "+",
+                                BinaryOperator::Subtract => "-",
+                                BinaryOperator::Multiply => "*",
+                                BinaryOperator::Remainder => "%",
+                                BinaryOperator::Equals => "==",
+                                BinaryOperator::NotEquals => "!=",
+                                BinaryOperator::Greater => ">",
+                                BinaryOperator::GreaterEq => ">=",
+                                BinaryOperator::Lesser => "<",
+                                BinaryOperator::LesserEq => "<=",
+                                _ => unreachable!(),
+                            };
+                            let left_int_range = left_typ.unwrap_int_bounds();
+                            let right_int_range = right_typ.unwrap_int_bounds();
+
+                            let op_is_signed =
+                                left_int_range.is_signed() | right_int_range.is_signed();
+                            let left_arg = wrap_in_signed_if_needed(
+                                left_with_path,
+                                op_is_signed,
+                                left_int_range,
+                            );
+                            let right_arg = wrap_in_signed_if_needed(
+                                right_with_path,
+                                op_is_signed,
+                                right_int_range,
+                            );
+
+                            format!("assign {output_with_path} = {left_arg} {op_sv} {right_arg};\n")
+                        }
+                        BinaryOperator::Modulo => {
+                            let left_int_range = left.typ.walk_path(path).unwrap_int_bounds();
+                            let right_int_range = right.typ.walk_path(path).unwrap_int_bounds();
+
+                            let content = codegen_optimized_modulo(
+                                left_int_range,
+                                right_int_range,
+                                &format!("{left_with_path}"),
+                                &format!("{right_with_path}"),
+                            );
+                            format!("assign {output_with_path} = {content}\n")
+                        }
+                        BinaryOperator::Divide => {
+                            let left_int_range = left.typ.walk_path(path).unwrap_int_bounds();
+                            let right_int_range = right.typ.walk_path(path).unwrap_int_bounds();
+
+                            let content = codegen_optimized_divide(
+                                left_int_range,
+                                right_int_range,
+                                &format!("{left_with_path}"),
+                                &format!("{right_with_path}"),
+                            );
+                            format!("assign {output_with_path} = {content}\n")
+                        }
+                    }
+                };
+                self.in_generate(|slf| match op {
+                    // bool arrays are packed, so the bitwise operators work on whole vectors at once
+                    BinaryOperator::And | BinaryOperator::Or | BinaryOperator::Xor => {
+                        slf.foreach_for_copy_unpacked(&w.typ, false, |path, _| codegen_at(path))
+                    }
+                    // For the other operators, the operands are not packed the way their output may be (`int[5] < int[5]` is a packed `bool[5]`)
+                    _ => slf.foreach_for_rank(&w.typ, rank.len(), |_, path| codegen_at(path)),
                 });
             }
             RealWireDataSource::Constant { value } => {

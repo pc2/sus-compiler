@@ -147,6 +147,8 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestCallWriteModifiersErrors #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate NegativeArraySize #(N: -1)
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate UseNegativeArraySize #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated CompareIntArrays #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated HigherRankOperators #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -6507,6 +6509,8 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for SinkFn #() as "SinkFn"
 [INFO  sus_compiler::codegen] Code generated for TestCallWriteModifiers #() as "TestCallWriteModifiers"
 [INFO  sus_compiler::codegen] Code generated for TestCallNextModifier #() as "TestCallNextModifier"
+[INFO  sus_compiler::codegen] Code generated for CompareIntArrays #() as "CompareIntArrays"
+[INFO  sus_compiler::codegen] Code generated for HigherRankOperators #() as "HigherRankOperators"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"

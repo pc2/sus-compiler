@@ -1357,3 +1357,13 @@ module UseNegativeArraySize {
 	NegativeArraySize#(N: -1) m
 	output int o = m.o
 }
+
+// Comparison operators on arrays, and operators on arrays of rank >= 2 used to be ICEs
+module CompareIntArrays : int#(0..8)[5] a, int#(-3..20)[5] b -> bool[5] eq, bool[5] neq, bool[5] lt {
+	eq = a == b
+	neq = a != b
+	lt = a < b
+}
+module HigherRankOperators : bool[3][2] a, bool[3][2] b, int#(0..8)[3][2] c, int#(0..8)[3][2] d -> bool[3][2] o {
+	o = a & b & (c >= d)
+}
