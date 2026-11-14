@@ -5918,17 +5918,17 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │          ────┬────  
      │              ╰────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: There is no unique assignment for weakly connected ports. Starting from the strongly connected port group (y'1, d'1, c'1) via outputs to 
-(x'0, b'0, a'0) via inputs to 
-(y'0, d'0, c'0) 
+Error: There is no unique assignment for weakly connected ports. Starting from the strongly connected port group (y'1, c'1, d'1) via outputs to 
+(x'0, a'0, b'0) via inputs to 
+(y'0, c'0, d'0) 
 It is recommended to explicitly mark this port, y'1 or y'0
      ╭─[ test_latencies.sus:144:9 ]
      │
  144 │     action y : bool c -> bool d {
      │            ┬        ┬         ┬  
-     │            ╰───────────────────── There is no unique assignment for weakly connected ports. Starting from the strongly connected port group (y'1, d'1, c'1) via outputs to 
-(x'0, b'0, a'0) via inputs to 
-(y'0, d'0, c'0) 
+     │            ╰───────────────────── There is no unique assignment for weakly connected ports. Starting from the strongly connected port group (y'1, c'1, d'1) via outputs to 
+(x'0, a'0, b'0) via inputs to 
+(y'0, c'0, d'0) 
 It is recommended to explicitly mark this port, y'1 or y'0
      │            │        │         │  
      │            ╰───────────────────── y'1 declared here

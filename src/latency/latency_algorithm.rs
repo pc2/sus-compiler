@@ -752,7 +752,7 @@ fn refine_weak_port_connections(
     fanouts: &ListOfLists<FanInOut>,
     ports: &LatencyCountingPorts,
     solution_memory: &mut SolutionMemory,
-    strong_port_groups: Vec<Vec<SpecifiedLatency>>,
+    mut strong_port_groups: Vec<Vec<SpecifiedLatency>>,
 ) -> Result<Vec<Vec<SpecifiedLatency>>, LatencyCountingError> {
     if strong_port_groups.len() <= 1 {
         return Ok(strong_port_groups); // No need for merging for a single port group
@@ -785,8 +785,20 @@ fn refine_weak_port_connections(
         .map(|output| find_port_group_for(&strong_port_groups, *output))
         .collect();
 
-    for (sourge_port_group, port_group) in strong_port_groups.iter().enumerate() {
-        let mut solution = solution_memory.make_solution_with_initial_values::<false>(port_group);
+    for sourge_port_group in 0..strong_port_groups.len() {
+        // Inputs at the front, outputs at the back
+        let num_group_inputs =
+            partition_in_place(&mut strong_port_groups[sourge_port_group], |p| {
+                ports.inputs.contains(&p.node)
+            });
+        let port_group = &strong_port_groups[sourge_port_group];
+        let (group_inputs, group_outputs) = port_group.split_at(num_group_inputs);
+
+        // Input/Input connections can only start from the inputs of this group.
+        // Starting from its outputs too would let a group without inputs (like a lone `output`)
+        // find the inputs it shares a fanout with, while those inputs can't find it in return.
+        // The rest of the group is still reached, since extend_faninout bound its ports together.
+        let mut solution = solution_memory.make_solution_with_initial_values::<false>(group_inputs);
         solution
             .latency_count_bellman_ford(fanouts, NO_STOP_AT_NODE)
             .unwrap();
@@ -808,7 +820,8 @@ fn refine_weak_port_connections(
             }
         }
 
-        let mut solution = solution_memory.make_solution_with_initial_values::<true>(port_group);
+        // Likewise, Output/Output connections can only start from the outputs of this group.
+        let mut solution = solution_memory.make_solution_with_initial_values::<true>(group_outputs);
         solution
             .latency_count_bellman_ford(fanins, NO_STOP_AT_NODE)
             .unwrap();
@@ -2815,5 +2828,37 @@ mod tests {
         ];
 
         assert_eq!(results, [Ok(-5), Ok(-5)])
+    }
+
+    /// An `output state` that is only read (node 0) shares a fanout (node 2) with the input (node 1).
+    /// That is not an Input/Input weak connection, so the ports are simply not connected. This used to hang.
+    ///
+    /// ```sus
+    /// module M {
+    ///     output state int source_value
+    ///     action increment {
+    ///         int next_source_value = source_value + 1
+    ///     }
+    /// }
+    /// ```
+    #[test]
+    fn output_without_fanin_not_weakly_connected_to_input() {
+        let fanins: [&[FanInOut]; 6] = [
+            /*0*/ &[],
+            /*1*/ &[],
+            /*2*/ &[mk_fan(1, 0), mk_fan(5, 0)],
+            /*3*/ &[mk_fan(0, 0)],
+            /*4*/ &[],
+            /*5*/ &[mk_fan(3, 0), mk_fan(4, 0)],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+        let inputs = [1];
+        let outputs = [0];
+        let specified_latencies = [];
+        let err = solve_latencies_test_case(fanins, &inputs, &outputs, &specified_latencies);
+
+        let Err(LatencyCountingError::PortsNotStronglyConnected { .. }) = err else {
+            unreachable!("{err:?}")
+        };
     }
 }
