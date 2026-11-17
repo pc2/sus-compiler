@@ -354,6 +354,95 @@ impl<'g> CodeGenerationContext<'g> {
         format!("{for_stack}{content}{ends_stack}")
     }
 
+    /// `==` and `!=` check for binary identity, and work on any type.
+    ///
+    /// `path` leads to the values to be compared, which is the full path for `output`.
+    ///
+    /// If [equality_requires_always_comb], then `output` must be declared as `logic`.
+    fn codegen_equality(
+        &mut self,
+        op: BinaryOperator,
+        output: &WireName<'g>,
+        left: &WireName<'g>,
+        right: &WireName<'g>,
+        path: &[PathElem],
+    ) -> String {
+        let (identical, different) = match op {
+            BinaryOperator::Equals => ("1'b1", "1'b0"),
+            BinaryOperator::NotEquals => ("1'b0", "1'b1"),
+            _ => unreachable!(),
+        };
+        let left_typ = left.wire.typ.walk_path(path);
+        let right_typ = right.wire.typ.walk_path(path);
+        let output = output.with_path(path);
+
+        if matches!(left_typ, ConcreteType::Array(_)) && left_typ.is_zero_sized() {
+            // Zero-sized arrays have no wires to compare, and are always identical
+            format!("assign {output} = {identical};\n")
+        } else if left_typ.can_be_represented_as_packed_bits().is_some() {
+            let comparison = codegen_packed_comparison(
+                left_typ,
+                right_typ,
+                left.with_path(path),
+                right.with_path(path),
+                op.op_text(),
+            );
+            format!("assign {output} = {comparison};\n")
+        } else {
+            self.for_vars.reuse();
+            let mut path = path.to_vec();
+            let on_mismatch = format!("{output} = {different};");
+            let checks = self.codegen_mismatch_checks(
+                left_typ,
+                right_typ,
+                left,
+                right,
+                &mut path,
+                &on_mismatch,
+            );
+            format!("always_comb begin\n\t{output} = {identical};\n{checks}end\n")
+        }
+    }
+
+    /// Produces `if(left[...] != right[...]) {on_mismatch}` for every packed element under `path`
+    fn codegen_mismatch_checks(
+        &mut self,
+        left_typ: &ConcreteType,
+        right_typ: &ConcreteType,
+        left: &WireName<'g>,
+        right: &WireName<'g>,
+        path: &mut Vec<PathElem>,
+        on_mismatch: &str,
+    ) -> String {
+        if left_typ.can_be_represented_as_packed_bits().is_some() {
+            let mismatch = codegen_packed_comparison(
+                left_typ,
+                right_typ,
+                left.with_path(path),
+                right.with_path(path),
+                "!=",
+            );
+            format!("\tif({mismatch}) {on_mismatch}\n")
+        } else {
+            let (left_content, sz) = left_typ.unwrap_array();
+            let (right_content, _) = right_typ.unwrap_array();
+            let (for_stm, idx) = self.mk_for(sz.unwrap_integer(), true);
+            path.push(PathElem::Array {
+                idx: idx.to_string(),
+            });
+            let content = self.codegen_mismatch_checks(
+                left_content,
+                right_content,
+                left,
+                right,
+                path,
+                on_mismatch,
+            );
+            path.pop();
+            format!("\t{for_stm} begin\n{content}\tend\n")
+        }
+    }
+
     /// Convert array accesses and slices
     ///
     /// `a = b[5][n+:3][3:8]` becomes
@@ -606,10 +695,27 @@ impl<'g> CodeGenerationContext<'g> {
                 left,
                 right,
             } => {
-                writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
-
                 let left = &self.instance.wires[*left];
                 let right = &self.instance.wires[*right];
+                if matches!(op, BinaryOperator::Equals | BinaryOperator::NotEquals) {
+                    let wire_or_reg =
+                        if equality_requires_always_comb(left.typ.walk_rank(rank.len())) {
+                            "logic"
+                        } else {
+                            wire_or_reg
+                        };
+                    writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
+                    let left_name = self.wire_name(left, w.absolute_latency);
+                    let right_name = self.wire_name(right, w.absolute_latency);
+                    self.in_generate(|slf| {
+                        slf.foreach_for_rank(&w.typ, rank.len(), |slf, path| {
+                            slf.codegen_equality(*op, &output_name, &left_name, &right_name, path)
+                        })
+                    });
+                    return;
+                }
+                writeln!(self.program_text, "{wire_or_reg}{output_decl};").unwrap();
+
                 let left_name = self.wire_name(left, w.absolute_latency);
                 let right_name = self.wire_name(right, w.absolute_latency);
                 let codegen_at = |path: &[PathElem]| {
@@ -654,8 +760,6 @@ impl<'g> CodeGenerationContext<'g> {
                         | BinaryOperator::Subtract
                         | BinaryOperator::Multiply
                         | BinaryOperator::Remainder
-                        | BinaryOperator::Equals
-                        | BinaryOperator::NotEquals
                         | BinaryOperator::Greater
                         | BinaryOperator::GreaterEq
                         | BinaryOperator::Lesser
@@ -665,8 +769,6 @@ impl<'g> CodeGenerationContext<'g> {
                                 BinaryOperator::Subtract => "-",
                                 BinaryOperator::Multiply => "*",
                                 BinaryOperator::Remainder => "%",
-                                BinaryOperator::Equals => "==",
-                                BinaryOperator::NotEquals => "!=",
                                 BinaryOperator::Greater => ">",
                                 BinaryOperator::GreaterEq => ">=",
                                 BinaryOperator::Lesser => "<",
@@ -690,6 +792,9 @@ impl<'g> CodeGenerationContext<'g> {
                             );
 
                             format!("assign {output_with_path} = {left_arg} {op_sv} {right_arg};\n")
+                        }
+                        BinaryOperator::Equals | BinaryOperator::NotEquals => {
+                            unreachable!("Handled by codegen_equality")
                         }
                         BinaryOperator::Modulo => {
                             let left_int_range = left.typ.walk_path(path).unwrap_int_bounds();
@@ -1332,6 +1437,37 @@ impl RealWire {
     }
 }
 
+/// Whether `==` or `!=` on values of this type can't be written as a single expression, see [CodeGenerationContext::codegen_equality]
+fn equality_requires_always_comb(typ: &ConcreteType) -> bool {
+    !typ.is_zero_sized() && typ.can_be_represented_as_packed_bits().is_none()
+}
+
+/// Compares two values that are packed bit vectors with `op_sv`, which must be `==` or `!=`.
+///
+/// Integers are identical if their values are, since differing bounds give them differing representations.
+/// All other types must be of exactly the same type, and are compared bit-for-bit
+fn codegen_packed_comparison(
+    left_typ: &ConcreteType,
+    right_typ: &ConcreteType,
+    left: impl Display,
+    right: impl Display,
+    op_sv: &str,
+) -> String {
+    if let ConcreteType::Named(named) = left_typ
+        && named.id == get_builtin_type!("int")
+    {
+        let left_int_range = left_typ.unwrap_int_bounds();
+        let right_int_range = right_typ.unwrap_int_bounds();
+
+        let op_is_signed = left_int_range.is_signed() | right_int_range.is_signed();
+        let left = wrap_in_signed_if_needed(left, op_is_signed, left_int_range);
+        let right = wrap_in_signed_if_needed(right, op_is_signed, right_int_range);
+        format!("{left} {op_sv} {right}")
+    } else {
+        format!("{left} {op_sv} {right}")
+    }
+}
+
 fn wrap_in_signed_if_needed(
     name_with_path: impl Display,
     require_signed: bool,
@@ -1430,6 +1566,7 @@ fn codegen_optimized_divide(
 }
 
 /// Used as &[ForEachPathElement]
+#[derive(Clone)]
 enum PathElem {
     Array { idx: String },
 }

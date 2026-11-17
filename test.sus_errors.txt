@@ -149,6 +149,18 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate UseNegativeArraySize #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated CompareIntArrays #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated HigherRankOperators #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated EqBools #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated EqBoolMatrices #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated EqFloats #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated EqDoubles #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated EqGeneric #(T: type int #(FROM: 0, TO: 8)[3][2])
+[INFO  sus_compiler::instantiation::instantiator] Instantiated EqGeneric #(T: type bool #()[3])
+[INFO  sus_compiler::instantiation::instantiator] Instantiated EqGeneric #(T: type bool #()[3][2])
+[INFO  sus_compiler::instantiation::instantiator] Instantiated EqGeneric #(T: type float #())
+[INFO  sus_compiler::instantiation::instantiator] Instantiated EqGeneric #(T: type int #(FROM: 0, TO: 4)[0])
+[INFO  sus_compiler::instantiation::instantiator] Instantiated UseEqGeneric #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated EqGenerative #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate EqErrors #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -338,6 +350,7 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate TestFunctions due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate TestCallWriteModifiersErrors due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate UseNegativeArraySize due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate EqErrors due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -3609,6 +3622,515 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+      ╭─[ test.sus:1389:40 ]
+      │
+ 1389 │     EqGeneric #(T: type int#(0..8)[3][2]) arrs
+      │                                           ──┬─  
+      │                                             ╰─── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+──────╯
+Warning: Unused port 'a'
+      ╭─[ test.sus:1389:40 ]
+      │
+ 1389 │     EqGeneric #(T: type int#(0..8)[3][2]) arrs
+      │                                           ──┬─  
+      │                                             ╰─── Unused port 'a'
+      │
+      ├─[ test.sus:1389:40 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                           ┬  
+      │                           ╰── Port 'a' declared here
+      │ 
+ 1389 │     EqGeneric #(T: type int#(0..8)[3][2]) arrs
+      │                                           ──┬─  
+      │                                             ╰─── arrs declared here
+──────╯
+Warning: Unused port 'b'
+      ╭─[ test.sus:1389:40 ]
+      │
+ 1389 │     EqGeneric #(T: type int#(0..8)[3][2]) arrs
+      │                                           ──┬─  
+      │                                             ╰─── Unused port 'b'
+      │
+      ├─[ test.sus:1389:40 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                ┬  
+      │                                ╰── Port 'b' declared here
+      │ 
+ 1389 │     EqGeneric #(T: type int#(0..8)[3][2]) arrs
+      │                                           ──┬─  
+      │                                             ╰─── arrs declared here
+──────╯
+Warning: Unused port 'c'
+      ╭─[ test.sus:1389:40 ]
+      │
+ 1389 │     EqGeneric #(T: type int#(0..8)[3][2]) arrs
+      │                                           ──┬─  
+      │                                             ╰─── Unused port 'c'
+      │
+      ├─[ test.sus:1389:40 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                        ┬  
+      │                                        ╰── Port 'c' declared here
+      │ 
+ 1389 │     EqGeneric #(T: type int#(0..8)[3][2]) arrs
+      │                                           ──┬─  
+      │                                             ╰─── arrs declared here
+──────╯
+Warning: Unused port 'eq'
+      ╭─[ test.sus:1389:40 ]
+      │
+ 1389 │     EqGeneric #(T: type int#(0..8)[3][2]) arrs
+      │                                           ──┬─  
+      │                                             ╰─── Unused port 'eq'
+      │
+      ├─[ test.sus:1389:40 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                                  ─┬  
+      │                                                   ╰── Port 'eq' declared here
+      │ 
+ 1389 │     EqGeneric #(T: type int#(0..8)[3][2]) arrs
+      │                                           ──┬─  
+      │                                             ╰─── arrs declared here
+──────╯
+Warning: Unused port 'neq'
+      ╭─[ test.sus:1389:40 ]
+      │
+ 1389 │     EqGeneric #(T: type int#(0..8)[3][2]) arrs
+      │                                           ──┬─  
+      │                                             ╰─── Unused port 'neq'
+      │
+      ├─[ test.sus:1389:40 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                                              ─┬─  
+      │                                                               ╰─── Port 'neq' declared here
+      │ 
+ 1389 │     EqGeneric #(T: type int#(0..8)[3][2]) arrs
+      │                                           ──┬─  
+      │                                             ╰─── arrs declared here
+──────╯
+Warning: Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+      ╭─[ test.sus:1390:31 ]
+      │
+ 1390 │     EqGeneric #(T: type bool[3]) bools
+      │                                  ──┬──  
+      │                                    ╰──── Clock 'Unconnected_clock_2' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+──────╯
+Warning: Unused port 'a'
+      ╭─[ test.sus:1390:31 ]
+      │
+ 1390 │     EqGeneric #(T: type bool[3]) bools
+      │                                  ──┬──  
+      │                                    ╰──── Unused port 'a'
+      │
+      ├─[ test.sus:1390:31 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                           ┬  
+      │                           ╰── Port 'a' declared here
+      │ 
+ 1390 │     EqGeneric #(T: type bool[3]) bools
+      │                                  ──┬──  
+      │                                    ╰──── bools declared here
+──────╯
+Warning: Unused port 'b'
+      ╭─[ test.sus:1390:31 ]
+      │
+ 1390 │     EqGeneric #(T: type bool[3]) bools
+      │                                  ──┬──  
+      │                                    ╰──── Unused port 'b'
+      │
+      ├─[ test.sus:1390:31 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                ┬  
+      │                                ╰── Port 'b' declared here
+      │ 
+ 1390 │     EqGeneric #(T: type bool[3]) bools
+      │                                  ──┬──  
+      │                                    ╰──── bools declared here
+──────╯
+Warning: Unused port 'c'
+      ╭─[ test.sus:1390:31 ]
+      │
+ 1390 │     EqGeneric #(T: type bool[3]) bools
+      │                                  ──┬──  
+      │                                    ╰──── Unused port 'c'
+      │
+      ├─[ test.sus:1390:31 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                        ┬  
+      │                                        ╰── Port 'c' declared here
+      │ 
+ 1390 │     EqGeneric #(T: type bool[3]) bools
+      │                                  ──┬──  
+      │                                    ╰──── bools declared here
+──────╯
+Warning: Unused port 'eq'
+      ╭─[ test.sus:1390:31 ]
+      │
+ 1390 │     EqGeneric #(T: type bool[3]) bools
+      │                                  ──┬──  
+      │                                    ╰──── Unused port 'eq'
+      │
+      ├─[ test.sus:1390:31 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                                  ─┬  
+      │                                                   ╰── Port 'eq' declared here
+      │ 
+ 1390 │     EqGeneric #(T: type bool[3]) bools
+      │                                  ──┬──  
+      │                                    ╰──── bools declared here
+──────╯
+Warning: Unused port 'neq'
+      ╭─[ test.sus:1390:31 ]
+      │
+ 1390 │     EqGeneric #(T: type bool[3]) bools
+      │                                  ──┬──  
+      │                                    ╰──── Unused port 'neq'
+      │
+      ├─[ test.sus:1390:31 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                                              ─┬─  
+      │                                                               ╰─── Port 'neq' declared here
+      │ 
+ 1390 │     EqGeneric #(T: type bool[3]) bools
+      │                                  ──┬──  
+      │                                    ╰──── bools declared here
+──────╯
+Warning: Clock 'Unconnected_clock_3' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+      ╭─[ test.sus:1391:34 ]
+      │
+ 1391 │     EqGeneric #(T: type bool[3][2]) bool_matrices
+      │                                     ──────┬──────  
+      │                                           ╰──────── Clock 'Unconnected_clock_3' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+──────╯
+Warning: Unused port 'a'
+      ╭─[ test.sus:1391:34 ]
+      │
+ 1391 │     EqGeneric #(T: type bool[3][2]) bool_matrices
+      │                                     ──────┬──────  
+      │                                           ╰──────── Unused port 'a'
+      │
+      ├─[ test.sus:1391:34 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                           ┬  
+      │                           ╰── Port 'a' declared here
+      │ 
+ 1391 │     EqGeneric #(T: type bool[3][2]) bool_matrices
+      │                                     ──────┬──────  
+      │                                           ╰──────── bool_matrices declared here
+──────╯
+Warning: Unused port 'b'
+      ╭─[ test.sus:1391:34 ]
+      │
+ 1391 │     EqGeneric #(T: type bool[3][2]) bool_matrices
+      │                                     ──────┬──────  
+      │                                           ╰──────── Unused port 'b'
+      │
+      ├─[ test.sus:1391:34 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                ┬  
+      │                                ╰── Port 'b' declared here
+      │ 
+ 1391 │     EqGeneric #(T: type bool[3][2]) bool_matrices
+      │                                     ──────┬──────  
+      │                                           ╰──────── bool_matrices declared here
+──────╯
+Warning: Unused port 'c'
+      ╭─[ test.sus:1391:34 ]
+      │
+ 1391 │     EqGeneric #(T: type bool[3][2]) bool_matrices
+      │                                     ──────┬──────  
+      │                                           ╰──────── Unused port 'c'
+      │
+      ├─[ test.sus:1391:34 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                        ┬  
+      │                                        ╰── Port 'c' declared here
+      │ 
+ 1391 │     EqGeneric #(T: type bool[3][2]) bool_matrices
+      │                                     ──────┬──────  
+      │                                           ╰──────── bool_matrices declared here
+──────╯
+Warning: Unused port 'eq'
+      ╭─[ test.sus:1391:34 ]
+      │
+ 1391 │     EqGeneric #(T: type bool[3][2]) bool_matrices
+      │                                     ──────┬──────  
+      │                                           ╰──────── Unused port 'eq'
+      │
+      ├─[ test.sus:1391:34 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                                  ─┬  
+      │                                                   ╰── Port 'eq' declared here
+      │ 
+ 1391 │     EqGeneric #(T: type bool[3][2]) bool_matrices
+      │                                     ──────┬──────  
+      │                                           ╰──────── bool_matrices declared here
+──────╯
+Warning: Unused port 'neq'
+      ╭─[ test.sus:1391:34 ]
+      │
+ 1391 │     EqGeneric #(T: type bool[3][2]) bool_matrices
+      │                                     ──────┬──────  
+      │                                           ╰──────── Unused port 'neq'
+      │
+      ├─[ test.sus:1391:34 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                                              ─┬─  
+      │                                                               ╰─── Port 'neq' declared here
+      │ 
+ 1391 │     EqGeneric #(T: type bool[3][2]) bool_matrices
+      │                                     ──────┬──────  
+      │                                           ╰──────── bool_matrices declared here
+──────╯
+Warning: Clock 'Unconnected_clock_4' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+      ╭─[ test.sus:1392:29 ]
+      │
+ 1392 │     EqGeneric #(T: type float) floats
+      │                                ───┬──  
+      │                                   ╰──── Clock 'Unconnected_clock_4' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+──────╯
+Warning: Unused port 'a'
+      ╭─[ test.sus:1392:29 ]
+      │
+ 1392 │     EqGeneric #(T: type float) floats
+      │                                ───┬──  
+      │                                   ╰──── Unused port 'a'
+      │
+      ├─[ test.sus:1392:29 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                           ┬  
+      │                           ╰── Port 'a' declared here
+      │ 
+ 1392 │     EqGeneric #(T: type float) floats
+      │                                ───┬──  
+      │                                   ╰──── floats declared here
+──────╯
+Warning: Unused port 'b'
+      ╭─[ test.sus:1392:29 ]
+      │
+ 1392 │     EqGeneric #(T: type float) floats
+      │                                ───┬──  
+      │                                   ╰──── Unused port 'b'
+      │
+      ├─[ test.sus:1392:29 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                ┬  
+      │                                ╰── Port 'b' declared here
+      │ 
+ 1392 │     EqGeneric #(T: type float) floats
+      │                                ───┬──  
+      │                                   ╰──── floats declared here
+──────╯
+Warning: Unused port 'c'
+      ╭─[ test.sus:1392:29 ]
+      │
+ 1392 │     EqGeneric #(T: type float) floats
+      │                                ───┬──  
+      │                                   ╰──── Unused port 'c'
+      │
+      ├─[ test.sus:1392:29 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                        ┬  
+      │                                        ╰── Port 'c' declared here
+      │ 
+ 1392 │     EqGeneric #(T: type float) floats
+      │                                ───┬──  
+      │                                   ╰──── floats declared here
+──────╯
+Warning: Unused port 'eq'
+      ╭─[ test.sus:1392:29 ]
+      │
+ 1392 │     EqGeneric #(T: type float) floats
+      │                                ───┬──  
+      │                                   ╰──── Unused port 'eq'
+      │
+      ├─[ test.sus:1392:29 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                                  ─┬  
+      │                                                   ╰── Port 'eq' declared here
+      │ 
+ 1392 │     EqGeneric #(T: type float) floats
+      │                                ───┬──  
+      │                                   ╰──── floats declared here
+──────╯
+Warning: Unused port 'neq'
+      ╭─[ test.sus:1392:29 ]
+      │
+ 1392 │     EqGeneric #(T: type float) floats
+      │                                ───┬──  
+      │                                   ╰──── Unused port 'neq'
+      │
+      ├─[ test.sus:1392:29 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                                              ─┬─  
+      │                                                               ╰─── Port 'neq' declared here
+      │ 
+ 1392 │     EqGeneric #(T: type float) floats
+      │                                ───┬──  
+      │                                   ╰──── floats declared here
+──────╯
+Warning: Clock 'Unconnected_clock_5' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+      ╭─[ test.sus:1393:37 ]
+      │
+ 1393 │     EqGeneric #(T: type int#(0..4)[0]) empty
+      │                                        ──┬──  
+      │                                          ╰──── Clock 'Unconnected_clock_5' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+──────╯
+Warning: Unused port 'a'
+      ╭─[ test.sus:1393:37 ]
+      │
+ 1393 │     EqGeneric #(T: type int#(0..4)[0]) empty
+      │                                        ──┬──  
+      │                                          ╰──── Unused port 'a'
+      │
+      ├─[ test.sus:1393:37 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                           ┬  
+      │                           ╰── Port 'a' declared here
+      │ 
+ 1393 │     EqGeneric #(T: type int#(0..4)[0]) empty
+      │                                        ──┬──  
+      │                                          ╰──── empty declared here
+──────╯
+Warning: Unused port 'b'
+      ╭─[ test.sus:1393:37 ]
+      │
+ 1393 │     EqGeneric #(T: type int#(0..4)[0]) empty
+      │                                        ──┬──  
+      │                                          ╰──── Unused port 'b'
+      │
+      ├─[ test.sus:1393:37 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                ┬  
+      │                                ╰── Port 'b' declared here
+      │ 
+ 1393 │     EqGeneric #(T: type int#(0..4)[0]) empty
+      │                                        ──┬──  
+      │                                          ╰──── empty declared here
+──────╯
+Warning: Unused port 'c'
+      ╭─[ test.sus:1393:37 ]
+      │
+ 1393 │     EqGeneric #(T: type int#(0..4)[0]) empty
+      │                                        ──┬──  
+      │                                          ╰──── Unused port 'c'
+      │
+      ├─[ test.sus:1393:37 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                        ┬  
+      │                                        ╰── Port 'c' declared here
+      │ 
+ 1393 │     EqGeneric #(T: type int#(0..4)[0]) empty
+      │                                        ──┬──  
+      │                                          ╰──── empty declared here
+──────╯
+Warning: Unused port 'eq'
+      ╭─[ test.sus:1393:37 ]
+      │
+ 1393 │     EqGeneric #(T: type int#(0..4)[0]) empty
+      │                                        ──┬──  
+      │                                          ╰──── Unused port 'eq'
+      │
+      ├─[ test.sus:1393:37 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                                  ─┬  
+      │                                                   ╰── Port 'eq' declared here
+      │ 
+ 1393 │     EqGeneric #(T: type int#(0..4)[0]) empty
+      │                                        ──┬──  
+      │                                          ╰──── empty declared here
+──────╯
+Warning: Unused port 'neq'
+      ╭─[ test.sus:1393:37 ]
+      │
+ 1393 │     EqGeneric #(T: type int#(0..4)[0]) empty
+      │                                        ──┬──  
+      │                                          ╰──── Unused port 'neq'
+      │
+      ├─[ test.sus:1393:37 ]
+      │
+ 1384 │ module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+      │                                                              ─┬─  
+      │                                                               ╰─── Port 'neq' declared here
+      │ 
+ 1393 │     EqGeneric #(T: type int#(0..4)[0]) empty
+      │                                        ──┬──  
+      │                                          ╰──── empty declared here
+──────╯
+Warning: Not Instantiating EqErrors #() due to abstract typing errors
+      ╭─[ test.sus:1404:8 ]
+      │
+ 1404 │ module EqErrors {
+      │        ────┬───  
+      │            ╰───── Not Instantiating EqErrors #() due to abstract typing errors
+──────╯
+Error: Typing Error: operator == right side expects 'bool #()' but was given 'int #(FROM: _, TO: _)'
+      ╭─[ test.sus:1407:23 ]
+      │
+ 1407 │     output bool c = a == b
+      │                          ┬  
+      │                          ╰── Typing Error: operator == right side expects 'bool #()' but was given 'int #(FROM: _, TO: _)'
+──────╯
+Error: Typing Error: writing the output of this expression expects 'bool #()[]' but was given 'bool #()'
+      ╭─[ test.sus:1409:2 ]
+      │
+ 1409 │     output bool e = d == b
+      │     ──────┬──────  
+      │           ╰──────── Typing Error: writing the output of this expression expects 'bool #()[]' but was given 'bool #()'
+──────╯
+Error: Typing Error: operator == right side expects 'int #(FROM: _, TO: _)[]' but was given 'int #(FROM: _, TO: _)'
+      ╭─[ test.sus:1409:23 ]
+      │
+ 1409 │     output bool e = d == b
+      │                          ┬  
+      │                          ╰── Typing Error: operator == right side expects 'int #(FROM: _, TO: _)[]' but was given 'int #(FROM: _, TO: _)'
+──────╯
+Error: Operator == cannot compare modules, but was given 'SubModule EqBools #()'
+      ╭─[ test.sus:1412:18 ]
+      │
+ 1412 │     output bool f = x == y
+      │                     ┬  
+      │                     ╰── Operator == cannot compare modules, but was given 'SubModule EqBools #()'
+──────╯
+Error: Operator != cannot compare modules, but was given 'SubModule EqBools #()'
+      ╭─[ test.sus:1413:18 ]
+      │
+ 1413 │     output bool g = x != 3
+      │                     ┬  
+      │                     ╰── Operator != cannot compare modules, but was given 'SubModule EqBools #()'
+──────╯
+Error: Typing Error: operator != right side expects 'SubModule EqBools #()' but was given 'int #(FROM: _, TO: _)'
+      ╭─[ test.sus:1413:23 ]
+      │
+ 1413 │     output bool g = x != 3
+      │                          ┬  
+      │                          ╰── Typing Error: operator != right side expects 'SubModule EqBools #()' but was given 'int #(FROM: _, TO: _)'
+──────╯
+Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:24:6 ]
     │
  24 │     int a = pow17(2)
@@ -6511,6 +7033,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for TestCallNextModifier #() as "TestCallNextModifier"
 [INFO  sus_compiler::codegen] Code generated for CompareIntArrays #() as "CompareIntArrays"
 [INFO  sus_compiler::codegen] Code generated for HigherRankOperators #() as "HigherRankOperators"
+[INFO  sus_compiler::codegen] Code generated for EqBools #() as "EqBools"
+[INFO  sus_compiler::codegen] Code generated for EqBoolMatrices #() as "EqBoolMatrices"
+[INFO  sus_compiler::codegen] Code generated for EqFloats #() as "EqFloats"
+[INFO  sus_compiler::codegen] Code generated for EqDoubles #() as "EqDoubles"
+[INFO  sus_compiler::codegen] Code generated for UseEqGeneric #() as "UseEqGeneric"
+[INFO  sus_compiler::codegen] Code generated for EqGenerative #() as "EqGenerative"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"

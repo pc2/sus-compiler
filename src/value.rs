@@ -203,6 +203,30 @@ impl Value {
     #[allow(clippy::declare_interior_mutable_const)]
     pub const UNKNOWN: UniCell<Value> = UniCell::<Value>::UNKNOWN;
 }
+impl Value {
+    /// The semantics of the `==` and `!=` operators: Two values are equal iff their hardware representation is bit-for-bit identical.
+    ///
+    /// This differs from [PartialEq] for floats, where `0.0 == -0.0`.
+    pub fn is_binary_identical(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Value::Float(a), Value::Float(b)) => a.to_bits() == b.to_bits(),
+            (Value::Double(a), Value::Double(b)) => a.to_bits() == b.to_bits(),
+            (Value::Array(a), Value::Array(b)) => {
+                let len = usize::max(a.values.len(), b.values.len());
+                let elements_identical = (0..len).all(|idx| match (a.get(idx), b.get(idx)) {
+                    (Some(a), Some(b)) => a.is_binary_identical(b),
+                    _ => false,
+                });
+                let defaults_identical = match (&a.default, &b.default) {
+                    (Some(a), Some(b)) => a.is_binary_identical(b),
+                    _ => true,
+                };
+                elements_identical && defaults_identical
+            }
+            (a, b) => a == b,
+        }
+    }
+}
 impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
@@ -420,8 +444,8 @@ pub fn compute_binary_op(left: &Value, op: BinaryOperator, right: &Value) -> Res
         BinaryOperator::Or => Value::Bool(left.unwrap_bool() | right.unwrap_bool()),
         BinaryOperator::Xor => Value::Bool(left.unwrap_bool() ^ right.unwrap_bool()),
         BinaryOperator::And => Value::Bool(left.unwrap_bool() & right.unwrap_bool()),
-        BinaryOperator::Equals => Value::Bool(left == right),
-        BinaryOperator::NotEquals => Value::Bool(left != right),
+        BinaryOperator::Equals => Value::Bool(left.is_binary_identical(right)),
+        BinaryOperator::NotEquals => Value::Bool(!left.is_binary_identical(right)),
         BinaryOperator::GreaterEq => Value::Bool(left.unwrap_integer() >= right.unwrap_integer()),
         BinaryOperator::Greater => Value::Bool(left.unwrap_integer() > right.unwrap_integer()),
         BinaryOperator::LesserEq => Value::Bool(left.unwrap_integer() <= right.unwrap_integer()),

@@ -1111,6 +1111,9 @@ impl<'l> TypeCheckingContext<'l> {
         left_span: Span,
         right_span: Span,
     ) -> AbstractRankedType {
+        if matches!(op, BinaryOperator::Equals | BinaryOperator::NotEquals) {
+            return self.typecheck_equality_abstr(op, left_typ, right_typ, left_span, right_span);
+        }
         let (exp_left, exp_right, out_typ): (
             &AbstractInnerType,
             &AbstractInnerType,
@@ -1119,8 +1122,9 @@ impl<'l> TypeCheckingContext<'l> {
             BinaryOperator::Or => (&BOOL_INNER, &BOOL_INNER, &BOOL_INNER),
             BinaryOperator::Xor => (&BOOL_INNER, &BOOL_INNER, &BOOL_INNER),
             BinaryOperator::And => (&BOOL_INNER, &BOOL_INNER, &BOOL_INNER),
-            BinaryOperator::Equals => (&INT_INNER, &INT_INNER, &BOOL_INNER),
-            BinaryOperator::NotEquals => (&INT_INNER, &INT_INNER, &BOOL_INNER),
+            BinaryOperator::Equals | BinaryOperator::NotEquals => {
+                unreachable!("Handled by typecheck_equality_abstr")
+            }
             BinaryOperator::GreaterEq => (&INT_INNER, &INT_INNER, &BOOL_INNER),
             BinaryOperator::Greater => (&INT_INNER, &INT_INNER, &BOOL_INNER),
             BinaryOperator::LesserEq => (&INT_INNER, &INT_INNER, &BOOL_INNER),
@@ -1142,6 +1146,44 @@ impl<'l> TypeCheckingContext<'l> {
         self.set_type_report_error(left_typ, exp_left, left_span, "binop left side");
         self.set_type_report_error(right_typ, exp_right, right_span, "binop right side");
         out_typ
+    }
+
+    /// `==` and `!=` work on any type, as long as both sides are of the same type. They check binary identity.
+    ///
+    /// Like all other operators, they are applied element-wise over arrays: `int[5] == int[5]` is a `bool[5]`.
+    fn typecheck_equality_abstr(
+        &self,
+        op: BinaryOperator,
+        left_typ: &'l AbstractRankedType,
+        right_typ: &'l AbstractRankedType,
+        left_span: Span,
+        right_span: Span,
+    ) -> AbstractRankedType {
+        let op_text = op.op_text();
+        self.unify_type_report_error(right_typ, left_typ, right_span, || {
+            (format!("operator {op_text} right side"), Vec::new())
+        });
+
+        let errors = self.errors;
+        let globals = self.globals.globals;
+        let link_info = self.link_info;
+        self.unifier.delayed_error(move |unifier| {
+            unifier.fully_substitute_recurse(left_typ);
+            // Unknown types are reported by finalize_types
+            if let Some(inner) = left_typ.inner.get()
+                && inner.is_submodule()
+            {
+                let found_name = left_typ.display(globals, link_info);
+                errors.error(
+                    left_span,
+                    format!(
+                        "Operator {op_text} cannot compare modules, but was given '{found_name}'"
+                    ),
+                );
+            }
+        });
+
+        BOOL_INNER.with_rank(self.unifier.clone_unify(&left_typ.rank))
     }
 
     // ===== Finalization =====

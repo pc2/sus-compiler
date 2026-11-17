@@ -1367,3 +1367,48 @@ module CompareIntArrays : int#(0..8)[5] a, int#(-3..20)[5] b -> bool[5] eq, bool
 module HigherRankOperators : bool[3][2] a, bool[3][2] b, int#(0..8)[3][2] c, int#(0..8)[3][2] d -> bool[3][2] o {
 	o = a & b & (c >= d)
 }
+
+// == and != work on all types, and check binary identity
+module EqBools : bool a, bool b -> bool eq {
+	eq = a == b
+}
+module EqBoolMatrices : bool[3][2] a, bool[3][2] b -> bool[3][2] eq {
+	eq = a == b
+}
+module EqFloats : float a, float b -> bool eq {
+	eq = a == b
+}
+module EqDoubles : double[3] a, double[3] b -> bool[3] neq {
+	neq = a != b
+}
+module EqGeneric #(T) : T a, T b, T[2] c -> bool eq, bool[2] neq {
+	eq = a == b
+	neq = c != [a, b]
+}
+module UseEqGeneric {
+	EqGeneric #(T: type int#(0..8)[3][2]) arrs
+	EqGeneric #(T: type bool[3]) bools
+	EqGeneric #(T: type bool[3][2]) bool_matrices
+	EqGeneric #(T: type float) floats
+	EqGeneric #(T: type int#(0..4)[0]) empty
+}
+module EqGenerative {
+	gen bool[3] X = [true, false, true]
+	gen int[3] Y = [1, 2, 3]
+	assert #(C: &(X == [true, false, true]))
+	assert #(C: |(Y != [1, 5, 3]))
+	assert #(C: "abc" == "abc")
+	assert #(C: "abc" != "abd")
+	assert #(C: true != false)
+}
+module EqErrors {
+	input bool a
+	input int b
+	output bool c = a == b
+	input int[3] d
+	output bool e = d == b
+	EqBools x
+	EqBools y
+	output bool f = x == y
+	output bool g = x != 3
+}

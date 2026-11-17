@@ -4638,6 +4638,372 @@ always_comb begin // combinatorial mul1
 end
 endmodule // example_md #()
 
+// EqGenerative #()
+module EqGenerative(
+	/* clock */ input clk
+);
+
+// PATCH XRT 2.16 over-zealous empty module DRC
+initial begin end
+endmodule // EqGenerative #()
+
+// UseEqGeneric #()
+module UseEqGeneric(
+	/* clock */ input clk
+);
+
+EqGeneric_T_type_int_FROM_0_TO_8_3_2 arrs(
+	.clk(clk),
+	.a(),
+	.b(),
+	.c(),
+	.eq(),
+	.neq()
+);
+EqGeneric_T_type_bool_3 bools(
+	.clk(clk),
+	.a(),
+	.b(),
+	.c(),
+	.eq(),
+	.neq()
+);
+EqGeneric_T_type_bool_3_2 bool_matrices(
+	.clk(clk),
+	.a(),
+	.b(),
+	.c(),
+	.eq(),
+	.neq()
+);
+EqGeneric_T_type_float floats(
+	.clk(clk),
+	.a(),
+	.b(),
+	.c(),
+	.eq(),
+	.neq()
+);
+EqGeneric_T_type_int_FROM_0_TO_4_0 empty(
+	.clk(clk),
+	// (zero sized port) .a()
+	// (zero sized port) .b()
+	// (zero sized port) .c()
+	.eq(),
+	.neq()
+);
+endmodule // UseEqGeneric #()
+
+// EqGeneric #(T: type int #(FROM: 0, TO: 4)[0])
+module EqGeneric_T_type_int_FROM_0_TO_4_0(
+	/* clock */ input clk,
+	// (zero sized) input a
+	// (zero sized) input b
+	// (zero sized) input c
+	output /*mux_wire*/ logic eq,
+	output /*mux_wire*/ logic[1:0] neq
+);
+
+genvar _g0;
+wire _3;
+assign _3 = 1'b1;
+// (zero sized) _7
+wire[1:0] _8;
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+assign _8[_g0] = 1'b0;
+end
+endgenerate
+always_comb begin // combinatorial eq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	eq = 1'bx;
+	eq = _3;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	eq = eq;
+end
+always_comb begin // combinatorial neq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	neq = 2'bxx;
+	neq = _8;
+end
+endmodule // EqGeneric #(T: type int #(FROM: 0, TO: 4)[0])
+
+// EqGeneric #(T: type float #())
+module EqGeneric_T_type_float(
+	/* clock */ input clk,
+	input wire[31:0] a,
+	input wire[31:0] b,
+	input wire[31:0] c[0:1],
+	output /*mux_wire*/ logic eq,
+	output /*mux_wire*/ logic[1:0] neq
+);
+
+genvar _g0;
+wire _3;
+assign _3 = a == b;
+wire[31:0] _7[0:1];
+assign _7[0] = a;
+assign _7[1] = b;
+wire[1:0] _8;
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+assign _8[_g0] = c[_g0] != _7[_g0];
+end
+endgenerate
+always_comb begin // combinatorial eq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	eq = 1'bx;
+	eq = _3;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	eq = eq;
+end
+always_comb begin // combinatorial neq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	neq = 2'bxx;
+	neq = _8;
+end
+endmodule // EqGeneric #(T: type float #())
+
+// EqGeneric #(T: type bool #()[3][2])
+module EqGeneric_T_type_bool_3_2(
+	/* clock */ input clk,
+	input wire[2:0] a[0:1],
+	input wire[2:0] b[0:1],
+	input wire[2:0] c[0:1][0:1],
+	output /*mux_wire*/ logic eq,
+	output /*mux_wire*/ logic[1:0] neq
+);
+
+genvar _g0;
+logic _3;
+always_comb begin
+	_3 = 1'b1;
+	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
+	if(a[_v0] != b[_v0]) _3 = 1'b0;
+	end
+end
+wire[2:0] _7[0:1][0:1];
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+assign _7[0][_g0] = a[_g0];
+end
+endgenerate
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+assign _7[1][_g0] = b[_g0];
+end
+endgenerate
+logic[1:0] _8;
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+always_comb begin
+	_8[_g0] = 1'b0;
+	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
+	if(c[_g0][_v0] != _7[_g0][_v0]) _8[_g0] = 1'b1;
+	end
+end
+end
+endgenerate
+always_comb begin // combinatorial eq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	eq = 1'bx;
+	eq = _3;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	eq = eq;
+end
+always_comb begin // combinatorial neq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	neq = 2'bxx;
+	neq = _8;
+end
+endmodule // EqGeneric #(T: type bool #()[3][2])
+
+// EqGeneric #(T: type bool #()[3])
+module EqGeneric_T_type_bool_3(
+	/* clock */ input clk,
+	input wire[2:0] a,
+	input wire[2:0] b,
+	input wire[2:0] c[0:1],
+	output /*mux_wire*/ logic eq,
+	output /*mux_wire*/ logic[1:0] neq
+);
+
+genvar _g0;
+wire _3;
+assign _3 = a == b;
+wire[2:0] _7[0:1];
+assign _7[0] = a;
+assign _7[1] = b;
+wire[1:0] _8;
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+assign _8[_g0] = c[_g0] != _7[_g0];
+end
+endgenerate
+always_comb begin // combinatorial eq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	eq = 1'bx;
+	eq = _3;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	eq = eq;
+end
+always_comb begin // combinatorial neq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	neq = 2'bxx;
+	neq = _8;
+end
+endmodule // EqGeneric #(T: type bool #()[3])
+
+// EqGeneric #(T: type int #(FROM: 0, TO: 8)[3][2])
+module EqGeneric_T_type_int_FROM_0_TO_8_3_2(
+	/* clock */ input clk,
+	input wire[2:0] a[0:1][0:2],
+	input wire[2:0] b[0:1][0:2],
+	input wire[2:0] c[0:1][0:1][0:2],
+	output /*mux_wire*/ logic eq,
+	output /*mux_wire*/ logic[1:0] neq
+);
+
+genvar _g0;
+genvar _g1;
+logic _3;
+always_comb begin
+	_3 = 1'b1;
+	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
+	for(int _v1 = 0; _v1 < 3; _v1 = _v1 + 1) begin
+	if(a[_v0][_v1] != b[_v0][_v1]) _3 = 1'b0;
+	end
+	end
+end
+wire[2:0] _7[0:1][0:1][0:2];
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+for(_g1 = 0; _g1 < 3; _g1 = _g1 + 1) begin
+assign _7[0][_g0][_g1] = a[_g0][_g1];
+end
+end
+endgenerate
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+for(_g1 = 0; _g1 < 3; _g1 = _g1 + 1) begin
+assign _7[1][_g0][_g1] = b[_g0][_g1];
+end
+end
+endgenerate
+logic[1:0] _8;
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+always_comb begin
+	_8[_g0] = 1'b0;
+	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
+	for(int _v1 = 0; _v1 < 3; _v1 = _v1 + 1) begin
+	if(c[_g0][_v0][_v1] != _7[_g0][_v0][_v1]) _8[_g0] = 1'b1;
+	end
+	end
+end
+end
+endgenerate
+always_comb begin // combinatorial eq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	eq = 1'bx;
+	eq = _3;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	eq = eq;
+end
+always_comb begin // combinatorial neq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	neq = 2'bxx;
+	neq = _8;
+end
+endmodule // EqGeneric #(T: type int #(FROM: 0, TO: 8)[3][2])
+
+// EqDoubles #()
+module EqDoubles(
+	/* clock */ input clk,
+	input wire[63:0] a[0:2],
+	input wire[63:0] b[0:2],
+	output /*mux_wire*/ logic[2:0] neq
+);
+
+genvar _g0;
+wire[2:0] _3;
+generate
+for(_g0 = 0; _g0 < 3; _g0 = _g0 + 1) begin
+assign _3[_g0] = a[_g0] != b[_g0];
+end
+endgenerate
+always_comb begin // combinatorial neq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	neq = 3'bxxx;
+	neq = _3;
+end
+endmodule // EqDoubles #()
+
+// EqFloats #()
+module EqFloats(
+	/* clock */ input clk,
+	input wire[31:0] a,
+	input wire[31:0] b,
+	output /*mux_wire*/ logic eq
+);
+
+wire _3;
+assign _3 = a == b;
+always_comb begin // combinatorial eq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	eq = 1'bx;
+	eq = _3;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	eq = eq;
+end
+endmodule // EqFloats #()
+
+// EqBoolMatrices #()
+module EqBoolMatrices(
+	/* clock */ input clk,
+	input wire[2:0] a[0:1],
+	input wire[2:0] b[0:1],
+	output /*mux_wire*/ logic[2:0] eq[0:1]
+);
+
+genvar _g0;
+genvar _g1;
+wire[2:0] _3[0:1];
+generate
+for(_g0 = 0; _g0 < 2; _g0 = _g0 + 1) begin
+for(_g1 = 0; _g1 < 3; _g1 = _g1 + 1) begin
+assign _3[_g0][_g1] = a[_g0][_g1] == b[_g0][_g1];
+end
+end
+endgenerate
+always_comb begin // combinatorial eq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	eq = '{3'bxxx, 3'bxxx};
+	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
+eq[_v0] = _3[_v0];
+end
+end
+endmodule // EqBoolMatrices #()
+
+// EqBools #()
+module EqBools(
+	/* clock */ input clk,
+	input wire a,
+	input wire b,
+	output /*mux_wire*/ logic eq
+);
+
+wire _3;
+assign _3 = a == b;
+always_comb begin // combinatorial eq
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	eq = 1'bx;
+	eq = _3;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	eq = eq;
+end
+endmodule // EqBools #()
+
 // HigherRankOperators #()
 module HigherRankOperators(
 	/* clock */ input clk,
