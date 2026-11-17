@@ -1,7 +1,7 @@
 [package]
 name = "sus_compiler"
 description = "Compiler for the SUS Hardware Design Language"
-version = "0.6.0-dev"
+version.workspace = true
 authors = ["Lennart Van Hirtum <lennart.vanhirtum@gmail.com>"]
 license = "GPL-3.0-or-later"
 repository = "https://github.com/pc2/sus-compiler"
@@ -19,6 +19,14 @@ members = [
     "sus-proc-macro",
     "tree-sitter-sus"
 ]
+
+# The version of all three crates lives here, and only here. They are always released together.
+[workspace.package]
+version = "0.6.0-dev"
+
+[workspace.dependencies]
+tree-sitter-sus = {version = "~0.6.0-dev", path = "./tree-sitter-sus"}
+sus-proc-macro = {version = "~0.6.0-dev", path = "./sus-proc-macro"}
 
 [dependencies]
 # console = "0.15.7" # for terminal colors
@@ -42,9 +50,8 @@ pulldown-cmark = { version = "0.13", default-features = false, features = ["html
 
 # Tree sitter
 tree-sitter = "0.27.2"
-tree-sitter-sus = {version = "~0.6.0-dev", path = "./tree-sitter-sus"}
-
-sus-proc-macro = {version = "~0.6.0-dev", path = "./sus-proc-macro"}
+tree-sitter-sus.workspace = true
+sus-proc-macro.workspace = true
 
 # calyx-ir = {version = "0.6.1", optional = true}
 # calyx-opt = {version = "0.6.1", optional = true}

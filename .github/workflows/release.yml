@@ -1,0 +1,65 @@
+name: Release
+
+# Pushing a tag `vX.Y.Z` publishes all three crates to crates.io and creates the GitHub release.
+# The release notes are the `## X.Y.Z: Title` section of CHANGELOG.md.
+on:
+  push:
+    tags: [ "v[0-9]+.[0-9]+.[0-9]+" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Check that the tag matches the workspace version and the changelog
+      id: version
+      run: |
+        VERSION="${GITHUB_REF_NAME#v}"
+        CARGO_VERSION="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "sus_compiler") | .version')"
+        if [ "$VERSION" != "$CARGO_VERSION" ]; then
+          echo "::error::Tag $GITHUB_REF_NAME does not match the version in Cargo.toml ($CARGO_VERSION)"
+          exit 1
+        fi
+        if ! grep -q "^## $VERSION\(:\|\$\)" CHANGELOG.md; then
+          echo "::error::CHANGELOG.md has no '## $VERSION' section"
+          exit 1
+        fi
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: [check, ci]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write # crates.io trusted publishing
+      contents: write # create the GitHub release
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Rust
+      run: rustup toolchain install 1.94.1 --profile minimal && rustup default 1.94.1
+    - uses: rust-lang/crates-io-auth-action@v1
+      id: auth
+    - name: Publish to crates.io
+      run: cargo publish --workspace --locked
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+    - name: Create GitHub release
+      run: |
+        TITLE="$(awk -v h="## $VERSION" 'index($0, h) == 1 { print "v" substr($0, 4); exit }' CHANGELOG.md)"
+        awk -v h="## $VERSION" '
+          index($0, h) == 1 { printing = 1; next }
+          /^## [0-9]+\.[0-9]+\.[0-9]+/ { printing = 0 }
+          printing
+        ' CHANGELOG.md > release_notes.md
+        gh release create "$GITHUB_REF_NAME" --verify-tag --title "$TITLE" --notes-file release_notes.md
+      env:
+        VERSION: ${{ needs.check.outputs.version }}
+        GH_TOKEN: ${{ github.token }}
