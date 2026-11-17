@@ -22,11 +22,11 @@ members = [
 
 # The version of all three crates lives here, and only here. They are always released together.
 [workspace.package]
-version = "0.6.0-dev"
+version = "0.6.0"
 
 [workspace.dependencies]
-tree-sitter-sus = {version = "~0.6.0-dev", path = "./tree-sitter-sus"}
-sus-proc-macro = {version = "~0.6.0-dev", path = "./sus-proc-macro"}
+tree-sitter-sus = {version = "~0.6.0", path = "./tree-sitter-sus"}
+sus-proc-macro = {version = "~0.6.0", path = "./sus-proc-macro"}
 
 [dependencies]
 # console = "0.15.7" # for terminal colors

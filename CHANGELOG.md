@@ -1,4 +1,51 @@
 # Changelog
+## 0.6.0: An integrally functional update
+SUS 0.6.0 is a syntax-heavy release. The main additions are a shorthand for integer bounds (`int#(0..16)` as shorthand for `int#(FROM: 0, TO: 16)`). With this the general "ranges" syntax has been updated to `a..b` instead of `a:b`. Likewise this version also introduces the `function` keyword; a "local" action that can be called from within the module. With this, we've made `action`s, `trigger`s and `function`s the type `bool`, which lets you use them in general boolean expressions. 
+
+### Breaking Changes
+- Change slicing syntax to `[a..b]`, `[a..=b]`, `[a +.. w]`, `[a -.. w]`, and add `[a *.. w]` (#171). This replaces `[a:b]`, `[a +: w]` and `[a -: w]`
+- Remove the `interface` keyword. A module's main interface is now declared in its header: `module M #(T) : T a -> T b { ... }`. The old `module M {action M : ... {}}` syntax is still supported for making "function-style" modules. 
+- Actions, triggers and functions are now plain `bool` wires (#95). Referring to one by name yields its condition wire, so they can be used in boolean expressions
+- Generative assignments now check the declared array size (#205). `gen int[10] X = [1, 2, 3]` used to silently make `X` a 3-element array
+- Remove `LatencyOffset`, use `next(N)` instead
+
+### Language
+- Add local actions with the `function` keyword (#198): `function name : T a -> T b { body }`
+- Add secondary (partial) bindings on actions, triggers and functions (#198): an `action` or `function` may be declared without a body, and bound later with `when name : T a -> T b { ... }`
+- Add shorthand for integer bounds: `int#(a..b)`. All slice forms work: `int#(a..=b)`, `int#(a +.. w)`, `int#(a -.. w)`, `int#(a *.. w)` (#171)
+- `for` loops accept every slice form too: `for int I in a..=b`
+- Add array literals with a default element: `[v ...]` and `[a, b, v ...]`. The size is taken from context
+- Parser: Allow newlines after open brackets, before `{`, `else`, `->`, and after `=` and binary operators (#107)
+- Parser: Allow trailing commas in function calls
+- Allow write modifiers on standalone function calls: `reg f(x, y)`, `next f(x, y)`
+- `==` and `!=` now work on all types, not just `int`. They check binary identity, not any "equivalence". (#192)
+
+### Compiler
+- Update to Minimum Rust version to 1.94
+- Add `--no-optimization` flag, for more readable testbenching
+- Explicit `reg` latency registers are now marked `(* shreg_extract = "no" *)`, so Vivado doesn't turn them into SRLs
+- Add bounds checking for `split` wire indices
+- Improve the jagged tensor error by telling you which array indices don't match
+- Lint: Remove "effectively constant" for output ports
+- Lint: Remove spurious "unused" warning on trigger return values
+- Fix ICE on out of bounds array write (#204)
+- Fix ICE on negative array sizes
+- Fix `[gen -: w]` ignored the direction when the start index is generative
+- Fix module names may conflict with SystemVerilog keywords
+- Remove `__top_module.html` from `--gen-docs`
+
+### LSP
+- Fix LSP crashed on startup for file paths containing spaces, non-ASCII characters, `[`, `]` or `%`
+- Slightly improve completions for conditional bindings without braces
+- Tab-complete on a type template argument now adds the `type` keyword
+
+### Standard Library
+- Add `MultiReduction`
+- Add `CountStartingZeros`
+- Remove `LatencyOffset`, `LatencyOffsetAction` and `LatencyOffsetActionNoData`. Use `next(N)` instead
+- Remove `Repeat` and `RepeatGen`. Use `[v ...]` instead
+- Fix off-by-one error in the size of `TreeAdd`'s intermediate sums
+
 ## 0.5.0: `reg(N)`, `next(N)`, various small fixes
 - Add parameter to the `reg(N)` keyword
 - Add the `next(N)` keyword (#103)
