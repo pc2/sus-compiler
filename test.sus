@@ -1412,3 +1412,19 @@ module EqErrors {
 	output bool f = x == y
 	output bool g = x != 3
 }
+
+// An action, trigger or function may read its own condition wire from inside its own body
+module use_action_name_in_own_body {
+    function func : -> bool f {
+        f = func
+    }
+    trigger trig {
+        bool t = trig
+    }
+    action act : -> bool a {
+        a = act & func()
+        trig()
+    } else {
+        a = act
+    }
+}

@@ -4638,6 +4638,59 @@ always_comb begin // combinatorial mul1
 end
 endmodule // example_md #()
 
+// use_action_name_in_own_body #()
+module use_action_name_in_own_body(
+	/* clock */ input clk,
+	output /*mux_wire*/ logic trig,
+	input wire act,
+	output /*mux_wire*/ logic a
+);
+
+/*mux_wire*/ logic func;
+/*mux_wire*/ logic f;
+/*mux_wire*/ logic t;
+wire _6;
+assign _6 = act & f;
+always_comb begin // combinatorial func
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	func = 1'bx;
+	func = 1'b0;
+	if(act) func = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	func = func;
+end
+always_comb begin // combinatorial f
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	f = 1'bx;
+	f = func;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	f = f;
+end
+always_comb begin // combinatorial trig
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	trig = 1'bx;
+	trig = 1'b0;
+	if(act) trig = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	trig = trig;
+end
+always_comb begin // combinatorial t
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	t = 1'bx;
+	t = trig;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	t = t;
+end
+always_comb begin // combinatorial a
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	a = 1'bx;
+	if(act) a = _6;
+	if(!act) a = act;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	a = a;
+end
+endmodule // use_action_name_in_own_body #()
+
 // EqGenerative #()
 module EqGenerative(
 	/* clock */ input clk
@@ -5289,6 +5342,22 @@ always_comb begin // combinatorial a_delayed
 	a_delayed = _a_D2;
 end
 endmodule // TestExplicitRegNoSRL #()
+
+// CallInsideWhenOnSelf #()
+module CallInsideWhenOnSelf(
+	/* clock */ input clk
+);
+
+/*mux_wire*/ logic f;
+always_comb begin // combinatorial f
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	f = 1'bx;
+	f = 1'b0;
+	if(f) f = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	f = f;
+end
+endmodule // CallInsideWhenOnSelf #()
 
 // SubmodPartialBinding #()
 module SubmodPartialBinding(

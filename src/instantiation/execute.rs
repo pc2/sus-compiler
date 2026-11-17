@@ -1803,6 +1803,10 @@ impl<'l> ExecutionContext<'l> {
                             );
                         }
 
+                        // The body may refer to its own action, so it must already be available
+                        self.generation_state[original_instruction] =
+                            SubModuleOrWire::Wire(condition_wire);
+
                         self.condition_stack.push(ConditionStackElem {
                             condition_wire,
                             inverse: false,

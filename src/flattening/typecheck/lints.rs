@@ -667,21 +667,6 @@ impl LintContext<'_> {
         }
     }
 
-    /// If `when_id` is a `when` statement whose condition directly names a local action, trigger or function, returns it
-    fn when_condition_names_action(&self, when_id: FlatID) -> Option<FlatID> {
-        let Instruction::IfStatement(stm) = &self.working_on.instructions[when_id] else {
-            return None;
-        };
-        let cond_expr = self.working_on.instructions[stm.condition].unwrap_expression();
-        let ExpressionSource::WireRef(cond_ref) = &cond_expr.source else {
-            return None;
-        };
-        let WireReferenceRoot::LocalTrigger(action_id) = &cond_ref.root else {
-            return None;
-        };
-        cond_ref.path.is_empty().then_some(*action_id)
-    }
-
     /// The outputs of an action, trigger or function may be bound by at most one site: either the declaration's own body, or one
     /// conditional binding `when x : T a -> T b {}`. Other bindings must be partial (inputs only). Otherwise every binding would be
     /// another writer of the same outputs under the same condition.
@@ -790,27 +775,7 @@ impl LintContext<'_> {
                             format!("{kind_capitalized} {} declared here", interface_instr.name),
                         );
                 }
-                ActionKind::Trigger(_) | ActionKind::Function => {
-                    // Calling from within its own body, or from within a `when` on itself, would make the condition depend on itself
-                    let mut cur = expr_instr.parent_condition;
-                    while let Some(parent) = cur {
-                        if parent.parent_when == *interf
-                            || self.when_condition_names_action(parent.parent_when) == Some(*interf)
-                        {
-                            self.errors
-                                .error(
-                                    fc_func_wireref.root_span,
-                                    format!(
-                                        "Cannot call '{}' from inside its own body",
-                                        interface_instr.name
-                                    ),
-                                )
-                                .info_obj(interface_instr);
-                            break;
-                        }
-                        cur = md.link_info.instructions[parent.parent_when].get_parent_condition();
-                    }
-                }
+                ActionKind::Trigger(_) | ActionKind::Function => {}
             }
         }
     }
