@@ -825,7 +825,7 @@ pub struct Declaration {
 
 /// An [Instruction] that represents a instantiation of a submodule.
 ///
-/// It can be referenced by a [WireReferenceRoot::SubModulePort]
+/// It can be referenced by a [WireReferenceRoot::LocalSubmodule]
 ///
 /// A SubModuleInstance Instruction always corresponds to a new entry in the [self::name_context::LocalVariableContext].
 ///
@@ -834,6 +834,12 @@ pub struct Declaration {
 pub struct SubModuleInstance {
     pub parent_condition: Option<ParentCondition>,
     pub module_ref: GlobalReference<ModuleUUID>,
+    /// Non-empty for submodule arrays: `FIFO[3][5] fifos`. The (generative) size of each array dimension, outermost first.
+    ///
+    /// So in the order they're indexed: `fifos[4][2]`, sizes `[5, 3]`. [Self::typ]'s rank is the length of this list.
+    ///
+    /// All elements of the array share the same template arguments, clocks and port latencies.
+    pub array_sizes: Vec<(FlatID, BracketSpan)>,
 
     pub name: String,
     pub name_span: Span,

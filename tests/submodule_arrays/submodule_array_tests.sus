@@ -1,0 +1,113 @@
+
+// ==== Runtime-indexed actions on an array of FIFOs ====
+
+module TestFIFOArray {
+    FIFO#(DEPTH: 16)[4] fifos
+
+    action rst'0 {
+        for int I in 0..4 {
+            fifos[I].rst()
+        }
+    }
+
+    trigger push_success'0
+    action try_push'0 : int#(0..4) push_idx'0, int#(0..65536) push_v'0 {
+        when fifos[push_idx].may_push {
+            // The extra registers force a nonzero MAY_PUSH_LATENCY, shared by all FIFOs in the array
+            reg reg reg reg reg int#(0..65536) vv = push_v
+            fifos[push_idx].push(vv)
+            push_success()
+        }
+    }
+
+    trigger pop_success'1 : int#(0..65536) pop_v'1
+    action try_pop'0 : int#(0..4) pop_idx'0 {
+        when fifos[pop_idx].may_pop {
+            int#(0..65536) v = fifos[pop_idx].pop()
+
+            pop_success(v)
+        }
+    }
+}
+
+// ==== 2D array, plain ports, and mixing compile-time with runtime indices ====
+
+module Accumulator {
+    state int total
+    initial total = 0
+
+    output int cur_total'0 = total
+
+    action add'0 : int#(0..256) v'0 {
+        total = total + v mod pow2#(E: 32)
+    }
+    action clear'0 {
+        total = 0
+    }
+}
+
+module TestAccumulatorGrid {
+    gen int ROWS = 2
+    gen int COLS = 3
+    // Indexed as accs[row][col]
+    Accumulator[COLS][ROWS] accs
+
+    action clear'0 {
+        for int R in 0..ROWS {
+            for int C in 0..COLS {
+                accs[R][C].clear()
+            }
+        }
+    }
+
+    action add'0 : int#(0..ROWS) row'0, int#(0..COLS) col'0, int#(0..256) v'0 {
+        accs[row][col].add(v)
+    }
+    // Compile-time row, runtime column
+    action add_to_last_row'0 : int#(0..COLS) last_row_col'0, int#(0..256) last_row_v'0 {
+        accs[ROWS - 1][last_row_col].add(last_row_v)
+    }
+
+    input int#(0..ROWS) read_row'0
+    input int#(0..COLS) read_col'0
+    output int total'0 = accs[read_row][read_col].cur_total
+
+    // Compile-time indexed reads of every element
+    output int[COLS][ROWS] all_totals'0
+    for int R in 0..ROWS {
+        for int C in 0..COLS {
+            all_totals[R][C] = accs[R][C].cur_total
+        }
+    }
+}
+
+// ==== Conditional bindings on the triggers of an array ====
+
+module Echo {
+    trigger echo'2 : int#(0..256) echo_v'2
+    action send'0 : int#(0..256) v'0 {
+        echo(v)
+    }
+}
+
+module TestTriggerArray {
+    Echo[4] echos
+
+    action send'0 : int#(0..4) idx'0, int#(0..256) v'0 {
+        echos[idx].send(v)
+    }
+    // Compile-time indexed call. Never targets the same element as send in the testbench
+    action send_to_3'0 : int#(0..256) v3'0 {
+        echos[3].send(v3)
+    }
+
+    output bool[4] echoed'2
+    output int#(0..256)[4] echoed_v'2
+    for int I in 0..4 {
+        echoed[I] = false
+        when echos[I].echo : int#(0..256) ev {
+            echoed[I] = true
+            echoed_v[I] = ev
+        }
+    }
+}

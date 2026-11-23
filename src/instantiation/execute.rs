@@ -334,6 +334,8 @@ struct InterfaceWires {
     inputs: Vec<WireID>,
     outputs: Vec<WireID>,
     interface_span: Span,
+    /// For interfaces of submodule arrays (`fifos[3][i].push`), the path that selects the single submodule from every wire in this interface. Empty otherwise
+    path: Vec<RealWirePathElem>,
 }
 
 impl<'l> ExecutionContext<'l> {
@@ -898,6 +900,64 @@ impl<'l> ExecutionContext<'l> {
         })
     }
 
+    /// `false`, or for the condition ports of submodule arrays: an array of `false` with the given dimensions (outermost first)
+    fn alloc_all_false(
+        &mut self,
+        array_dims: &[IBig],
+        original_instruction: FlatID,
+        domain: ClockID,
+    ) -> WireID {
+        let mut value = Value::Bool(false);
+        let mut typ = ConcreteType::BOOL;
+        for dim in array_dims.iter().rev() {
+            let dim_usize = usize::try_from(dim).unwrap();
+            value = Value::Array(vec![value; dim_usize].into());
+            typ = ConcreteType::Array(Box::new((typ, UniCell::new(Value::Integer(dim.clone())))));
+        }
+        self.wires.alloc(RealWire {
+            typ,
+            source: RealWireDataSource::Constant { value },
+            original_instruction,
+            clock: domain,
+            name: self.unique_name_producer.get_unique_name(""),
+            specified_latency: AbsLat::UNKNOWN,
+            absolute_latency: AbsLat::UNKNOWN,
+            is_port: IsPort::PlainWire,
+        })
+    }
+
+    /// Selects the port of a single submodule out of the port wire of a submodule array. `path` is the path of indices into the submodule array.
+    ///
+    /// For regular submodules `path` is empty, and this is `port_wire` itself.
+    fn select_submodule_port(
+        &mut self,
+        port_wire: WireID,
+        path: &[RealWirePathElem],
+        original_instruction: FlatID,
+        clock: ClockID,
+    ) -> WireID {
+        if path.is_empty() {
+            return port_wire;
+        }
+        let typ = self.wires[port_wire]
+            .typ
+            .walk_rank(path.len())
+            .clone_prototype();
+        self.wires.alloc(RealWire {
+            typ,
+            source: RealWireDataSource::Select {
+                root: port_wire,
+                path: path.to_vec(),
+            },
+            original_instruction,
+            clock,
+            name: self.unique_name_producer.get_unique_name(""),
+            specified_latency: AbsLat::UNKNOWN,
+            absolute_latency: AbsLat::UNKNOWN,
+            is_port: IsPort::PlainWire,
+        })
+    }
+
     /// Converts constants to wires implicitly.
     fn get_wire_or_constant_as_wire(
         &mut self,
@@ -947,6 +1007,7 @@ impl<'l> ExecutionContext<'l> {
             let submod_md = &self.globals.modules[submod_instance.refers_to.id];
             let port_data = &submod_md.ports[port_id];
             let write_span = submod_instance.get_span(self.link_info);
+            let array_dims = submod_instance.array_dims.clone();
             let source = match port_data.direction {
                 Direction::Input => RealWireDataSource::Multiplexer {
                     is_state: None,
@@ -983,6 +1044,12 @@ impl<'l> ExecutionContext<'l> {
                 },
                 _ => unreachable!("Ports can only point to Declaration or InterfaceDeclaration"),
             };
+            // Same as [SubModule::wrap_port_typ]
+            let array_dim_cells = array_dims
+                .iter()
+                .map(|dim| UniCell::new(Value::Integer(dim.clone())))
+                .collect();
+            let typ = typ.stack_arrays(array_dim_cells);
 
             let new_wire = self.wires.alloc(RealWire {
                 source,
@@ -996,7 +1063,7 @@ impl<'l> ExecutionContext<'l> {
             });
 
             if is_condition && port_data.direction == Direction::Input {
-                let false_wire = self.alloc_bool(false, original_instruction, domain);
+                let false_wire = self.alloc_all_false(&array_dims, original_instruction, domain);
                 let_unwrap!(
                     RealWireDataSource::Multiplexer { sources, .. },
                     &mut self.wires[new_wire].source
@@ -1078,6 +1145,7 @@ impl<'l> ExecutionContext<'l> {
             inputs,
             outputs,
             interface_span: field_span,
+            path: Vec::new(),
         }
     }
 
@@ -1091,9 +1159,13 @@ impl<'l> ExecutionContext<'l> {
             WireReferenceRoot::LocalSubmodule(submod_decl_id) => {
                 let submod_id = self.generation_state[*submod_decl_id].unwrap_submodule_instance();
 
-                let (interface, name_span, _path) = self.execute_wire_ref_path(interface_ref)?;
+                // Typecheck guarantees the path consists of the indices into the submodule array, and then the field
+                let (interface, name_span, path) = self.execute_wire_ref_path(interface_ref)?;
 
-                Ok(self.get_submodule_interface(submod_id, interface, name_span, parent_clock))
+                let mut interface =
+                    self.get_submodule_interface(submod_id, interface, name_span, parent_clock);
+                interface.path = path;
+                Ok(interface)
             }
             WireReferenceRoot::NamedModule(module_ref) => {
                 let md = &self.globals.modules[module_ref.id];
@@ -1104,6 +1176,7 @@ impl<'l> ExecutionContext<'l> {
                     &md.link_info.name,
                     original_instruction,
                     clock_map,
+                    Vec::new(),
                 )?;
 
                 assert!(interface_ref.path.is_empty());
@@ -1148,6 +1221,7 @@ impl<'l> ExecutionContext<'l> {
                     inputs,
                     outputs,
                     interface_span: interface_ref.root_span,
+                    path: Vec::new(),
                 })
             }
             WireReferenceRoot::LocalDecl(_)
@@ -1213,7 +1287,7 @@ impl<'l> ExecutionContext<'l> {
 
                     self.instantiate_write_to_wire(
                         condition,
-                        Vec::new(),
+                        func_interface.path.clone(),
                         true_wire,
                         num_regs,
                         num_nexts,
@@ -1226,7 +1300,7 @@ impl<'l> ExecutionContext<'l> {
                     let from = self.get_wire_or_constant_as_wire(*arg, clock)?;
                     self.instantiate_write_to_wire(
                         *port_wire,
-                        Vec::new(),
+                        func_interface.path.clone(),
                         from,
                         num_regs,
                         num_nexts,
@@ -1234,7 +1308,18 @@ impl<'l> ExecutionContext<'l> {
                     );
                 }
 
-                return Ok(func_interface.outputs);
+                return Ok(func_interface
+                    .outputs
+                    .iter()
+                    .map(|output_wire| {
+                        self.select_submodule_port(
+                            *output_wire,
+                            &func_interface.path,
+                            original_instruction,
+                            clock,
+                        )
+                    })
+                    .collect());
             }
             ExpressionSource::ArrayConstruct { elements, default } => {
                 let mut array_wires = Vec::with_capacity(elements.len());
@@ -1500,6 +1585,7 @@ impl<'l> ExecutionContext<'l> {
         name_origin: &str,
         original_instruction: FlatID,
         clock_map: FlatAlloc<ClockID, ClockIDMarker>,
+        array_dims: Vec<IBig>,
     ) -> ExecutionResult<SubModuleID> {
         let sub_module = &self.globals.modules[module_ref.id];
 
@@ -1530,18 +1616,24 @@ impl<'l> ExecutionContext<'l> {
             port_map,
             field_call_sites,
             name: self.unique_name_producer.get_unique_name(name_origin),
+            array_dims,
         }))
     }
 
-    /// Does this wire reference name an action, trigger or function directly? So `my_trigger` or `submod.push`, but not `submod.port` or `submod`
+    /// Does this wire reference name an action, trigger or function directly? So `my_trigger`, `submod.push` or `submods[i].push`, but not `submod.port` or `submod`
     ///
-    /// Such references are the condition wire of what they name. Typecheck has already rejected any paths on them
+    /// Such references are the condition wire of what they name. Typecheck has already rejected any other paths on them
     fn names_action_condition(&self, wire_ref: &WireReference) -> bool {
         match &wire_ref.root {
             WireReferenceRoot::LocalTrigger(_) => true,
             WireReferenceRoot::LocalSubmodule(_) => {
+                let num_submodule_indices = wire_ref
+                    .path
+                    .iter()
+                    .take_while(|e| matches!(e, WireReferencePathElement::ArrayAccess { .. }))
+                    .count();
                 let [WireReferencePathElement::FieldAccess { refers_to, .. }] =
-                    wire_ref.path.as_slice()
+                    &wire_ref.path[num_submodule_indices..]
                 else {
                     return false;
                 };
@@ -1579,7 +1671,18 @@ impl<'l> ExecutionContext<'l> {
                 let domain = expr.clock_domain.unwrap_physical();
                 let (condition_wire, path) =
                     self.wire_ref_to_real_path(wire_ref, original_instruction, domain)?;
-                assert!(path.is_empty());
+                if !path.is_empty()
+                    && matches!(
+                        self.wires[condition_wire].is_port,
+                        IsPort::SubmodulePort(_, _, Direction::Input)
+                    )
+                {
+                    // An action of a submodule array. These can only be called (lints), which goes through [Self::get_interface]. Selecting it here would only create an unused wire
+                    return Ok(SubModuleOrWire::Unassigned);
+                }
+                // For a trigger of a submodule array, this selects the trigger of the single submodule
+                let condition_wire =
+                    self.select_submodule_port(condition_wire, &path, original_instruction, domain);
                 return Ok(SubModuleOrWire::Wire(condition_wire));
             }
         }
@@ -1662,11 +1765,26 @@ impl<'l> ExecutionContext<'l> {
                         .get()
                         .unwrap()
                         .map(|(_, cl)| *cl.unwrap());
+                    let mut array_dims = Vec::with_capacity(submodule.array_sizes.len());
+                    for (size_expr, _) in &submodule.array_sizes {
+                        let size = self.generation_state.get_generation_integer(*size_expr);
+                        if size < &IBig::from(0) {
+                            return Err(CompileError::error(
+                                self.link_info.instructions[*size_expr].get_span(),
+                                format!("array size must be non-negative, but found {size}"),
+                            ));
+                        }
+                        // Also checks that the size is at all reasonable
+                        let size: usize =
+                            self.generation_state.get_generation_small_int(*size_expr)?;
+                        array_dims.push(IBig::from(size));
+                    }
                     SubModuleOrWire::SubModule(self.instantiate_submodule(
                         &submodule.module_ref,
                         &submodule.name,
                         original_instruction,
                         clock_map,
+                        array_dims,
                     )?)
                 }
                 Instruction::Declaration(wire_decl) => {
@@ -1694,8 +1812,14 @@ impl<'l> ExecutionContext<'l> {
                             let trig_interface =
                                 self.get_interface(interface, if_stm.condition, domain)?;
 
+                            // For a trigger of a submodule array, the condition expression already selected the trigger of the single submodule
+                            let condition_wire = if trig_interface.path.is_empty() {
+                                trig_interface.condition_wire.unwrap()
+                            } else {
+                                self.generation_state[if_stm.condition].unwrap_wire()
+                            };
                             self.condition_stack.push(ConditionStackElem {
-                                condition_wire: trig_interface.condition_wire.unwrap(),
+                                condition_wire,
                                 inverse: false,
                             });
 
@@ -1706,10 +1830,16 @@ impl<'l> ExecutionContext<'l> {
                             {
                                 let binding_span = self.link_info.instructions[*binding].get_span();
                                 let binding = self.generation_state[*binding].unwrap_wire();
+                                let port_wire = self.select_submodule_port(
+                                    *port_wire,
+                                    &trig_interface.path,
+                                    if_stm.condition,
+                                    domain,
+                                );
                                 self.instantiate_write_to_wire(
                                     binding,
                                     Vec::new(),
-                                    *port_wire,
+                                    port_wire,
                                     0,
                                     0,
                                     binding_span,
@@ -1726,7 +1856,7 @@ impl<'l> ExecutionContext<'l> {
                                     let binding = self.generation_state[*binding].unwrap_wire();
                                     self.instantiate_write_to_wire(
                                         *port_wire,
-                                        Vec::new(),
+                                        trig_interface.path.clone(),
                                         binding,
                                         0,
                                         0,

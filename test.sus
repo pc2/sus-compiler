@@ -1428,3 +1428,129 @@ module use_action_name_in_own_body {
         a = act
     }
 }
+
+// Submodule arrays
+module SubmodArrayElem {
+	domain put_dom
+	action put : int#(0..100) v -> int#(0..200) doubled {
+		doubled = v * 2
+	}
+	domain plain_dom
+	input bool plain_in
+	output bool plain_out = !plain_in
+	trigger fire : int#(0..50) t -> bool resp
+	output bool last_resp = false
+	when plain_in {
+		last_resp = fire(3)
+	}
+}
+module SubmodArrayFn : int#(0..10) a -> int#(0..20) b {
+	b = a + a
+}
+module TestSubmoduleArray {
+	input int#(0..3) idx
+	input int#(0..100) data
+	input bool do_put
+
+	SubmodArrayElem[3] elems
+
+	// Compile-time indices
+	for int I in 0..3 {
+		elems[I].plain_in = do_put
+	}
+	output bool o = elems[2].plain_out
+
+	// Runtime indices
+	output int#(0..200) result = 0
+	when do_put {
+		result = elems[idx].put(data)
+	}
+	output bool any_last_resp = elems[idx].last_resp
+
+	// Trigger bindings. One binding site may bind the outputs
+	output int#(0..50) total = 0
+	for int I in 0..3 {
+		when elems[I].fire : int#(0..50) t -> bool resp {
+			resp = do_put
+		}
+	}
+	when elems[idx].fire : int#(0..50) t {
+		total = t
+	}
+}
+module TestSubmoduleArray2D {
+	input int#(0..5) i
+	input int#(0..3) j
+	input bool b
+	SubmodArrayElem[3][5] grid
+	grid[i][j].plain_in = b
+	output bool o = grid[4][j].plain_out
+}
+module TestSubmoduleArrayFn {
+	input int#(0..10) a
+	input int#(0..4) i
+	SubmodArrayFn[4] fns
+	output int#(0..20) x = fns[i](a)
+	output int#(0..20) y = fns[3](a)
+}
+// All elements share their template arguments, which are inferred from all uses together
+module TestSubmoduleArrayInference {
+	input int#(0..4) sel
+	input int#(0..10) small
+	input int#(5..100) big
+	input bool do_push
+	input bool do_pop
+
+	FIFO#(DEPTH: 16)[4] fifos
+
+	when do_push {
+		when fifos[0].may_push {
+			fifos[0].push(small)
+		}
+		when fifos[sel].may_push {
+			fifos[sel].push(big)
+		}
+	}
+	output int#(0..100) popped = 0
+	when do_pop & fifos[sel].may_pop {
+		popped = fifos[sel].pop()
+	}
+}
+module TestSubmoduleArrayEmpty {
+	SubmodArrayElem[0] elems
+}
+module TestSubmoduleArrayErrors {
+	input bool b
+	input int#(0..10) a
+	input int#(0..4) n
+	SubmodArrayElem[] no_size
+	SubmodArrayElem[n] runtime_size
+	SubmodArrayElem[true] bool_size
+
+	SubmodArrayElem[3] elems
+	// Must index down to a single submodule
+	elems.plain_in = b
+	int x = elems.put(3)
+	bool z = elems[0..2].plain_out
+	when elems.fire : int t {}
+	// Too many indices
+	int y = elems[1][2].put(3)
+	// Actions still can't be read
+	bool w = elems[1].put
+
+	SubmodArrayFn[4] fns
+	int f1 = fns(a)
+	int f2 = fns[2][1](a)
+
+	// Only one site may bind the outputs, even for different elements
+	when elems[0].fire : int t -> bool resp { resp = true }
+	when elems[1].fire : int t -> bool resp { resp = true }
+}
+module TestSubmoduleArrayOutOfBounds {
+	input bool b
+	SubmodArrayElem[3] elems
+	elems[3].plain_in = b
+}
+module TestSubmoduleArrayNegativeSize {
+	SubmodArrayElem[-1] elems
+}

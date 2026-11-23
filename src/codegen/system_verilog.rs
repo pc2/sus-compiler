@@ -900,52 +900,82 @@ impl<'g> CodeGenerationContext<'g> {
         })
     }
 
+    /// Regular submodules are a single instantiation. Submodule arrays ([SubModule::array_dims]) instantiate one submodule per element in a generate for:
+    ///
+    /// `FIFO[3][5] fifos`
+    ///
+    /// ```Verilog
+    /// generate
+    /// for(_g0 = 0; _g0 < 5; _g0 = _g0 + 1) begin : fifos
+    /// for(_g1 = 0; _g1 < 3; _g1 = _g1 + 1) begin : fifos
+    /// FIFO inst(.clk(clk), .push(_fifos_push[_g0][_g1]), ...);
+    /// end
+    /// end
+    /// endgenerate
+    /// ```
     fn write_submodules(&mut self) {
         for (_id, sm) in &self.instance.submodules {
             let sm_md = &self.linker.modules[sm.refers_to.id];
 
             // Invalid submodules are impossible to remain by the time codegen happens
             let sm_inst: &InstantiatedModule = sm.instance.get().unwrap();
-            if sm_md.link_info.is_extern == IsExtern::Extern {
-                self.write_template_args(&sm_md.link_info, &sm_inst.global_ref.template_args);
+            let module_name = if sm_md.link_info.is_extern == IsExtern::Extern {
+                Self::template_args_text(&sm_md.link_info, &sm_inst.global_ref.template_args)
             } else {
-                self.program_text.write_str(&sm_inst.mangled_name).unwrap();
+                sm_inst.mangled_name.clone()
             };
             let sm_name = &sm.name;
 
-            let mut port_list = CommaSeparatedList::new("", "// (zero sized port) ");
-
-            for (sm_clock_id, maps_to_parent) in &sm.clock_map {
-                let submod_clk = &sm_inst.clocks[sm_clock_id].name;
-                let parent_clk = &self.instance.clocks[*maps_to_parent].name;
-                port_list.line(format!(".{submod_clk}({parent_clk})"));
-            }
-
-            for (port_id, iport) in sm_inst.interface_ports.iter_valids() {
-                let sm_port = &sm_inst.wires[iport.wire];
-                let port_name = &sm_port.name;
-                let wire_name = if let Some(port_wire) = &sm.port_map[port_id] {
-                    &self.instance.wires[port_wire.maps_to_wire].name
-                } else {
-                    // Ports that are defined on the submodule, but not used by impl
-                    ""
-                };
-                let line = format!(".{port_name}({wire_name})");
-                if sm_port.typ.is_zero_sized() {
-                    port_list.commented(line);
-                } else {
-                    port_list.line(line);
+            self.in_generate(|slf| {
+                let mut for_stms = String::new();
+                let mut for_ends = String::new();
+                // Selects the port of this submodule out of the port wires of the submodule array
+                let mut port_idx = String::new();
+                for dim in &sm.array_dims {
+                    let (for_stm, var) = slf.mk_for(dim, false);
+                    writeln!(for_stms, "{for_stm} begin : {sm_name}").unwrap();
+                    for_ends.push_str("end\n");
+                    write!(port_idx, "[{var}]").unwrap();
                 }
-            }
-            writeln!(self.program_text, " {sm_name}({port_list});").unwrap();
+                let instance_name = if sm.array_dims.is_empty() {
+                    sm_name
+                } else {
+                    "inst"
+                };
+
+                let mut port_list = CommaSeparatedList::new("", "// (zero sized port) ");
+
+                for (sm_clock_id, maps_to_parent) in &sm.clock_map {
+                    let submod_clk = &sm_inst.clocks[sm_clock_id].name;
+                    let parent_clk = &slf.instance.clocks[*maps_to_parent].name;
+                    port_list.line(format!(".{submod_clk}({parent_clk})"));
+                }
+
+                for (port_id, iport) in sm_inst.interface_ports.iter_valids() {
+                    let sm_port = &sm_inst.wires[iport.wire];
+                    let port_name = &sm_port.name;
+                    let line = if let Some(port_wire) = &sm.port_map[port_id] {
+                        let wire_name = &slf.instance.wires[port_wire.maps_to_wire].name;
+                        format!(".{port_name}({wire_name}{port_idx})")
+                    } else {
+                        // Ports that are defined on the submodule, but not used by impl
+                        format!(".{port_name}()")
+                    };
+                    if sm_port.typ.is_zero_sized() {
+                        port_list.commented(line);
+                    } else {
+                        port_list.line(line);
+                    }
+                }
+                format!("{for_stms}{module_name} {instance_name}({port_list});\n{for_ends}")
+            });
         }
     }
 
-    fn write_template_args(
-        &mut self,
+    fn template_args_text(
         link_info: &LinkInfo,
         concrete_template_args: &TVec<ConcreteTemplateArg>,
-    ) {
+    ) -> String {
         let args = display_join(
             ", ",
             zip_eq(concrete_template_args, &link_info.parameters),
@@ -964,7 +994,7 @@ impl<'g> CodeGenerationContext<'g> {
             },
         );
         let extern_name = &link_info.name;
-        write!(self.program_text, "{extern_name} #({args})").unwrap();
+        format!("{extern_name} #({args})")
     }
 
     fn write_assign(

@@ -119,7 +119,8 @@ impl BinaryOperator {
 #[derive(Debug)]
 enum ModuleOrWrittenType {
     WrittenType(WrittenType),
-    Module(GlobalReference<ModuleUUID>),
+    /// The sizes are those of a submodule array (`FIFO[3][5] fifos`), outermost first. So `[5, 3]`. See [SubModuleInstance::array_sizes]
+    Module(GlobalReference<ModuleUUID>, Vec<(FlatID, BracketSpan)>),
 }
 
 struct FlatteningContext<'l, 'errs> {
@@ -475,18 +476,39 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         })
     }
 
-    fn flatten_array_type(&mut self, span: Span, cursor: &mut Cursor<'c>) -> WrittenType {
+    /// With `ALLOW_MODULES`, an array of a module (`FIFO[5]`) is a submodule array: [ModuleOrWrittenType::Module]
+    fn flatten_array_type<const ALLOW_MODULES: bool>(
+        &mut self,
+        span: Span,
+        cursor: &mut Cursor<'c>,
+    ) -> ModuleOrWrittenType {
         cursor.go_down(kind!("array_type"), |cursor| {
             cursor.field(field!("arr"));
-            let array_element_type = self.flatten_type(cursor);
+            let array_element_type = self.flatten_module_or_type::<ALLOW_MODULES>(cursor);
 
             cursor.field(field!("arr_idx"));
             let (array_size_wire_id, bracket_span) = self.flatten_array_bracket(cursor);
 
-            WrittenType::Array(
-                span,
-                Box::new((array_element_type, array_size_wire_id, bracket_span)),
-            )
+            match array_element_type {
+                ModuleOrWrittenType::WrittenType(array_element_type) => {
+                    ModuleOrWrittenType::WrittenType(WrittenType::Array(
+                        span,
+                        Box::new((array_element_type, array_size_wire_id, bracket_span)),
+                    ))
+                }
+                ModuleOrWrittenType::Module(module_ref, mut array_sizes) => {
+                    if let Some(array_size_wire_id) = array_size_wire_id {
+                        // Outermost first
+                        array_sizes.insert(0, (array_size_wire_id, bracket_span));
+                    } else {
+                        self.errors.error(
+                            bracket_span.outer_span(),
+                            "Submodule arrays must have an explicit size",
+                        );
+                    }
+                    ModuleOrWrittenType::Module(module_ref, array_sizes)
+                }
+            }
         })
     }
 
@@ -527,7 +549,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         ModuleOrWrittenType::WrittenType(WrittenType::Named(type_ref))
                     }
                     LocalOrGlobal::Module(module_ref) if ALLOW_MODULES => {
-                        ModuleOrWrittenType::Module(module_ref)
+                        ModuleOrWrittenType::Module(module_ref, Vec::new())
                     }
                     LocalOrGlobal::Module(module_ref) => {
                         self.globals.not_expected_global_error(
@@ -550,9 +572,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     } // Already covered
                 }
             }
-            kind!("array_type") => {
-                ModuleOrWrittenType::WrittenType(self.flatten_array_type(span, cursor))
-            }
+            kind!("array_type") => self.flatten_array_type::<ALLOW_MODULES>(span, cursor),
             _other => cursor.could_not_match(),
         }
     }
@@ -677,7 +697,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
             let typ_expr = match typ_or_module_expr {
                 ModuleOrWrittenType::WrittenType(typ) => typ,
-                ModuleOrWrittenType::Module(module_ref) => {
+                ModuleOrWrittenType::Module(module_ref, array_sizes) => {
                     assert!(ALLOW_MODULES);
                     if let Some((_, span)) = span_latency_specifier {
                         self.errors
@@ -689,6 +709,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         name: name.to_owned(),
                         name_span,
                         module_ref,
+                        array_sizes,
                         submodule_clock_map: OnceCell::new(),
                         typ: AbstractRankedType::UNKNOWN,
                         documentation,

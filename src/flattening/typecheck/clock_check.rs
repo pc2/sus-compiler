@@ -20,6 +20,9 @@ impl<'l> TypeCheckingContext<'l> {
                             .map(|_| ClockID::UNKNOWN),
                     )
                     .unwrap();
+                for (size_expr, _) in &sub_module_instance.array_sizes {
+                    self.must_be_generative(*size_expr, "Submodule array size");
+                }
             }
             Instruction::Declaration(declaration) => {
                 self.written_type_must_be_generative(&declaration.typ_expr);
@@ -440,6 +443,13 @@ impl<'l> TypeCheckingContext<'l> {
                         let clk_info = &sm_md.clocks[submod_clock_id];
                         if clk_info.visibility != ClockVisibility::Output {
                             continue;
+                        }
+                        if !sm.array_sizes.is_empty() {
+                            let err_text = format!(
+                                "Cannot make a submodule array of '{}', because every element would drive its output clock '{}'",
+                                sm_md.link_info.name, clk_info.name
+                            );
+                            self.errors.error(sm.name_span, err_text);
                         }
                         let parent_clk = d.unwrap();
                         let parent_clk_info = &clocks[*parent_clk];

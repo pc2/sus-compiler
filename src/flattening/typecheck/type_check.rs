@@ -231,6 +231,18 @@ impl<'l> TypeCheckingContext<'l> {
                     .alloc(UniCell::new(inner.into_owned(&self.unifier)));
                 let_unwrap!(AbstractInnerType::SubModule(md_ref), inner.unwrap());
                 let md = self.globals.get_submodule(md_ref);
+
+                // Submodule ranks are always known: They're set by their declaration, and only array accesses lower them.
+                let is_single_submodule = matches!(
+                    self.unifier.try_resolve(&mut walking_typ.rank),
+                    Ok(Some(rank)) if matches!(rank.deref(), PeanoType::Zero)
+                );
+                if !is_single_submodule {
+                    self.errors.error(
+                        *name_span,
+                        format!("Submodule arrays must be indexed down to a single submodule before accessing the field '{field_name}'"),
+                    );
+                }
                 let field = md.md.fields.find(|_, field| field.name == field_name);
 
                 refers_to
@@ -532,7 +544,13 @@ impl<'l> TypeCheckingContext<'l> {
             );
         };
         // `submod` and `Repeat` name their main interface, `submod.push` names a field. Anything else is a regular wire
-        let field_of_path = || match wire_ref.path.as_slice() {
+        // Submodule arrays are indexed first: `submods[3]`, `submods[i].push`
+        let num_submodule_indices = wire_ref
+            .path
+            .iter()
+            .take_while(|elem| matches!(elem, WireReferencePathElement::ArrayAccess { .. }))
+            .count();
+        let field_of_path = || match &wire_ref.path[num_submodule_indices..] {
             [] => Some(FieldID::MAIN_INTERFACE),
             [WireReferencePathElement::FieldAccess { refers_to, .. }] => match refers_to.get() {
                 Some(PathElemRefersTo::Field(_, Some(field))) => Some(*field),
@@ -557,12 +575,28 @@ impl<'l> TypeCheckingContext<'l> {
                 });
             }
             WireReferenceRoot::LocalSubmodule(submod_decl) => {
-                let submod = self
-                    .globals
-                    .get_declared_submodule(self.instructions[*submod_decl].unwrap_submodule());
-                (submod, field_of_path()?)
+                let submod_instr = self.instructions[*submod_decl].unwrap_submodule();
+                let submod = self.globals.get_declared_submodule(submod_instr);
+                let field = field_of_path()?;
+                // With a field, [Self::walk_field_access] and [Self::must_be_array] have already checked the indices
+                if wire_ref.path.len() == num_submodule_indices
+                    && num_submodule_indices < submod_instr.array_sizes.len()
+                {
+                    self.errors
+                        .error(
+                            wire_ref.get_total_span(),
+                            format!("{context} expects a single submodule. Submodule arrays must be indexed down to a single submodule"),
+                        )
+                        .info_obj(submod_instr);
+                    return None;
+                }
+                (submod, field)
             }
             WireReferenceRoot::NamedModule(md_ref) => {
+                if num_submodule_indices != 0 {
+                    // Already reported by [Self::must_be_array]
+                    return None;
+                }
                 (self.globals.get_inline_module(md_ref), field_of_path()?)
             }
             WireReferenceRoot::LocalDecl(_) | WireReferenceRoot::NamedConstant(_) => {
@@ -821,9 +855,19 @@ impl<'l> TypeCheckingContext<'l> {
         match instr {
             Instruction::SubModule(sm) => {
                 self.typecheck_global_ref(&sm.module_ref);
+                for (size_expr, _) in &sm.array_sizes {
+                    let size_expr = self.instructions[*size_expr].unwrap_subexpression();
+                    self.unify_type_report_error(
+                        size_expr.typ,
+                        &INT_SCALAR,
+                        size_expr.span,
+                        "submodule array size",
+                    );
+                }
                 sm.typ.set_initial(
                     AbstractInnerType::SubModule(self.make_global_ref_types(&sm.module_ref))
-                        .scalar(),
+                        .scalar()
+                        .rank_up_multi(sm.array_sizes.len()),
                 );
             }
             Instruction::Declaration(decl) => {

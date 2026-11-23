@@ -837,13 +837,18 @@ impl LinkInfo {
             match instr {
                 Instruction::SubModule(SubModuleInstance {
                     module_ref,
+                    array_sizes,
                     name,
                     submodule_clock_map: local_domain_map,
                     ..
                 }) => {
                     let disp_md_ref = module_ref.display(globals, &self.parameters);
                     let name = name.green();
-                    write!(f, "{disp_md_ref} {name}")?;
+                    let array_sizes =
+                        display_join("", array_sizes.iter().rev(), |f, (size_expr, _)| {
+                            write!(f, "[{size_expr:?}]")
+                        });
+                    write!(f, "{disp_md_ref}{array_sizes} {name}")?;
                     let submod_clocks = &globals[module_ref.id].clocks;
                     if let Some(local_domain_map) = local_domain_map.get() {
                         let domain_map = display_join(
@@ -1407,6 +1412,7 @@ impl ModuleTypingContext<'_> {
                 port_map,
                 field_call_sites: _,
                 name,
+                array_dims,
             },
         ) in &self.submodules
         {
@@ -1417,9 +1423,11 @@ impl ModuleTypingContext<'_> {
             } else {
                 "No Instance".red()
             };
+            let array_dims =
+                display_join("", array_dims.iter().rev(), |f, dim| write!(f, "[{dim}]"));
             writeln!(
                 f,
-                "{name}: {refers_to}[{original_instruction:?}]: {instantiate_success}"
+                "{name}: {refers_to}{array_dims}[{original_instruction:?}]: {instantiate_success}"
             )?;
             for (_clock_id, submod_clk, parent_clock) in zip_eq(&submod_md.clocks, clock_map) {
                 let submod_clk_name = &submod_clk.name;

@@ -657,10 +657,11 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         }
     }
 
+    /// The type of the port of a single submodule. For submodule arrays that's the element type of the port wire
     fn get_port_typ(&self, sm: &SubModule, port_id: PortID) -> Option<&ConcreteType> {
         let port = &sm.port_map[port_id].as_ref()?;
         let port_wire = &self.wires[port.maps_to_wire];
-        Some(&port_wire.typ)
+        Some(sm.unwrap_port_typ(&port_wire.typ))
     }
 
     fn get_port_value(
@@ -668,9 +669,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         sm: &SubModule,
         path: &InferenceTargetPath,
     ) -> Option<&UniCell<Value>> {
-        let port = &sm.port_map[path.port].as_ref()?;
-        let port_wire = &self.wires[port.maps_to_wire];
-        Some(path.follow_value_path(&port_wire.typ))
+        Some(path.follow_value_path(self.get_port_typ(sm, path.port)?))
     }
 
     fn add_submodule_subtype_constraints(
@@ -690,9 +689,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 TemplateKind::Type((t_param, t_info)) => {
                     let (inputs, outputs) = t_info.candidates.split_at(t_info.num_inputs);
                     unifier.create_subtype_constraint(inputs.iter().filter_map(|c| {
-                        let port = &sm.port_map[c.port].as_ref()?;
-                        let port_wire = &self.wires[port.maps_to_wire];
-                        Some((t_param, c.follow_type_path(&port_wire.typ)))
+                        let port_typ = self.get_port_typ(sm, c.port)?;
+                        Some((t_param, c.follow_type_path(port_typ)))
                     }));
                     for c in outputs {
                         let Some(port_typ) = self.get_port_typ(sm, c.port) else {
@@ -735,11 +733,9 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
     ) -> InferenceResult {
         match &candidate.target {
             InferenceTarget::Subtype(path) => {
-                let Some(port) = &sm.port_map[path.port] else {
+                let Some(v) = self.get_port_value(sm, path) else {
                     return InferenceResult::PortNotUsed;
                 };
-                let port_wire = &self.wires[port.maps_to_wire];
-                let v = path.follow_value_path(&port_wire.typ);
                 let Ok(v) = unifier.resolve(v) else {
                     return InferenceResult::NotFound;
                 };
@@ -1013,17 +1009,18 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         .info_obj(submod_instr);
                 }
                 (Some(concrete_port), Some(connecting_wire)) => {
-                    let wire = &self.wires[connecting_wire.maps_to_wire];
+                    let wire_typ =
+                        sm.unwrap_port_typ(&self.wires[connecting_wire.maps_to_wire].typ);
                     let instance_wire = &instance.wires[concrete_port.wire];
                     assert!(instance_wire.typ.is_valid());
                     // Failures are reported in final_checks
                     let _ = match source_code_port.direction {
                         // Subtype relations always flow FORWARD.
                         Direction::Input => {
-                            unifier.unify_concrete_only_exact(&wire.typ, &instance_wire.typ)
+                            unifier.unify_concrete_only_exact(wire_typ, &instance_wire.typ)
                         }
                         Direction::Output => {
-                            unifier.unify_concrete_all(&wire.typ, &instance_wire.typ)
+                            unifier.unify_concrete_all(wire_typ, &instance_wire.typ)
                         }
                     };
                 }
@@ -1146,7 +1143,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     let connecting_wire = &mut self.wires[connecting_wire.maps_to_wire];
                     let instance_wire = &instance.wires[concrete_port.wire];
                     assert!(instance_wire.typ.is_valid());
-                    connecting_wire.typ.clone_from(&instance_wire.typ);
+                    connecting_wire.typ = sm.wrap_port_typ(instance_wire.typ.clone());
                 }
             }
         }

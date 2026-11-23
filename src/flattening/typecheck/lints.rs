@@ -463,6 +463,9 @@ impl LintContext<'_> {
                     sm.module_ref.for_each_generative_input(&mut |id| {
                         instruction_fanins[instr_id].push(id);
                     });
+                    for (size_expr, _) in &sm.array_sizes {
+                        instruction_fanins[instr_id].push(*size_expr);
+                    }
                 }
                 Instruction::Declaration(decl) => {
                     if let Some(lat_spec) = decl.latency_specifier {
@@ -677,6 +680,7 @@ impl LintContext<'_> {
         let instructions = &md.link_info.instructions;
 
         // Keyed by the local action, or by (submodule, field) for a submodule's trigger
+        // All elements of a submodule array share a key: which element a binding names is not known here
         let mut output_binding_sites: HashMap<(FlatID, Option<FieldID>), Span> = HashMap::new();
 
         for (instr_id, instr) in instructions {
@@ -695,8 +699,17 @@ impl LintContext<'_> {
                     let ExpressionSource::WireRef(cond_ref) = &cond_expr.source else {
                         continue;
                     };
-                    let key = match (&cond_ref.root, cond_ref.path.as_slice()) {
-                        (WireReferenceRoot::LocalTrigger(action_id), []) => (*action_id, None),
+                    let num_submodule_indices = cond_ref
+                        .path
+                        .iter()
+                        .take_while(|e| matches!(e, WireReferencePathElement::ArrayAccess { .. }))
+                        .count();
+                    let key = match (&cond_ref.root, &cond_ref.path[num_submodule_indices..]) {
+                        (WireReferenceRoot::LocalTrigger(action_id), [])
+                            if num_submodule_indices == 0 =>
+                        {
+                            (*action_id, None)
+                        }
                         (
                             WireReferenceRoot::LocalSubmodule(submod_id),
                             [WireReferencePathElement::FieldAccess { refers_to, .. }],

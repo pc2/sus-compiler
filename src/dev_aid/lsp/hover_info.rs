@@ -194,8 +194,9 @@ impl HoverCollector<'_> {
         let submodule = &linker.modules[submod_inst.module_ref.id];
 
         self.sus_code(format!(
-            "{} {}",
+            "{}{} {}",
             submodule.link_info.display_full_name(),
+            "[]".repeat(submod_inst.array_sizes.len()),
             submod_inst.name
         ));
 

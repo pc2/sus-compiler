@@ -180,7 +180,7 @@ pub struct SubModulePort {
 ///
 /// All submodules have a name, either the name they were given by the user, or a generated name like _1, _13
 ///
-/// When generating RTL code, one submodule object generates a single submodule instantiation
+/// When generating RTL code, one submodule object generates a single submodule instantiation, or for submodule arrays (see [Self::array_dims]), one instantiation per element
 ///
 /// Generated from a [crate::flattening::SubModuleInstance] instruction
 #[derive(Debug)]
@@ -194,8 +194,26 @@ pub struct SubModule {
     pub port_map: FlatAlloc<Option<SubModulePort>, PortIDMarker>,
     pub field_call_sites: FlatAlloc<Vec<Span>, FieldIDMarker>,
     pub name: String,
+    /// Non-empty for submodule arrays (`FIFO[3][5] fifos`). The size of each array dimension, outermost first (so `[5, 3]`).
+    ///
+    /// All elements share [Self::refers_to], [Self::instance] and [Self::clock_map].
+    /// The wires in [Self::port_map] are arrays of the port's type with these dimensions, see [Self::wrap_port_typ].
+    pub array_dims: Vec<IBig>,
 }
 impl SubModule {
+    /// The type of a wire in [Self::port_map], given the type of the port of a single submodule
+    pub fn wrap_port_typ(&self, port_typ: ConcreteType) -> ConcreteType {
+        port_typ.stack_arrays(
+            self.array_dims
+                .iter()
+                .map(|dim| UniCell::new(Value::Integer(dim.clone())))
+                .collect(),
+        )
+    }
+    /// Inverse of [Self::wrap_port_typ]: The type of the port of a single submodule, given the type of the wire in [Self::port_map]
+    pub fn unwrap_port_typ<'t>(&self, port_wire_typ: &'t ConcreteType) -> &'t ConcreteType {
+        port_wire_typ.walk_rank(self.array_dims.len())
+    }
     pub fn get_span(&self, link_info: &LinkInfo) -> Span {
         match &link_info.instructions[self.original_instruction] {
             Instruction::SubModule(sub_module_instance) => sub_module_instance.name_span,

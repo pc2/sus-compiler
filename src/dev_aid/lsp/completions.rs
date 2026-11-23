@@ -243,10 +243,9 @@ fn make_submod_detail(
     linker_globals: &LinkerGlobals,
     params: &FlatAlloc<Parameter, TemplateIDMarker>,
 ) -> String {
-    submod
-        .module_ref
-        .display(linker_globals, params)
-        .to_string()
+    let md_ref = submod.module_ref.display(linker_globals, params);
+    let array_dims = "[]".repeat(submod.array_sizes.len());
+    format!("{md_ref}{array_dims}")
 }
 
 fn complete_global_ref<ID: Copy>(

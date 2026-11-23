@@ -162,6 +162,19 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated EqGenerative #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate EqErrors #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated use_action_name_in_own_body #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated SubmodArrayElem #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated SubmodArrayFn #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TestSubmoduleArray #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TestSubmoduleArray2D #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TestSubmoduleArrayFn #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated ToBits #(T: type int #(FROM: 0, TO: 100))
+[INFO  sus_compiler::instantiation::instantiator] Instantiated FromBits #(T: type int #(FROM: 0, TO: 100))
+[INFO  sus_compiler::instantiation::instantiator] Instantiated FIFO #(T: type int #(FROM: 0, TO: 100), DEPTH: 16, MAY_PUSH_LATENCY: 0)
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TestSubmoduleArrayInference #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TestSubmoduleArrayEmpty #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestSubmoduleArrayErrors #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestSubmoduleArrayOutOfBounds #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestSubmoduleArrayNegativeSize #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -351,6 +364,9 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate TestCallWriteModifiersErrors due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate UseNegativeArraySize due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate EqErrors due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TestSubmoduleArrayErrors due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TestSubmoduleArrayOutOfBounds due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TestSubmoduleArrayNegativeSize due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -4133,6 +4149,682 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │              ┬  
       │              ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1473:36 ]
+      │
+ 1473 │        when elems[I].fire : int#(0..50) t -> bool resp {
+      │                                         ┬  
+      │                                         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused port 'doubled'
+      ╭─[ test.sus:1485:24 ]
+      │
+ 1485 │     SubmodArrayElem[3][5] grid
+      │                           ──┬─  
+      │                             ╰─── Unused port 'doubled'
+      │
+      ├─[ test.sus:1485:24 ]
+      │
+ 1435 │     action put : int#(0..100) v -> int#(0..200) doubled {
+      │                                                 ───┬───  
+      │                                                    ╰───── Port 'doubled' declared here
+      │ 
+ 1485 │     SubmodArrayElem[3][5] grid
+      │                           ──┬─  
+      │                             ╰─── grid declared here
+──────╯
+Warning: Unused port 'fire'
+      ╭─[ test.sus:1485:24 ]
+      │
+ 1485 │     SubmodArrayElem[3][5] grid
+      │                           ──┬─  
+      │                             ╰─── Unused port 'fire'
+      │
+      ├─[ test.sus:1485:24 ]
+      │
+ 1441 │     trigger fire : int#(0..50) t -> bool resp
+      │             ──┬─  
+      │               ╰─── Port 'fire' declared here
+      │ 
+ 1485 │     SubmodArrayElem[3][5] grid
+      │                           ──┬─  
+      │                             ╰─── grid declared here
+──────╯
+Warning: Unused port 'last_resp'
+      ╭─[ test.sus:1485:24 ]
+      │
+ 1485 │     SubmodArrayElem[3][5] grid
+      │                           ──┬─  
+      │                             ╰─── Unused port 'last_resp'
+      │
+      ├─[ test.sus:1485:24 ]
+      │
+ 1442 │     output bool last_resp = false
+      │                 ────┬────  
+      │                     ╰────── Port 'last_resp' declared here
+      │ 
+ 1485 │     SubmodArrayElem[3][5] grid
+      │                           ──┬─  
+      │                             ╰─── grid declared here
+──────╯
+Warning: Unused port 'put'
+      ╭─[ test.sus:1485:24 ]
+      │
+ 1485 │     SubmodArrayElem[3][5] grid
+      │                           ──┬─  
+      │                             ╰─── Unused port 'put'
+      │
+      ├─[ test.sus:1485:24 ]
+      │
+ 1435 │     action put : int#(0..100) v -> int#(0..200) doubled {
+      │            ─┬─  
+      │             ╰─── Port 'put' declared here
+      │ 
+ 1485 │     SubmodArrayElem[3][5] grid
+      │                           ──┬─  
+      │                             ╰─── grid declared here
+──────╯
+Warning: Unused port 'resp'
+      ╭─[ test.sus:1485:24 ]
+      │
+ 1485 │     SubmodArrayElem[3][5] grid
+      │                           ──┬─  
+      │                             ╰─── Unused port 'resp'
+      │
+      ├─[ test.sus:1485:24 ]
+      │
+ 1441 │     trigger fire : int#(0..50) t -> bool resp
+      │                                          ──┬─  
+      │                                            ╰─── Port 'resp' declared here
+      │ 
+ 1485 │     SubmodArrayElem[3][5] grid
+      │                           ──┬─  
+      │                             ╰─── grid declared here
+──────╯
+Warning: Unused port 't'
+      ╭─[ test.sus:1485:24 ]
+      │
+ 1485 │     SubmodArrayElem[3][5] grid
+      │                           ──┬─  
+      │                             ╰─── Unused port 't'
+      │
+      ├─[ test.sus:1485:24 ]
+      │
+ 1441 │     trigger fire : int#(0..50) t -> bool resp
+      │                                ┬  
+      │                                ╰── Port 't' declared here
+      │ 
+ 1485 │     SubmodArrayElem[3][5] grid
+      │                           ──┬─  
+      │                             ╰─── grid declared here
+──────╯
+Warning: Unused port 'v'
+      ╭─[ test.sus:1485:24 ]
+      │
+ 1485 │     SubmodArrayElem[3][5] grid
+      │                           ──┬─  
+      │                             ╰─── Unused port 'v'
+      │
+      ├─[ test.sus:1485:24 ]
+      │
+ 1435 │     action put : int#(0..100) v -> int#(0..200) doubled {
+      │                               ┬  
+      │                               ╰── Port 'v' declared here
+      │ 
+ 1485 │     SubmodArrayElem[3][5] grid
+      │                           ──┬─  
+      │                             ╰─── grid declared here
+──────╯
+Warning: Unused port 'rst'
+      ╭─[ test.sus:1504:22 ]
+      │
+ 1504 │     FIFO#(DEPTH: 16)[4] fifos
+      │                         ──┬──  
+      │                           ╰──── Unused port 'rst'
+      │
+      ├─[ fifo.sus:56:12 ]
+      │
+   56 │     action rst {
+      │            ─┬─  
+      │             ╰─── Port 'rst' declared here
+      │
+      ├─[ test.sus:1504:22 ]
+      │
+ 1504 │     FIFO#(DEPTH: 16)[4] fifos
+      │                         ──┬──  
+      │                           ╰──── fifos declared here
+──────╯
+Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+      ╭─[ test.sus:1520:21 ]
+      │
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+──────╯
+Warning: Unused port 'doubled'
+      ╭─[ test.sus:1520:21 ]
+      │
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 'doubled'
+      │
+      ├─[ test.sus:1520:21 ]
+      │
+ 1435 │     action put : int#(0..100) v -> int#(0..200) doubled {
+      │                                                 ───┬───  
+      │                                                    ╰───── Port 'doubled' declared here
+      │ 
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Unused port 'fire'
+      ╭─[ test.sus:1520:21 ]
+      │
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 'fire'
+      │
+      ├─[ test.sus:1520:21 ]
+      │
+ 1441 │     trigger fire : int#(0..50) t -> bool resp
+      │             ──┬─  
+      │               ╰─── Port 'fire' declared here
+      │ 
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Unused port 'last_resp'
+      ╭─[ test.sus:1520:21 ]
+      │
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 'last_resp'
+      │
+      ├─[ test.sus:1520:21 ]
+      │
+ 1442 │     output bool last_resp = false
+      │                 ────┬────  
+      │                     ╰────── Port 'last_resp' declared here
+      │ 
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Unused port 'plain_in'
+      ╭─[ test.sus:1520:21 ]
+      │
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 'plain_in'
+      │
+      ├─[ test.sus:1520:21 ]
+      │
+ 1439 │     input bool plain_in
+      │                ────┬───  
+      │                    ╰───── Port 'plain_in' declared here
+      │ 
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Unused port 'plain_out'
+      ╭─[ test.sus:1520:21 ]
+      │
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 'plain_out'
+      │
+      ├─[ test.sus:1520:21 ]
+      │
+ 1440 │     output bool plain_out = !plain_in
+      │                 ────┬────  
+      │                     ╰────── Port 'plain_out' declared here
+      │ 
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Unused port 'put'
+      ╭─[ test.sus:1520:21 ]
+      │
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 'put'
+      │
+      ├─[ test.sus:1520:21 ]
+      │
+ 1435 │     action put : int#(0..100) v -> int#(0..200) doubled {
+      │            ─┬─  
+      │             ╰─── Port 'put' declared here
+      │ 
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Unused port 'resp'
+      ╭─[ test.sus:1520:21 ]
+      │
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 'resp'
+      │
+      ├─[ test.sus:1520:21 ]
+      │
+ 1441 │     trigger fire : int#(0..50) t -> bool resp
+      │                                          ──┬─  
+      │                                            ╰─── Port 'resp' declared here
+      │ 
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Unused port 't'
+      ╭─[ test.sus:1520:21 ]
+      │
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 't'
+      │
+      ├─[ test.sus:1520:21 ]
+      │
+ 1441 │     trigger fire : int#(0..50) t -> bool resp
+      │                                ┬  
+      │                                ╰── Port 't' declared here
+      │ 
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Unused port 'v'
+      ╭─[ test.sus:1520:21 ]
+      │
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 'v'
+      │
+      ├─[ test.sus:1520:21 ]
+      │
+ 1435 │     action put : int#(0..100) v -> int#(0..200) doubled {
+      │                               ┬  
+      │                               ╰── Port 'v' declared here
+      │ 
+ 1520 │     SubmodArrayElem[0] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Not Instantiating TestSubmoduleArrayErrors #() due to abstract typing errors
+      ╭─[ test.sus:1522:8 ]
+      │
+ 1522 │ module TestSubmoduleArrayErrors {
+      │        ────────────┬───────────  
+      │                    ╰───────────── Not Instantiating TestSubmoduleArrayErrors #() due to abstract typing errors
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1523:13 ]
+      │
+ 1523 │     input bool b
+      │                ┬  
+      │                ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1524:20 ]
+      │
+ 1524 │     input int#(0..10) a
+      │                       ┬  
+      │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1525:19 ]
+      │
+ 1525 │     input int#(0..4) n
+      │                      ┬  
+      │                      ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Submodule arrays must have an explicit size
+      ╭─[ test.sus:1526:17 ]
+      │
+ 1526 │     SubmodArrayElem[] no_size
+      │                    ─┬  
+      │                     ╰── Submodule arrays must have an explicit size
+──────╯
+Error: Submodule array size must be a compile-time expression
+      ╭─[ test.sus:1527:18 ]
+      │
+ 1527 │     SubmodArrayElem[n] runtime_size
+      │                     ┬  
+      │                     ╰── Submodule array size must be a compile-time expression
+──────╯
+Error: Typing Error: submodule array size expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
+      ╭─[ test.sus:1528:18 ]
+      │
+ 1528 │     SubmodArrayElem[true] bool_size
+      │                     ──┬─  
+      │                       ╰─── Typing Error: submodule array size expects 'int #(FROM: _, TO: _)' but was given 'bool #()'
+──────╯
+Error: Submodule arrays must be indexed down to a single submodule before accessing the field 'plain_in'
+      ╭─[ test.sus:1532:8 ]
+      │
+ 1532 │     elems.plain_in = b
+      │           ────┬───  
+      │               ╰───── Submodule arrays must be indexed down to a single submodule before accessing the field 'plain_in'
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1533:6 ]
+      │
+ 1533 │     int x = elems.put(3)
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Submodule arrays must be indexed down to a single submodule before accessing the field 'put'
+      ╭─[ test.sus:1533:16 ]
+      │
+ 1533 │     int x = elems.put(3)
+      │                   ─┬─  
+      │                    ╰─── Submodule arrays must be indexed down to a single submodule before accessing the field 'put'
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1534:7 ]
+      │
+ 1534 │     bool z = elems[0..2].plain_out
+      │          ┬  
+      │          ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Submodule arrays must be indexed down to a single submodule before accessing the field 'plain_out'
+      ╭─[ test.sus:1534:23 ]
+      │
+ 1534 │     bool z = elems[0..2].plain_out
+      │                          ────┬────  
+      │                              ╰────── Submodule arrays must be indexed down to a single submodule before accessing the field 'plain_out'
+──────╯
+Error: Submodule arrays must be indexed down to a single submodule before accessing the field 'fire'
+      ╭─[ test.sus:1535:13 ]
+      │
+ 1535 │     when elems.fire : int t {}
+      │                ──┬─  
+      │                  ╰─── Submodule arrays must be indexed down to a single submodule before accessing the field 'fire'
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1535:24 ]
+      │
+ 1535 │     when elems.fire : int t {}
+      │                           ┬  
+      │                           ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1537:6 ]
+      │
+ 1537 │     int y = elems[1][2].put(3)
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: This is not an array. Expected an array but found 'SubModule SubmodArrayElem #()'
+      ╭─[ test.sus:1537:18 ]
+      │
+ 1537 │     int y = elems[1][2].put(3)
+      │                     ─┬─  
+      │                      ╰─── This is not an array. Expected an array but found 'SubModule SubmodArrayElem #()'
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1539:7 ]
+      │
+ 1539 │     bool w = elems[1].put
+      │          ┬  
+      │          ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Action 'put' cannot be read, input ports cannot be read.
+      ╭─[ test.sus:1539:20 ]
+      │
+ 1539 │     bool w = elems[1].put
+      │                       ─┬─  
+      │                        ╰─── Action 'put' cannot be read, input ports cannot be read.
+      │
+      ├─[ test.sus:1539:20 ]
+      │
+ 1435 │     action put : int#(0..100) v -> int#(0..200) doubled {
+      │            ─┬─  
+      │             ╰─── 'put' declared here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1542:6 ]
+      │
+ 1542 │     int f1 = fns(a)
+      │         ─┬  
+      │          ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: A function call expects a single submodule. Submodule arrays must be indexed down to a single submodule
+      ╭─[ test.sus:1542:11 ]
+      │
+ 1542 │     int f1 = fns(a)
+      │              ─┬─  
+      │               ╰─── A function call expects a single submodule. Submodule arrays must be indexed down to a single submodule
+      │
+      ├─[ test.sus:1542:11 ]
+      │
+ 1541 │     SubmodArrayFn[4] fns
+      │                      ─┬─  
+      │                       ╰─── fns declared here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1543:6 ]
+      │
+ 1543 │     int f2 = fns[2][1](a)
+      │         ─┬  
+      │          ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: This is not an array. Expected an array but found 'SubModule SubmodArrayFn #()'
+      ╭─[ test.sus:1543:17 ]
+      │
+ 1543 │     int f2 = fns[2][1](a)
+      │                    ─┬─  
+      │                     ╰─── This is not an array. Expected an array but found 'SubModule SubmodArrayFn #()'
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1546:27 ]
+      │
+ 1546 │     when elems[0].fire : int t -> bool resp { resp = true }
+      │                              ┬  
+      │                              ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1546:37 ]
+      │
+ 1546 │     when elems[0].fire : int t -> bool resp { resp = true }
+      │                                        ──┬─  
+      │                                          ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: The outputs of 'elems[1].fire' are already bound. Only one binding may bind the outputs, the others must bind only the inputs
+      ╭─[ test.sus:1547:7 ]
+      │
+ 1547 │     when elems[1].fire : int t -> bool resp { resp = true }
+      │          ──────┬──────  
+      │                ╰──────── The outputs of 'elems[1].fire' are already bound. Only one binding may bind the outputs, the others must bind only the inputs
+      │
+      ├─[ test.sus:1547:7 ]
+      │
+ 1546 │     when elems[0].fire : int t -> bool resp { resp = true }
+      │          ──────┬──────  
+      │                ╰──────── First bound here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1547:27 ]
+      │
+ 1547 │     when elems[1].fire : int t -> bool resp { resp = true }
+      │                              ┬  
+      │                              ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1547:37 ]
+      │
+ 1547 │     when elems[1].fire : int t -> bool resp { resp = true }
+      │                                        ──┬─  
+      │                                          ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1550:13 ]
+      │
+ 1550 │     input bool b
+      │                ┬  
+      │                ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused port 'doubled'
+      ╭─[ test.sus:1551:21 ]
+      │
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 'doubled'
+      │
+      ├─[ test.sus:1551:21 ]
+      │
+ 1435 │     action put : int#(0..100) v -> int#(0..200) doubled {
+      │                                                 ───┬───  
+      │                                                    ╰───── Port 'doubled' declared here
+      │ 
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Unused port 'fire'
+      ╭─[ test.sus:1551:21 ]
+      │
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 'fire'
+      │
+      ├─[ test.sus:1551:21 ]
+      │
+ 1441 │     trigger fire : int#(0..50) t -> bool resp
+      │             ──┬─  
+      │               ╰─── Port 'fire' declared here
+      │ 
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Unused port 'last_resp'
+      ╭─[ test.sus:1551:21 ]
+      │
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 'last_resp'
+      │
+      ├─[ test.sus:1551:21 ]
+      │
+ 1442 │     output bool last_resp = false
+      │                 ────┬────  
+      │                     ╰────── Port 'last_resp' declared here
+      │ 
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Unused port 'plain_out'
+      ╭─[ test.sus:1551:21 ]
+      │
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 'plain_out'
+      │
+      ├─[ test.sus:1551:21 ]
+      │
+ 1440 │     output bool plain_out = !plain_in
+      │                 ────┬────  
+      │                     ╰────── Port 'plain_out' declared here
+      │ 
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Unused port 'put'
+      ╭─[ test.sus:1551:21 ]
+      │
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 'put'
+      │
+      ├─[ test.sus:1551:21 ]
+      │
+ 1435 │     action put : int#(0..100) v -> int#(0..200) doubled {
+      │            ─┬─  
+      │             ╰─── Port 'put' declared here
+      │ 
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Unused port 'resp'
+      ╭─[ test.sus:1551:21 ]
+      │
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 'resp'
+      │
+      ├─[ test.sus:1551:21 ]
+      │
+ 1441 │     trigger fire : int#(0..50) t -> bool resp
+      │                                          ──┬─  
+      │                                            ╰─── Port 'resp' declared here
+      │ 
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Unused port 't'
+      ╭─[ test.sus:1551:21 ]
+      │
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 't'
+      │
+      ├─[ test.sus:1551:21 ]
+      │
+ 1441 │     trigger fire : int#(0..50) t -> bool resp
+      │                                ┬  
+      │                                ╰── Port 't' declared here
+      │ 
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Warning: Unused port 'v'
+      ╭─[ test.sus:1551:21 ]
+      │
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── Unused port 'v'
+      │
+      ├─[ test.sus:1551:21 ]
+      │
+ 1435 │     action put : int#(0..100) v -> int#(0..200) doubled {
+      │                               ┬  
+      │                               ╰── Port 'v' declared here
+      │ 
+ 1551 │     SubmodArrayElem[3] elems
+      │                        ──┬──  
+      │                          ╰──── elems declared here
+──────╯
+Error: Out of bounds! The array is of size 3, but the index is 3
+      ╭─[ test.sus:1552:8 ]
+      │
+ 1552 │     elems[3].plain_in = b
+      │           ┬  
+      │           ╰── Out of bounds! The array is of size 3, but the index is 3
+──────╯
+Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+      ╭─[ test.sus:1554:8 ]
+      │
+ 1554 │ module TestSubmoduleArrayNegativeSize {
+      │        ───────────────┬──────────────  
+      │                       ╰──────────────── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+──────╯
+Error: Submodule array sizes must be non-negative, but found -1
+      ╭─[ test.sus:1555:18 ]
+      │
+ 1555 │     SubmodArrayElem[-1] elems
+      │                     ─┬  
+      │                      ╰── Submodule array sizes must be non-negative, but found -1
+──────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:24:6 ]
     │
@@ -7044,6 +7736,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for UseEqGeneric #() as "UseEqGeneric"
 [INFO  sus_compiler::codegen] Code generated for EqGenerative #() as "EqGenerative"
 [INFO  sus_compiler::codegen] Code generated for use_action_name_in_own_body #() as "use_action_name_in_own_body"
+[INFO  sus_compiler::codegen] Code generated for SubmodArrayElem #() as "SubmodArrayElem"
+[INFO  sus_compiler::codegen] Code generated for SubmodArrayFn #() as "SubmodArrayFn"
+[INFO  sus_compiler::codegen] Code generated for TestSubmoduleArray #() as "TestSubmoduleArray"
+[INFO  sus_compiler::codegen] Code generated for TestSubmoduleArray2D #() as "TestSubmoduleArray2D"
+[INFO  sus_compiler::codegen] Code generated for TestSubmoduleArrayFn #() as "TestSubmoduleArrayFn"
+[INFO  sus_compiler::codegen] Code generated for TestSubmoduleArrayInference #() as "TestSubmoduleArrayInference"
+[INFO  sus_compiler::codegen] Code generated for TestSubmoduleArrayEmpty #() as "TestSubmoduleArrayEmpty"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"
