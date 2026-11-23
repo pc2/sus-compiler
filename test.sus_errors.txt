@@ -175,6 +175,19 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestSubmoduleArrayErrors #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestSubmoduleArrayOutOfBounds #()
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestSubmoduleArrayNegativeSize #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated SubmodSplitStage #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TestSplitSubmoduleCascade #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated ToBits #(T: type int #(FROM: 0, TO: 10))
+[INFO  sus_compiler::instantiation::instantiator] Instantiated FromBits #(T: type int #(FROM: 0, TO: 10))
+[INFO  sus_compiler::instantiation::instantiator] Instantiated FIFO #(T: type int #(FROM: 0, TO: 10), DEPTH: 16, MAY_PUSH_LATENCY: 0)
+[INFO  sus_compiler::instantiation::instantiator] Instantiated ToBits #(T: type int #(FROM: -5, TO: 1000))
+[INFO  sus_compiler::instantiation::instantiator] Instantiated FromBits #(T: type int #(FROM: -5, TO: 1000))
+[INFO  sus_compiler::instantiation::instantiator] Instantiated FIFO #(T: type int #(FROM: -5, TO: 1000), DEPTH: 16, MAY_PUSH_LATENCY: 2)
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TestSplitSubmoduleInference #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TestSplitSubmoduleMixed #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated TestSplitSubmoduleEmpty #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestSplitSubmoduleErrors #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestSplitSubmoduleOutOfBounds #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -367,6 +380,8 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate TestSubmoduleArrayErrors due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate TestSubmoduleArrayOutOfBounds due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate TestSubmoduleArrayNegativeSize due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TestSplitSubmoduleErrors due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate TestSplitSubmoduleOutOfBounds due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -4818,12 +4833,144 @@ Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exa
       │        ───────────────┬──────────────  
       │                       ╰──────────────── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
 ──────╯
-Error: Submodule array sizes must be non-negative, but found -1
+Error: array size must be non-negative, but found -1
       ╭─[ test.sus:1555:18 ]
       │
  1555 │     SubmodArrayElem[-1] elems
       │                     ─┬  
-      │                      ╰── Submodule array sizes must be non-negative, but found -1
+      │                      ╰── array size must be non-negative, but found -1
+──────╯
+Warning: Unused port 'rst'
+      ╭─[ test.sus:1575:28 ]
+      │
+ 1575 │     split FIFO#(DEPTH: 16)[2] fifos
+      │                               ──┬──  
+      │                                 ╰──── Unused port 'rst'
+      │
+      ├─[ fifo.sus:56:12 ]
+      │
+   56 │     action rst {
+      │            ─┬─  
+      │             ╰─── Port 'rst' declared here
+      │
+      ├─[ test.sus:1575:28 ]
+      │
+ 1575 │     split FIFO#(DEPTH: 16)[2] fifos
+      │                               ──┬──  
+      │                                 ╰──── fifos declared here
+──────╯
+Warning: Unused port 'rst'
+      ╭─[ test.sus:1575:28 ]
+      │
+ 1575 │     split FIFO#(DEPTH: 16)[2] fifos
+      │                               ──┬──  
+      │                                 ╰──── Unused port 'rst'
+      │
+      ├─[ fifo.sus:56:12 ]
+      │
+   56 │     action rst {
+      │            ─┬─  
+      │             ╰─── Port 'rst' declared here
+      │
+      ├─[ test.sus:1575:28 ]
+      │
+ 1575 │     split FIFO#(DEPTH: 16)[2] fifos
+      │                               ──┬──  
+      │                                 ╰──── fifos declared here
+──────╯
+Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+      ╭─[ test.sus:1612:8 ]
+      │
+ 1612 │ module TestSplitSubmoduleEmpty {
+      │        ───────────┬───────────  
+      │                   ╰───────────── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+──────╯
+Warning: Not Instantiating TestSplitSubmoduleErrors #() due to abstract typing errors
+      ╭─[ test.sus:1615:8 ]
+      │
+ 1615 │ module TestSplitSubmoduleErrors {
+      │        ────────────┬───────────  
+      │                    ╰───────────── Not Instantiating TestSplitSubmoduleErrors #() due to abstract typing errors
+──────╯
+Error: `split` requires the submodule to have as many array levels as `split` keywords provided. Found 1 arrays, and 2 splits.
+      ╭─[ test.sus:1619:34 ]
+      │
+ 1619 │     split split SubmodSplitStage[4] too_many_splits
+      │                                     ───────┬───────  
+      │                                            ╰───────── `split` requires the submodule to have as many array levels as `split` keywords provided. Found 1 arrays, and 2 splits.
+──────╯
+Error: `split` requires the submodule to have as many array levels as `split` keywords provided. Found 0 arrays, and 1 splits.
+      ╭─[ test.sus:1620:25 ]
+      │
+ 1620 │     split SubmodSplitStage not_an_array
+      │                            ──────┬─────  
+      │                                  ╰─────── `split` requires the submodule to have as many array levels as `split` keywords provided. Found 0 arrays, and 1 splits.
+──────╯
+Error: Indexing a split dimension must be generative. stages has 1 splits.
+      ╭─[ test.sus:1621:45 ]
+      │
+ 1621 │     output int#(0..100) o_runtime_idx = stages[idx](i)
+      │                                                ─┬─  
+      │                                                 ╰─── Indexing a split dimension must be generative. stages has 1 splits.
+      │
+      ├─[ test.sus:1621:45 ]
+      │
+ 1618 │     split SubmodSplitStage[4] stages
+      │                               ───┬──  
+      │                                  ╰──── stages declared here
+──────╯
+Error: A function call expects a single submodule. Submodule arrays must be indexed down to a single submodule
+      ╭─[ test.sus:1622:38 ]
+      │
+ 1622 │     output int#(0..100) o_not_indexed = stages(i)
+      │                                         ───┬──  
+      │                                            ╰──── A function call expects a single submodule. Submodule arrays must be indexed down to a single submodule
+      │
+      ├─[ test.sus:1622:38 ]
+      │
+ 1618 │     split SubmodSplitStage[4] stages
+      │                               ───┬──  
+      │                                  ╰──── stages declared here
+──────╯
+Error: All split dimensions must be indexed. stages has 1 splits.
+      ╭─[ test.sus:1622:38 ]
+      │
+ 1622 │     output int#(0..100) o_not_indexed = stages(i)
+      │                                         ───┬──  
+      │                                            ╰──── All split dimensions must be indexed. stages has 1 splits.
+      │
+      ├─[ test.sus:1622:38 ]
+      │
+ 1618 │     split SubmodSplitStage[4] stages
+      │                               ───┬──  
+      │                                  ╰──── stages declared here
+──────╯
+Error: A function call expects this to be an interface, but found a regular wire
+      ╭─[ test.sus:1623:33 ]
+      │
+ 1623 │     output int#(0..100) o_sliced = stages[0..2](i)
+      │                                    ──────┬─────  
+      │                                          ╰─────── A function call expects this to be an interface, but found a regular wire
+──────╯
+Error: Split dimensions cannot be sliced. stages has 1 splits.
+      ╭─[ test.sus:1623:40 ]
+      │
+ 1623 │     output int#(0..100) o_sliced = stages[0..2](i)
+      │                                           ──┬─  
+      │                                             ╰─── Split dimensions cannot be sliced. stages has 1 splits.
+      │
+      ├─[ test.sus:1623:40 ]
+      │
+ 1618 │     split SubmodSplitStage[4] stages
+      │                               ───┬──  
+      │                                  ╰──── stages declared here
+──────╯
+Error: Index 4 out of bounds for array of size 4
+      ╭─[ test.sus:1628:33 ]
+      │
+ 1628 │     output int#(0..100) o = stages[4](i)
+      │                                    ┬  
+      │                                    ╰── Index 4 out of bounds for array of size 4
 ──────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:24:6 ]
@@ -7743,6 +7890,11 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for TestSubmoduleArrayFn #() as "TestSubmoduleArrayFn"
 [INFO  sus_compiler::codegen] Code generated for TestSubmoduleArrayInference #() as "TestSubmoduleArrayInference"
 [INFO  sus_compiler::codegen] Code generated for TestSubmoduleArrayEmpty #() as "TestSubmoduleArrayEmpty"
+[INFO  sus_compiler::codegen] Code generated for SubmodSplitStage #() as "SubmodSplitStage"
+[INFO  sus_compiler::codegen] Code generated for TestSplitSubmoduleCascade #() as "TestSplitSubmoduleCascade"
+[INFO  sus_compiler::codegen] Code generated for TestSplitSubmoduleInference #() as "TestSplitSubmoduleInference"
+[INFO  sus_compiler::codegen] Code generated for TestSplitSubmoduleMixed #() as "TestSplitSubmoduleMixed"
+[INFO  sus_compiler::codegen] Code generated for TestSplitSubmoduleEmpty #() as "TestSplitSubmoduleEmpty"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"

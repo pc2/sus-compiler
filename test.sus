@@ -1554,3 +1554,76 @@ module TestSubmoduleArrayOutOfBounds {
 module TestSubmoduleArrayNegativeSize {
 	SubmodArrayElem[-1] elems
 }
+
+// Split submodule arrays
+module SubmodSplitStage : int#(0..100) a -> int#(0..100) b {
+	reg b = a
+}
+// A cascade is only possible with split, otherwise all elements share their port latencies
+module TestSplitSubmoduleCascade {
+	input int#(0..100) i
+	split SubmodSplitStage[4] stages
+	split int#(0..100)[5] chain
+	chain[0] = i
+	for int I in 0..4 {
+		chain[I + 1] = stages[I](chain[I])
+	}
+	output int#(0..100) o = chain[4]
+}
+// Every element infers its own T and MAY_PUSH_LATENCY
+module TestSplitSubmoduleInference {
+	split FIFO#(DEPTH: 16)[2] fifos
+
+	domain push_dom
+	input int#(0..10) small
+	input int#(-5..1000) big
+	input bool do_push
+
+	when do_push {
+		when fifos[0].may_push {
+			fifos[0].push(small)
+		}
+		when fifos[1].may_push {
+			reg reg int#(-5..1000) big_d = big
+			fifos[1].push(big_d)
+		}
+	}
+	domain pop_dom
+	input bool do_pop
+	output int#(0..10) popped_small = 0
+	output int#(-5..1000) popped_big = 0
+	when do_pop {
+		when fifos[0].may_pop {
+			popped_small = fifos[0].pop()
+		}
+		when fifos[1].may_pop {
+			popped_big = fifos[1].pop()
+		}
+	}
+}
+// Outer dimension split, inner dimension a regular submodule array with a runtime index
+module TestSplitSubmoduleMixed {
+	input int#(0..3) idx
+	input int#(0..100) i
+	split SubmodSplitStage[3][2] stages
+	output int#(0..100) o0 = stages[0][idx](i)
+	output int#(0..100) o1 = stages[1][idx](stages[0][2](i))
+}
+module TestSplitSubmoduleEmpty {
+	split SubmodSplitStage[0] stages
+}
+module TestSplitSubmoduleErrors {
+	input int#(0..4) idx
+	input int#(0..100) i
+	split SubmodSplitStage[4] stages
+	split split SubmodSplitStage[4] too_many_splits
+	split SubmodSplitStage not_an_array
+	output int#(0..100) o_runtime_idx = stages[idx](i)
+	output int#(0..100) o_not_indexed = stages(i)
+	output int#(0..100) o_sliced = stages[0..2](i)
+}
+module TestSplitSubmoduleOutOfBounds {
+	input int#(0..100) i
+	split SubmodSplitStage[4] stages
+	output int#(0..100) o = stages[4](i)
+}

@@ -55,6 +55,7 @@ impl HoverCollector<'_> {
             if is_generative {
                 let value_str = match &inst.generation_state[id] {
                     SubModuleOrWire::SubModule(_)
+                    | SubModuleOrWire::SplitSubModule(_)
                     | SubModuleOrWire::Wire(_)
                     | SubModuleOrWire::SplitWire(_) => {
                         unreachable!()
@@ -194,7 +195,8 @@ impl HoverCollector<'_> {
         let submodule = &linker.modules[submod_inst.module_ref.id];
 
         self.sus_code(format!(
-            "{}{} {}",
+            "{}{}{} {}",
+            "split ".repeat(submod_inst.num_splits),
             submodule.link_info.display_full_name(),
             "[]".repeat(submod_inst.array_sizes.len()),
             submod_inst.name

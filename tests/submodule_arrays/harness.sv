@@ -316,19 +316,140 @@ end
 endmodule
 
 ////////////////////////////////////////////////////////////
+// TestSplitCascade: 4 separate AddOne submodules in a chain. The output is i + 4, 4 cycles later
+////////////////////////////////////////////////////////////
+module split_cascade_test(output logic done);
+
+localparam int STAGES = 4;
+
+logic clk = 0;
+always #5 clk = !clk;
+
+logic [7:0] i = 0;
+logic [7:0] o;
+
+TestSplitCascade dut(
+    .clk,
+    .i,
+    .o
+);
+
+// Reference model: the inputs of the last STAGES cycles
+logic [7:0] history[STAGES];
+int unsigned cycle = 0;
+int unsigned num_checks = 0;
+
+always @(posedge clk) begin
+    for (int s = STAGES - 1; s > 0; s--) history[s] = history[s - 1];
+    history[0] = i;
+    cycle++;
+end
+
+initial begin
+    done = 0;
+    repeat (2000) begin
+        @(negedge clk);
+        if (cycle >= STAGES) begin
+            if (o !== 8'(history[STAGES - 1] + STAGES)) begin
+                $fatal(1, "o is %0d, expected %0d + %0d at time %t", o, history[STAGES - 1], STAGES, $time);
+            end
+            num_checks++;
+        end
+        i = 8'($urandom);
+    end
+    $display("split_cascade_test passed (%0d checks)", num_checks);
+    done = 1;
+end
+
+endmodule
+
+////////////////////////////////////////////////////////////
+// TestSplitAccumulatorRows: both rows are separate submodule arrays, and may be added to in the same cycle
+////////////////////////////////////////////////////////////
+module split_accumulator_rows_test(output logic done);
+
+localparam int ROWS = 2;
+localparam int COLS = 3;
+
+logic clk = 0;
+always #5 clk = !clk;
+
+logic add_row_0 = 0;
+logic [1:0] col_0 = 0;
+logic [7:0] v_0 = 0;
+logic add_row_1 = 0;
+logic [1:0] col_1 = 0;
+logic [7:0] v_1 = 0;
+logic [31:0] all_totals[0:ROWS-1][0:COLS-1];
+
+TestSplitAccumulatorRows dut(
+    .clk,
+    .add_row_0,
+    .col_0,
+    .v_0,
+    .add_row_1,
+    .col_1,
+    .v_1,
+    .all_totals
+);
+
+logic [31:0] model[ROWS][COLS] = '{default: 0};
+int unsigned num_checks = 0;
+
+always @(posedge clk) begin
+    if (add_row_0) model[0][col_0] = model[0][col_0] + 32'(v_0);
+    if (add_row_1) model[1][col_1] = model[1][col_1] + 32'(v_1);
+end
+
+task automatic check();
+    for (int r = 0; r < ROWS; r++) begin
+        for (int c = 0; c < COLS; c++) begin
+            if (all_totals[r][c] !== model[r][c]) begin
+                $fatal(1, "all_totals[%0d][%0d] is %0d, expected %0d at time %t", r, c, all_totals[r][c], model[r][c], $time);
+            end
+        end
+    end
+    num_checks++;
+endtask
+
+initial begin
+    done = 0;
+    repeat (5000) begin
+        @(negedge clk);
+        check();
+        add_row_0 = ($urandom_range(1) == 0);
+        col_0 = 2'($urandom_range(COLS - 1));
+        v_0 = 8'($urandom);
+        add_row_1 = ($urandom_range(1) == 0);
+        col_1 = 2'($urandom_range(COLS - 1));
+        v_1 = 8'($urandom);
+    end
+    @(negedge clk);
+    check();
+    $display("split_accumulator_rows_test passed (%0d checks)", num_checks);
+    done = 1;
+end
+
+endmodule
+
+////////////////////////////////////////////////////////////
 // Top
 ////////////////////////////////////////////////////////////
 module submodule_array_tests;
 
 logic fifo_array_done, accumulator_grid_done, trigger_array_done;
+logic split_cascade_done, split_accumulator_rows_done;
 
 fifo_array_test fifo_array(.done(fifo_array_done));
 accumulator_grid_test accumulator_grid(.done(accumulator_grid_done));
 trigger_array_test trigger_array(.done(trigger_array_done));
+split_cascade_test split_cascade(.done(split_cascade_done));
+split_accumulator_rows_test split_accumulator_rows(.done(split_accumulator_rows_done));
 
 initial begin
     $display("Starting submodule array tests");
     wait (fifo_array_done && accumulator_grid_done && trigger_array_done);
+    wait (split_cascade_done && split_accumulator_rows_done);
     $display("All tests passed");
     $finish();
 end

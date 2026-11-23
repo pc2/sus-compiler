@@ -111,3 +111,44 @@ module TestTriggerArray {
         }
     }
 }
+
+// ==== `split` submodule arrays: every index of a split dimension is its own submodule ====
+
+module AddOne : int#(0..256) a'0 -> int#(0..256) b'1 {
+    reg b = (a + 1) mod 256
+}
+
+// A cascade is only possible with split, since every stage needs its own latency
+module TestSplitCascade {
+    gen int STAGES = 4
+    input int#(0..256) i'0
+
+    split AddOne[STAGES] stages
+    split int#(0..256)[STAGES + 1] chain
+    chain[0] = i
+    for int I in 0..STAGES {
+        chain[I + 1] = stages[I](chain[I])
+    }
+    output int#(0..256) o'STAGES = chain[STAGES]
+}
+
+// Split rows, where every row is a regular submodule array indexed at runtime
+module TestSplitAccumulatorRows {
+    gen int ROWS = 2
+    gen int COLS = 3
+    split Accumulator[COLS][ROWS] accs
+
+    action add_row_0'0 : int#(0..COLS) col_0'0, int#(0..256) v_0'0 {
+        accs[0][col_0].add(v_0)
+    }
+    action add_row_1'0 : int#(0..COLS) col_1'0, int#(0..256) v_1'0 {
+        accs[1][col_1].add(v_1)
+    }
+
+    output int[COLS][ROWS] all_totals'0
+    for int R in 0..ROWS {
+        for int C in 0..COLS {
+            all_totals[R][C] = accs[R][C].cur_total
+        }
+    }
+}

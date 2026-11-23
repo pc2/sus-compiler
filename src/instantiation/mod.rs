@@ -300,10 +300,21 @@ pub struct SplitWire {
     contained_wires: HashMap<Box<[IBig]>, WireID>,
 }
 
+/// A submodule array declared with `split`: `split FIFO[5] fifos`. See [crate::flattening::SubModuleInstance::num_splits]
+///
+/// Every index of the split dimensions is its own [SubModule]. Unlike [SplitWire], all of them are created at the declaration, since unused submodules still exist.
+#[derive(Debug, Clone)]
+pub struct SplitSubModule {
+    /// Sizes of the split dimensions, outermost first
+    split_dims: Vec<IBig>,
+    contained_submodules: HashMap<Box<[IBig]>, SubModuleID>,
+}
+
 /// See [execute::GenerationState]
 #[derive(Debug, Clone)]
 pub enum SubModuleOrWire {
     SubModule(SubModuleID),
+    SplitSubModule(Box<SplitSubModule>),
     Wire(WireID),
     SplitWire(Box<SplitWire>),
     CompileTimeValue(Value),
@@ -321,11 +332,6 @@ impl SubModuleOrWire {
     pub fn unwrap_generation_value(&self) -> &Value {
         let_unwrap!(Self::CompileTimeValue(result), self);
         result
-    }
-    #[track_caller]
-    pub fn unwrap_submodule_instance(&self) -> SubModuleID {
-        let_unwrap!(Self::SubModule(result), self);
-        *result
     }
 }
 

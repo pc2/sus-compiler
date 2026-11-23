@@ -797,18 +797,20 @@ impl LintContext<'_> {
     fn check_splits_for_wire_ref(&self, wr: &WireReference) {
         let mut path_iter = wr.path.iter();
         let decl = match &wr.root {
-            WireReferenceRoot::LocalDecl(decl_id) => {
-                self.working_on.instructions[*decl_id].unwrap_declaration()
+            WireReferenceRoot::LocalDecl(decl_id) | WireReferenceRoot::LocalSubmodule(decl_id) => {
+                &self.working_on.instructions[*decl_id]
             }
-            WireReferenceRoot::LocalSubmodule(_)
-            | WireReferenceRoot::LocalTrigger(_)
+            WireReferenceRoot::LocalTrigger(_)
             | WireReferenceRoot::NamedConstant(_)
             | WireReferenceRoot::NamedModule(_)
             | WireReferenceRoot::Error => return,
         };
 
-        let decl_name = &decl.name;
-        let num_splits = decl.decl_kind.num_splits();
+        let (decl_name, num_splits) = match decl {
+            Instruction::Declaration(decl) => (&decl.name, decl.decl_kind.num_splits()),
+            Instruction::SubModule(sm) => (&sm.name, sm.num_splits),
+            _ => unreachable!(),
+        };
         for _ in 0..num_splits {
             match path_iter.next() {
                 Some(WireReferencePathElement::FieldAccess { name_span, .. }) => {
@@ -852,8 +854,14 @@ impl LintContext<'_> {
                         }
                     }
                 }
+                Instruction::SubModule(sm) => {
+                    let num_arrays = sm.array_sizes.len();
+                    let num_splits = sm.num_splits;
+                    if num_arrays < num_splits {
+                        self.errors.error(sm.name_span, format!("`split` requires the submodule to have as many array levels as `split` keywords provided. Found {num_arrays} arrays, and {num_splits} splits."));
+                    }
+                }
                 Instruction::Expression(_)
-                | Instruction::SubModule(_)
                 | Instruction::Action(_)
                 | Instruction::IfStatement(_)
                 | Instruction::ForStatement(_) => {}

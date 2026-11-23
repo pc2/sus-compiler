@@ -840,6 +840,11 @@ pub struct SubModuleInstance {
     ///
     /// All elements of the array share the same template arguments, clocks and port latencies.
     pub array_sizes: Vec<(FlatID, BracketSpan)>,
+    /// Describes how many 'split' keywords have been used for this submodule array. At most `array_sizes.len()`.
+    ///
+    /// The outer `num_splits` dimensions aren't part of one big submodule array, instead each index is its own separate submodule (or submodule array, for the remaining dimensions),
+    /// with independently inferred template arguments and port latencies. Like split wires, split dimensions can only be indexed with generative indices.
+    pub num_splits: usize,
 
     pub name: String,
     pub name_span: Span,

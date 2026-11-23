@@ -4638,6 +4638,544 @@ always_comb begin // combinatorial mul1
 end
 endmodule // example_md #()
 
+// TestSplitSubmoduleEmpty #()
+module TestSplitSubmoduleEmpty(
+	/* clock */ input clk
+);
+
+// PATCH XRT 2.16 over-zealous empty module DRC
+initial begin end
+endmodule // TestSplitSubmoduleEmpty #()
+
+// TestSplitSubmoduleMixed #()
+module TestSplitSubmoduleMixed(
+	/* clock */ input clk,
+	input wire[1:0] idx,
+	input wire[6:0] i,
+	output /*mux_wire*/ logic[6:0] o0,
+	output /*mux_wire*/ logic[6:0] o1
+);
+
+genvar _g0;
+/*latency*/ logic[1:0] _idx_D1; always_ff @(posedge clk) begin _idx_D1 <= idx; end
+/*latency*/ logic[1:0] _idx_D2; always_ff @(posedge clk) begin _idx_D2 <= _idx_D1; end
+/*mux_wire*/ logic[6:0] _stages_split_0_a[0:2];
+wire[6:0] _stages_split_0_b[0:2];
+wire[6:0] _3 = _stages_split_0_b[_idx_D1];
+wire[6:0] _6 = _stages_split_0_b[2];
+/*mux_wire*/ logic[6:0] _stages_split_1_a[0:2];
+wire[6:0] _stages_split_1_b[0:2];
+wire[6:0] _7 = _stages_split_1_b[_idx_D2];
+generate
+for(_g0 = 0; _g0 < 3; _g0 = _g0 + 1) begin : stages_split_0
+SubmodSplitStage inst(
+	.clk(clk),
+	.a(_stages_split_0_a[_g0]),
+	.b(_stages_split_0_b[_g0])
+);
+end
+endgenerate
+generate
+for(_g0 = 0; _g0 < 3; _g0 = _g0 + 1) begin : stages_split_1
+SubmodSplitStage inst(
+	.clk(clk),
+	.a(_stages_split_1_a[_g0]),
+	.b(_stages_split_1_b[_g0])
+);
+end
+endgenerate
+always_comb begin // combinatorial o0
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	o0 = 7'dx;
+	o0 = _3;
+end
+always_comb begin // combinatorial _stages_split_0_a
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_stages_split_0_a = '{7'dx, 7'dx, 7'dx};
+	_stages_split_0_a[idx] = i;
+	_stages_split_0_a[2] = i;
+end
+always_comb begin // combinatorial o1
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	o1 = 7'dx;
+	o1 = _7;
+end
+always_comb begin // combinatorial _stages_split_1_a
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_stages_split_1_a = '{7'dx, 7'dx, 7'dx};
+	_stages_split_1_a[_idx_D1] = _6;
+end
+endmodule // TestSplitSubmoduleMixed #()
+
+// TestSplitSubmoduleInference #()
+module TestSplitSubmoduleInference(
+	/* clock */ input clk,
+	input wire[3:0] small_1,
+	input wire signed[10:0] big,
+	input wire do_push,
+	input wire do_pop,
+	output /*mux_wire*/ logic[3:0] popped_small,
+	output /*mux_wire*/ logic signed[10:0] popped_big
+);
+
+/*mux_wire*/ logic signed[10:0] big_d;
+/*latency*/ (* shreg_extract = "no" *) logic signed[10:0] _big_D1; always_ff @(posedge clk) begin _big_D1 <= big; end
+/*latency*/ (* shreg_extract = "no" *) logic signed[10:0] _big_D2; always_ff @(posedge clk) begin _big_D2 <= _big_D1; end
+/*latency*/ logic _do_push_D1; always_ff @(posedge clk) begin _do_push_D1 <= do_push; end
+/*latency*/ logic _do_push_D2; always_ff @(posedge clk) begin _do_push_D2 <= _do_push_D1; end
+/*latency*/ logic _do_pop_D3001; always_ff @(posedge clk) begin _do_pop_D3001 <= do_pop; end
+wire _fifos_split_0_may_push;
+/*mux_wire*/ logic _fifos_split_0_push;
+/*mux_wire*/ logic[3:0] _fifos_split_0_push_data;
+wire _fifos_split_1_may_push;
+/*latency*/ logic __fifos_split_1_may_push_D1; always_ff @(posedge clk) begin __fifos_split_1_may_push_D1 <= _fifos_split_1_may_push; end
+/*latency*/ logic __fifos_split_1_may_push_D2; always_ff @(posedge clk) begin __fifos_split_1_may_push_D2 <= __fifos_split_1_may_push_D1; end
+/*mux_wire*/ logic _fifos_split_1_push;
+/*mux_wire*/ logic signed[10:0] _fifos_split_1_push_data;
+wire _fifos_split_0_may_pop;
+/*latency*/ logic __fifos_split_0_may_pop_D3001; always_ff @(posedge clk) begin __fifos_split_0_may_pop_D3001 <= _fifos_split_0_may_pop; end
+/*mux_wire*/ logic _fifos_split_0_pop;
+wire[3:0] _fifos_split_0_pop_data;
+wire _fifos_split_1_may_pop;
+/*latency*/ logic __fifos_split_1_may_pop_D3001; always_ff @(posedge clk) begin __fifos_split_1_may_pop_D3001 <= _fifos_split_1_may_pop; end
+/*mux_wire*/ logic _fifos_split_1_pop;
+wire signed[10:0] _fifos_split_1_pop_data;
+FIFO_T_type_int_FROM_0_TO_10_DEPTH_16_MAY_PUSH_LATENCY_0 fifos_split_0(
+	.clk(clk),
+	.may_push(_fifos_split_0_may_push),
+	.push(_fifos_split_0_push),
+	.push_data(_fifos_split_0_push_data),
+	.may_pop(_fifos_split_0_may_pop),
+	.pop(_fifos_split_0_pop),
+	.pop_data(_fifos_split_0_pop_data),
+	.rst()
+);
+FIFO_T_type_int_FROM_N5_TO_1000_DEPTH_16_MAY_PUSH_LATENCY_2 fifos_split_1(
+	.clk(clk),
+	.may_push(_fifos_split_1_may_push),
+	.push(_fifos_split_1_push),
+	.push_data(_fifos_split_1_push_data),
+	.may_pop(_fifos_split_1_may_pop),
+	.pop(_fifos_split_1_pop),
+	.pop_data(_fifos_split_1_pop_data),
+	.rst()
+);
+always_comb begin // combinatorial _fifos_split_0_push
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_fifos_split_0_push = 1'bx;
+	_fifos_split_0_push = 1'b0;
+	if(do_push) if(_fifos_split_0_may_push) _fifos_split_0_push = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_fifos_split_0_push = _fifos_split_0_push;
+end
+always_comb begin // combinatorial _fifos_split_0_push_data
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_fifos_split_0_push_data = 4'dx;
+	_fifos_split_0_push_data = small_1;
+end
+always_comb begin // combinatorial big_d
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	big_d = 11'sdx;
+	big_d = _big_D2;
+end
+always_comb begin // combinatorial _fifos_split_1_push
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_fifos_split_1_push = 1'bx;
+	_fifos_split_1_push = 1'b0;
+	if(_do_push_D2) if(__fifos_split_1_may_push_D2) _fifos_split_1_push = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_fifos_split_1_push = _fifos_split_1_push;
+end
+always_comb begin // combinatorial _fifos_split_1_push_data
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_fifos_split_1_push_data = 11'sdx;
+	_fifos_split_1_push_data = big_d;
+end
+always_comb begin // combinatorial popped_small
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	popped_small = 4'dx;
+	popped_small = 1'd0;
+	if(_do_pop_D3001) if(__fifos_split_0_may_pop_D3001) popped_small = _fifos_split_0_pop_data;
+end
+always_comb begin // combinatorial popped_big
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	popped_big = 11'sdx;
+	popped_big = 1'd0;
+	if(_do_pop_D3001) if(__fifos_split_1_may_pop_D3001) popped_big = _fifos_split_1_pop_data;
+end
+always_comb begin // combinatorial _fifos_split_0_pop
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_fifos_split_0_pop = 1'bx;
+	_fifos_split_0_pop = 1'b0;
+	if(do_pop) if(_fifos_split_0_may_pop) _fifos_split_0_pop = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_fifos_split_0_pop = _fifos_split_0_pop;
+end
+always_comb begin // combinatorial _fifos_split_1_pop
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_fifos_split_1_pop = 1'bx;
+	_fifos_split_1_pop = 1'b0;
+	if(do_pop) if(_fifos_split_1_may_pop) _fifos_split_1_pop = 1'b1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_fifos_split_1_pop = _fifos_split_1_pop;
+end
+endmodule // TestSplitSubmoduleInference #()
+
+// FIFO #(T: type int #(FROM: -5, TO: 1000), DEPTH: 16, MAY_PUSH_LATENCY: 2)
+module FIFO_T_type_int_FROM_N5_TO_1000_DEPTH_16_MAY_PUSH_LATENCY_2(
+	/* clock */ input clk,
+	output /*mux_wire*/ logic may_push,
+	input wire push,
+	input wire signed[10:0] push_data,
+	output /*mux_wire*/ logic may_pop,
+	input wire pop,
+	output /*mux_wire*/ logic signed[10:0] pop_data,
+	input wire rst
+);
+
+/*state*/ logic[10:0] mem[0:15];
+/*state*/ logic[3:0] read_addr;
+/*state*/ logic[3:0] write_addr;
+/*mux_wire*/ logic[3:0] space_remaining;
+/*mux_wire*/ logic[10:0] pop_out_reg;
+wire signed[4:0] _3;
+assign _3 = read_addr - write_addr;
+wire signed[4:0] _5;
+assign _5 = _3 - $signed({1'b0, 1'd1});
+wire[3:0] _6;
+assign _6 = _5; // == mod 16 (target is 4 bits wide)
+wire _9;
+assign _9 = space_remaining > 2'd3;
+/*latency*/ (* shreg_extract = "no" *) logic __9_D1; always_ff @(posedge clk) begin __9_D1 <= _9; end
+/*mux_wire*/ logic signed[10:0] _ToBits_value;
+wire[10:0] _ToBits_bits;
+wire[4:0] _14;
+assign _14 = write_addr + 1'd1;
+wire[3:0] _15;
+assign _15 = _14; // == mod 16 (target is 4 bits wide)
+wire _18;
+assign _18 = read_addr != write_addr;
+wire[10:0] _20 = mem[read_addr];
+/*latency*/ (* shreg_extract = "no" *) logic[10:0] __20_D1; always_ff @(posedge clk) begin __20_D1 <= _20; end
+/*mux_wire*/ logic[10:0] _FromBits_bits;
+wire signed[10:0] _FromBits_value;
+wire[4:0] _24;
+assign _24 = read_addr + 1'd1;
+wire[3:0] _25;
+assign _25 = _24; // == mod 16 (target is 4 bits wide)
+ToBits_T_type_int_FROM_N5_TO_1000 ToBits(
+	.clk(clk),
+	.value(_ToBits_value),
+	.bits(_ToBits_bits)
+);
+FromBits_T_type_int_FROM_N5_TO_1000 FromBits(
+	.clk(clk),
+	.bits(_FromBits_bits),
+	.value(_FromBits_value)
+);
+always_ff @(posedge clk) begin // state mem
+	if(push) mem[write_addr] <= _ToBits_bits;
+end
+always_ff @(posedge clk) begin // state read_addr
+	if(pop) read_addr <= _25;
+	if(rst) read_addr <= 1'd0;
+end
+always_ff @(posedge clk) begin // state write_addr
+	if(push) write_addr <= _15;
+	if(rst) write_addr <= 1'd0;
+end
+always_comb begin // combinatorial space_remaining
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	space_remaining = 4'dx;
+	space_remaining = _6;
+end
+always_comb begin // combinatorial may_push
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	may_push = 1'bx;
+	may_push = __9_D1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	may_push = may_push;
+end
+always_comb begin // combinatorial _ToBits_value
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_ToBits_value = 11'sdx;
+	_ToBits_value = push_data;
+end
+always_comb begin // combinatorial may_pop
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	may_pop = 1'bx;
+	may_pop = _18;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	may_pop = may_pop;
+end
+always_comb begin // combinatorial pop_data
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	pop_data = 11'sdx;
+	pop_data = _FromBits_value;
+end
+always_comb begin // combinatorial pop_out_reg
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	pop_out_reg = 11'bxxxxxxxxxxx;
+	pop_out_reg = __20_D1;
+end
+always_comb begin // combinatorial _FromBits_bits
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_FromBits_bits = 11'bxxxxxxxxxxx;
+	_FromBits_bits = pop_out_reg;
+end
+endmodule // FIFO #(T: type int #(FROM: -5, TO: 1000), DEPTH: 16, MAY_PUSH_LATENCY: 2)
+
+// FromBits #(T: type int #(FROM: -5, TO: 1000))
+module FromBits_T_type_int_FROM_N5_TO_1000(
+	/* clock */ input clk,
+	input wire[10:0] bits,
+	output /*mux_wire*/ logic signed[10:0] value
+);
+
+assign value = bits;
+endmodule // FromBits #(T: type int #(FROM: -5, TO: 1000))
+
+// ToBits #(T: type int #(FROM: -5, TO: 1000))
+module ToBits_T_type_int_FROM_N5_TO_1000(
+	/* clock */ input clk,
+	input wire signed[10:0] value,
+	output /*mux_wire*/ logic[10:0] bits
+);
+
+assign bits = value;
+endmodule // ToBits #(T: type int #(FROM: -5, TO: 1000))
+
+// FIFO #(T: type int #(FROM: 0, TO: 10), DEPTH: 16, MAY_PUSH_LATENCY: 0)
+module FIFO_T_type_int_FROM_0_TO_10_DEPTH_16_MAY_PUSH_LATENCY_0(
+	/* clock */ input clk,
+	output /*mux_wire*/ logic may_push,
+	input wire push,
+	input wire[3:0] push_data,
+	output /*mux_wire*/ logic may_pop,
+	input wire pop,
+	output /*mux_wire*/ logic[3:0] pop_data,
+	input wire rst
+);
+
+/*state*/ logic[3:0] mem[0:15];
+/*state*/ logic[3:0] read_addr;
+/*state*/ logic[3:0] write_addr;
+/*mux_wire*/ logic[3:0] space_remaining;
+/*mux_wire*/ logic[3:0] pop_out_reg;
+wire signed[4:0] _3;
+assign _3 = read_addr - write_addr;
+wire signed[4:0] _5;
+assign _5 = _3 - $signed({1'b0, 1'd1});
+wire[3:0] _6;
+assign _6 = _5; // == mod 16 (target is 4 bits wide)
+wire _9;
+assign _9 = space_remaining > 1'd1;
+/*latency*/ (* shreg_extract = "no" *) logic __9_D1; always_ff @(posedge clk) begin __9_D1 <= _9; end
+/*mux_wire*/ logic[3:0] _ToBits_value;
+wire[3:0] _ToBits_bits;
+wire[4:0] _14;
+assign _14 = write_addr + 1'd1;
+wire[3:0] _15;
+assign _15 = _14; // == mod 16 (target is 4 bits wide)
+wire _18;
+assign _18 = read_addr != write_addr;
+wire[3:0] _20 = mem[read_addr];
+/*latency*/ (* shreg_extract = "no" *) logic[3:0] __20_D1; always_ff @(posedge clk) begin __20_D1 <= _20; end
+/*mux_wire*/ logic[3:0] _FromBits_bits;
+wire[3:0] _FromBits_value;
+wire[4:0] _24;
+assign _24 = read_addr + 1'd1;
+wire[3:0] _25;
+assign _25 = _24; // == mod 16 (target is 4 bits wide)
+ToBits_T_type_int_FROM_0_TO_10 ToBits(
+	.clk(clk),
+	.value(_ToBits_value),
+	.bits(_ToBits_bits)
+);
+FromBits_T_type_int_FROM_0_TO_10 FromBits(
+	.clk(clk),
+	.bits(_FromBits_bits),
+	.value(_FromBits_value)
+);
+always_ff @(posedge clk) begin // state mem
+	if(push) mem[write_addr] <= _ToBits_bits;
+end
+always_ff @(posedge clk) begin // state read_addr
+	if(pop) read_addr <= _25;
+	if(rst) read_addr <= 1'd0;
+end
+always_ff @(posedge clk) begin // state write_addr
+	if(push) write_addr <= _15;
+	if(rst) write_addr <= 1'd0;
+end
+always_comb begin // combinatorial space_remaining
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	space_remaining = 4'dx;
+	space_remaining = _6;
+end
+always_comb begin // combinatorial may_push
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	may_push = 1'bx;
+	may_push = __9_D1;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	may_push = may_push;
+end
+always_comb begin // combinatorial _ToBits_value
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_ToBits_value = 4'dx;
+	_ToBits_value = push_data;
+end
+always_comb begin // combinatorial may_pop
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	may_pop = 1'bx;
+	may_pop = _18;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	may_pop = may_pop;
+end
+always_comb begin // combinatorial pop_data
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	pop_data = 4'dx;
+	pop_data = _FromBits_value;
+end
+always_comb begin // combinatorial pop_out_reg
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	pop_out_reg = 4'bxxxx;
+	pop_out_reg = __20_D1;
+end
+always_comb begin // combinatorial _FromBits_bits
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_FromBits_bits = 4'bxxxx;
+	_FromBits_bits = pop_out_reg;
+end
+endmodule // FIFO #(T: type int #(FROM: 0, TO: 10), DEPTH: 16, MAY_PUSH_LATENCY: 0)
+
+// FromBits #(T: type int #(FROM: 0, TO: 10))
+module FromBits_T_type_int_FROM_0_TO_10(
+	/* clock */ input clk,
+	input wire[3:0] bits,
+	output /*mux_wire*/ logic[3:0] value
+);
+
+assign value = bits;
+endmodule // FromBits #(T: type int #(FROM: 0, TO: 10))
+
+// ToBits #(T: type int #(FROM: 0, TO: 10))
+module ToBits_T_type_int_FROM_0_TO_10(
+	/* clock */ input clk,
+	input wire[3:0] value,
+	output /*mux_wire*/ logic[3:0] bits
+);
+
+assign bits = value;
+endmodule // ToBits #(T: type int #(FROM: 0, TO: 10))
+
+// TestSplitSubmoduleCascade #()
+module TestSplitSubmoduleCascade(
+	/* clock */ input clk,
+	input wire[6:0] i,
+	output /*mux_wire*/ logic[6:0] o
+);
+
+/*mux_wire*/ logic[6:0] chain_split_0;
+/*mux_wire*/ logic[6:0] chain_split_1;
+/*mux_wire*/ logic[6:0] chain_split_2;
+/*mux_wire*/ logic[6:0] chain_split_3;
+/*mux_wire*/ logic[6:0] chain_split_4;
+/*mux_wire*/ logic[6:0] _stages_split_0_a;
+wire[6:0] _stages_split_0_b;
+/*mux_wire*/ logic[6:0] _stages_split_1_a;
+wire[6:0] _stages_split_1_b;
+/*mux_wire*/ logic[6:0] _stages_split_2_a;
+wire[6:0] _stages_split_2_b;
+/*mux_wire*/ logic[6:0] _stages_split_3_a;
+wire[6:0] _stages_split_3_b;
+SubmodSplitStage stages_split_0(
+	.clk(clk),
+	.a(_stages_split_0_a),
+	.b(_stages_split_0_b)
+);
+SubmodSplitStage stages_split_1(
+	.clk(clk),
+	.a(_stages_split_1_a),
+	.b(_stages_split_1_b)
+);
+SubmodSplitStage stages_split_2(
+	.clk(clk),
+	.a(_stages_split_2_a),
+	.b(_stages_split_2_b)
+);
+SubmodSplitStage stages_split_3(
+	.clk(clk),
+	.a(_stages_split_3_a),
+	.b(_stages_split_3_b)
+);
+always_comb begin // combinatorial chain_split_0
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	chain_split_0 = 7'dx;
+	chain_split_0 = i;
+end
+always_comb begin // combinatorial _stages_split_0_a
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_stages_split_0_a = 7'dx;
+	_stages_split_0_a = chain_split_0;
+end
+always_comb begin // combinatorial chain_split_1
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	chain_split_1 = 7'dx;
+	chain_split_1 = _stages_split_0_b;
+end
+always_comb begin // combinatorial _stages_split_1_a
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_stages_split_1_a = 7'dx;
+	_stages_split_1_a = chain_split_1;
+end
+always_comb begin // combinatorial chain_split_2
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	chain_split_2 = 7'dx;
+	chain_split_2 = _stages_split_1_b;
+end
+always_comb begin // combinatorial _stages_split_2_a
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_stages_split_2_a = 7'dx;
+	_stages_split_2_a = chain_split_2;
+end
+always_comb begin // combinatorial chain_split_3
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	chain_split_3 = 7'dx;
+	chain_split_3 = _stages_split_2_b;
+end
+always_comb begin // combinatorial _stages_split_3_a
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_stages_split_3_a = 7'dx;
+	_stages_split_3_a = chain_split_3;
+end
+always_comb begin // combinatorial chain_split_4
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	chain_split_4 = 7'dx;
+	chain_split_4 = _stages_split_3_b;
+end
+always_comb begin // combinatorial o
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	o = 7'dx;
+	o = chain_split_4;
+end
+endmodule // TestSplitSubmoduleCascade #()
+
+// SubmodSplitStage #()
+module SubmodSplitStage(
+	/* clock */ input clk,
+	input wire[6:0] a,
+	output /*mux_wire*/ logic[6:0] b
+);
+
+/*latency*/ (* shreg_extract = "no" *) logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
+always_comb begin // combinatorial b
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	b = 7'dx;
+	b = _a_D1;
+end
+endmodule // SubmodSplitStage #()
+
 // TestSubmoduleArrayEmpty #()
 module TestSubmoduleArrayEmpty(
 	/* clock */ input clk

@@ -710,6 +710,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         name_span,
                         module_ref,
                         array_sizes,
+                        num_splits,
                         submodule_clock_map: OnceCell::new(),
                         typ: AbstractRankedType::UNKNOWN,
                         documentation,

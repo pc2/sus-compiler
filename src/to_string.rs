@@ -838,10 +838,14 @@ impl LinkInfo {
                 Instruction::SubModule(SubModuleInstance {
                     module_ref,
                     array_sizes,
+                    num_splits,
                     name,
                     submodule_clock_map: local_domain_map,
                     ..
                 }) => {
+                    for _ in 0..*num_splits {
+                        f.write_str("split ")?;
+                    }
                     let disp_md_ref = module_ref.display(globals, &self.parameters);
                     let name = name.green();
                     let array_sizes =

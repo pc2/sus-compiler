@@ -204,7 +204,7 @@ impl GenerationState<'_> {
     }
     fn get_wire_or_int(&self, v: FlatID) -> ExecutionResult<WireOrInt<'_>> {
         match &self.generation_state[v] {
-            SubModuleOrWire::SubModule(_) => unreachable!(),
+            SubModuleOrWire::SubModule(_) | SubModuleOrWire::SplitSubModule(_) => unreachable!(),
             SubModuleOrWire::Unassigned => unreachable!(),
             SubModuleOrWire::SplitWire(_) => {
                 unreachable!("Split wires *must* be indexed, and so cannot be used here")
@@ -686,7 +686,7 @@ impl<'l> ExecutionContext<'l> {
                 };
                 let local_domain_map = submod.submodule_clock_map.get().unwrap();
                 let clock = &local_domain_map[submod_field.clock.unwrap()];
-                let submod_id = self.generation_state[*submod_id].unwrap_submodule_instance();
+                let submod_id = self.get_submodule_instance(*submod_id, &mut path)?;
                 self.get_submodule_port(submod_id, port_id, Some(port_span), *clock.unwrap())
             }
             WireReferenceRoot::NamedConstant(cst) => {
@@ -965,7 +965,7 @@ impl<'l> ExecutionContext<'l> {
         domain: ClockID,
     ) -> ExecutionResult<WireID> {
         match &self.generation_state[original_instruction] {
-            SubModuleOrWire::SubModule(_) => unreachable!(),
+            SubModuleOrWire::SubModule(_) | SubModuleOrWire::SplitSubModule(_) => unreachable!(),
             SubModuleOrWire::Unassigned => unreachable!(),
             SubModuleOrWire::SplitWire(_) => {
                 unreachable!("Split wires *must* be indexed, and so cannot be used here")
@@ -1149,6 +1149,39 @@ impl<'l> ExecutionContext<'l> {
         }
     }
 
+    /// Finds the [SubModule] that a [WireReferenceRoot::LocalSubmodule] with the given path refers to.
+    ///
+    /// For `split` submodule arrays, the indices of the split dimensions select the submodule, and are removed from the path.
+    fn get_submodule_instance(
+        &self,
+        submod_decl_id: FlatID,
+        path: &mut Vec<RealWirePathElem>,
+    ) -> ExecutionResult<SubModuleID> {
+        match &self.generation_state[submod_decl_id] {
+            SubModuleOrWire::SubModule(submod_id) => Ok(*submod_id),
+            SubModuleOrWire::SplitSubModule(split) => {
+                let num_splits = split.split_dims.len();
+                let mut split_index: Vec<IBig> = Vec::with_capacity(num_splits);
+                // Lints guarantee that all split dimensions are indexed with generative indices
+                for (size, path_elem) in split.split_dims.iter().zip(path.drain(0..num_splits)) {
+                    let_unwrap!(RealWirePathElem::ConstIndex { span, idx }, path_elem);
+                    if idx < IBig::from(0) || &idx >= size {
+                        return Err(CompileError::error(
+                            span.inner_span(),
+                            format!("Index {idx} out of bounds for array of size {size}"),
+                        ));
+                    }
+                    split_index.push(idx);
+                }
+                Ok(split.contained_submodules[split_index.as_slice()])
+            }
+            SubModuleOrWire::Wire(_)
+            | SubModuleOrWire::SplitWire(_)
+            | SubModuleOrWire::CompileTimeValue(_)
+            | SubModuleOrWire::Unassigned => unreachable!(),
+        }
+    }
+
     fn get_interface(
         &mut self,
         interface_ref: &'l WireReference,
@@ -1157,10 +1190,9 @@ impl<'l> ExecutionContext<'l> {
     ) -> ExecutionResult<InterfaceWires> {
         match &interface_ref.root {
             WireReferenceRoot::LocalSubmodule(submod_decl_id) => {
-                let submod_id = self.generation_state[*submod_decl_id].unwrap_submodule_instance();
-
                 // Typecheck guarantees the path consists of the indices into the submodule array, and then the field
-                let (interface, name_span, path) = self.execute_wire_ref_path(interface_ref)?;
+                let (interface, name_span, mut path) = self.execute_wire_ref_path(interface_ref)?;
+                let submod_id = self.get_submodule_instance(*submod_decl_id, &mut path)?;
 
                 let mut interface =
                     self.get_submodule_interface(submod_id, interface, name_span, parent_clock);
@@ -1620,6 +1652,51 @@ impl<'l> ExecutionContext<'l> {
         }))
     }
 
+    /// Instantiates one [SubModule] for every index of the split dimensions. See [SplitSubModule]
+    fn instantiate_split_submodule(
+        &mut self,
+        submodule: &SubModuleInstance,
+        original_instruction: FlatID,
+        clock_map: FlatAlloc<ClockID, ClockIDMarker>,
+        split_dims: Vec<IBig>,
+        array_dims: Vec<IBig>,
+    ) -> ExecutionResult<SubModuleOrWire> {
+        let name_proto = &submodule.name;
+        let mut contained_submodules = HashMap::new();
+        let mut split_index = vec![IBig::from(0); split_dims.len()];
+        // If any dimension is empty, there are no submodules at all
+        let mut index_exists = split_dims.iter().all(|dim| dim > &IBig::from(0));
+        while index_exists {
+            let name = format!(
+                "{name_proto}_split_{}",
+                display_join("_", &split_index, |f, idx| write!(f, "{idx}"))
+            );
+            let submod_id = self.instantiate_submodule(
+                &submodule.module_ref,
+                &name,
+                original_instruction,
+                clock_map.clone(),
+                array_dims.clone(),
+            )?;
+            contained_submodules.insert(split_index.clone().into_boxed_slice(), submod_id);
+
+            // Advance to the next index, last dimension fastest
+            index_exists = false;
+            for (idx, dim) in split_index.iter_mut().zip(&split_dims).rev() {
+                *idx += 1;
+                if &*idx < dim {
+                    index_exists = true;
+                    break;
+                }
+                *idx = IBig::from(0);
+            }
+        }
+        Ok(SubModuleOrWire::SplitSubModule(Box::new(SplitSubModule {
+            split_dims,
+            contained_submodules,
+        })))
+    }
+
     /// Does this wire reference name an action, trigger or function directly? So `my_trigger`, `submod.push` or `submods[i].push`, but not `submod.port` or `submod`
     ///
     /// Such references are the condition wire of what they name. Typecheck has already rejected any other paths on them
@@ -1779,13 +1856,26 @@ impl<'l> ExecutionContext<'l> {
                             self.generation_state.get_generation_small_int(*size_expr)?;
                         array_dims.push(IBig::from(size));
                     }
-                    SubModuleOrWire::SubModule(self.instantiate_submodule(
-                        &submodule.module_ref,
-                        &submodule.name,
-                        original_instruction,
-                        clock_map,
-                        array_dims,
-                    )?)
+                    if submodule.num_splits == 0 {
+                        SubModuleOrWire::SubModule(self.instantiate_submodule(
+                            &submodule.module_ref,
+                            &submodule.name,
+                            original_instruction,
+                            clock_map,
+                            array_dims,
+                        )?)
+                    } else {
+                        // Lints guarantee num_splits <= array_sizes.len()
+                        let mut split_dims = array_dims;
+                        let array_dims = split_dims.split_off(submodule.num_splits);
+                        self.instantiate_split_submodule(
+                            submodule,
+                            original_instruction,
+                            clock_map,
+                            split_dims,
+                            array_dims,
+                        )?
+                    }
                 }
                 Instruction::Declaration(wire_decl) => {
                     self.instantiate_declaration(wire_decl, original_instruction)?
