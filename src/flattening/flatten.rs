@@ -652,6 +652,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         decl_context: DeclarationKind,
         mut read_only: bool,
         declaration_itself_is_not_written_to: bool,
+        annotations: Vec<Annotation>,
         cursor: &mut Cursor<'c>,
     ) -> FlatID {
         let decl_span = cursor.span();
@@ -713,6 +714,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         num_splits,
                         submodule_clock_map: OnceCell::new(),
                         typ: AbstractRankedType::UNKNOWN,
+                        annotations,
                         documentation,
                     };
                     self.instructions.alloc_next_alloc_id(
@@ -911,6 +913,20 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 }
             };
 
+            if let Some(first_annotation) = annotations.first() {
+                if decl_kind.is_generative() {
+                    self.errors.error(
+                        first_annotation.span,
+                        "Annotations can't be placed on generative declarations",
+                    );
+                } else if let DeclarationKind::StructField(_) = decl_kind {
+                    self.errors.error(
+                        first_annotation.span,
+                        "Annotations can't be placed on struct fields",
+                    );
+                }
+            }
+
             let clock_domain = if let DeclarationKind::Port { .. }
             | DeclarationKind::FunctionParameter { .. } = decl_kind
             {
@@ -934,6 +950,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     decl_kind,
                     read_only,
                     latency_specifier,
+                    annotations,
                     documentation,
                 }),
             );
@@ -1652,6 +1669,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             DeclarationKind::RegularGenerative,
             true,
             true,
+            Vec::new(),
             cursor,
         );
 
@@ -1987,6 +2005,41 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         })
     }
 
+    /// See [Annotation]
+    fn flatten_annotations(&mut self, cursor: &mut Cursor<'c>) -> Vec<Annotation> {
+        if cursor.optional_field(field!("annotations")) {
+            cursor.collect_list(kind!("annotations"), |cursor| {
+                let span = cursor.span();
+                cursor.go_down(kind!("annotation"), |cursor| {
+                    let (name_span, name) =
+                        cursor.field_to_string(field!("name"), kind!("identifier"));
+                    let value = cursor.optional_field(field!("value")).then(|| {
+                        cursor.go_down_content(kind!("parenthesis_expression"), |cursor| {
+                            self.flatten_subexpr(cursor)
+                        })
+                    });
+                    Annotation {
+                        name,
+                        name_span,
+                        span,
+                        value,
+                    }
+                })
+            })
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn annotations_only_on_declarations(&self, annotations: &[Annotation]) {
+        if let Some(first_annotation) = annotations.first() {
+            self.errors.error(
+                first_annotation.span,
+                "Annotations can only be placed on declarations",
+            );
+        }
+    }
+
     fn flatten_write_modifiers(&mut self, cursor: &mut Cursor<'c>) -> WriteModifiers {
         if cursor.optional_field(field!("write_modifiers")) {
             let mut initial_kw_span: Option<Span> = None;
@@ -2043,6 +2096,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     fn flatten_assignment_left_side(&mut self, cursor: &mut Cursor<'c>) -> Vec<WriteTo> {
         cursor.collect_list(kind!("assign_left_side"), |cursor| {
             cursor.go_down(kind!("assign_to"), |cursor| {
+                let annotations = self.flatten_annotations(cursor);
                 let write_modifiers = self.flatten_write_modifiers(cursor);
 
                 cursor.field(field!("expr_or_decl"));
@@ -2052,6 +2106,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         self.default_decl_kind,
                         false,
                         false,
+                        annotations,
                         cursor,
                     );
                     let flat_root_decl = self.instructions[root].unwrap_declaration();
@@ -2063,6 +2118,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     }
                 } else {
                     // It's _expression
+                    self.annotations_only_on_declarations(&annotations);
                     self.flatten_wire_reference(cursor)
                 };
                 WriteTo {
@@ -2090,6 +2146,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 }
                 is_first_item = false;
 
+                let annotations = self.flatten_annotations(cursor);
                 let write_modifiers = self.flatten_write_modifiers(cursor);
 
                 cursor.field(field!("expr_or_decl"));
@@ -2106,10 +2163,12 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         self.default_decl_kind,
                         false,
                         true,
+                        annotations,
                         cursor,
                     );
                 } else {
                     // It's _expression
+                    self.annotations_only_on_declarations(&annotations);
                     self.flatten_standalone_expr(write_modifiers, cursor);
                 }
             });
@@ -2161,7 +2220,13 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     ) -> Vec<FlatID> {
         if cursor.optional_field(field) {
             cursor.collect_list(kind!("declaration_list"), |cursor| {
-                self.flatten_declaration::<false>(default_decl_kind, false, true, cursor)
+                self.flatten_declaration::<false>(
+                    default_decl_kind,
+                    false,
+                    true,
+                    Vec::new(),
+                    cursor,
+                )
             })
         } else {
             Vec::new()
@@ -2265,6 +2330,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             DeclarationKind::TemplateParameter(next_param_id),
                             true,
                             true,
+                            Vec::new(),
                             cursor,
                         );
                         let decl = self.instructions[decl_id].unwrap_declaration();
@@ -2323,6 +2389,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             decl_kind: DeclarationKind::RegularGenerative,
                             read_only: false,
                             latency_specifier: None,
+                            annotations: Vec::new(),
                             documentation: const_type_cursor.extract_gathered_docs(),
                         }));
 

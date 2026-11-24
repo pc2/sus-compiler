@@ -4068,6 +4068,140 @@ always_ff @(posedge clk) begin // latency mul1
 end
 endmodule // example_md #()
 
+// AnnotationTop #()
+module AnnotationTop(
+	/* clock */ input clk,
+	input wire abc,
+	output /*mux_wire*/ logic o
+);
+
+/*mux_wire*/ logic _t_abc;
+/*latency*/ logic _t_dbg_in;
+wire _t_o;
+AnnotationTest_FANOUT_8_STYLE_block t(
+	.clk(clk),
+	.abc(_t_abc),
+	.dbg_in(_t_dbg_in),
+	.o(_t_o)
+);
+always_comb begin // combinatorial _t_abc
+	_t_abc = abc;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_t_abc = _t_abc;
+end
+always_ff @(posedge clk) begin // latency _t_dbg_in
+	_t_dbg_in <= abc;
+end
+always_comb begin // combinatorial o
+	o = _t_o;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	o = o;
+end
+endmodule // AnnotationTop #()
+
+// AnnotationTest #(FANOUT: 8, STYLE: "block")
+module AnnotationTest_FANOUT_8_STYLE_block(
+	/* clock */ input clk,
+	input wire abc,
+	(* mark_debug *) input wire dbg_in,
+	(* keep *) output /*mux_wire*/ logic o
+);
+
+genvar _g0;
+(* shreg_extract = "no" *) (* async_reg *) /*latency*/ logic xyz;
+(* keep, max_fanout = 16 *) /*state*/ logic[7:0] counter;
+(* ram_style = "block", keep = 1'b1 *) /*mux_wire*/ logic[31:0] mem[0:15];
+(* keep *) /*mux_wire*/ logic sp_split_0;
+(* keep *) /*mux_wire*/ logic sp_split_1;
+wire[8:0] _4;
+assign _4 = counter + 1'd1;
+wire[7:0] _6;
+assign _6 = _4 % 9'd256;
+wire[3:0] _9;
+assign _9 = counter % 5'd16;
+/*mux_wire*/ logic _s_a;
+wire _s_b;
+/*latency*/ logic __s_b_D1; always_ff @(posedge clk) begin __s_b_D1 <= _s_b; end
+wire _15;
+assign _15 = xyz & __s_b_D1;
+/*mux_wire*/ logic[2:0] _subs_a;
+wire[2:0] _subs_b;
+wire _17 = _subs_b[0];
+wire _18;
+assign _18 = _15 & _17;
+wire _19 = mem[2][3];
+wire _20;
+assign _20 = _18 & _19;
+wire _23;
+assign _23 = counter == 2'd3;
+wire _24;
+assign _24 = _20 & _23;
+(* dont_touch *) AnnotationSub s(
+	.clk(clk),
+	.a(_s_a),
+	.b(_s_b)
+);
+generate
+for(_g0 = 0; _g0 < 3; _g0 = _g0 + 1) begin : subs
+(* dont_touch = "yes" *) AnnotationSub inst(
+	.clk(clk),
+	.a(_subs_a[_g0]),
+	.b(_subs_b[_g0])
+);
+end
+endgenerate
+always_ff @(posedge clk) begin // latency xyz
+	xyz <= abc;
+end
+always_ff @(posedge clk) begin // state counter
+	counter <= _6;
+end
+always_comb begin // combinatorial mem
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	mem = '{32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx};
+	mem[_9][0] = dbg_in;
+end
+always_comb begin // combinatorial sp_split_0
+	sp_split_0 = abc;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	sp_split_0 = sp_split_0;
+end
+always_comb begin // combinatorial sp_split_1
+	sp_split_1 = xyz;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	sp_split_1 = sp_split_1;
+end
+always_comb begin // combinatorial o
+	o = _24;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	o = o;
+end
+always_comb begin // combinatorial _s_a
+	_s_a = sp_split_0;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	_s_a = _s_a;
+end
+always_comb begin // combinatorial _subs_a
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	_subs_a = 3'bxxx;
+	_subs_a[0] = sp_split_1;
+end
+endmodule // AnnotationTest #(FANOUT: 8, STYLE: "block")
+
+// AnnotationSub #()
+module AnnotationSub(
+	/* clock */ input clk,
+	input wire a,
+	output /*mux_wire*/ logic b
+);
+
+always_comb begin // combinatorial b
+	b = a;
+	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
+	b = b;
+end
+endmodule // AnnotationSub #()
+
 // TestAlwaysValid #()
 module TestAlwaysValid(
 	/* clock */ input clk,

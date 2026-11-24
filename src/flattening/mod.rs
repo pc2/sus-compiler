@@ -820,7 +820,24 @@ pub struct Declaration {
     pub decl_kind: DeclarationKind,
     pub read_only: bool,
     pub latency_specifier: Option<FlatID>,
+    pub annotations: Vec<Annotation>,
     pub documentation: Documentation,
+}
+
+/// `@keep` or `@ram_style("block")` in front of a declaration or submodule instance.
+///
+/// Passed through to the generated code as a synthesis attribute: `(* keep *)`, `(* ram_style = "block" *)`.
+/// The name is not interpreted by the compiler.
+///
+/// When instantiating, creates a [crate::instantiation::Attribute]
+#[derive(Debug)]
+pub struct Annotation {
+    pub name: String,
+    pub name_span: Span,
+    /// Covers the whole annotation, from the `@` up to and including the value
+    pub span: Span,
+    /// A generative expression of type `bool`, `int` or `string`
+    pub value: Option<FlatID>,
 }
 
 /// An [Instruction] that represents a instantiation of a submodule.
@@ -855,6 +872,7 @@ pub struct SubModuleInstance {
     /// These are *always* [ClockDomain::Physical] (of course, start out as [ClockDomain::UNKNOWN] before typing)
     pub submodule_clock_map: OnceCell<FlatAlloc<UniCell<ClockID>, ClockIDMarker>>,
     pub typ: AbstractRankedType,
+    pub annotations: Vec<Annotation>,
     pub documentation: Documentation,
 }
 

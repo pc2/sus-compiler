@@ -23,12 +23,14 @@ impl<'l> TypeCheckingContext<'l> {
                 for (size_expr, _) in &sub_module_instance.array_sizes {
                     self.must_be_generative(*size_expr, "Submodule array size");
                 }
+                self.annotation_values_must_be_generative(&sub_module_instance.annotations);
             }
             Instruction::Declaration(declaration) => {
                 self.written_type_must_be_generative(&declaration.typ_expr);
                 if let Some(latency_spec) = declaration.latency_specifier {
                     self.must_be_generative(latency_spec, "Latency Specifier");
                 }
+                self.annotation_values_must_be_generative(&declaration.annotations);
             }
             Instruction::Expression(expr) => {
                 // We can safely set it to PLACEHOLDER here. We would only access it *if* we're Physical anyway, and in that case it *must* have been set
@@ -377,6 +379,14 @@ impl<'l> TypeCheckingContext<'l> {
                 expr.span,
                 format!("{context} must be a compile-time expression"),
             );
+        }
+    }
+
+    fn annotation_values_must_be_generative(&self, annotations: &[Annotation]) {
+        for annotation in annotations {
+            if let Some(value) = annotation.value {
+                self.must_be_generative(value, "Annotation value");
+            }
         }
     }
 

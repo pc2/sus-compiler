@@ -654,6 +654,7 @@ impl<'l> ExecutionContext<'l> {
                                 specified_latency: split.specified_latency_prototype,
                                 absolute_latency: AbsLat::UNKNOWN,
                                 is_port: split.is_port_prototype,
+                                attributes: split.attributes_prototype.clone(),
                             })
                         });
                     *wire_id
@@ -883,6 +884,7 @@ impl<'l> ExecutionContext<'l> {
             specified_latency: AbsLat::UNKNOWN,
             absolute_latency: AbsLat::UNKNOWN,
             is_port: IsPort::PlainWire,
+            attributes: Vec::new(),
         }))
     }
     fn alloc_bool(&mut self, v: bool, original_instruction: FlatID, domain: ClockID) -> WireID {
@@ -897,6 +899,7 @@ impl<'l> ExecutionContext<'l> {
             specified_latency: AbsLat::UNKNOWN,
             absolute_latency: AbsLat::UNKNOWN,
             is_port: IsPort::PlainWire,
+            attributes: Vec::new(),
         })
     }
 
@@ -923,6 +926,7 @@ impl<'l> ExecutionContext<'l> {
             specified_latency: AbsLat::UNKNOWN,
             absolute_latency: AbsLat::UNKNOWN,
             is_port: IsPort::PlainWire,
+            attributes: Vec::new(),
         })
     }
 
@@ -955,6 +959,7 @@ impl<'l> ExecutionContext<'l> {
             specified_latency: AbsLat::UNKNOWN,
             absolute_latency: AbsLat::UNKNOWN,
             is_port: IsPort::PlainWire,
+            attributes: Vec::new(),
         })
     }
 
@@ -1060,6 +1065,7 @@ impl<'l> ExecutionContext<'l> {
                 specified_latency: AbsLat::UNKNOWN,
                 absolute_latency: AbsLat::UNKNOWN,
                 is_port: IsPort::SubmodulePort(sub_module_id, port_id, port_data.direction),
+                attributes: Vec::new(),
             });
 
             if is_condition && port_data.direction == Direction::Input {
@@ -1208,6 +1214,7 @@ impl<'l> ExecutionContext<'l> {
                     &md.link_info.name,
                     original_instruction,
                     clock_map,
+                    Vec::new(),
                     Vec::new(),
                 )?;
 
@@ -1386,7 +1393,39 @@ impl<'l> ExecutionContext<'l> {
             specified_latency: AbsLat::UNKNOWN,
             absolute_latency: AbsLat::UNKNOWN,
             is_port: IsPort::PlainWire,
+            attributes: Vec::new(),
         })])
+    }
+
+    /// See [Annotation]
+    fn execute_annotations(&self, annotations: &[Annotation]) -> ExecutionResult<Vec<Attribute>> {
+        annotations
+            .iter()
+            .map(|annotation| {
+                let value = match annotation.value {
+                    Some(value_id) => {
+                        let value = self.generation_state.get_generation_value(value_id);
+                        if !matches!(
+                            value,
+                            Value::Bool(_) | Value::Integer(_) | Value::String(_)
+                        ) {
+                            return Err(CompileError::error(
+                                self.link_info.instructions[value_id].get_span(),
+                                format!(
+                                    "The value of an annotation must be a bool, int or string, but found {value}"
+                                ),
+                            ));
+                        }
+                        Some(value.clone())
+                    }
+                    None => None,
+                };
+                Ok(Attribute {
+                    name: annotation.name.clone(),
+                    value,
+                })
+            })
+            .collect()
     }
 
     fn get_specified_latency(&mut self, spec_lat: Option<FlatID>) -> ExecutionResult<AbsLat> {
@@ -1418,6 +1457,7 @@ impl<'l> ExecutionContext<'l> {
             SubModuleOrWire::CompileTimeValue(value)
         } else {
             let specified_latency = self.get_specified_latency(wire_decl.latency_specifier)?;
+            let attributes = self.execute_annotations(&wire_decl.annotations)?;
 
             let is_port = if let DeclarationKind::Port {
                 direction, port_id, ..
@@ -1446,6 +1486,7 @@ impl<'l> ExecutionContext<'l> {
                 SubModuleOrWire::SplitWire(Box::new(SplitWire {
                     specified_latency_prototype: specified_latency,
                     is_port_prototype: is_port,
+                    attributes_prototype: attributes,
                     original_decl: original_instruction,
                     element_typ_prototype,
                     name_prototype: self.unique_name_producer.get_unique_name(&wire_decl.name),
@@ -1476,6 +1517,7 @@ impl<'l> ExecutionContext<'l> {
                     specified_latency,
                     absolute_latency: AbsLat::UNKNOWN,
                     is_port,
+                    attributes,
                 });
                 SubModuleOrWire::Wire(wire_id)
             }
@@ -1618,6 +1660,7 @@ impl<'l> ExecutionContext<'l> {
         original_instruction: FlatID,
         clock_map: FlatAlloc<ClockID, ClockIDMarker>,
         array_dims: Vec<IBig>,
+        attributes: Vec<Attribute>,
     ) -> ExecutionResult<SubModuleID> {
         let sub_module = &self.globals.modules[module_ref.id];
 
@@ -1649,6 +1692,7 @@ impl<'l> ExecutionContext<'l> {
             field_call_sites,
             name: self.unique_name_producer.get_unique_name(name_origin),
             array_dims,
+            attributes,
         }))
     }
 
@@ -1660,6 +1704,7 @@ impl<'l> ExecutionContext<'l> {
         clock_map: FlatAlloc<ClockID, ClockIDMarker>,
         split_dims: Vec<IBig>,
         array_dims: Vec<IBig>,
+        attributes: Vec<Attribute>,
     ) -> ExecutionResult<SubModuleOrWire> {
         let name_proto = &submodule.name;
         let mut contained_submodules = HashMap::new();
@@ -1677,6 +1722,7 @@ impl<'l> ExecutionContext<'l> {
                 original_instruction,
                 clock_map.clone(),
                 array_dims.clone(),
+                attributes.clone(),
             )?;
             contained_submodules.insert(split_index.clone().into_boxed_slice(), submod_id);
 
@@ -1856,6 +1902,7 @@ impl<'l> ExecutionContext<'l> {
                             self.generation_state.get_generation_small_int(*size_expr)?;
                         array_dims.push(IBig::from(size));
                     }
+                    let attributes = self.execute_annotations(&submodule.annotations)?;
                     if submodule.num_splits == 0 {
                         SubModuleOrWire::SubModule(self.instantiate_submodule(
                             &submodule.module_ref,
@@ -1863,6 +1910,7 @@ impl<'l> ExecutionContext<'l> {
                             original_instruction,
                             clock_map,
                             array_dims,
+                            attributes,
                         )?)
                     } else {
                         // Lints guarantee num_splits <= array_sizes.len()
@@ -1874,6 +1922,7 @@ impl<'l> ExecutionContext<'l> {
                             clock_map,
                             split_dims,
                             array_dims,
+                            attributes,
                         )?
                     }
                 }
@@ -2009,6 +2058,7 @@ impl<'l> ExecutionContext<'l> {
                             specified_latency,
                             absolute_latency: AbsLat::UNKNOWN,
                             is_port,
+                            attributes: Vec::new(),
                         });
 
                         if is_fired_locally {

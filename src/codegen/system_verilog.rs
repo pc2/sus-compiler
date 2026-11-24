@@ -15,7 +15,7 @@ use crate::{
         BinaryOperator, ClockVisibility, Direction, Module, PartSelectKind, UnaryOperator,
     },
     instantiation::{
-        InstantiatedModule, InstantiatedPort, IsPort, MultiplexerSource, RealWire,
+        Attribute, InstantiatedModule, InstantiatedPort, IsPort, MultiplexerSource, RealWire,
         RealWireDataSource, RealWirePathElem,
     },
     latency::{AbsLat, RegisterPlacement},
@@ -899,10 +899,12 @@ impl<'g> CodeGenerationContext<'g> {
     }
 
     /// Attributes that go in front of the declaration of the wire (for ports, in front of the direction). May have a trailing space.
-    fn wire_attributes(&self, wire_id: WireID) -> &'static str {
+    fn wire_attributes(&self, wire_id: WireID) -> String {
         let is_explicit_reg =
             matches!(self.registers.absorbed_regs[wire_id], Some(reg) if reg.is_explicit);
-        super::patches::patch_explicit_reg_no_srl(is_explicit_reg)
+        let patch_attributes = super::patches::patch_explicit_reg_no_srl(is_explicit_reg);
+        let attributes = codegen_attributes(&self.instance.wires[wire_id].attributes);
+        format!("{patch_attributes}{attributes}")
     }
 
     fn codegen_declaration(
@@ -991,7 +993,10 @@ impl<'g> CodeGenerationContext<'g> {
                         port_list.line(line);
                     }
                 }
-                format!("{for_stms}{module_name} {instance_name}({port_list});\n{for_ends}")
+                let attributes = codegen_attributes(&sm.attributes);
+                format!(
+                    "{for_stms}{attributes}{module_name} {instance_name}({port_list});\n{for_ends}"
+                )
             });
         }
     }
@@ -1744,6 +1749,24 @@ impl<'g> WireName<'g> {
 
         self.wire.typ.codegen_declaration(self)
     }
+}
+
+/// `(* keep, ram_style = "block" *) `, with a trailing space. Empty if there are no attributes.
+fn codegen_attributes(attributes: &[Attribute]) -> String {
+    if attributes.is_empty() {
+        return String::new();
+    }
+    let attributes = display_join(", ", attributes, |f, attribute| {
+        f.write_str(&attribute.name)?;
+        match &attribute.value {
+            None => Ok(()),
+            Some(Value::Bool(b)) => write!(f, " = {}", if *b { "1'b1" } else { "1'b0" }),
+            Some(Value::Integer(i)) => write!(f, " = {i}"),
+            Some(Value::String(s)) => write!(f, " = \"{}\"", s.escape_default()),
+            Some(_) => unreachable!("Checked by execute_annotations"),
+        }
+    });
+    format!("(* {attributes} *) ")
 }
 
 /// This is for making the resulting Verilog a little nicer to read

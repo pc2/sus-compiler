@@ -466,10 +466,16 @@ impl LintContext<'_> {
                     for (size_expr, _) in &sm.array_sizes {
                         instruction_fanins[instr_id].push(*size_expr);
                     }
+                    for annotation in &sm.annotations {
+                        instruction_fanins[instr_id].extend(annotation.value);
+                    }
                 }
                 Instruction::Declaration(decl) => {
                     if let Some(lat_spec) = decl.latency_specifier {
                         instruction_fanins[instr_id].push(lat_spec);
+                    }
+                    for annotation in &decl.annotations {
+                        instruction_fanins[instr_id].extend(annotation.value);
                     }
                     decl.typ_expr.for_each_generative_input(&mut |id| {
                         instruction_fanins[instr_id].push(id);

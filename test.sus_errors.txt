@@ -190,6 +190,11 @@
 [ERROR sus_compiler::instantiation::instantiator] Failed to instantiate TestSplitSubmoduleOutOfBounds #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestAbsorbedRegs #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestAlwaysValid #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated AnnotationSub #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated AnnotationTest #(FANOUT: 8, STYLE: "block")
+[INFO  sus_compiler::instantiation::instantiator] Instantiated AnnotationTop #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate AnnotationErrors #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate AnnotationBadValue #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated example_md #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated multiply_add #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated pow17 #()
@@ -384,6 +389,8 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate TestSubmoduleArrayNegativeSize due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate TestSplitSubmoduleErrors due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate TestSplitSubmoduleOutOfBounds due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate AnnotationErrors due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate AnnotationBadValue due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate generative due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate assignment_producer due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_various_assignments due to errors
@@ -4974,6 +4981,104 @@ Error: Index 4 out of bounds for array of size 4
       │                                    ┬  
       │                                    ╰── Index 4 out of bounds for array of size 4
 ──────╯
+Warning: Not Instantiating AnnotationErrors #() due to abstract typing errors
+      ╭─[ test.sus:1737:8 ]
+      │
+ 1737 │ module AnnotationErrors {
+      │        ────────┬───────  
+      │                ╰───────── Not Instantiating AnnotationErrors #() due to abstract typing errors
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1738:13 ]
+      │
+ 1738 │     input bool abc
+      │                ─┬─  
+      │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Annotations can't be placed on generative declarations
+      ╭─[ test.sus:1739:2 ]
+      │
+ 1739 │     @keep gen int X = 3
+      │     ──┬──  
+      │       ╰──── Annotations can't be placed on generative declarations
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1739:16 ]
+      │
+ 1739 │     @keep gen int X = 3
+      │                   ┬  
+      │                   ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1740:7 ]
+      │
+ 1740 │     bool q
+      │          ┬  
+      │          ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Annotations can only be placed on declarations
+      ╭─[ test.sus:1741:2 ]
+      │
+ 1741 │     @keep q = abc
+      │     ──┬──  
+      │       ╰──── Annotations can only be placed on declarations
+──────╯
+Error: Annotation value must be a compile-time expression
+      ╭─[ test.sus:1742:8 ]
+      │
+ 1742 │     @keep(abc) bool rt
+      │           ─┬─  
+      │            ╰─── Annotation value must be a compile-time expression
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1742:18 ]
+      │
+ 1742 │     @keep(abc) bool rt
+      │                     ─┬  
+      │                      ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Annotations can only be placed on declarations
+      ╭─[ test.sus:1743:2 ]
+      │
+ 1743 │     @keep
+      │     ──┬──  
+      │       ╰──── Annotations can only be placed on declarations
+──────╯
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+      ╭─[ test.sus:1744:2 ]
+      │
+ 1744 │     abc
+      │     ─┬─  
+      │      ╰─── The result of this expression is not used. Only function calls can return nothing. 
+──────╯
+Error: Annotations can't be placed on struct fields
+      ╭─[ test.sus:1747:2 ]
+      │
+ 1747 │     @keep bool field
+      │     ──┬──  
+      │       ╰──── Annotations can't be placed on struct fields
+──────╯
+Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+      ╭─[ test.sus:1749:8 ]
+      │
+ 1749 │ module AnnotationBadValue {
+      │        ─────────┬────────  
+      │                 ╰────────── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+──────╯
+Error: The value of an annotation must be a bool, int or string, but found 3.5
+      ╭─[ test.sus:1750:8 ]
+      │
+ 1750 │     @keep(3.5) bool v
+      │           ─┬─  
+      │            ╰─── The value of an annotation must be a bool, int or string, but found 3.5
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1750:18 ]
+      │
+ 1750 │     @keep(3.5) bool v
+      │                     ┬  
+      │                     ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
 Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
     ╭─[ test_old.sus:24:6 ]
     │
@@ -7899,6 +8004,8 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for TestSplitSubmoduleEmpty #() as "TestSplitSubmoduleEmpty"
 [INFO  sus_compiler::codegen] Code generated for TestAbsorbedRegs #() as "TestAbsorbedRegs"
 [INFO  sus_compiler::codegen] Code generated for TestAlwaysValid #() as "TestAlwaysValid"
+[INFO  sus_compiler::codegen] Code generated for AnnotationSub #() as "AnnotationSub"
+[INFO  sus_compiler::codegen] Code generated for AnnotationTop #() as "AnnotationTop"
 [INFO  sus_compiler::codegen] Code generated for example_md #() as "example_md"
 [INFO  sus_compiler::codegen] Code generated for multiply_add #() as "multiply_add"
 [INFO  sus_compiler::codegen] Code generated for test_pow17 #() as "test_pow17"

@@ -1698,3 +1698,54 @@ module TestAlwaysValid {
 		one_conditional[1] = 4
 	}
 }
+
+// Annotations (#29)
+module AnnotationSub : bool a -> bool b {
+	b = a
+}
+module AnnotationTest #(int FANOUT, string STYLE) {
+	input bool abc
+	@mark_debug
+	input bool dbg_in
+	@async_reg reg bool xyz = abc
+
+	@keep
+	@max_fanout(FANOUT * 2)
+	state int#(0..256) counter
+	counter = (counter + 1) % 256
+
+	@ram_style(STYLE) @keep(true)
+	bool[32][16] mem
+	mem[counter % 16][0] = dbg_in
+
+	@dont_touch
+	AnnotationSub s
+	@dont_touch("yes") AnnotationSub[3] subs
+	@keep split bool[2] sp
+	sp[0] = abc
+	sp[1] = xyz
+	@keep
+	output bool o = xyz & s(sp[0]) & subs[0](sp[1]) & mem[2][3] & (counter == 3)
+}
+module AnnotationTop {
+	input bool abc
+	AnnotationTest#(FANOUT: 8, STYLE: "block") t
+	t.abc = abc
+	t.dbg_in = abc
+	output bool o = t.o
+}
+module AnnotationErrors {
+	input bool abc
+	@keep gen int X = 3
+	bool q
+	@keep q = abc
+	@keep(abc) bool rt
+	@keep
+	abc
+}
+struct AnnotationOnStructField {
+	@keep bool field
+}
+module AnnotationBadValue {
+	@keep(3.5) bool v
+}

@@ -1308,6 +1308,7 @@ impl ModuleTypingContext<'_> {
                 specified_latency: _,
                 absolute_latency,
                 is_port,
+                attributes: _,
             },
         ) in &self.wires
         {
@@ -1417,6 +1418,7 @@ impl ModuleTypingContext<'_> {
                 field_call_sites: _,
                 name,
                 array_dims,
+                attributes: _,
             },
         ) in &self.submodules
         {

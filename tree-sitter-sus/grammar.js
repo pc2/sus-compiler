@@ -130,12 +130,23 @@ module.exports = grammar({
         ),
         assign_left_side: $ => sepSeq1($.assign_to, $._comma),
         assign_to: $ => seq(
+            optional(field('annotations', $.annotations)),
             optional(field('write_modifiers', $.write_modifiers)),
             field('expr_or_decl', choice(
                 $.declaration,
                 $._expression
             ))
         ),
+        // `@keep` or `@ram_style("block")`. May be on the lines before the declaration it annotates
+        annotations: $ => repeat1(seq(
+            field('item', $.annotation),
+            optional($._linebreak)
+        )),
+        annotation: $ => prec.right(seq( // Same conflict with the $._expression that comes after as reg_modifier
+            '@',
+            field('name', $.identifier),
+            optional(field('value', $.parenthesis_expression))
+        )),
         reg_modifier: $ => prec.right(seq( // Have to add prescedence because otherwise it conflicts with the $._expression that comes after
             'reg',
             optional(field('reg_param', $.parenthesis_expression))

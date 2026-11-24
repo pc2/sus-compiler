@@ -160,6 +160,16 @@ pub struct RealWire {
     /// The computed latencies after latency counting
     pub absolute_latency: AbsLat,
     pub is_port: IsPort,
+    /// Only on wires that come from a [crate::flattening::Declaration]
+    pub attributes: Vec<Attribute>,
+}
+
+/// A synthesis attribute, from an [crate::flattening::Annotation]. Codegen places it on the declaration of the wire or submodule it belongs to.
+#[derive(Debug, Clone)]
+pub struct Attribute {
+    pub name: String,
+    /// Always a [Value::Bool], [Value::Integer] or [Value::String]
+    pub value: Option<Value>,
 }
 impl RealWire {
     pub fn get_span(&self, link_info: &LinkInfo) -> Span {
@@ -199,6 +209,7 @@ pub struct SubModule {
     /// All elements share [Self::refers_to], [Self::instance] and [Self::clock_map].
     /// The wires in [Self::port_map] are arrays of the port's type with these dimensions, see [Self::wrap_port_typ].
     pub array_dims: Vec<IBig>,
+    pub attributes: Vec<Attribute>,
 }
 impl SubModule {
     /// The type of a wire in [Self::port_map], given the type of the port of a single submodule
@@ -293,6 +304,7 @@ pub struct InstantiatedModule {
 pub struct SplitWire {
     specified_latency_prototype: AbsLat,
     is_port_prototype: IsPort,
+    attributes_prototype: Vec<Attribute>,
     element_typ_prototype: ConcreteType,
     name_prototype: String,
     bounds: Vec<PartialBound>,
