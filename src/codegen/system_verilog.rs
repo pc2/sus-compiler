@@ -1073,6 +1073,7 @@ impl<'g> CodeGenerationContext<'g> {
                     let clk_name = &self.instance.clocks[w.clock].name;
                     let unset_str = codegen_constant(&w.typ, &Value::Unset);
                     let is_absorbed_reg = self.registers.absorbed_regs[w_id].is_some();
+                    let is_always_valid = w.is_always_valid(&self.instance.wires);
                     let arrow_str = if is_state.is_some() {
                         writeln!(
                             self.program_text,
@@ -1086,11 +1087,19 @@ impl<'g> CodeGenerationContext<'g> {
                             "always_ff @(posedge {clk_name}) begin // latency {output_name}"
                         )
                         .unwrap();
-                        writeln!(self.program_text, "\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable\n\t{output_name} <= {unset_str};").unwrap();
+                        if !is_always_valid {
+                            writeln!(self.program_text, "\t// Latency registers are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable\n\t{output_name} <= {unset_str};").unwrap();
+                        }
                         "<="
                     } else {
-                        writeln!(self.program_text, "always_comb begin // combinatorial {output_name}\n\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches").unwrap();
-                        writeln!(self.program_text, "\t{output_name} = {unset_str};").unwrap();
+                        writeln!(
+                            self.program_text,
+                            "always_comb begin // combinatorial {output_name}"
+                        )
+                        .unwrap();
+                        if !is_always_valid {
+                            writeln!(self.program_text, "\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches\n\t{output_name} = {unset_str};").unwrap();
+                        }
                         "="
                     };
 

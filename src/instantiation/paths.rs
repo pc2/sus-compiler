@@ -10,11 +10,21 @@ use super::*;
 use crate::{instantiation::execute::ExecutionResult, to_string::display_maybe, util::zip_eq};
 
 #[derive(Debug, Clone)]
-/// Describes all "slots" of a wire.
-/// For arrays this is all elements of the array
+/// Stores a `T` for every "slot" of a wire, to answer questions about which parts of the wire a set of paths touch.
+/// For arrays the slots are all elements of the array
 /// For structs, this is each field of the struct
+///
+/// The tree is only split up as far as the paths applied to it require: a wire that is only ever accessed as a whole stays a single [PathRange::Full].
+///
+/// Typical use ([PathRange<usize>]): start from `PathRange::new(0)`, [Self::count_uses] the [MultiplexerSource::to_path] of every write to a wire,
+/// and then query the counts with [Self::all], [Self::is_used_eactly_once] or [Self::find_unused_path].
+///
+/// Paths are over-approximated: a runtime index (`arr[idx]`, or a part-select with a runtime start) touches every slot its index wire's bounds allow it to reach,
+/// even though any one cycle only accesses one of them. So "not touched" is exact, but "touched" means "may be touched".
 pub enum PathRange<T: Clone> {
+    /// All slots below this point share the same value
     Full(T),
+    /// One sub-range per array element
     Partial(Vec<PathRange<T>>),
 }
 
@@ -35,6 +45,10 @@ impl<T: Clone> PathRange<T> {
             }
         }
     }
+    /// Calls `f` on every slot that `path` may touch (See [PathRange]), splitting up [PathRange::Full] nodes where `path` only covers part of them.
+    ///
+    /// `typ` is the type of the wire that `path` indexes into.
+    ///
     /// Returns Err(OutOfBoundsError) when casting IBigs to usize fails
     pub fn apply(
         &mut self,
@@ -121,6 +135,7 @@ impl<T: Clone> PathRange<T> {
         Ok(())
     }
 
+    /// `f` holds for every slot of the wire
     pub fn all(&self, f: &mut impl FnMut(&T) -> bool) -> bool {
         match self {
             PathRange::Full(v) => f(v),
@@ -130,6 +145,7 @@ impl<T: Clone> PathRange<T> {
 }
 
 impl PathRange<usize> {
+    /// Increments the count of every slot that `path` may touch.
     pub fn count_uses(
         &mut self,
         path: &[RealWirePathElem],
@@ -138,6 +154,9 @@ impl PathRange<usize> {
     ) {
         let _ = self.apply(path, wires, typ, &mut |v| *v += 1);
     }
+    /// True if `path` is the only path that may touch any of its slots: no other counted path overlaps it.
+    ///
+    /// `path` itself must have been counted with [Self::count_uses] before.
     pub fn is_used_eactly_once(
         &mut self,
         path: &[RealWirePathElem],
@@ -153,6 +172,7 @@ impl PathRange<usize> {
         });
         used_exactly_once
     }
+    /// Finds the first region of slots that no counted path touches, as one index range per array dimension. None if every slot is touched.
     pub fn find_unused_path(&self, typ: &ConcreteType) -> Option<Vec<Range<usize>>> {
         match self {
             PathRange::Full(0) => Some(Vec::new()),
@@ -184,6 +204,36 @@ impl PathRange<usize> {
                 None
             }
         }
+    }
+}
+
+impl MultiplexerSource {
+    /// This write happens every cycle, to exactly the slots that [PathRange] counts for [Self::to_path].
+    ///
+    /// Writes through a runtime index are excluded: [PathRange] counts every slot the index could reach, but only one of them is written.
+    fn always_writes_its_slots(&self) -> bool {
+        self.condition.is_empty()
+            && self.to_path.iter().all(|e| match e {
+                RealWirePathElem::ConstIndex { .. } | RealWirePathElem::Slice { .. } => true,
+                RealWirePathElem::Index { .. } | RealWirePathElem::PartSelect { .. } => false,
+            })
+    }
+}
+
+impl RealWire {
+    /// Every slot of this [RealWireDataSource::Multiplexer] wire is written every cycle. Such a wire never takes its "not valid" `'x` value.
+    pub fn is_always_valid(&self, wires: &FlatAlloc<RealWire, WireIDMarker>) -> bool {
+        let_unwrap!(
+            RealWireDataSource::Multiplexer { sources, .. },
+            &self.source
+        );
+        let mut always_written: PathRange<usize> = PathRange::new(0);
+        for s in sources {
+            if s.always_writes_its_slots() {
+                always_written.count_uses(&s.to_path, wires, &self.typ);
+            }
+        }
+        always_written.all(&mut |num_writes| *num_writes >= 1)
     }
 }
 

@@ -14,18 +14,12 @@ module LocalFunctionCalledFromTwoLatencies(
 wire[6:0] _4;
 assign _4 = x + 1'd1;
 always_comb begin // combinatorial r1
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	r1 = 7'dx;
 	r1 = y;
 end
 always_comb begin // combinatorial r2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	r2 = 7'dx;
 	r2 = y;
 end
 always_comb begin // combinatorial add_one
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	add_one = 1'bx;
 	add_one = 1'b0;
 	add_one = 1'b1;
 	add_one = 1'b1;
@@ -33,19 +27,13 @@ always_comb begin // combinatorial add_one
 	add_one = add_one;
 end
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 7'dx;
 	x = _a_D1;
 	x = a_delayed;
 end
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 7'dx;
 	y = _4;
 end
 always_ff @(posedge clk) begin // latency a_delayed
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	a_delayed <= 7'dx;
 	a_delayed <= a;
 end
 endmodule // LocalFunctionCalledFromTwoLatencies #()
@@ -67,36 +55,24 @@ assign _4 = x + 1'd1;
 wire[7:0] _10;
 assign _10 = r1 + a_delayed;
 always_comb begin // combinatorial r1
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	r1 = 7'dx;
 	r1 = y;
 end
 always_comb begin // combinatorial r2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	r2 = 8'dx;
 	r2 = _10;
 end
 always_comb begin // combinatorial add_one
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	add_one = 1'bx;
 	add_one = 1'b0;
 	add_one = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	add_one = add_one;
 end
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 7'dx;
 	x = a;
 end
 always_ff @(posedge clk) begin // latency y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	y <= 7'dx;
 	y <= _4;
 end
 always_ff @(posedge clk) begin // latency a_delayed
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	a_delayed <= 7'dx;
 	a_delayed <= a;
 end
 endmodule // LocalFunctionLatency #()
@@ -118,13 +94,9 @@ module TestNexts(
 /*latency*/ logic _a_D3; always_ff @(posedge clk) begin _a_D3 <= _a_D2; end
 /*latency*/ logic _a_D4; always_ff @(posedge clk) begin _a_D4 <= _a_D3; end
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 3'dx;
 	y = x;
 end
 always_comb begin // combinatorial z
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	z = 3'dx;
 	z = x;
 end
 always_comb begin // combinatorial b
@@ -134,13 +106,9 @@ always_comb begin // combinatorial b
 	b = b;
 end
 always_ff @(posedge clk) begin // latency c
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	c <= 1'bx;
 	c <= _a_D4;
 end
 always_ff @(posedge clk) begin // latency d
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	d <= 1'bx;
 	d <= _a_D4;
 end
 endmodule // TestNexts #()
@@ -157,13 +125,9 @@ module ParametrizeableRegs(
 /*latency*/ (* shreg_extract = "no" *) logic[2:0] _x_D3; always_ff @(posedge clk) begin _x_D3 <= _x_D2; end
 /*latency*/ (* shreg_extract = "no" *) logic[2:0] _x_D4; always_ff @(posedge clk) begin _x_D4 <= _x_D3; end
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 3'dx;
 	x = 3'd5;
 end
 always_ff @(posedge clk) begin // latency y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	y <= 3'dx;
 	y <= _x_D4;
 end
 endmodule // ParametrizeableRegs #()
@@ -177,15 +141,11 @@ module PositiveAndNegativeNext(
 );
 
 always_comb begin // combinatorial pos
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	pos = 1'bx;
 	pos = i;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	pos = pos;
 end
 always_comb begin // combinatorial neg
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	neg = 1'bx;
 	neg = i;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	neg = neg;
@@ -213,18 +173,12 @@ module TwoDomainsWithLatRegs(
 /*latency*/ logic _a_i_D18; always_ff @(posedge clk) begin _a_i_D18 <= _a_i_D17; end
 /*latency*/ logic _a_i_D19; always_ff @(posedge clk) begin _a_i_D19 <= _a_i_D18; end
 always_ff @(posedge clk) begin // latency a_o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	a_o <= 1'bx;
 	a_o <= _a_i_D11;
 end
 always_ff @(posedge clk) begin // latency a_o2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	a_o2 <= 1'bx;
 	a_o2 <= _a_i_D19;
 end
 always_comb begin // combinatorial b_o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	b_o = 1'bx;
 	b_o = b_i;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	b_o = b_o;
@@ -457,250 +411,168 @@ BoolToInt BoolToInt_20(
 	.o(_BoolToInt_20_o)
 );
 always_comb begin // combinatorial _BoolToInt_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_i = 1'bx;
 	_BoolToInt_i = _1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_i = _BoolToInt_i;
 end
 always_comb begin // combinatorial sums_split_0
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_0 = 1'dx;
 	sums_split_0 = _BoolToInt_o;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	sums_split_0 = sums_split_0;
 end
 always_comb begin // combinatorial _BoolToInt_2_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_2_i = 1'bx;
 	_BoolToInt_2_i = _3;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_2_i = _BoolToInt_2_i;
 end
 always_comb begin // combinatorial sums_split_1
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_1 = 2'dx;
 	sums_split_1 = _4;
 end
 always_comb begin // combinatorial _BoolToInt_3_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_3_i = 1'bx;
 	_BoolToInt_3_i = _6;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_3_i = _BoolToInt_3_i;
 end
 always_comb begin // combinatorial sums_split_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_2 = 2'dx;
 	sums_split_2 = _7;
 end
 always_comb begin // combinatorial _BoolToInt_4_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_4_i = 1'bx;
 	_BoolToInt_4_i = _9;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_4_i = _BoolToInt_4_i;
 end
 always_comb begin // combinatorial sums_split_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_3 = 3'dx;
 	sums_split_3 = _10;
 end
 always_comb begin // combinatorial _BoolToInt_5_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_5_i = 1'bx;
 	_BoolToInt_5_i = _12;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_5_i = _BoolToInt_5_i;
 end
 always_comb begin // combinatorial sums_split_4
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_4 = 3'dx;
 	sums_split_4 = _13;
 end
 always_comb begin // combinatorial _BoolToInt_6_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_6_i = 1'bx;
 	_BoolToInt_6_i = _15;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_6_i = _BoolToInt_6_i;
 end
 always_comb begin // combinatorial sums_split_5
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_5 = 3'dx;
 	sums_split_5 = _16;
 end
 always_comb begin // combinatorial _BoolToInt_7_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_7_i = 1'bx;
 	_BoolToInt_7_i = _18;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_7_i = _BoolToInt_7_i;
 end
 always_comb begin // combinatorial sums_split_6
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_6 = 3'dx;
 	sums_split_6 = _19;
 end
 always_comb begin // combinatorial _BoolToInt_8_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_8_i = 1'bx;
 	_BoolToInt_8_i = _21;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_8_i = _BoolToInt_8_i;
 end
 always_comb begin // combinatorial sums_split_7
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_7 = 4'dx;
 	sums_split_7 = _22;
 end
 always_comb begin // combinatorial _BoolToInt_9_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_9_i = 1'bx;
 	_BoolToInt_9_i = _24;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_9_i = _BoolToInt_9_i;
 end
 always_comb begin // combinatorial sums_split_8
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_8 = 4'dx;
 	sums_split_8 = _25;
 end
 always_comb begin // combinatorial _BoolToInt_10_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_10_i = 1'bx;
 	_BoolToInt_10_i = _27;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_10_i = _BoolToInt_10_i;
 end
 always_comb begin // combinatorial sums_split_9
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_9 = 4'dx;
 	sums_split_9 = _28;
 end
 always_comb begin // combinatorial _BoolToInt_11_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_11_i = 1'bx;
 	_BoolToInt_11_i = _30;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_11_i = _BoolToInt_11_i;
 end
 always_comb begin // combinatorial sums_split_10
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_10 = 4'dx;
 	sums_split_10 = _31;
 end
 always_comb begin // combinatorial _BoolToInt_12_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_12_i = 1'bx;
 	_BoolToInt_12_i = _33;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_12_i = _BoolToInt_12_i;
 end
 always_comb begin // combinatorial sums_split_11
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_11 = 4'dx;
 	sums_split_11 = _34;
 end
 always_comb begin // combinatorial _BoolToInt_13_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_13_i = 1'bx;
 	_BoolToInt_13_i = _36;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_13_i = _BoolToInt_13_i;
 end
 always_comb begin // combinatorial sums_split_12
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_12 = 4'dx;
 	sums_split_12 = _37;
 end
 always_comb begin // combinatorial _BoolToInt_14_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_14_i = 1'bx;
 	_BoolToInt_14_i = _39;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_14_i = _BoolToInt_14_i;
 end
 always_comb begin // combinatorial sums_split_13
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_13 = 4'dx;
 	sums_split_13 = _40;
 end
 always_comb begin // combinatorial _BoolToInt_15_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_15_i = 1'bx;
 	_BoolToInt_15_i = _42;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_15_i = _BoolToInt_15_i;
 end
 always_comb begin // combinatorial sums_split_14
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_14 = 4'dx;
 	sums_split_14 = _43;
 end
 always_comb begin // combinatorial _BoolToInt_16_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_16_i = 1'bx;
 	_BoolToInt_16_i = _45;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_16_i = _BoolToInt_16_i;
 end
 always_comb begin // combinatorial sums_split_15
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_15 = 5'dx;
 	sums_split_15 = _46;
 end
 always_comb begin // combinatorial _BoolToInt_17_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_17_i = 1'bx;
 	_BoolToInt_17_i = _48;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_17_i = _BoolToInt_17_i;
 end
 always_comb begin // combinatorial sums_split_16
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_16 = 5'dx;
 	sums_split_16 = _49;
 end
 always_comb begin // combinatorial _BoolToInt_18_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_18_i = 1'bx;
 	_BoolToInt_18_i = _51;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_18_i = _BoolToInt_18_i;
 end
 always_comb begin // combinatorial sums_split_17
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_17 = 5'dx;
 	sums_split_17 = _52;
 end
 always_comb begin // combinatorial _BoolToInt_19_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_19_i = 1'bx;
 	_BoolToInt_19_i = _54;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_19_i = _BoolToInt_19_i;
 end
 always_comb begin // combinatorial sums_split_18
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_18 = 5'dx;
 	sums_split_18 = _55;
 end
 always_comb begin // combinatorial _BoolToInt_20_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_BoolToInt_20_i = 1'bx;
 	_BoolToInt_20_i = _57;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_BoolToInt_20_i = _BoolToInt_20_i;
 end
 always_comb begin // combinatorial sums_split_19
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums_split_19 = 5'dx;
 	sums_split_19 = _58;
 end
 always_comb begin // combinatorial total
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	total = 5'dx;
 	total = sums_split_19;
 end
 endmodule // CountBitsWithSplits #()
@@ -727,90 +599,60 @@ module TestSplits(
 (* shreg_extract = "no" *) /*latency*/ logic x_unknowns_split_4;
 /*mux_wire*/ logic x_with_latency_split_4;
 always_comb begin // combinatorial x_split_0
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x_split_0 = 1'bx;
 	x_split_0 = y;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	x_split_0 = x_split_0;
 end
 always_comb begin // combinatorial x_unknowns_split_0
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x_unknowns_split_0 = 1'bx;
 	x_unknowns_split_0 = y;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	x_unknowns_split_0 = x_unknowns_split_0;
 end
 always_comb begin // combinatorial x_with_latency_split_0
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x_with_latency_split_0 = 1'bx;
 	x_with_latency_split_0 = y;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	x_with_latency_split_0 = x_with_latency_split_0;
 end
 always_ff @(posedge clk) begin // latency x_split_1
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	x_split_1 <= 1'bx;
 	x_split_1 <= x_split_0;
 end
 always_ff @(posedge clk) begin // latency x_unknowns_split_1
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	x_unknowns_split_1 <= 1'bx;
 	x_unknowns_split_1 <= x_unknowns_split_0;
 end
 always_comb begin // combinatorial x_with_latency_split_1
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x_with_latency_split_1 = 1'bx;
 	x_with_latency_split_1 = x_with_latency_split_0;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	x_with_latency_split_1 = x_with_latency_split_1;
 end
 always_ff @(posedge clk) begin // latency x_split_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	x_split_2 <= 1'bx;
 	x_split_2 <= x_split_1;
 end
 always_ff @(posedge clk) begin // latency x_unknowns_split_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	x_unknowns_split_2 <= 1'bx;
 	x_unknowns_split_2 <= x_unknowns_split_1;
 end
 always_comb begin // combinatorial x_with_latency_split_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x_with_latency_split_2 = 1'bx;
 	x_with_latency_split_2 = x_with_latency_split_1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	x_with_latency_split_2 = x_with_latency_split_2;
 end
 always_ff @(posedge clk) begin // latency x_split_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	x_split_3 <= 1'bx;
 	x_split_3 <= x_split_2;
 end
 always_ff @(posedge clk) begin // latency x_unknowns_split_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	x_unknowns_split_3 <= 1'bx;
 	x_unknowns_split_3 <= x_unknowns_split_2;
 end
 always_comb begin // combinatorial x_with_latency_split_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x_with_latency_split_3 = 1'bx;
 	x_with_latency_split_3 = x_with_latency_split_2;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	x_with_latency_split_3 = x_with_latency_split_3;
 end
 always_ff @(posedge clk) begin // latency x_split_4
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	x_split_4 <= 1'bx;
 	x_split_4 <= x_split_3;
 end
 always_ff @(posedge clk) begin // latency x_unknowns_split_4
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	x_unknowns_split_4 <= 1'bx;
 	x_unknowns_split_4 <= x_unknowns_split_3;
 end
 always_comb begin // combinatorial x_with_latency_split_4
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x_with_latency_split_4 = 1'bx;
 	x_with_latency_split_4 = x_with_latency_split_3;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	x_with_latency_split_4 = x_with_latency_split_4;
@@ -870,39 +712,29 @@ infer_me_with_negative_delta_V_31 inf(
 	.q(_inf_q)
 );
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 1'bx;
 	y = __inf_y_N1;
 	y = _inf_q;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	y = y;
 end
 always_comb begin // combinatorial _inf_a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_inf_a = 1'bx;
 	_inf_a = 1'b0;
 	_inf_a = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_inf_a = _inf_a;
 end
 always_comb begin // combinatorial _inf_x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_inf_x = 1'bx;
 	_inf_x = x;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_inf_x = _inf_x;
 end
 always_comb begin // combinatorial _inf_b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_inf_b = 1'bx;
 	_inf_b = 1'b0;
 	_inf_b = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_inf_b = _inf_b;
 end
 always_comb begin // combinatorial _inf_p
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_inf_p = 1'bx;
 	_inf_p = x;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_inf_p = _inf_p;
@@ -987,39 +819,29 @@ infer_me_with_delta_V_N31 inf(
 	.q(_inf_q)
 );
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 1'bx;
 	y = __inf_y_N1;
 	y = _inf_q;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	y = y;
 end
 always_comb begin // combinatorial _inf_a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_inf_a = 1'bx;
 	_inf_a = 1'b0;
 	_inf_a = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_inf_a = _inf_a;
 end
 always_comb begin // combinatorial _inf_x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_inf_x = 1'bx;
 	_inf_x = x;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_inf_x = _inf_x;
 end
 always_comb begin // combinatorial _inf_b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_inf_b = 1'bx;
 	_inf_b = 1'b0;
 	_inf_b = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_inf_b = _inf_b;
 end
 always_comb begin // combinatorial _inf_p
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_inf_p = 1'bx;
 	_inf_p = x;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_inf_p = _inf_p;
@@ -1068,22 +890,16 @@ module specified_latencies_not_ports_edge_case(
 wire _4;
 assign _4 = out_spec | _in_port_D5;
 always_comb begin // combinatorial out_port
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	out_port = 1'bx;
 	out_port = _4;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	out_port = out_port;
 end
 always_comb begin // combinatorial in_spec
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	in_spec = 1'bx;
 	in_spec = in_port;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	in_spec = in_spec;
 end
 always_comb begin // combinatorial out_spec
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	out_spec = 1'bx;
 	out_spec = 1'b0;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	out_spec = out_spec;
@@ -1124,29 +940,21 @@ FIFO_T_type_int_FROM_0_TO_6_DEPTH_30_MAY_PUSH_LATENCY_8 fifo(
 	.rst()
 );
 always_comb begin // combinatorial request_data
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	request_data = 1'bx;
 	request_data = 1'b0;
 	if(_fifo_may_push) request_data = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	request_data = request_data;
 end
 always_ff @(posedge clk) begin // latency heavy_computation
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	heavy_computation <= 3'dx;
 	heavy_computation <= _data_received_D7;
 end
 always_comb begin // combinatorial _fifo_push
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_fifo_push = 1'bx;
 	_fifo_push = 1'b0;
 	if(__fifo_may_push_D8) _fifo_push = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_fifo_push = _fifo_push;
 end
 always_comb begin // combinatorial _fifo_push_data
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_fifo_push_data = 3'dx;
 	_fifo_push_data = heavy_computation;
 end
 endmodule // instantiate_fifo #()
@@ -1213,40 +1021,26 @@ always_ff @(posedge clk) begin // state write_addr
 	if(rst) write_addr <= 1'd0;
 end
 always_comb begin // combinatorial space_remaining
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	space_remaining = 5'dx;
 	space_remaining = _6;
 end
 always_ff @(posedge clk) begin // latency may_push
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	may_push <= 1'bx;
 	may_push <= _9;
 end
 always_comb begin // combinatorial _ToBits_value
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_ToBits_value = 3'dx;
 	_ToBits_value = push_data;
 end
 always_comb begin // combinatorial may_pop
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	may_pop = 1'bx;
 	may_pop = _18;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	may_pop = may_pop;
 end
 always_comb begin // combinatorial pop_data
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	pop_data = 3'dx;
 	pop_data = _FromBits_value;
 end
 always_ff @(posedge clk) begin // latency pop_out_reg
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	pop_out_reg <= 3'bxxx;
 	pop_out_reg <= _20;
 end
 always_comb begin // combinatorial _FromBits_bits
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_FromBits_bits = 3'bxxx;
 	_FromBits_bits = pop_out_reg;
 end
 endmodule // FIFO #(T: type int #(FROM: 0, TO: 6), DEPTH: 30, MAY_PUSH_LATENCY: 8)
@@ -1293,20 +1087,14 @@ infer_me_A_5 infer_me(
 	.y(_infer_me_y)
 );
 always_comb begin // combinatorial out_val
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	out_val = 1'bx;
 	out_val = _4;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	out_val = out_val;
 end
 always_ff @(posedge clk) begin // latency heavily_pipelined_computation
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	heavily_pipelined_computation <= 1'bx;
 	heavily_pipelined_computation <= _in_val_D4;
 end
 always_comb begin // combinatorial _infer_me_x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_infer_me_x = 1'bx;
 	_infer_me_x = in_val;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_infer_me_x = _infer_me_x;
@@ -1325,8 +1113,6 @@ module infer_me_A_5(
 /*latency*/ logic _x_D3; always_ff @(posedge clk) begin _x_D3 <= _x_D2; end
 /*latency*/ logic _x_D4; always_ff @(posedge clk) begin _x_D4 <= _x_D3; end
 always_ff @(posedge clk) begin // latency y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	y <= 1'bx;
 	y <= _x_D4;
 end
 endmodule // infer_me #(A: 5)
@@ -1348,22 +1134,16 @@ assign _3 = a ^ shared;
 wire _6;
 assign _6 = c ^ shared;
 always_comb begin // combinatorial shared
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	shared = 1'bx;
 	shared = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	shared = shared;
 end
 always_comb begin // combinatorial b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	b = 1'bx;
 	b = _3;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	b = b;
 end
 always_comb begin // combinatorial d
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	d = 1'bx;
 	d = _6;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	d = d;
@@ -1382,13 +1162,9 @@ module multiple_outputs_only(
 wire _2;
 assign _2 = ~loop;
 always_ff @(posedge clk) begin // latency o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	o <= 1'bx;
 	o <= _loop_N1;
 end
 always_ff @(posedge clk) begin // latency o2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	o2 <= 1'bx;
 	o2 <= _loop_N1;
 end
 always_ff @(posedge clk) begin // state loop
@@ -1406,8 +1182,6 @@ module output_only(
 wire _2;
 assign _2 = ~loop;
 always_ff @(posedge clk) begin // latency o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	o <= 1'bx;
 	o <= loop;
 end
 always_ff @(posedge clk) begin // state loop
@@ -1458,8 +1232,6 @@ module good_cycle(
 wire _3;
 assign _3 = test ^ a;
 always_comb begin // combinatorial r
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	r = 1'bx;
 	r = new_test;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	r = r;
@@ -1468,8 +1240,6 @@ always_ff @(posedge clk) begin // state test
 	test <= new_test;
 end
 always_comb begin // combinatorial new_test
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	new_test = 1'bx;
 	new_test = _3;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	new_test = new_test;
@@ -1683,8 +1453,6 @@ module module_taking_a_lot_of_time(
 /*latency*/ logic[6:0] _data_in_D198; always_ff @(posedge clk) begin _data_in_D198 <= _data_in_D197; end
 /*latency*/ logic[6:0] _data_in_D199; always_ff @(posedge clk) begin _data_in_D199 <= _data_in_D198; end
 always_ff @(posedge clk) begin // latency data_out
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	data_out <= 7'dx;
 	data_out <= _data_in_D199;
 end
 endmodule // module_taking_a_lot_of_time #()
@@ -1701,8 +1469,6 @@ module module_taking_time(
 /*latency*/ logic[6:0] _i_D3; always_ff @(posedge clk) begin _i_D3 <= _i_D2; end
 /*latency*/ logic[6:0] _i_D4; always_ff @(posedge clk) begin _i_D4 <= _i_D3; end
 always_ff @(posedge clk) begin // latency o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	o <= 7'dx;
 	o <= _i_D4;
 end
 endmodule // module_taking_time #()
@@ -1724,28 +1490,18 @@ module determinable_because_no_input_output_ports(
 wire[7:0] _7;
 assign _7 = _t_d_D3 + a_dd;
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 8'dx;
 	x = _7;
 end
 always_ff @(posedge clk) begin // latency a_d
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	a_d <= 7'dx;
 	a_d <= a;
 end
 always_comb begin // combinatorial t
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t = 7'dx;
 	t = a_d;
 end
 always_ff @(posedge clk) begin // latency a_dd
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	a_dd <= 7'dx;
 	a_dd <= _a_D2;
 end
 always_ff @(posedge clk) begin // latency t_d
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	t_d <= 7'dx;
 	t_d <= t;
 end
 endmodule // determinable_because_no_input_output_ports #()
@@ -1769,33 +1525,21 @@ assign _4 = a_d + b;
 wire[8:0] _9;
 assign _9 = t_d + a_dd;
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 9'dx;
 	x = _9;
 end
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 8'dx;
 	y = t;
 end
 always_ff @(posedge clk) begin // latency a_d
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	a_d <= 7'dx;
 	a_d <= a;
 end
 always_comb begin // combinatorial t
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t = 8'dx;
 	t = _4;
 end
 always_ff @(posedge clk) begin // latency a_dd
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	a_dd <= 7'dx;
 	a_dd <= _a_D1;
 end
 always_ff @(posedge clk) begin // latency t_d
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	t_d <= 8'dx;
 	t_d <= t;
 end
 endmodule // determinable_input_latency #()
@@ -1821,33 +1565,21 @@ assign _4 = a_d + b;
 wire[8:0] _9;
 assign _9 = _t_d_D3 + a_dd;
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 9'dx;
 	x = _9;
 end
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 8'dx;
 	y = t;
 end
 always_ff @(posedge clk) begin // latency a_d
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	a_d <= 7'dx;
 	a_d <= a;
 end
 always_comb begin // combinatorial t
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t = 8'dx;
 	t = _4;
 end
 always_ff @(posedge clk) begin // latency a_dd
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	a_dd <= 7'dx;
 	a_dd <= _a_D2;
 end
 always_ff @(posedge clk) begin // latency t_d
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	t_d <= 8'dx;
 	t_d <= t;
 end
 endmodule // specified_input_latency #()
@@ -1878,102 +1610,64 @@ module NegativeIntLiterals(
 /*mux_wire*/ logic[3:0] j_19;
 /*mux_wire*/ logic[3:0] j_20;
 always_comb begin // combinatorial j
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j = 5'sdx;
 	j = 5'sh16 /* -10 */;
 end
 always_comb begin // combinatorial j_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_2 = 5'sdx;
 	j_2 = 5'sh17 /* -9 */;
 end
 always_comb begin // combinatorial j_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_3 = 4'sdx;
 	j_3 = 4'sh8 /* -8 */;
 end
 always_comb begin // combinatorial j_4
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_4 = 4'sdx;
 	j_4 = 4'sh9 /* -7 */;
 end
 always_comb begin // combinatorial j_5
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_5 = 4'sdx;
 	j_5 = 4'sha /* -6 */;
 end
 always_comb begin // combinatorial j_6
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_6 = 4'sdx;
 	j_6 = 4'shb /* -5 */;
 end
 always_comb begin // combinatorial j_7
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_7 = 3'sdx;
 	j_7 = 3'sh4 /* -4 */;
 end
 always_comb begin // combinatorial j_8
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_8 = 3'sdx;
 	j_8 = 3'sh5 /* -3 */;
 end
 always_comb begin // combinatorial j_9
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_9 = 2'sdx;
 	j_9 = 2'sh2 /* -2 */;
 end
 always_comb begin // combinatorial j_10
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_10 = 1'sdx;
 	j_10 = 1'sh1 /* -1 */;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	j_10 = j_10;
 end
 always_comb begin // combinatorial j_12
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_12 = 1'dx;
 	j_12 = 1'd1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	j_12 = j_12;
 end
 always_comb begin // combinatorial j_13
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_13 = 2'dx;
 	j_13 = 2'd2;
 end
 always_comb begin // combinatorial j_14
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_14 = 2'dx;
 	j_14 = 2'd3;
 end
 always_comb begin // combinatorial j_15
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_15 = 3'dx;
 	j_15 = 3'd4;
 end
 always_comb begin // combinatorial j_16
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_16 = 3'dx;
 	j_16 = 3'd5;
 end
 always_comb begin // combinatorial j_17
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_17 = 3'dx;
 	j_17 = 3'd6;
 end
 always_comb begin // combinatorial j_18
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_18 = 3'dx;
 	j_18 = 3'd7;
 end
 always_comb begin // combinatorial j_19
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_19 = 4'dx;
 	j_19 = 4'd8;
 end
 always_comb begin // combinatorial j_20
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	j_20 = 4'dx;
 	j_20 = 4'd9;
 end
 endmodule // NegativeIntLiterals #()
@@ -2019,22 +1713,16 @@ ReceiveZerosArray ReceiveZerosArray(
 	// (zero sized port) .values(_ReceiveZerosArray_values)
 );
 always_comb begin // combinatorial vs
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	vs = '{4'sdx, 4'sdx};
 	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
 vs[_v0] = 1'd0;
 end
 end
 always_comb begin // combinatorial nums
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	nums = '{4'dx, 4'dx};
 	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
 nums[_v0] = _5[_v0];
 end
 end
 always_comb begin // combinatorial sums
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sums = '{4'dx, 4'dx};
 	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
 sums[_v0] = _12[_v0];
 end
@@ -2148,8 +1836,6 @@ UIntToBits_NUM_BITS_0 UIntToBits(
 	// (zero sized port) .bits(_UIntToBits_bits)
 );
 always_comb begin // combinatorial addr
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	addr = 3'dx;
 	addr = 3'd4;
 end
 endmodule // zero_sized_stuffs #()
@@ -2250,29 +1936,21 @@ end
 end
 endgenerate
 always_comb begin // combinatorial slice
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	slice = '{20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx};
 	for(int _v0 = 0; _v0 < 9; _v0 = _v0 + 1) begin
 slice[_v0] = _1[_v0];
 end
 end
 always_comb begin // combinatorial slice2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	slice2 = '{2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx, 2'bxx};
 	for(int _v0 = 0; _v0 < 27; _v0 = _v0 + 1) begin
 slice2[_v0] = _2[_v0];
 end
 end
 always_comb begin // combinatorial gen_partselect
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	gen_partselect = '{5'bxxxxx, 5'bxxxxx, 5'bxxxxx, 5'bxxxxx, 5'bxxxxx, 5'bxxxxx, 5'bxxxxx, 5'bxxxxx, 5'bxxxxx};
 	for(int _v0 = 0; _v0 < 9; _v0 = _v0 + 1) begin
 gen_partselect[_v0] = _3[_v0];
 end
 end
 always_comb begin // combinatorial partselect
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	partselect = '{2'bxx, 2'bxx, 2'bxx};
 	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
 partselect[_v0] = _6[_v0];
 end
@@ -2358,8 +2036,6 @@ wire signed[3:0] _60 = in_arr[0][3][9];
 wire signed[3:0] _61 = in_arr[0][4][9];
 wire signed[3:0] _62 = in_arr[0][5][9];
 always_comb begin // combinatorial out_arr
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	out_arr = '{'{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}, '{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}, '{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}, '{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}, '{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}, '{4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx, 4'sdx}};
 	for(int _v0 = 0; _v0 < 6; _v0 = _v0 + 1) begin
 for(int _v1 = 0; _v1 < 10; _v1 = _v1 + 1) begin
 out_arr[_v0][_v1] = _1[_v0][_v1];
@@ -2447,18 +2123,12 @@ sized_int_add #(.LEFT_SIZE(4), .RIGHT_SIZE(3), .OUTPUT_SIZE(5)) sized_int_add(
 	.c(_sized_int_add_c)
 );
 always_comb begin // combinatorial c
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	c = 5'bxxxxx;
 	c = _sized_int_add_c;
 end
 always_comb begin // combinatorial _sized_int_add_a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_sized_int_add_a = 4'bxxxx;
 	_sized_int_add_a = a;
 end
 always_comb begin // combinatorial _sized_int_add_b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_sized_int_add_b = 3'bxxx;
 	_sized_int_add_b = b;
 end
 endmodule // use_sized_int_add #()
@@ -2496,21 +2166,15 @@ permute_t_T_type_int_FROM_1_TO_8_SIZE_8_SOURCES_3_2_4_5_1_2_7_6 permut(
 	.d_out(_permut_d_out)
 );
 always_comb begin // combinatorial inArr
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	inArr = '{20'dx, 20'dx};
 	inArr[0] = 12'd2387;
 	inArr[1] = 20'd786823;
 end
 always_comb begin // combinatorial beep
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	beep = '{3'dx, 3'dx, 3'dx, 3'dx, 3'dx, 3'dx, 3'dx, 3'dx};
 	for(int _v0 = 0; _v0 < 8; _v0 = _v0 + 1) begin
 beep[_v0] = _permut_d_out[_v0];
 end
 end
 always_comb begin // combinatorial _permut_d_in
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_permut_d_in = '{3'dx, 3'dx, 3'dx, 3'dx, 3'dx, 3'dx, 3'dx, 3'dx};
 	for(int _v0 = 0; _v0 < 8; _v0 = _v0 + 1) begin
 _permut_d_in[_v0] = SOURCES[_v0];
 end
@@ -2533,8 +2197,6 @@ wire[2:0] _6 = d_in[2];
 wire[2:0] _7 = d_in[7];
 wire[2:0] _8 = d_in[6];
 always_comb begin // combinatorial d_out
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	d_out = '{3'dx, 3'dx, 3'dx, 3'dx, 3'dx, 3'dx, 3'dx, 3'dx};
 	d_out[0] = _1;
 	d_out[1] = _2;
 	d_out[2] = _3;
@@ -2593,35 +2255,25 @@ IntNarrow_FROM_I_N1_TO_I_100_FROM_0_TO_101 IntNarrow(
 	.dout(_IntNarrow_dout)
 );
 always_comb begin // combinatorial _upTo_cr_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_upTo_cr_i = 7'dx;
 	_upTo_cr_i = upTo;
 end
 always_comb begin // combinatorial _start_cr_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_start_cr_i = 1'bx;
 	_start_cr_i = start;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_start_cr_i = _start_cr_i;
 end
 always_comb begin // combinatorial ready
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	ready = 1'bx;
 	ready = _ready_cr_o;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	ready = ready;
 end
 always_comb begin // combinatorial iter
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	iter = 1'bx;
 	iter = 1'b0;
 	if(valid) iter = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	iter = iter;
 end
 always_comb begin // combinatorial index_out
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	index_out = 7'dx;
 	index_out = index;
 end
 always_ff @(posedge clk) begin // state index
@@ -2629,22 +2281,16 @@ always_ff @(posedge clk) begin // state index
 	if(_start_cr_o) index <= _upTo_cr_o;
 end
 always_comb begin // combinatorial valid
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	valid = 1'bx;
 	valid = _7;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	valid = valid;
 end
 always_comb begin // combinatorial _ready_cr_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_ready_cr_i = 1'bx;
 	_ready_cr_i = _9;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_ready_cr_i = _ready_cr_i;
 end
 always_comb begin // combinatorial _IntNarrow_din
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_IntNarrow_din = 8'sdx;
 	_IntNarrow_din = _13;
 end
 endmodule // sequenceDownFrom #()
@@ -2699,15 +2345,11 @@ always_comb begin // combinatorial domain3
 	domain3 = domain3;
 end
 always_comb begin // combinatorial domain4
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	domain4 = 1'bx;
 	domain4 = _ci_o;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	domain4 = domain4;
 end
 always_comb begin // combinatorial _ci_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_ci_i = 1'bx;
 	_ci_i = domain3;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_ci_i = _ci_i;
@@ -2748,15 +2390,11 @@ always_ff @(posedge clk) begin // state mem
 	if(write) mem[wr_addr] <= wr_data;
 end
 always_comb begin // combinatorial _cr_m_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_cr_m_i = '{20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx, 20'bxxxxxxxxxxxxxxxxxxxx};
 	for(int _v0 = 0; _v0 < 512; _v0 = _v0 + 1) begin
 _cr_m_i[_v0] = mem[_v0];
 end
 end
 always_comb begin // combinatorial rd_data
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	rd_data = 20'bxxxxxxxxxxxxxxxxxxxx;
 	rd_data = _5;
 end
 endmodule // dual_port_mem #()
@@ -2769,8 +2407,6 @@ module offset_backwards(
 );
 
 always_comb begin // combinatorial o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o = 1'bx;
 	o = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	o = o;
@@ -2799,8 +2435,6 @@ module cross_int(
 );
 
 always_comb begin // combinatorial o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o = 1'dx;
 	o = 1'd1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	o = o;
@@ -2815,8 +2449,6 @@ module cross_bool(
 );
 
 always_comb begin // combinatorial o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o = 1'bx;
 	o = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	o = o;
@@ -2834,8 +2466,6 @@ module submodule_named_ports(
 wire[7:0] _3;
 assign _3 = port_a + port_b;
 always_comb begin // combinatorial port_c
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	port_c = 8'dx;
 	port_c = _3;
 end
 endmodule // submodule_named_ports #()
@@ -2860,29 +2490,21 @@ my_mod my_mod(
 	.b(_my_mod_b)
 );
 always_comb begin // combinatorial either
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	either = 1'bx;
 	either = _4;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	either = either;
 end
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 1'bx;
 	x = _my_mod_a;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	x = x;
 end
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 1'bx;
 	y = _my_mod_b;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	y = y;
 end
 always_comb begin // combinatorial _my_mod_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_my_mod_i = 7'dx;
 	_my_mod_i = 2'd3;
 end
 endmodule // use_my_mod #()
@@ -2900,15 +2522,11 @@ assign _3 = i == 2'd3;
 wire _6;
 assign _6 = i == 3'd5;
 always_comb begin // combinatorial a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	a = 1'bx;
 	a = _3;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	a = a;
 end
 always_comb begin // combinatorial b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	b = 1'bx;
 	b = _6;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	b = b;
@@ -3086,8 +2704,6 @@ wire _126 = mbf8[13];
 wire _127 = mbf8[14];
 wire _128 = mbf8[15];
 always_comb begin // combinatorial mtDown
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	mtDown = 16'bxxxxxxxxxxxxxxxx;
 	mtDown[0] = _99;
 	mtDown[1] = _102;
 	mtDown[2] = _105;
@@ -3106,8 +2722,6 @@ always_comb begin // combinatorial mtDown
 	mtDown[15] = _128;
 end
 always_comb begin // combinatorial mbf2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	mbf2 = 16'bxxxxxxxxxxxxxxxx;
 	mbf2[0] = _3;
 	mbf2[1] = _4;
 	mbf2[2] = _7;
@@ -3126,8 +2740,6 @@ always_comb begin // combinatorial mbf2
 	mbf2[15] = _32;
 end
 always_comb begin // combinatorial mbf4
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	mbf4 = 16'bxxxxxxxxxxxxxxxx;
 	mbf4[0] = _35;
 	mbf4[1] = _38;
 	mbf4[2] = _39;
@@ -3146,8 +2758,6 @@ always_comb begin // combinatorial mbf4
 	mbf4[15] = _64;
 end
 always_comb begin // combinatorial mbf8
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	mbf8 = 16'bxxxxxxxxxxxxxxxx;
 	mbf8[0] = _67;
 	mbf8[1] = _70;
 	mbf8[2] = _73;
@@ -3559,8 +3169,6 @@ wire _255 = mbf[0];
 wire _256;
 assign _256 = ~_255;
 always_comb begin // combinatorial dual
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	dual = 128'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
 	dual[0] = _2;
 	dual[1] = _4;
 	dual[2] = _6;
@@ -3720,15 +3328,11 @@ always_comb begin // combinatorial fb
 	if(!_13) if(!fizz) if(!buzz) fb = v;
 end
 always_comb begin // combinatorial fizz
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	fizz = 1'bx;
 	fizz = _5;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	fizz = fizz;
 end
 always_comb begin // combinatorial buzz
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	buzz = 1'bx;
 	buzz = _10;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	buzz = buzz;
@@ -3751,22 +3355,16 @@ xor_deconflict xor_1(
 	.y(_xor_1_y)
 );
 always_comb begin // combinatorial b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	b = 1'bx;
 	b = _xor_1_y;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	b = b;
 end
 always_comb begin // combinatorial _xor_1_x1
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_xor_1_x1 = 1'bx;
 	_xor_1_x1 = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_xor_1_x1 = _xor_1_x1;
 end
 always_comb begin // combinatorial _xor_1_x2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_xor_1_x2 = 1'bx;
 	_xor_1_x2 = 1'b0;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_xor_1_x2 = _xor_1_x2;
@@ -3796,36 +3394,26 @@ assign _10 = x2 & w1;
 wire _13;
 assign _13 = w3 | w4;
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 1'bx;
 	y = _13;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	y = y;
 end
 always_comb begin // combinatorial w1
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	w1 = 1'bx;
 	w1 = _2;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	w1 = w1;
 end
 always_comb begin // combinatorial w2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	w2 = 1'bx;
 	w2 = _4;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	w2 = w2;
 end
 always_comb begin // combinatorial w3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	w3 = 1'bx;
 	w3 = _7;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	w3 = w3;
 end
 always_comb begin // combinatorial w4
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	w4 = 1'bx;
 	w4 = _10;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	w4 = w4;
@@ -3852,8 +3440,6 @@ module submodule(
 wire[13:0] _3;
 assign _3 = a * b;
 always_comb begin // combinatorial r
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	r = 14'dx;
 	r = _3;
 end
 endmodule // submodule #()
@@ -3999,8 +3585,6 @@ always_comb begin
 	for(int _v0 = 0; _v0 < 4; _v0 += 1) _84 += row_products_6[_v0];
 end
 always_comb begin // combinatorial result
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	result = '{16'dx, 16'dx, 16'dx, 16'dx, 16'dx, 16'dx};
 	result[0] = _14;
 	result[1] = _28;
 	result[2] = _42;
@@ -4009,48 +3593,36 @@ always_comb begin // combinatorial result
 	result[5] = _84;
 end
 always_comb begin // combinatorial row_products
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	row_products = '{14'dx, 14'dx, 14'dx, 14'dx};
 	row_products[0] = _3;
 	row_products[1] = _6;
 	row_products[2] = _9;
 	row_products[3] = _12;
 end
 always_comb begin // combinatorial row_products_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	row_products_2 = '{14'dx, 14'dx, 14'dx, 14'dx};
 	row_products_2[0] = _17;
 	row_products_2[1] = _20;
 	row_products_2[2] = _23;
 	row_products_2[3] = _26;
 end
 always_comb begin // combinatorial row_products_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	row_products_3 = '{14'dx, 14'dx, 14'dx, 14'dx};
 	row_products_3[0] = _31;
 	row_products_3[1] = _34;
 	row_products_3[2] = _37;
 	row_products_3[3] = _40;
 end
 always_comb begin // combinatorial row_products_4
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	row_products_4 = '{14'dx, 14'dx, 14'dx, 14'dx};
 	row_products_4[0] = _45;
 	row_products_4[1] = _48;
 	row_products_4[2] = _51;
 	row_products_4[3] = _54;
 end
 always_comb begin // combinatorial row_products_5
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	row_products_5 = '{14'dx, 14'dx, 14'dx, 14'dx};
 	row_products_5[0] = _59;
 	row_products_5[1] = _62;
 	row_products_5[2] = _65;
 	row_products_5[3] = _68;
 end
 always_comb begin // combinatorial row_products_6
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	row_products_6 = '{14'dx, 14'dx, 14'dx, 14'dx};
 	row_products_6[0] = _73;
 	row_products_6[1] = _76;
 	row_products_6[2] = _79;
@@ -4066,8 +3638,6 @@ module test_single_wire(
 );
 
 always_comb begin // combinatorial o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o = 7'dx;
 	o = a;
 end
 endmodule // test_single_wire #()
@@ -4159,8 +3729,6 @@ wire[6:0] _28 = values[9];
 wire[6:0] _30;
 assign _30 = t_10 + 4'd9;
 always_comb begin // combinatorial added_values
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	added_values = '{7'dx, 7'dx, 7'dx, 7'dx, 7'dx, 7'dx, 7'dx, 7'dx, 7'dx, 7'dx};
 	added_values[0] = _3;
 	added_values[1] = _6;
 	added_values[2] = _9;
@@ -4173,53 +3741,33 @@ always_comb begin // combinatorial added_values
 	added_values[9] = _30;
 end
 always_comb begin // combinatorial t
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t = 7'dx;
 	t = _1;
 end
 always_comb begin // combinatorial t_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t_2 = 7'dx;
 	t_2 = _4;
 end
 always_comb begin // combinatorial t_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t_3 = 7'dx;
 	t_3 = _7;
 end
 always_comb begin // combinatorial t_4
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t_4 = 7'dx;
 	t_4 = _10;
 end
 always_comb begin // combinatorial t_5
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t_5 = 7'dx;
 	t_5 = _13;
 end
 always_comb begin // combinatorial t_6
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t_6 = 7'dx;
 	t_6 = _16;
 end
 always_comb begin // combinatorial t_7
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t_7 = 7'dx;
 	t_7 = _19;
 end
 always_comb begin // combinatorial t_8
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t_8 = 7'dx;
 	t_8 = _22;
 end
 always_comb begin // combinatorial t_9
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t_9 = 7'dx;
 	t_9 = _25;
 end
 always_comb begin // combinatorial t_10
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t_10 = 7'dx;
 	t_10 = _28;
 end
 endmodule // add_indices_to_array #()
@@ -4286,8 +3834,6 @@ assign _4 = prev + a;
 wire _7;
 assign _7 = ~done;
 always_ff @(posedge clk) begin // latency result
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	result <= 8'dx;
 	result <= __4_D2;
 end
 always_ff @(posedge clk) begin // state working
@@ -4313,8 +3859,6 @@ assign _3 = tot + term;
 wire[6:0] _5;
 assign _5 = _3 - ((_3 >= 100) ? 100 : 0); // == mod 100
 always_ff @(posedge clk) begin // latency total
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	total <= 7'dx;
 	total <= new_tot;
 end
 always_ff @(posedge clk) begin // state tot
@@ -4322,8 +3866,6 @@ always_ff @(posedge clk) begin // state tot
 	if(!done) tot <= new_tot;
 end
 always_comb begin // combinatorial new_tot
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	new_tot = 7'dx;
 	new_tot = _5;
 end
 endmodule // Accumulator #()
@@ -4348,18 +3890,12 @@ assign _6 = _4 * _5;
 wire[26:0] _9;
 assign _9 = a * b;
 always_ff @(posedge clk) begin // latency total
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	total <= 27'dx;
 	total <= _9;
 end
 always_ff @(posedge clk) begin // latency a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	a <= 14'dx;
 	a <= _3;
 end
 always_ff @(posedge clk) begin // latency b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	b <= 14'dx;
 	b <= _6;
 end
 endmodule // Tree_Multiply #()
@@ -4380,8 +3916,6 @@ assign _5 = data + prev;
 wire[6:0] _7;
 assign _7 = _5 - ((_5 >= 100) ? 100 : 0); // == mod 100
 always_comb begin // combinatorial blurred
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	blurred = 7'dx;
 	blurred = _7;
 end
 always_ff @(posedge clk) begin // state prev
@@ -4402,8 +3936,6 @@ assign _5 = cur + prev;
 wire[6:0] _7;
 assign _7 = _5 - ((_5 >= 100) ? 100 : 0); // == mod 100
 always_comb begin // combinatorial num
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	num = 7'dx;
 	num = _7;
 end
 always_ff @(posedge clk) begin // state cur
@@ -4430,13 +3962,9 @@ pow17 pow17(
 	.o(_pow17_o)
 );
 always_comb begin // combinatorial a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	a = 113'dx;
 	a = _pow17_o;
 end
 always_comb begin // combinatorial _pow17_i
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_pow17_i = 7'dx;
 	_pow17_i = 2'd2;
 end
 endmodule // test_pow17 #()
@@ -4465,28 +3993,18 @@ assign _12 = i8 * i8;
 wire[112:0] _15;
 assign _15 = i16 * _i_D2;
 always_comb begin // combinatorial o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o = 113'dx;
 	o = _15;
 end
 always_comb begin // combinatorial i2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	i2 = 14'dx;
 	i2 = _3;
 end
 always_ff @(posedge clk) begin // latency i4
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	i4 <= 27'dx;
 	i4 <= _6;
 end
 always_comb begin // combinatorial i8
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	i8 = 54'dx;
 	i8 = _9;
 end
 always_ff @(posedge clk) begin // latency i16
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	i16 <= 107'dx;
 	i16 <= _12;
 end
 endmodule // pow17 #()
@@ -4506,13 +4024,9 @@ assign _3 = a * b;
 wire[13:0] _6;
 assign _6 = tmp + c;
 always_comb begin // combinatorial total
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	total = 14'dx;
 	total = _6;
 end
 always_ff @(posedge clk) begin // latency tmp
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	tmp <= 14'dx;
 	tmp <= _3;
 end
 endmodule // multiply_add #()
@@ -4541,26 +4055,66 @@ assign _9 = mul0 * mul1;
 wire[26:0] _12;
 assign _12 = product + add_to;
 always_ff @(posedge clk) begin // latency product
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	product <= 27'dx;
 	product <= _9;
 end
 always_ff @(posedge clk) begin // latency total
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	total <= 27'dx;
 	total <= _12;
 end
 always_ff @(posedge clk) begin // latency mul0
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	mul0 <= 14'dx;
 	mul0 <= _3;
 end
 always_ff @(posedge clk) begin // latency mul1
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	mul1 <= 14'dx;
 	mul1 <= _6;
 end
 endmodule // example_md #()
+
+// TestAlwaysValid #()
+module TestAlwaysValid(
+	/* clock */ input clk,
+	input wire[3:0] a,
+	input wire[1:0] idx,
+	input wire c,
+	output /*mux_wire*/ logic[3:0] elementwise[0:3],
+	output /*mux_wire*/ logic[3:0] overridden,
+	output /*mux_wire*/ logic[3:0] runtime_idx[0:3],
+	output /*mux_wire*/ logic[3:0] partly_conditional[0:1],
+	output /*mux_wire*/ logic[3:0] one_conditional[0:1]
+);
+
+wire[3:0] _5[0:1];
+assign _5[0] = a;
+assign _5[1] = a;
+wire _20;
+assign _20 = a == 2'd3;
+always_comb begin // combinatorial elementwise
+	elementwise[0] = a;
+	elementwise[1] = a;
+	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
+elementwise[2 + _v0] = _5[_v0];
+end
+end
+always_comb begin // combinatorial overridden
+	overridden = a;
+	if(c) overridden = 2'd3;
+end
+always_comb begin // combinatorial runtime_idx
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	runtime_idx = '{4'dx, 4'dx, 4'dx, 4'dx};
+	runtime_idx[idx] = a;
+end
+always_comb begin // combinatorial partly_conditional
+	partly_conditional[0] = a;
+	partly_conditional[1] = a;
+	if(c) partly_conditional[1] = 2'd3;
+end
+always_comb begin // combinatorial one_conditional
+	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
+	one_conditional = '{4'dx, 4'dx};
+	one_conditional[0] = a;
+	if(c) one_conditional[1] = a;
+	if(!c) if(_20) one_conditional[1] = 3'd4;
+end
+endmodule // TestAlwaysValid #()
 
 // TestAbsorbedRegs #()
 module TestAbsorbedRegs(
@@ -4585,33 +4139,25 @@ module TestAbsorbedRegs(
 wire[4:0] _4;
 assign _4 = a + a;
 always_ff @(posedge clk) begin // latency x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	x <= 1'bx;
 	x <= y;
 end
 always_ff @(posedge clk) begin // latency t
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	t <= 5'dx;
 	t <= _4;
 end
 always_ff @(posedge clk) begin // latency t3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	t3 <= 4'dx;
 	t3 <= _a_D2;
 end
 always_ff @(posedge clk) begin // latency s
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
+	// Latency registers are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
 	s <= 6'dx;
 	if(x) s <= t;
 	if(!x) s <= _a_D1;
 end
 always_ff @(posedge clk) begin // latency balanced
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	balanced <= 4'dx;
 	balanced <= a;
 end
 always_ff @(posedge clk) begin // latency arr
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
+	// Latency registers are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
 	arr <= '{4'dx, 4'dx, 4'dx, 4'dx};
 	arr[idx] <= a;
 end
@@ -4676,8 +4222,6 @@ SubmodSplitStage inst(
 end
 endgenerate
 always_comb begin // combinatorial o0
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o0 = 7'dx;
 	o0 = _3;
 end
 always_comb begin // combinatorial _stages_split_0_a
@@ -4687,8 +4231,6 @@ always_comb begin // combinatorial _stages_split_0_a
 	_stages_split_0_a[2] = i;
 end
 always_comb begin // combinatorial o1
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o1 = 7'dx;
 	o1 = _7;
 end
 always_comb begin // combinatorial _stages_split_1_a
@@ -4751,59 +4293,41 @@ FIFO_T_type_int_FROM_N5_TO_1000_DEPTH_16_MAY_PUSH_LATENCY_2 fifos_split_1(
 	.rst()
 );
 always_comb begin // combinatorial _fifos_split_0_push
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_fifos_split_0_push = 1'bx;
 	_fifos_split_0_push = 1'b0;
 	if(do_push) if(_fifos_split_0_may_push) _fifos_split_0_push = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_fifos_split_0_push = _fifos_split_0_push;
 end
 always_comb begin // combinatorial _fifos_split_0_push_data
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_fifos_split_0_push_data = 4'dx;
 	_fifos_split_0_push_data = small_1;
 end
 always_ff @(posedge clk) begin // latency big_d
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	big_d <= 11'sdx;
 	big_d <= _big_D1;
 end
 always_comb begin // combinatorial _fifos_split_1_push
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_fifos_split_1_push = 1'bx;
 	_fifos_split_1_push = 1'b0;
 	if(_do_push_D2) if(__fifos_split_1_may_push_D2) _fifos_split_1_push = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_fifos_split_1_push = _fifos_split_1_push;
 end
 always_comb begin // combinatorial _fifos_split_1_push_data
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_fifos_split_1_push_data = 11'sdx;
 	_fifos_split_1_push_data = big_d;
 end
 always_comb begin // combinatorial popped_small
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	popped_small = 4'dx;
 	popped_small = 1'd0;
 	if(_do_pop_D3001) if(__fifos_split_0_may_pop_D3001) popped_small = _fifos_split_0_pop_data;
 end
 always_comb begin // combinatorial popped_big
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	popped_big = 11'sdx;
 	popped_big = 1'd0;
 	if(_do_pop_D3001) if(__fifos_split_1_may_pop_D3001) popped_big = _fifos_split_1_pop_data;
 end
 always_comb begin // combinatorial _fifos_split_0_pop
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_fifos_split_0_pop = 1'bx;
 	_fifos_split_0_pop = 1'b0;
 	if(do_pop) if(_fifos_split_0_may_pop) _fifos_split_0_pop = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_fifos_split_0_pop = _fifos_split_0_pop;
 end
 always_comb begin // combinatorial _fifos_split_1_pop
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_fifos_split_1_pop = 1'bx;
 	_fifos_split_1_pop = 1'b0;
 	if(do_pop) if(_fifos_split_1_may_pop) _fifos_split_1_pop = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
@@ -4873,40 +4397,26 @@ always_ff @(posedge clk) begin // state write_addr
 	if(rst) write_addr <= 1'd0;
 end
 always_comb begin // combinatorial space_remaining
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	space_remaining = 4'dx;
 	space_remaining = _6;
 end
 always_ff @(posedge clk) begin // latency may_push
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	may_push <= 1'bx;
 	may_push <= _9;
 end
 always_comb begin // combinatorial _ToBits_value
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_ToBits_value = 11'sdx;
 	_ToBits_value = push_data;
 end
 always_comb begin // combinatorial may_pop
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	may_pop = 1'bx;
 	may_pop = _18;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	may_pop = may_pop;
 end
 always_comb begin // combinatorial pop_data
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	pop_data = 11'sdx;
 	pop_data = _FromBits_value;
 end
 always_ff @(posedge clk) begin // latency pop_out_reg
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	pop_out_reg <= 11'bxxxxxxxxxxx;
 	pop_out_reg <= _20;
 end
 always_comb begin // combinatorial _FromBits_bits
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_FromBits_bits = 11'bxxxxxxxxxxx;
 	_FromBits_bits = pop_out_reg;
 end
 endmodule // FIFO #(T: type int #(FROM: -5, TO: 1000), DEPTH: 16, MAY_PUSH_LATENCY: 2)
@@ -4993,40 +4503,26 @@ always_ff @(posedge clk) begin // state write_addr
 	if(rst) write_addr <= 1'd0;
 end
 always_comb begin // combinatorial space_remaining
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	space_remaining = 4'dx;
 	space_remaining = _6;
 end
 always_ff @(posedge clk) begin // latency may_push
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	may_push <= 1'bx;
 	may_push <= _9;
 end
 always_comb begin // combinatorial _ToBits_value
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_ToBits_value = 4'dx;
 	_ToBits_value = push_data;
 end
 always_comb begin // combinatorial may_pop
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	may_pop = 1'bx;
 	may_pop = _18;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	may_pop = may_pop;
 end
 always_comb begin // combinatorial pop_data
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	pop_data = 4'dx;
 	pop_data = _FromBits_value;
 end
 always_ff @(posedge clk) begin // latency pop_out_reg
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	pop_out_reg <= 4'bxxxx;
 	pop_out_reg <= _20;
 end
 always_comb begin // combinatorial _FromBits_bits
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_FromBits_bits = 4'bxxxx;
 	_FromBits_bits = pop_out_reg;
 end
 endmodule // FIFO #(T: type int #(FROM: 0, TO: 10), DEPTH: 16, MAY_PUSH_LATENCY: 0)
@@ -5092,53 +4588,33 @@ SubmodSplitStage stages_split_3(
 	.b(_stages_split_3_b)
 );
 always_comb begin // combinatorial chain_split_0
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	chain_split_0 = 7'dx;
 	chain_split_0 = i;
 end
 always_comb begin // combinatorial _stages_split_0_a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_stages_split_0_a = 7'dx;
 	_stages_split_0_a = chain_split_0;
 end
 always_comb begin // combinatorial chain_split_1
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	chain_split_1 = 7'dx;
 	chain_split_1 = _stages_split_0_b;
 end
 always_comb begin // combinatorial _stages_split_1_a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_stages_split_1_a = 7'dx;
 	_stages_split_1_a = chain_split_1;
 end
 always_comb begin // combinatorial chain_split_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	chain_split_2 = 7'dx;
 	chain_split_2 = _stages_split_1_b;
 end
 always_comb begin // combinatorial _stages_split_2_a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_stages_split_2_a = 7'dx;
 	_stages_split_2_a = chain_split_2;
 end
 always_comb begin // combinatorial chain_split_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	chain_split_3 = 7'dx;
 	chain_split_3 = _stages_split_2_b;
 end
 always_comb begin // combinatorial _stages_split_3_a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_stages_split_3_a = 7'dx;
 	_stages_split_3_a = chain_split_3;
 end
 always_comb begin // combinatorial chain_split_4
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	chain_split_4 = 7'dx;
 	chain_split_4 = _stages_split_3_b;
 end
 always_comb begin // combinatorial o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o = 7'dx;
 	o = chain_split_4;
 end
 endmodule // TestSplitSubmoduleCascade #()
@@ -5151,8 +4627,6 @@ module SubmodSplitStage(
 );
 
 always_ff @(posedge clk) begin // latency b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	b <= 7'dx;
 	b <= a;
 end
 endmodule // SubmodSplitStage #()
@@ -5224,8 +4698,6 @@ FIFO_T_type_int_FROM_0_TO_100_DEPTH_16_MAY_PUSH_LATENCY_0 inst(
 end
 endgenerate
 always_comb begin // combinatorial _fifos_push
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_fifos_push = 4'bxxxx;
 	_fifos_push = _3;
 	if(do_push) if(_2) _fifos_push[0] = 1'b1;
 	if(do_push) if(_7) _fifos_push[sel] = 1'b1;
@@ -5237,14 +4709,10 @@ always_comb begin // combinatorial _fifos_push_data
 	if(do_push) if(_7) _fifos_push_data[sel] = big;
 end
 always_comb begin // combinatorial popped
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	popped = 7'dx;
 	popped = 1'd0;
 	if(__15_D1) popped = _19;
 end
 always_comb begin // combinatorial _fifos_pop
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_fifos_pop = 4'bxxxx;
 	_fifos_pop = _17;
 	if(_15) _fifos_pop[sel] = 1'b1;
 end
@@ -5312,40 +4780,26 @@ always_ff @(posedge clk) begin // state write_addr
 	if(rst) write_addr <= 1'd0;
 end
 always_comb begin // combinatorial space_remaining
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	space_remaining = 4'dx;
 	space_remaining = _6;
 end
 always_ff @(posedge clk) begin // latency may_push
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	may_push <= 1'bx;
 	may_push <= _9;
 end
 always_comb begin // combinatorial _ToBits_value
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_ToBits_value = 7'dx;
 	_ToBits_value = push_data;
 end
 always_comb begin // combinatorial may_pop
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	may_pop = 1'bx;
 	may_pop = _18;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	may_pop = may_pop;
 end
 always_comb begin // combinatorial pop_data
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	pop_data = 7'dx;
 	pop_data = _FromBits_value;
 end
 always_ff @(posedge clk) begin // latency pop_out_reg
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	pop_out_reg <= 7'bxxxxxxx;
 	pop_out_reg <= _20;
 end
 always_comb begin // combinatorial _FromBits_bits
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_FromBits_bits = 7'bxxxxxxx;
 	_FromBits_bits = pop_out_reg;
 end
 endmodule // FIFO #(T: type int #(FROM: 0, TO: 100), DEPTH: 16, MAY_PUSH_LATENCY: 0)
@@ -5394,8 +4848,6 @@ SubmodArrayFn inst(
 end
 endgenerate
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 5'dx;
 	x = _3;
 end
 always_comb begin // combinatorial _fns_a
@@ -5405,8 +4857,6 @@ always_comb begin // combinatorial _fns_a
 	_fns_a[3] = a;
 end
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 5'dx;
 	y = _5;
 end
 endmodule // TestSubmoduleArrayFn #()
@@ -5449,8 +4899,6 @@ always_comb begin // combinatorial _grid_plain_in
 	_grid_plain_in[i][j] = b;
 end
 always_comb begin // combinatorial o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o = 1'bx;
 	o = _5;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	o = o;
@@ -5515,28 +4963,20 @@ SubmodArrayElem inst(
 end
 endgenerate
 always_comb begin // combinatorial _elems_plain_in
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_elems_plain_in = 3'bxxx;
 	_elems_plain_in[0] = do_put;
 	_elems_plain_in[1] = do_put;
 	_elems_plain_in[2] = do_put;
 end
 always_comb begin // combinatorial o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o = 1'bx;
 	o = _4;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	o = o;
 end
 always_comb begin // combinatorial result
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	result = 8'dx;
 	result = 1'd0;
 	if(do_put) result = _11;
 end
 always_comb begin // combinatorial _elems_put
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_elems_put = 3'bxxx;
 	_elems_put = _8;
 	if(do_put) _elems_put[idx] = 1'b1;
 end
@@ -5546,64 +4986,44 @@ always_comb begin // combinatorial _elems_v
 	_elems_v[idx] = data;
 end
 always_comb begin // combinatorial any_last_resp
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	any_last_resp = 1'bx;
 	any_last_resp = _13;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	any_last_resp = any_last_resp;
 end
 always_comb begin // combinatorial total
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	total = 6'dx;
 	total = 1'd0;
 	if(_25) total = t_4;
 end
 always_comb begin // combinatorial _elems_resp
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_elems_resp = 3'bxxx;
 	_elems_resp[0] = resp;
 	_elems_resp[1] = resp_2;
 	_elems_resp[2] = resp_3;
 end
 always_comb begin // combinatorial t
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t = 6'dx;
 	t = _17;
 end
 always_comb begin // combinatorial resp
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	resp = 1'bx;
 	resp = do_put;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	resp = resp;
 end
 always_comb begin // combinatorial t_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t_2 = 6'dx;
 	t_2 = _20;
 end
 always_comb begin // combinatorial resp_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	resp_2 = 1'bx;
 	resp_2 = do_put;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	resp_2 = resp_2;
 end
 always_comb begin // combinatorial t_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t_3 = 6'dx;
 	t_3 = _23;
 end
 always_comb begin // combinatorial resp_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	resp_3 = 1'bx;
 	resp_3 = do_put;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	resp_3 = resp_3;
 end
 always_comb begin // combinatorial t_4
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t_4 = 6'dx;
 	t_4 = _27;
 end
 endmodule // TestSubmoduleArray #()
@@ -5618,8 +5038,6 @@ module SubmodArrayFn(
 wire[4:0] _3;
 assign _3 = a + a;
 always_comb begin // combinatorial b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	b = 5'dx;
 	b = _3;
 end
 endmodule // SubmodArrayFn #()
@@ -5643,33 +5061,23 @@ assign _3 = v * 2'd2;
 wire _5;
 assign _5 = ~plain_in;
 always_comb begin // combinatorial doubled
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	doubled = 8'dx;
 	doubled = _3;
 end
 always_comb begin // combinatorial plain_out
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	plain_out = 1'bx;
 	plain_out = _5;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	plain_out = plain_out;
 end
 always_comb begin // combinatorial fire
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	fire = 1'bx;
 	fire = 1'b0;
 	if(plain_in) fire = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	fire = fire;
 end
 always_comb begin // combinatorial t
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t = 6'dx;
 	t = 2'd3;
 end
 always_comb begin // combinatorial last_resp
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	last_resp = 1'bx;
 	last_resp = 1'b0;
 	if(plain_in) last_resp = resp;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
@@ -5691,31 +5099,23 @@ module use_action_name_in_own_body(
 wire _6;
 assign _6 = act & f;
 always_comb begin // combinatorial func
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	func = 1'bx;
 	func = 1'b0;
 	if(act) func = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	func = func;
 end
 always_comb begin // combinatorial f
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	f = 1'bx;
 	f = func;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	f = f;
 end
 always_comb begin // combinatorial trig
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	trig = 1'bx;
 	trig = 1'b0;
 	if(act) trig = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	trig = trig;
 end
 always_comb begin // combinatorial t
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t = 1'bx;
 	t = trig;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	t = t;
@@ -5807,15 +5207,11 @@ assign _8[_g0] = 1'b0;
 end
 endgenerate
 always_comb begin // combinatorial eq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	eq = 1'bx;
 	eq = _3;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	eq = eq;
 end
 always_comb begin // combinatorial neq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	neq = 2'bxx;
 	neq = _8;
 end
 endmodule // EqGeneric #(T: type int #(FROM: 0, TO: 4)[0])
@@ -5843,15 +5239,11 @@ assign _8[_g0] = c[_g0] != _7[_g0];
 end
 endgenerate
 always_comb begin // combinatorial eq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	eq = 1'bx;
 	eq = _3;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	eq = eq;
 end
 always_comb begin // combinatorial neq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	neq = 2'bxx;
 	neq = _8;
 end
 endmodule // EqGeneric #(T: type float #())
@@ -5897,15 +5289,11 @@ end
 end
 endgenerate
 always_comb begin // combinatorial eq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	eq = 1'bx;
 	eq = _3;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	eq = eq;
 end
 always_comb begin // combinatorial neq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	neq = 2'bxx;
 	neq = _8;
 end
 endmodule // EqGeneric #(T: type bool #()[3][2])
@@ -5933,15 +5321,11 @@ assign _8[_g0] = c[_g0] != _7[_g0];
 end
 endgenerate
 always_comb begin // combinatorial eq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	eq = 1'bx;
 	eq = _3;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	eq = eq;
 end
 always_comb begin // combinatorial neq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	neq = 2'bxx;
 	neq = _8;
 end
 endmodule // EqGeneric #(T: type bool #()[3])
@@ -5996,15 +5380,11 @@ end
 end
 endgenerate
 always_comb begin // combinatorial eq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	eq = 1'bx;
 	eq = _3;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	eq = eq;
 end
 always_comb begin // combinatorial neq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	neq = 2'bxx;
 	neq = _8;
 end
 endmodule // EqGeneric #(T: type int #(FROM: 0, TO: 8)[3][2])
@@ -6025,8 +5405,6 @@ assign _3[_g0] = a[_g0] != b[_g0];
 end
 endgenerate
 always_comb begin // combinatorial neq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	neq = 3'bxxx;
 	neq = _3;
 end
 endmodule // EqDoubles #()
@@ -6042,8 +5420,6 @@ module EqFloats(
 wire _3;
 assign _3 = a == b;
 always_comb begin // combinatorial eq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	eq = 1'bx;
 	eq = _3;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	eq = eq;
@@ -6069,8 +5445,6 @@ end
 end
 endgenerate
 always_comb begin // combinatorial eq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	eq = '{3'bxxx, 3'bxxx};
 	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
 eq[_v0] = _3[_v0];
 end
@@ -6088,8 +5462,6 @@ module EqBools(
 wire _3;
 assign _3 = a == b;
 always_comb begin // combinatorial eq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	eq = 1'bx;
 	eq = _3;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	eq = eq;
@@ -6129,8 +5501,6 @@ assign _7[_g0] = _3[_g0] & _6[_g0];
 end
 endgenerate
 always_comb begin // combinatorial o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o = '{3'bxxx, 3'bxxx};
 	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
 o[_v0] = _7[_v0];
 end
@@ -6167,18 +5537,12 @@ assign _9[_g0] = $signed({1'b0, a[_g0]}) < b[_g0];
 end
 endgenerate
 always_comb begin // combinatorial eq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	eq = 5'bxxxxx;
 	eq = _3;
 end
 always_comb begin // combinatorial neq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	neq = 5'bxxxxx;
 	neq = _6;
 end
 always_comb begin // combinatorial lt
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	lt = 5'bxxxxx;
 	lt = _9;
 end
 endmodule // CompareIntArrays #()
@@ -6203,26 +5567,18 @@ SinkAction s(
 	.sum(_s_sum)
 );
 always_comb begin // combinatorial _s_take
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_s_take = 1'bx;
 	_s_take = 1'b0;
 	_s_take = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_s_take = _s_take;
 end
 always_comb begin // combinatorial _s_a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_s_a = 8'dx;
 	_s_a = x;
 end
 always_comb begin // combinatorial _s_b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_s_b = 8'dx;
 	_s_b = y;
 end
 always_comb begin // combinatorial o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o = 9'dx;
 	o = _s_sum;
 end
 endmodule // TestCallNextModifier #()
@@ -6262,41 +5618,27 @@ SinkFn adder(
 	.sum(_adder_sum)
 );
 always_comb begin // combinatorial _s_take
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_s_take = 1'bx;
 	_s_take = 1'b0;
 	if(_c_D2) _s_take = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_s_take = _s_take;
 end
 always_ff @(posedge clk) begin // latency _s_a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	_s_a <= 8'dx;
 	_s_a <= _x_D1;
 end
 always_ff @(posedge clk) begin // latency _s_b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	_s_b <= 8'dx;
 	_s_b <= _y_D1;
 end
 always_comb begin // combinatorial o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o = 9'dx;
 	o = _s_sum;
 end
 always_ff @(posedge clk) begin // latency _adder_a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	_adder_a <= 8'dx;
 	_adder_a <= _x_D1;
 end
 always_ff @(posedge clk) begin // latency _adder_b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	_adder_b <= 8'dx;
 	_adder_b <= _y_D1;
 end
 always_comb begin // combinatorial o2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o2 = 9'dx;
 	o2 = _adder_sum;
 end
 endmodule // TestCallWriteModifiers #()
@@ -6312,8 +5654,6 @@ module SinkFn(
 wire[8:0] _3;
 assign _3 = a + b;
 always_ff @(posedge clk) begin // latency sum
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	sum <= 9'dx;
 	sum <= _3;
 end
 endmodule // SinkFn #()
@@ -6329,8 +5669,6 @@ module AddFn(
 wire[8:0] _3;
 assign _3 = a + b;
 always_comb begin // combinatorial sum
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sum = 9'dx;
 	sum = _3;
 end
 endmodule // AddFn #()
@@ -6347,8 +5685,6 @@ module SinkAction(
 wire[8:0] _3;
 assign _3 = a + b;
 always_ff @(posedge clk) begin // latency sum
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	sum <= 9'dx;
 	sum <= _3;
 end
 endmodule // SinkAction #()
@@ -6366,13 +5702,9 @@ module TestExplicitRegNoSRL(
 wire[8:0] _4;
 assign _4 = a_delayed + b;
 always_comb begin // combinatorial sum
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sum = 9'dx;
 	sum = _4;
 end
 always_ff @(posedge clk) begin // latency a_delayed
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	a_delayed <= 8'dx;
 	a_delayed <= _a_D1;
 end
 endmodule // TestExplicitRegNoSRL #()
@@ -6384,8 +5716,6 @@ module CallInsideWhenOnSelf(
 
 /*mux_wire*/ logic f;
 always_comb begin // combinatorial f
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	f = 1'bx;
 	f = 1'b0;
 	if(f) f = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
@@ -6433,30 +5763,22 @@ always_comb begin // combinatorial _my_submod_dout
 	_my_submod_dout = _my_submod_dout;
 end
 always_comb begin // combinatorial d
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	d = 1'bx;
 	d = _my_submod_din;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	d = d;
 end
 always_comb begin // combinatorial outd
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	outd = 1'bx;
 	outd = _my_submod_outd;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	outd = outd;
 end
 always_comb begin // combinatorial _my_submod_do_req
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_my_submod_do_req = 1'bx;
 	_my_submod_do_req = 1'b0;
 	if(do_req) _my_submod_do_req = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_my_submod_do_req = _my_submod_do_req;
 end
 always_comb begin // combinatorial _my_submod_ind
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_my_submod_ind = 1'bx;
 	_my_submod_ind = ind;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_my_submod_ind = _my_submod_ind;
@@ -6485,21 +5807,15 @@ always_comb begin // combinatorial fired_big
 	fired_big = fired_big;
 end
 always_comb begin // combinatorial t
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t = 1'bx;
 	t = 1'b0;
 	if(fire) t = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	t = t;
 end
 always_comb begin // combinatorial v
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	v = 7'dx;
 	v = x;
 end
 always_comb begin // combinatorial vv
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	vv = 7'dx;
 	vv = v;
 end
 endmodule // TriggerLeftBinding #()
@@ -6520,36 +5836,24 @@ module FunctionSecondaryBinding(
 wire[6:0] _4;
 assign _4 = xx + 1'd1;
 always_comb begin // combinatorial r
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	r = 7'dx;
 	r = y;
 end
 always_comb begin // combinatorial add_one
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	add_one = 1'bx;
 	add_one = 1'b0;
 	if(go) add_one = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	add_one = add_one;
 end
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 7'dx;
 	x = a;
 end
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 7'dx;
 	y = yy;
 end
 always_comb begin // combinatorial xx
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	xx = 7'dx;
 	xx = x;
 end
 always_comb begin // combinatorial yy
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	yy = 7'dx;
 	yy = _4;
 end
 endmodule // FunctionSecondaryBinding #()
@@ -6582,39 +5886,27 @@ ActionSecondaryBindings_T_type_bool_4_DEPTH_8 m(
 	.rd_data(_m_rd_data)
 );
 always_comb begin // combinatorial result
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	result = 4'bxxxx;
 	result = _m_rd_data;
 end
 always_comb begin // combinatorial _m_write
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_m_write = 1'bx;
 	_m_write = 1'b0;
 	if(do_write) _m_write = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_m_write = _m_write;
 end
 always_comb begin // combinatorial _m_wr_addr
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_m_wr_addr = 3'dx;
 	_m_wr_addr = addr;
 end
 always_comb begin // combinatorial _m_wr_data
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_m_wr_data = 4'bxxxx;
 	_m_wr_data = data;
 end
 always_comb begin // combinatorial _m_read
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_m_read = 1'bx;
 	_m_read = 1'b0;
 	if(do_read) _m_read = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_m_read = _m_read;
 end
 always_comb begin // combinatorial _m_rd_addr
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_m_rd_addr = 3'dx;
 	_m_rd_addr = addr;
 end
 endmodule // UseActionSecondaryBindings #()
@@ -6655,50 +5947,32 @@ always_comb begin // combinatorial wrote
 	wrote = wrote;
 end
 always_comb begin // combinatorial read_low
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	read_low = 1'bx;
 	read_low = _7;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	read_low = read_low;
 end
 always_comb begin // combinatorial rd_data
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	rd_data = 4'bxxxx;
 	rd_data = d_2;
 end
 always_comb begin // combinatorial a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	a = 3'dx;
 	a = wr_addr;
 end
 always_comb begin // combinatorial d
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	d = 4'bxxxx;
 	d = wr_data;
 end
 always_comb begin // combinatorial a2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	a2 = 3'dx;
 	a2 = wr_addr;
 end
 always_comb begin // combinatorial d2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	d2 = 4'bxxxx;
 	d2 = wr_data;
 end
 always_comb begin // combinatorial a_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	a_2 = 3'dx;
 	a_2 = rd_addr;
 end
 always_comb begin // combinatorial d_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	d_2 = 4'bxxxx;
 	d_2 = _4;
 end
 always_comb begin // combinatorial a3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	a3 = 3'dx;
 	a3 = rd_addr;
 end
 endmodule // ActionSecondaryBindings #(T: type bool #()[4], DEPTH: 8)
@@ -6719,21 +5993,15 @@ always_ff @(posedge clk) begin // state cool
 	if(c) cool[2] <= 1'b1;
 end
 always_comb begin // combinatorial c2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	c2 = 1'bx;
 	c2 = _2;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	c2 = c2;
 end
 always_comb begin // combinatorial overridden
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	overridden = 4'bxxxx;
 	overridden = _3;
 	if(c) overridden[1] = 1'b1;
 end
 always_comb begin // combinatorial ov
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	ov = 4'bxxxx;
 	ov = overridden;
 end
 endmodule // ArrayDefaultState #()
@@ -6756,15 +6024,11 @@ assign _6[1] = 2'd3;
 assign _6[2] = v;
 assign _6[3] = v;
 always_comb begin // combinatorial d
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	d = '{4'dx, 4'dx, 4'dx};
 	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
 d[_v0] = _2[_v0];
 end
 end
 always_comb begin // combinatorial e
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	e = '{4'dx, 4'dx, 4'dx, 4'dx};
 	for(int _v0 = 0; _v0 < 4; _v0 = _v0 + 1) begin
 e[_v0] = _6[_v0];
 end
@@ -6783,25 +6047,17 @@ module ArrayDefaultGen(
 localparam[3:0] _1 = 4'b0000;
 localparam[1:0] _2[0:3] = '{2'd1, 2'd2, 2'd0, 2'd0};
 always_comb begin // combinatorial a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	a = 4'bxxxx;
 	a = _1;
 end
 always_comb begin // combinatorial b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	b = '{2'dx, 2'dx, 2'dx, 2'dx};
 	for(int _v0 = 0; _v0 < 4; _v0 = _v0 + 1) begin
 b[_v0] = _2[_v0];
 end
 end
 always_comb begin // combinatorial g3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	g3 = 3'dx;
 	g3 = 3'd4;
 end
 always_comb begin // combinatorial n11
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	n11 = 2'dx;
 	n11 = 2'd3;
 end
 endmodule // ArrayDefaultGen #()
@@ -6818,8 +6074,6 @@ TemplateArrayParam_N_3_V_1_2_3 m(
 	.x(_m_x)
 );
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 1'dx;
 	x = _m_x;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	x = x;
@@ -6833,8 +6087,6 @@ module TemplateArrayParam_N_3_V_1_2_3(
 );
 
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 1'dx;
 	x = 1'd1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	x = x;
@@ -6848,8 +6100,6 @@ module GenUnsizedIntoSized205(
 );
 
 always_comb begin // combinatorial xx
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	xx = 3'dx;
 	xx = 3'd7;
 end
 endmodule // GenUnsizedIntoSized205 #()
@@ -6861,8 +6111,6 @@ module GenUnsizedOuterSizedInner205(
 );
 
 always_comb begin // combinatorial xx
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	xx = 3'dx;
 	xx = 3'd6;
 end
 endmodule // GenUnsizedOuterSizedInner205 #()
@@ -6908,60 +6156,42 @@ module_interface_shorthand_T_type_bool_N_5 sub(
 	.inverted(_sub_inverted)
 );
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = '{7'dx, 7'dx, 7'dx};
 	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
 x[_v0] = _module_interface_shorthand_result[_v0];
 end
 end
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 1'bx;
 	y = _10;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	y = y;
 end
 always_comb begin // combinatorial inverted
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	inverted = 1'bx;
 	inverted = _module_interface_shorthand_inverted;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	inverted = inverted;
 end
 always_comb begin // combinatorial _module_interface_shorthand_v
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_module_interface_shorthand_v = 7'dx;
 	_module_interface_shorthand_v = a;
 end
 always_comb begin // combinatorial _module_interface_shorthand_invert
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_module_interface_shorthand_invert = 1'bx;
 	_module_interface_shorthand_invert = b;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_module_interface_shorthand_invert = _module_interface_shorthand_invert;
 end
 always_comb begin // combinatorial sub_x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sub_x = 5'bxxxxx;
 	sub_x = _sub_result;
 end
 always_comb begin // combinatorial sub_y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sub_y = 1'bx;
 	sub_y = _sub_inverted;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	sub_y = sub_y;
 end
 always_comb begin // combinatorial _sub_v
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_sub_v = 1'bx;
 	_sub_v = b;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_sub_v = _sub_v;
 end
 always_comb begin // combinatorial _sub_invert
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_sub_invert = 1'bx;
 	_sub_invert = b;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_sub_invert = _sub_invert;
@@ -6986,13 +6216,9 @@ assign _2[4] = v;
 wire _4;
 assign _4 = ~invert;
 always_comb begin // combinatorial result
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	result = 5'bxxxxx;
 	result = _2;
 end
 always_comb begin // combinatorial inverted
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	inverted = 1'bx;
 	inverted = _4;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	inverted = inverted;
@@ -7015,15 +6241,11 @@ assign _2[2] = v;
 wire _4;
 assign _4 = ~invert;
 always_comb begin // combinatorial result
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	result = '{7'dx, 7'dx, 7'dx};
 	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
 result[_v0] = _2[_v0];
 end
 end
 always_comb begin // combinatorial inverted
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	inverted = 1'bx;
 	inverted = _4;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	inverted = inverted;
@@ -7059,45 +6281,33 @@ use_trigger submod(
 	.maybe_use_trigger(_submod_maybe_use_trigger)
 );
 always_comb begin // combinatorial beeped
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	beeped = 1'bx;
 	beeped = _4;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	beeped = beeped;
 end
 always_comb begin // combinatorial fired
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	fired = 1'bx;
 	fired = _11;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	fired = fired;
 end
 always_comb begin // combinatorial trig_read
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	trig_read = 1'bx;
 	trig_read = _submod_beep;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	trig_read = trig_read;
 end
 always_comb begin // combinatorial my_trigger
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	my_trigger = 1'bx;
 	my_trigger = 1'b0;
 	if(_6) my_trigger = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	my_trigger = my_trigger;
 end
 always_comb begin // combinatorial my_function
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	my_function = 1'bx;
 	my_function = 1'b0;
 	if(a) my_function = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	my_function = my_function;
 end
 always_comb begin // combinatorial _submod_maybe_use_trigger
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_submod_maybe_use_trigger = 1'bx;
 	_submod_maybe_use_trigger = 1'b0;
 	if(_submod_beep) _submod_maybe_use_trigger = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
@@ -7123,8 +6333,6 @@ always_ff @(posedge clk) begin // state x
 	if(increase_x) x <= _6;
 end
 always_comb begin // combinatorial increase_x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	increase_x = 1'bx;
 	increase_x = 1'b0;
 	if(increase_by_5) increase_x = 1'b1;
 	if(increase_by_10) increase_x = 1'b1;
@@ -7166,32 +6374,22 @@ assign _14 = b > 2'd3;
 wire _20;
 assign _20 = a > 3'd5;
 always_comb begin // combinatorial r1
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	r1 = 7'dx;
 	r1 = y;
 end
 always_comb begin // combinatorial r2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	r2 = 7'dx;
 	r2 = y;
 end
 always_comb begin // combinatorial was_big
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	was_big = 1'bx;
 	was_big = big;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	was_big = was_big;
 end
 always_comb begin // combinatorial ticked
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	ticked = 1'bx;
 	ticked = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	ticked = ticked;
 end
 always_comb begin // combinatorial add_one
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	add_one = 1'bx;
 	add_one = 1'b0;
 	add_one = 1'b1;
 	if(_14) add_one = 1'b1;
@@ -7199,19 +6397,13 @@ always_comb begin // combinatorial add_one
 	add_one = add_one;
 end
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 7'dx;
 	x = a;
 	if(_14) x = b;
 end
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 7'dx;
 	y = _4;
 end
 always_comb begin // combinatorial tick
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	tick = 1'bx;
 	tick = 1'b0;
 	if(_14) tick = 1'b1;
 	if(_20) tick = 1'b1;
@@ -7219,16 +6411,12 @@ always_comb begin // combinatorial tick
 	tick = tick;
 end
 always_comb begin // combinatorial check_big
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	check_big = 1'bx;
 	check_big = 1'b0;
 	check_big = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	check_big = check_big;
 end
 always_comb begin // combinatorial v
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	v = 7'dx;
 	v = a;
 end
 always_comb begin // combinatorial big
@@ -7270,28 +6458,20 @@ IntBoundsShorthandInference_FROM_N2_TO_9 inst(
 	.result(_inst_result)
 );
 always_comb begin // combinatorial are_eq
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	are_eq = 1'bx;
 	are_eq = _inst_result;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	are_eq = are_eq;
 end
 always_comb begin // combinatorial _inst_equals
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_inst_equals = 1'bx;
 	_inst_equals = 1'b0;
 	_inst_equals = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_inst_equals = _inst_equals;
 end
 always_comb begin // combinatorial _inst_a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_inst_a = 5'sdx;
 	_inst_a = x;
 end
 always_comb begin // combinatorial _inst_b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_inst_b = 5'sdx;
 	_inst_b = y;
 end
 endmodule // UseIntBoundsShorthandInference #()
@@ -7308,8 +6488,6 @@ module IntBoundsShorthandInference_FROM_N2_TO_9(
 wire _3;
 assign _3 = a == b;
 always_comb begin // combinatorial result
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	result = 1'bx;
 	result = _3;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	result = result;
@@ -7349,38 +6527,24 @@ assign _21 = -a;
 wire signed[4:0] _23;
 assign _23 = _21 - $signed({1'b0, 1'd1});
 always_comb begin // combinatorial sum
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sum = 5'dx;
 	sum = _3;
 end
 always_comb begin // combinatorial sum2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sum2 = 5'dx;
 	sum2 = _6;
 end
 always_comb begin // combinatorial sum3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sum3 = 5'dx;
 	sum3 = _9;
 end
 always_comb begin // combinatorial neg
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	neg = 5'sdx;
 	neg = _13;
 end
 always_comb begin // combinatorial part_select_sum
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	part_select_sum = 5'dx;
 	part_select_sum = _16;
 end
 always_comb begin // combinatorial multiplied_sum
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	multiplied_sum = 5'dx;
 	multiplied_sum = _19;
 end
 always_comb begin // combinatorial neg2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	neg2 = 5'sdx;
 	neg2 = _23;
 end
 endmodule // IntBoundsShorthand #()
@@ -7409,13 +6573,9 @@ assign _3[_g0] = data[4 + _g0];
 end
 endgenerate
 always_comb begin // combinatorial byte_sel
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	byte_sel = 8'bxxxxxxxx;
 	byte_sel = _2;
 end
 always_comb begin // combinatorial incl
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	incl = 4'bxxxx;
 	incl = _3;
 end
 always_comb begin // combinatorial written
@@ -7440,16 +6600,12 @@ module newlines_interface_body(
 );
 
 always_comb begin // combinatorial t
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	t = 1'bx;
 	t = 1'b0;
 	if(fire) t = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	t = t;
 end
 always_comb begin // combinatorial w
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	w = 1'bx;
 	w = f;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	w = w;
@@ -7527,74 +6683,50 @@ always_comb begin // combinatorial result2
 	if(!do_it) result2 = 1'd0;
 end
 always_comb begin // combinatorial big
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	big = 6'dx;
 	big = _14;
 end
 always_comb begin // combinatorial _my_mod_add
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_my_mod_add = 1'bx;
 	_my_mod_add = 1'b0;
 	if(do_it) _my_mod_add = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_my_mod_add = _my_mod_add;
 end
 always_comb begin // combinatorial _my_mod_a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_my_mod_a = 4'dx;
 	_my_mod_a = x;
 end
 always_comb begin // combinatorial _my_mod_b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_my_mod_b = 4'dx;
 	_my_mod_b = y;
 end
 always_comb begin // combinatorial _other_add
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_other_add = 1'bx;
 	_other_add = 1'b0;
 	if(do_it) _other_add = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_other_add = _other_add;
 end
 always_comb begin // combinatorial _other_a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_other_a = 4'dx;
 	_other_a = y;
 end
 always_comb begin // combinatorial _other_b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_other_b = 4'dx;
 	_other_b = x;
 end
 always_comb begin // combinatorial sum
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sum = 5'dx;
 	sum = _17;
 end
 always_comb begin // combinatorial s2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	s2 = 5'dx;
 	s2 = sum;
 end
 always_comb begin // combinatorial arr
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	arr = 4'bxxxx;
 	arr[0] = _21;
 	arr[1] = _24;
 	arr[2] = _27;
 	arr[3] = _30;
 end
 always_comb begin // combinatorial arr_el
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	arr_el = 1'bx;
 	arr_el = _31;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	arr_el = arr_el;
 end
 always_comb begin // combinatorial slice_out
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	slice_out = 2'bxx;
 	slice_out = _32;
 end
 endmodule // newlines_lenient #()
@@ -7611,8 +6743,6 @@ module newlines_helper(
 wire[4:0] _3;
 assign _3 = a + b;
 always_comb begin // combinatorial out
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	out = 5'dx;
 	out = _3;
 end
 endmodule // newlines_helper #()
@@ -7645,44 +6775,32 @@ CallTrigger my_submod(
 	.outd(_my_submod_outd)
 );
 always_comb begin // combinatorial _my_submod_dout
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_my_submod_dout = 1'bx;
 	_my_submod_dout = bind_dout;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_my_submod_dout = _my_submod_dout;
 end
 always_comb begin // combinatorial bind_din
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	bind_din = 1'bx;
 	bind_din = _my_submod_din;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	bind_din = bind_din;
 end
 always_comb begin // combinatorial bind_dout
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	bind_dout = 1'bx;
 	bind_dout = _2;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	bind_dout = bind_dout;
 end
 always_comb begin // combinatorial outd
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	outd = 1'bx;
 	outd = _my_submod_outd;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	outd = outd;
 end
 always_comb begin // combinatorial _my_submod_do_req
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_my_submod_do_req = 1'bx;
 	_my_submod_do_req = 1'b0;
 	if(do_req) _my_submod_do_req = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_my_submod_do_req = _my_submod_do_req;
 end
 always_comb begin // combinatorial _my_submod_ind
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_my_submod_ind = 1'bx;
 	_my_submod_ind = ind;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_my_submod_ind = _my_submod_ind;
@@ -7701,23 +6819,17 @@ module CallTrigger(
 );
 
 always_comb begin // combinatorial request_dependency
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	request_dependency = 1'bx;
 	request_dependency = 1'b0;
 	if(do_req) request_dependency = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	request_dependency = request_dependency;
 end
 always_comb begin // combinatorial din
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	din = 1'bx;
 	din = ind;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	din = din;
 end
 always_comb begin // combinatorial outd
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	outd = 1'bx;
 	outd = dout;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	outd = outd;
@@ -7741,8 +6853,6 @@ always_comb begin // combinatorial values_intersect
 	if(b) values_intersect[0] = 1'd1;
 end
 always_comb begin // combinatorial values_nointersect
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	values_nointersect = '{1'dx, 1'dx};
 	values_nointersect[0] = 1'd0;
 	values_nointersect[1] = 1'd1;
 end
@@ -7762,8 +6872,6 @@ module UnknownSizeArraySynth(
 localparam[2:0] MY_INTS[0:4] = '{3'd0, 3'd1, 3'd2, 3'd3, 3'd4};
 wire[2:0] _2 = MY_INTS[idx];
 always_comb begin // combinatorial result
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	result = 3'dx;
 	result = _2;
 end
 endmodule // UnknownSizeArraySynth #()
@@ -7790,13 +6898,9 @@ IntNarrow_FROM_I_0_TO_I_1_FROM_N3_TO_6 IntNarrow_2(
 	.dout(_IntNarrow_2_dout)
 );
 always_comb begin // combinatorial _IntNarrow_din
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_IntNarrow_din = 3'dx;
 	_IntNarrow_din = 3'd5;
 end
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 4'sdx;
 	y = _IntNarrow_2_dout;
 end
 endmodule // IntNarrowToZero #()
@@ -7840,23 +6944,17 @@ ModWithDomains mwd(
 	.a_data(_mwd_a_data)
 );
 always_comb begin // combinatorial d
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	d = 1'bx;
 	d = _mwd_b_data;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	d = d;
 end
 always_comb begin // combinatorial _mwd_a_act
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_mwd_a_act = 1'bx;
 	_mwd_a_act = 1'b0;
 	_mwd_a_act = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_mwd_a_act = _mwd_a_act;
 end
 always_comb begin // combinatorial _mwd_a_data
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_mwd_a_data = 1'bx;
 	_mwd_a_data = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_mwd_a_data = _mwd_a_data;
@@ -7873,16 +6971,12 @@ module ModWithDomains(
 );
 
 always_comb begin // combinatorial b_trig
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	b_trig = 1'bx;
 	b_trig = 1'b0;
 	if(a_act) b_trig = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	b_trig = b_trig;
 end
 always_comb begin // combinatorial b_data
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	b_data = 1'bx;
 	b_data = a_data;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	b_data = b_data;
@@ -7938,13 +7032,9 @@ assign _17 = -b;
 wire signed[1:0] _18;
 assign _18 = _15 % _17;
 always_comb begin // combinatorial a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	a = 4'dx;
 	a = 4'd10;
 end
 always_comb begin // combinatorial b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	b = 2'dx;
 	b = 2'd3;
 end
 endmodule // testRemainder #()
@@ -7968,23 +7058,15 @@ module floats_and_doubles(
 /*mux_wire*/ logic[63:0] a;
 /*mux_wire*/ logic[63:0] b;
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 'x;
 	x = 32'h3f000000 /* 0.5 */;
 end
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 'x;
 	y = 32'h4dee6b28 /* 500000000.0 */;
 end
 always_comb begin // combinatorial a
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	a = 'x;
 	a = 64'h3fe0000000000000 /* 0.5 */;
 end
 always_comb begin // combinatorial b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	b = 'x;
 	b = 64'h41bdcd6500000000 /* 500000000.0 */;
 end
 endmodule // floats_and_doubles #()
@@ -7999,13 +7081,9 @@ module boolean_array_literals(
 localparam[49:0] _1 = 50'b00000000000000000000000000000000000000010100100110;
 localparam[99:0] _2 = 100'b0000000000000000000000000000000000000000000000000000000000000000000011101100011100000111100110100111;
 always_comb begin // combinatorial b
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	b = 50'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
 	b = _1;
 end
 always_comb begin // combinatorial ob
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	ob = 100'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
 	ob = _2;
 end
 endmodule // boolean_array_literals #()
@@ -8032,61 +7110,41 @@ localparam[0:0] _2 = 1'b0;
 localparam[1:0] _6 = 2'b00;
 localparam[2:0] _10 = 3'b000;
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 1'bx;
 	x = _2;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	x = x;
 end
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 1'bx;
 	y = x;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	y = y;
 end
 always_comb begin // combinatorial x_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x_2 = 2'bxx;
 	x_2 = _6;
 end
 always_comb begin // combinatorial y_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y_2 = 2'bxx;
 	y_2 = x_2;
 end
 always_comb begin // combinatorial u_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	u_2 = 1'dx;
 	u_2 = 1'd0;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	u_2 = u_2;
 end
 always_comb begin // combinatorial v_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	v_2 = 1'dx;
 	v_2 = u_2;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	v_2 = v_2;
 end
 always_comb begin // combinatorial x_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x_3 = 3'bxxx;
 	x_3 = _10;
 end
 always_comb begin // combinatorial y_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y_3 = 3'bxxx;
 	y_3 = x_3;
 end
 always_comb begin // combinatorial u_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	u_3 = 2'dx;
 	u_3 = 1'd0;
 end
 always_comb begin // combinatorial v_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	v_3 = 2'dx;
 	v_3 = u_3;
 end
 endmodule // test_vivado_bug #()
@@ -8103,20 +7161,14 @@ localparam[31:0] floats[0:4] = '{32'h3e99999a /* 0.3 */, 32'h3ecccccd /* 0.4 */,
 localparam[31:0] floats_2[0:4] = '{32'h3e99999a /* 0.3 */, 32'h3ecccccd /* 0.4 */, 32'h3e4ccccd /* 0.2 */, 32'h3e99999a /* 0.3 */, 32'h3f000000 /* 0.5 */};
 wire[31:0] _3 = floats_2[y];
 always_comb begin // combinatorial fs
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	fs = '{'x, 'x, 'x, 'x, 'x};
 	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
 fs[_v0] = floats[_v0];
 end
 end
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 2'dx;
 	y = 2'd3;
 end
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 'x;
 	x = _3;
 end
 endmodule // check_non_inlineds #()
@@ -8131,18 +7183,12 @@ module float_literal(
 /*mux_wire*/ logic[31:0] many_floats[0:4];
 localparam[31:0] _2[0:4] = '{32'h3f333333 /* 0.7 */, 32'h3f666666 /* 0.9 */, 32'hbf333333 /* -0.7 */, 32'hbf666666 /* -0.9 */, 32'h3dcccccd /* 0.1 */};
 always_comb begin // combinatorial ff
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	ff = 'x;
 	ff = 32'h4cbebc20 /* 100000000.0 */;
 end
 always_comb begin // combinatorial fff
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	fff = 'x;
 	fff = 32'h3d800000 /* 0.0625 */;
 end
 always_comb begin // combinatorial many_floats
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	many_floats = '{'x, 'x, 'x, 'x, 'x};
 	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
 many_floats[_v0] = _2[_v0];
 end
@@ -8174,29 +7220,21 @@ always_comb begin // combinatorial b
 	b = b;
 end
 always_comb begin // combinatorial pass_it_up
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	pass_it_up = 1'bx;
 	pass_it_up = 1'b0;
 	if(_submod_beep) pass_it_up = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	pass_it_up = pass_it_up;
 end
 always_comb begin // combinatorial _submod_maybe_use_trigger
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_submod_maybe_use_trigger = 1'bx;
 	_submod_maybe_use_trigger = 1'b0;
 	_submod_maybe_use_trigger = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_submod_maybe_use_trigger = _submod_maybe_use_trigger;
 end
 always_comb begin // combinatorial x
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	x = 3'dx;
 	x = _submod_boop;
 end
 always_comb begin // combinatorial y
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	y = 3'dx;
 	y = x;
 end
 endmodule // use_use_trigger #()
@@ -8210,8 +7248,6 @@ module use_trigger(
 );
 
 always_comb begin // combinatorial beep
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	beep = 1'bx;
 	beep = 1'b0;
 	if(maybe_use_trigger) beep = 1'b1;
 	if(!maybe_use_trigger) beep = 1'b1;
@@ -8234,8 +7270,6 @@ module testInts(
 /*mux_wire*/ logic[2:0] vs[0:4];
 localparam[2:0] _1[0:4] = '{3'd1, 3'd2, 3'd3, 3'd4, 3'd5};
 always_comb begin // combinatorial vs
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	vs = '{3'dx, 3'dx, 3'dx, 3'dx, 3'dx};
 	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
 vs[_v0] = _1[_v0];
 end
@@ -8259,8 +7293,6 @@ TreeAdd_SIZE_5_FROM_3_TO_4 adder(
 	.sum(_adder_sum)
 );
 always_comb begin // combinatorial arr
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	arr = '{2'dx, 2'dx, 2'dx, 2'dx, 2'dx};
 	arr[0] = 2'd3;
 	arr[1] = 2'd3;
 	arr[2] = 2'd3;
@@ -8268,21 +7300,15 @@ always_comb begin // combinatorial arr
 	arr[4] = 2'd3;
 end
 always_comb begin // combinatorial total
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	total = 5'dx;
 	total = _adder_sum;
 end
 always_comb begin // combinatorial _adder_TreeAdd
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_adder_TreeAdd = 1'bx;
 	_adder_TreeAdd = 1'b0;
 	_adder_TreeAdd = 1'b1;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	_adder_TreeAdd = _adder_TreeAdd;
 end
 always_comb begin // combinatorial _adder_values
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	_adder_values = '{2'dx, 2'dx, 2'dx, 2'dx, 2'dx};
 	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
 _adder_values[_v0] = arr[_v0];
 end
@@ -8328,8 +7354,6 @@ wire[4:0] _24;
 assign _24 = _22 + _23;
 wire[4:0] _27 = last[0];
 always_comb begin // combinatorial sum
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	sum = 5'dx;
 	sum = _27;
 end
 always_comb begin // combinatorial inter_sums_split_0
@@ -8352,68 +7376,48 @@ if(TreeAdd) inter_sums_split_0[_v0] = values[_v0];
 end
 end
 always_comb begin // combinatorial cur_sums
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	cur_sums = '{2'dx, 2'dx, 2'dx, 2'dx, 2'dx};
 	for(int _v0 = 0; _v0 < 5; _v0 = _v0 + 1) begin
 cur_sums[_v0] = inter_sums_split_0[_v0];
 end
 end
 always_ff @(posedge clk) begin // latency next_sums
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	next_sums <= '{3'dx, 3'dx, 3'dx};
 	next_sums[0] <= _9;
 	next_sums[1] <= _12;
 	next_sums[2] <= _13;
 end
 always_comb begin // combinatorial inter_sums_split_1
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	inter_sums_split_1 = '{3'dx, 3'dx, 3'dx};
 	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
 inter_sums_split_1[_v0] = next_sums[_v0];
 end
 end
 always_comb begin // combinatorial cur_sums_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	cur_sums_2 = '{3'dx, 3'dx, 3'dx};
 	for(int _v0 = 0; _v0 < 3; _v0 = _v0 + 1) begin
 cur_sums_2[_v0] = inter_sums_split_1[_v0];
 end
 end
 always_ff @(posedge clk) begin // latency next_sums_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	next_sums_2 <= '{4'dx, 4'dx};
 	next_sums_2[0] <= _18;
 	next_sums_2[1] <= _19;
 end
 always_comb begin // combinatorial inter_sums_split_2
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	inter_sums_split_2 = '{4'dx, 4'dx};
 	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
 inter_sums_split_2[_v0] = next_sums_2[_v0];
 end
 end
 always_comb begin // combinatorial cur_sums_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	cur_sums_3 = '{4'dx, 4'dx};
 	for(int _v0 = 0; _v0 < 2; _v0 = _v0 + 1) begin
 cur_sums_3[_v0] = inter_sums_split_2[_v0];
 end
 end
 always_ff @(posedge clk) begin // latency next_sums_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable
-	next_sums_3 <= '{5'dx};
 	next_sums_3[0] <= _24;
 end
 always_comb begin // combinatorial inter_sums_split_3
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	inter_sums_split_3 = '{5'dx};
 	for(int _v0 = 0; _v0 < 1; _v0 = _v0 + 1) begin
 inter_sums_split_3[_v0] = next_sums_3[_v0];
 end
 end
 always_comb begin // combinatorial last
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	last = '{5'dx};
 	for(int _v0 = 0; _v0 < 1; _v0 = _v0 + 1) begin
 last[_v0] = inter_sums_split_3[_v0];
 end
@@ -8446,8 +7450,6 @@ module tinyTestMod_beep_4(
 );
 
 always_comb begin // combinatorial o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o = 3'dx;
 	o = 3'd4;
 end
 endmodule // tinyTestMod #(beep: 4)
@@ -8459,8 +7461,6 @@ module tinyTestMod_beep_3(
 );
 
 always_comb begin // combinatorial o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o = 2'dx;
 	o = 2'd3;
 end
 endmodule // tinyTestMod #(beep: 3)
@@ -8501,8 +7501,6 @@ module IntToBool(
 wire _3;
 assign _3 = i == 1'd1;
 always_comb begin // combinatorial o
-	// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches
-	o = 1'bx;
 	o = _3;
 	// PATCH Vivado 23.1 Simulator Bug: 1-bit Conditional Assigns become don't care
 	o = o;
