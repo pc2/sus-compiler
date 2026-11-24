@@ -18,7 +18,7 @@ use crate::{
         InstantiatedModule, InstantiatedPort, IsPort, MultiplexerSource, RealWire,
         RealWireDataSource, RealWirePathElem,
     },
-    latency::AbsLat,
+    latency::{AbsLat, RegisterPlacement},
     linker::{IsExtern, LinkInfo},
     prelude::*,
     to_string::display_join,
@@ -39,8 +39,7 @@ pub fn generate_systemverilog(instance: &InstantiatedModule, linker: &Linker) ->
         program_text: String::new(),
         genvars: VariableAlloc::new("_g"),
         for_vars: VariableAlloc::new("_v"),
-        needed_untils: instance.compute_needed_untils(),
-        explicit_reg_stages: instance.compute_explicit_reg_stages(),
+        registers: instance.compute_register_placement(),
     };
 
     crate::debug::debug_context("codegen", instance.name.clone(), || {
@@ -58,8 +57,7 @@ pub fn generate_testbench_stub(instance: &InstantiatedModule, linker: &Linker) -
         program_text: String::new(),
         genvars: VariableAlloc::new("_g"),
         for_vars: VariableAlloc::new("_v"),
-        needed_untils: instance.compute_needed_untils(),
-        explicit_reg_stages: instance.compute_explicit_reg_stages(),
+        registers: instance.compute_register_placement(),
     };
 
     crate::debug::debug_context("codegen_testbench", instance.name.clone(), || {
@@ -78,9 +76,7 @@ struct CodeGenerationContext<'g> {
     instance: &'g InstantiatedModule,
     linker: &'g Linker,
 
-    needed_untils: FlatAlloc<i64, WireIDMarker>,
-    /// See [InstantiatedModule::compute_explicit_reg_stages]
-    explicit_reg_stages: FlatAlloc<Vec<(i64, i64)>, WireIDMarker>,
+    registers: RegisterPlacement,
 }
 
 impl<'g> CodeGenerationContext<'g> {
@@ -129,7 +125,7 @@ impl<'g> CodeGenerationContext<'g> {
             };
             port_list.line(format!("/* clock */ {direction} {clk_name}"));
         }
-        for (_id, port_wire) in &self.instance.wires {
+        for (port_wire_id, port_wire) in &self.instance.wires {
             let IsPort::Port(_, direction) = port_wire.is_port else {
                 continue;
             };
@@ -137,7 +133,8 @@ impl<'g> CodeGenerationContext<'g> {
             if port_wire.typ.is_zero_sized() {
                 port_list.commented(format!("{direction} {}", port_wire.name));
             } else {
-                let wire_or_reg = port_wire.source.codegen_wire_or_reg();
+                let attributes = self.wire_attributes(port_wire_id);
+                let wire_or_reg = self.codegen_wire_or_reg(port_wire_id);
                 let is_state = match direction {
                     Direction::Input => &None,
                     Direction::Output => {
@@ -152,7 +149,7 @@ impl<'g> CodeGenerationContext<'g> {
                 let output_decl = output_name.codegen_declaration();
                 let decl = Self::codegen_declaration(port_wire, wire_or_reg, output_decl, is_state);
 
-                port_list.line(format!("{direction} {decl}"));
+                port_list.line(format!("{attributes}{direction} {decl}"));
             }
         }
         writeln!(self.program_text, "module {module_name}({port_list});\n").unwrap();
@@ -212,7 +209,7 @@ impl<'g> CodeGenerationContext<'g> {
 
             let to_decl = to.codegen_declaration();
 
-            let is_explicit_reg = self.explicit_reg_stages[wire_id]
+            let is_explicit_reg = self.registers.explicit_reg_stages[wire_id]
                 .iter()
                 .any(|(first, last)| (*first..=*last).contains(&(i + 1)));
             let attributes = super::patches::patch_explicit_reg_no_srl(is_explicit_reg);
@@ -563,30 +560,31 @@ impl<'g> CodeGenerationContext<'g> {
 
     fn write_wire_declarations(&mut self) {
         // Write out named wires first
-        for (_wire_id, w) in &self.instance.wires {
+        for (wire_id, w) in &self.instance.wires {
             if !w.name.starts_with("_") {
-                self.write_wire_declaration(w);
+                self.write_wire_declaration(wire_id);
             }
         }
         // Add latency regs for named wires after all have been declared, because named wires are guaranteed to be Multiplexers
         for (wire_id, w) in &self.instance.wires {
             if !w.name.starts_with("_") {
-                self.add_latency_registers(wire_id, self.needed_untils[wire_id], "")
+                self.add_latency_registers(wire_id, self.registers.needed_untils[wire_id], "")
                     .unwrap();
             }
         }
         // And only then temporaries
         for (wire_id, w) in &self.instance.wires {
             if w.name.starts_with("_") {
-                self.write_wire_declaration(w);
+                self.write_wire_declaration(wire_id);
                 // Add latency regs for temporaries immediately, because they may immediately depend on each other
-                self.add_latency_registers(wire_id, self.needed_untils[wire_id], "")
+                self.add_latency_registers(wire_id, self.registers.needed_untils[wire_id], "")
                     .unwrap();
             }
         }
     }
 
-    fn write_wire_declaration(&mut self, w: &'g RealWire) {
+    fn write_wire_declaration(&mut self, wire_id: WireID) {
+        let w = &self.instance.wires[wire_id];
         w.get_span(&self.md.link_info).debug();
         // For better readability of output Verilog
         if can_inline(w) {
@@ -600,7 +598,7 @@ impl<'g> CodeGenerationContext<'g> {
             writeln!(self.program_text, "// (zero sized) {}", w.name).unwrap();
             return;
         }
-        let wire_or_reg = w.source.codegen_wire_or_reg();
+        let wire_or_reg = self.codegen_wire_or_reg(wire_id);
         let output_name = self.output_wire_name(w);
         let output_decl = output_name.codegen_declaration();
 
@@ -875,10 +873,36 @@ impl<'g> CodeGenerationContext<'g> {
                 is_state,
                 sources: _,
             } => {
+                let attributes = self.wire_attributes(wire_id);
                 let decl_stm = Self::codegen_declaration(w, wire_or_reg, output_decl, is_state);
-                writeln!(self.program_text, "{decl_stm};").unwrap();
+                writeln!(self.program_text, "{attributes}{decl_stm};").unwrap();
             }
         }
+    }
+
+    fn codegen_wire_or_reg(&self, wire_id: WireID) -> &'static str {
+        match &self.instance.wires[wire_id].source {
+            RealWireDataSource::Multiplexer {
+                is_state: Some(_),
+                sources: _,
+            } => "/*state*/ logic",
+            RealWireDataSource::Multiplexer {
+                is_state: None,
+                sources: _,
+            } => match self.registers.absorbed_regs[wire_id] {
+                Some(_) => "/*latency*/ logic",
+                None => "/*mux_wire*/ logic",
+            },
+            RealWireDataSource::Constant { .. } => "localparam",
+            _ => "wire", // Has to be "wire", because `logic[5:0] v = other_wire;` would *initialize* v to other_wire, so we need to use `wire`
+        }
+    }
+
+    /// Attributes that go in front of the declaration of the wire (for ports, in front of the direction). May have a trailing space.
+    fn wire_attributes(&self, wire_id: WireID) -> &'static str {
+        let is_explicit_reg =
+            matches!(self.registers.absorbed_regs[wire_id], Some(reg) if reg.is_explicit);
+        super::patches::patch_explicit_reg_no_srl(is_explicit_reg)
     }
 
     fn codegen_declaration(
@@ -1002,9 +1026,10 @@ impl<'g> CodeGenerationContext<'g> {
         output_name: &WireName,
         arrow_str: &'static str,
         s: &'g MultiplexerSource,
-        target: &'g RealWire,
+        target_id: WireID,
     ) {
-        let computed_target_latency = AbsLat::new(target.absolute_latency.unwrap() + s.num_nexts);
+        let target = &self.instance.wires[target_id];
+        let computed_target_latency = self.registers.read_latency(target_id, target, s.num_nexts);
         let from = &self.instance.wires[s.from];
         from.get_span(&self.md.link_info).debug();
         let from_name = self.wire_name(from, computed_target_latency);
@@ -1035,7 +1060,7 @@ impl<'g> CodeGenerationContext<'g> {
     }
 
     fn write_multiplexers(&mut self) {
-        for (_id, w) in &self.instance.wires {
+        for (w_id, w) in &self.instance.wires {
             w.get_span(&self.md.link_info).debug();
 
             if w.typ.is_zero_sized() {
@@ -1045,17 +1070,26 @@ impl<'g> CodeGenerationContext<'g> {
             match &w.source {
                 RealWireDataSource::Multiplexer { is_state, sources } => {
                     let output_name = self.output_wire_name(w);
+                    let clk_name = &self.instance.clocks[w.clock].name;
+                    let unset_str = codegen_constant(&w.typ, &Value::Unset);
+                    let is_absorbed_reg = self.registers.absorbed_regs[w_id].is_some();
                     let arrow_str = if is_state.is_some() {
-                        let clk_name = &self.instance.clocks[w.clock].name;
                         writeln!(
                             self.program_text,
                             "always_ff @(posedge {clk_name}) begin // state {output_name}"
                         )
                         .unwrap();
                         "<="
+                    } else if is_absorbed_reg {
+                        writeln!(
+                            self.program_text,
+                            "always_ff @(posedge {clk_name}) begin // latency {output_name}"
+                        )
+                        .unwrap();
+                        writeln!(self.program_text, "\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate a clock enable\n\t{output_name} <= {unset_str};").unwrap();
+                        "<="
                     } else {
                         writeln!(self.program_text, "always_comb begin // combinatorial {output_name}\n\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches").unwrap();
-                        let unset_str = codegen_constant(&w.typ, &Value::Unset);
                         writeln!(self.program_text, "\t{output_name} = {unset_str};").unwrap();
                         "="
                     };
@@ -1065,19 +1099,22 @@ impl<'g> CodeGenerationContext<'g> {
                             // Eliminate zero-size sub-slice assignments
                             continue;
                         }
-                        self.write_assign(&output_name, arrow_str, s, w);
+                        self.write_assign(&output_name, arrow_str, s, w_id);
                     }
 
-                    write!(
-                        self.program_text,
-                        "{}",
-                        super::patches::patch_combinatorial_write_one_bit_dont_care(
-                            is_state,
-                            &output_name,
-                            &w.typ
+                    // The patch is a blocking self-assignment, which only makes sense in an always_comb
+                    if !is_absorbed_reg {
+                        write!(
+                            self.program_text,
+                            "{}",
+                            super::patches::patch_combinatorial_write_one_bit_dont_care(
+                                is_state,
+                                &output_name,
+                                &w.typ
+                            )
                         )
-                    )
-                    .unwrap();
+                        .unwrap();
+                    }
 
                     writeln!(self.program_text, "end").unwrap();
                 }
@@ -1418,23 +1455,6 @@ impl ConcreteType {
             };
         }
         t
-    }
-}
-
-impl RealWireDataSource {
-    fn codegen_wire_or_reg(&self) -> &'static str {
-        match self {
-            RealWireDataSource::Multiplexer {
-                is_state: Some(_),
-                sources: _,
-            } => "/*state*/ logic",
-            RealWireDataSource::Multiplexer {
-                is_state: None,
-                sources: _,
-            } => "/*mux_wire*/ logic",
-            RealWireDataSource::Constant { .. } => "localparam",
-            _ => "wire", // Has to be "wire", because `logic[5:0] v = other_wire;` would *initialize* v to other_wire, so we need to use `wire`
-        }
     }
 }
 

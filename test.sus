@@ -1627,3 +1627,40 @@ module TestSplitSubmoduleOutOfBounds {
 	split SubmodSplitStage[4] stages
 	output int#(0..100) o = stages[4](i)
 }
+// Wires whose sources are all at least a cycle earlier are the register themselves, instead of reading a `_D` delay chain
+module TestAbsorbedRegs {
+	input bool y'0
+	input int#(0..16) a'0
+	input int#(0..4) idx'0
+	// Explicit regs are named after what they're assigned to
+	reg bool x = y
+	reg int t = a + a
+	output int t3
+	reg(3) t3 = a
+	// Conditional writes too
+	output int#(0..40) s
+	when x {
+		reg s = t
+	} else {
+		reg s = a
+	}
+	// A balancing register, not requested with `reg`
+	output int#(0..16) balanced'1 = a
+	// Partial writes
+	output int#(0..16)[4] arr
+	reg arr[idx] = a
+	// Not absorbed: the condition and `t` are of the same latency as `not_absorbed`
+	output int#(0..40) not_absorbed
+	when x {
+		not_absorbed = a
+	} else {
+		not_absorbed = t
+	}
+	// Not absorbed: the constant is of the same latency as `with_constant`
+	output int#(0..40) with_constant
+	when x {
+		reg with_constant = t
+	} else {
+		with_constant = 3
+	}
+}

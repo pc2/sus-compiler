@@ -345,57 +345,111 @@ impl RealWireDataSource {
     }
 }
 
-impl InstantiatedModule {
-    /// Is used to add implicit registers to wires that are used longer than one cycle.
+/// A non-`state` wire that is itself a pipeline register. See [RegisterPlacement::absorbed_regs]
+#[derive(Debug, Clone, Copy)]
+pub struct AbsorbedReg {
+    /// At least one of the writes to this wire was an explicit `reg`. See [crate::codegen::patches::patch_explicit_reg_no_srl]
+    pub is_explicit: bool,
+}
+
+/// Where the pipeline registers of an [InstantiatedModule] go.
+///
+/// Latency counting only decides the [RealWire::absolute_latency] of every wire. When a wire `t` reads a wire `s` of an earlier latency, registers are needed in between.
+/// By default these are `s`'s *delay chain*: `_s_D<lat>` for every latency up to [Self::needed_untils], shared by all readers of `s`. `t` is then combinatorial, and reads the chain at its own latency.
+///
+/// The exception are [Self::absorbed_regs]. These wires are the last register stage themselves, such that `reg bool x = y` produces a register named `x`.
+///
+/// Everything that depends on the latency at which a wire reads its sources goes through [Self::read_latency].
+pub struct RegisterPlacement {
+    /// Multiplexer wires for which every source, condition and index of every write is at least one cycle earlier than where the wire reads it.
     ///
-    /// If needed only the same cycle it is generated, then this is equal to [RealWire::absolute_latency].
-    pub fn compute_needed_untils(&self) -> FlatAlloc<i64, WireIDMarker> {
-        let mut result = self.wires.map(|(_id, w)| w.absolute_latency.unwrap());
+    /// Such a wire is computed from its sources one cycle earlier, and registered itself. That is the same hardware, with the last stage of all the delay chains it reads moved to after the multiplexer.
+    pub absorbed_regs: FlatAlloc<Option<AbsorbedReg>, WireIDMarker>,
+    /// The last latency at which each wire is read, so the length of its delay chain.
+    ///
+    /// If only needed the same cycle it is generated, then this is equal to [RealWire::absolute_latency].
+    pub needed_untils: FlatAlloc<i64, WireIDMarker>,
+    /// For each wire, the inclusive ranges of absolute latencies whose delay chain stage was requested by an explicit `reg` on a write.
+    ///
+    /// A write `t = reg s` asks for the stages of `s`'s delay chain from `lat(s) + 1` up to and including where `t` reads it. Stages shared with other readers are included.
+    pub explicit_reg_stages: FlatAlloc<Vec<(i64, i64)>, WireIDMarker>,
+}
 
-        for (_id, w) in &self.wires {
-            w.source.iter_sources_with_min_latency(|other, _, nexts| {
-                let other = match &self.wires[other].source {
-                    // For inlining path-less Selects
-                    RealWireDataSource::Select { root, path } if path.is_empty() => *root,
-                    _ => other,
-                };
-                let nu = &mut result[other];
+/// See [RegisterPlacement::read_latency]
+fn read_latency(w: &RealWire, num_nexts: i64, absorbed_reg: &Option<AbsorbedReg>) -> i64 {
+    let absorbed_stage = if absorbed_reg.is_some() { 1 } else { 0 };
+    w.absolute_latency.unwrap() + num_nexts - absorbed_stage
+}
 
-                let w_required_at = w.absolute_latency.unwrap() + nexts;
-                *nu = max(*nu, w_required_at);
-            });
+impl RegisterPlacement {
+    /// The latency at which `w` reads the sources of one of its writes. `num_nexts` is [MultiplexerSource::num_nexts], or 0 for non-multiplexers.
+    pub fn read_latency(&self, w_id: WireID, w: &RealWire, num_nexts: i64) -> AbsLat {
+        AbsLat::new(read_latency(w, num_nexts, &self.absorbed_regs[w_id]))
+    }
+}
+
+impl InstantiatedModule {
+    /// Reading `wire` at a later latency actually reads the delay chain of the wire returned here, because path-less Selects are inlined by codegen.
+    fn delay_chain_of(&self, wire: WireID) -> WireID {
+        match &self.wires[wire].source {
+            RealWireDataSource::Select { root, path } if path.is_empty() => *root,
+            _ => wire,
         }
-
-        result
     }
 
-    /// For each wire, the inclusive ranges of absolute latencies whose delay-chain stage was requested by an explicit `reg` on a write.
-    ///
-    /// A write `t = reg s` is emitted by reading `s` at `t`'s latency, so the registers it asks for are the stages of `s`'s delay chain
-    /// from `lat(s) + 1` up to and including `lat(t) + num_nexts`. Stages shared with other readers are included. See [Self::compute_needed_untils].
-    pub fn compute_explicit_reg_stages(&self) -> FlatAlloc<Vec<(i64, i64)>, WireIDMarker> {
-        let mut result = self.wires.map(|_| Vec::new());
+    pub fn compute_register_placement(&self) -> RegisterPlacement {
+        let absorbed_regs = self.compute_absorbed_regs();
+        let mut needed_untils = self.wires.map(|(_id, w)| w.absolute_latency.unwrap());
+        let mut explicit_reg_stages = self.wires.map(|_| Vec::new());
 
-        for (_id, w) in &self.wires {
-            let RealWireDataSource::Multiplexer { sources, .. } = &w.source else {
-                continue;
-            };
-            for s in sources {
-                if s.num_regs == 0 {
-                    continue;
-                }
-                let from = match &self.wires[s.from].source {
-                    // For inlining path-less Selects
-                    RealWireDataSource::Select { root, path } if path.is_empty() => *root,
-                    _ => s.from,
-                };
-                let first = self.wires[from].absolute_latency.unwrap() + 1;
-                let last = w.absolute_latency.unwrap() + s.num_nexts;
-                result[from].push((first, last));
-            }
+        for (w_id, w) in &self.wires {
+            w.source
+                .iter_sources_with_min_latency(|from, num_regs, num_nexts| {
+                    let from = self.delay_chain_of(from);
+                    let read_at = read_latency(w, num_nexts, &absorbed_regs[w_id]);
+
+                    let nu = &mut needed_untils[from];
+                    *nu = max(*nu, read_at);
+
+                    if num_regs != 0 {
+                        let first = self.wires[from].absolute_latency.unwrap() + 1;
+                        explicit_reg_stages[from].push((first, read_at));
+                    }
+                });
         }
 
-        result
+        RegisterPlacement {
+            absorbed_regs,
+            needed_untils,
+            explicit_reg_stages,
+        }
+    }
+
+    /// See [RegisterPlacement::absorbed_regs]
+    fn compute_absorbed_regs(&self) -> FlatAlloc<Option<AbsorbedReg>, WireIDMarker> {
+        self.wires.map(|(_id, w)| {
+            let RealWireDataSource::Multiplexer {
+                is_state: None,
+                sources,
+            } = &w.source
+            else {
+                return None;
+            };
+            if sources.is_empty() {
+                return None;
+            }
+            let mut all_reads_earlier = true;
+            for s in sources {
+                let read_at = w.absolute_latency.unwrap() + s.num_nexts;
+                s.for_each_wire(&mut |from| {
+                    let from = &self.wires[self.delay_chain_of(from)];
+                    all_reads_earlier &= from.absolute_latency.unwrap() < read_at;
+                });
+            }
+            all_reads_earlier.then(|| AbsorbedReg {
+                is_explicit: sources.iter().any(|s| s.num_regs != 0),
+            })
+        })
     }
 }
 
