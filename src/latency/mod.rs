@@ -520,10 +520,26 @@ impl ModuleTypingContext<'_> {
         latency_node_meanings: &[WireID],
         conflicts: &[SpecifiedLatency],
     ) -> Vec<LatencyPathElem<'_>> {
+        let submodule_of =
+            |node: &SpecifiedLatency| match self.wires[latency_node_meanings[node.node]].is_port {
+                IsPort::SubmodulePort(sm, _, _) => Some(sm),
+                _ => None,
+            };
+
         let mut connection_list = Vec::new();
-        for wire_specified in conflicts {
+        for (idx, wire_specified) in conflicts.iter().enumerate() {
             let wire_id = latency_node_meanings[wire_specified.node];
             let wire = &self.wires[wire_id];
+
+            // The ports of a submodule are tied together in a cycle, so skip the intermediary ports the path passes on its way through a submodule
+            if let Some(sm) = submodule_of(wire_specified)
+                && idx > 0
+                && submodule_of(&conflicts[idx - 1]) == Some(sm)
+                && let Some(next) = conflicts.get(idx + 1)
+                && submodule_of(next) == Some(sm)
+            {
+                continue;
+            }
 
             // Check that the wire has an understandable name
             match &wire.source {

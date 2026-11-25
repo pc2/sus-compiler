@@ -313,6 +313,10 @@
 [INFO  sus_compiler::instantiation::instantiator] Instantiated TestNexts #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated LocalFunctionLatency #()
 [INFO  sus_compiler::instantiation::instantiator] Instantiated LocalFunctionCalledFromTwoLatencies #()
+[INFO  sus_compiler::instantiation::instantiator] Instantiated latency_path_many_ports #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate latency_cycle_through_many_ports #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate latency_cycle_only_submodule_ports #()
+[ERROR sus_compiler::instantiation::instantiator] Failed to instantiate latency_conflict_through_many_ports #()
 [ERROR sus_compiler::compiler_top] Cannot instantiate use_no_input_module due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate test_write_to_gen_var due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate make_tree_add due to errors
@@ -431,6 +435,9 @@
 [ERROR sus_compiler::compiler_top] Cannot instantiate GenerativeCannotHaveLatencyDeclaration due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate try_conflicting_latencies due to errors
 [ERROR sus_compiler::compiler_top] Cannot instantiate RegressionForBadPort due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate latency_cycle_through_many_ports due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate latency_cycle_only_submodule_ports due to errors
+[ERROR sus_compiler::compiler_top] Cannot instantiate latency_conflict_through_many_ports due to errors
 Warning: Not Instantiating use_no_input_module #() due to abstract typing errors
    ╭─[ test.sus:3:8 ]
    │
@@ -7929,6 +7936,188 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │          ┬  
      │          ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: This instruction is part of a net-positive latency cycle of +6
+
+acc'0
+-> _mp_a'-6 (-6)
+-> _mp_z'0 (+6)
+-> acc'6 (+6)
+
+Which conflicts with the starting latency
+     ╭─[ test_latencies.sus:428:21 ]
+     │
+ 428 │     state int#(0..100) acc
+     │                        ─┬─  
+     │                         ╰─── This instruction is part of a net-positive latency cycle of +6
+
+acc'0
+-> _mp_a'-6 (-6)
+-> _mp_z'0 (+6)
+-> acc'6 (+6)
+
+Which conflicts with the starting latency
+─────╯
+Error: This instruction is part of a net-positive latency cycle of +6
+
+acc'0
+-> _mp_a'-6 (-6)
+-> _mp_z'0 (+6)
+-> acc'6 (+6)
+
+Which conflicts with the starting latency
+     ╭─[ test_latencies.sus:430:26 ]
+     │
+ 430 │     latency_path_many_ports mp
+     │                             ─┬  
+     │                              ╰── This instruction is part of a net-positive latency cycle of +6
+
+acc'0
+-> _mp_a'-6 (-6)
+-> _mp_z'0 (+6)
+-> acc'6 (+6)
+
+Which conflicts with the starting latency
+─────╯
+Error: This instruction is part of a net-positive latency cycle of +6
+
+acc'0
+-> _mp_a'-6 (-6)
+-> _mp_z'0 (+6)
+-> acc'6 (+6)
+
+Which conflicts with the starting latency
+     ╭─[ test_latencies.sus:430:26 ]
+     │
+ 430 │     latency_path_many_ports mp
+     │                             ─┬  
+     │                              ╰── This instruction is part of a net-positive latency cycle of +6
+
+acc'0
+-> _mp_a'-6 (-6)
+-> _mp_z'0 (+6)
+-> acc'6 (+6)
+
+Which conflicts with the starting latency
+─────╯
+Warning: Unused port 'y'
+     ╭─[ test_latencies.sus:430:26 ]
+     │
+ 430 │     latency_path_many_ports mp
+     │                             ─┬  
+     │                              ╰── Unused port 'y'
+     │
+     ├─[ test_latencies.sus:430:26 ]
+     │
+ 422 │     output bool y'4 = b
+     │                 ┬  
+     │                 ╰── Port 'y' declared here
+     │ 
+ 430 │     latency_path_many_ports mp
+     │                             ─┬  
+     │                              ╰── mp declared here
+─────╯
+Warning: Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+     ╭─[ test_latencies.sus:439:26 ]
+     │
+ 439 │     latency_path_many_ports mp
+     │                             ─┬  
+     │                              ╰── Clock 'Unconnected_clock_1' has no driver. Non-input clocks require exactly one driving submodule. Defaulting to 'clk'
+─────╯
+Error: This instruction is part of a net-positive latency cycle of +1
+
+_mp_c'0
+-> _mp_x'1 (+1)
+-> _mp_c'1 (+0)
+
+Which conflicts with the starting latency
+     ╭─[ test_latencies.sus:439:26 ]
+     │
+ 439 │     latency_path_many_ports mp
+     │                             ─┬  
+     │                              ╰── This instruction is part of a net-positive latency cycle of +1
+
+_mp_c'0
+-> _mp_x'1 (+1)
+-> _mp_c'1 (+0)
+
+Which conflicts with the starting latency
+─────╯
+Error: This instruction is part of a net-positive latency cycle of +1
+
+_mp_c'0
+-> _mp_x'1 (+1)
+-> _mp_c'1 (+0)
+
+Which conflicts with the starting latency
+     ╭─[ test_latencies.sus:439:26 ]
+     │
+ 439 │     latency_path_many_ports mp
+     │                             ─┬  
+     │                              ╰── This instruction is part of a net-positive latency cycle of +1
+
+_mp_c'0
+-> _mp_x'1 (+1)
+-> _mp_c'1 (+0)
+
+Which conflicts with the starting latency
+─────╯
+Error: Conflicting specified latency
+
+i'0
+-> _mp_c'0 (+0)
+-> _mp_z'4 (+4)
+-> o'4 (+0)
+
+But this was specified as o'3
+     ╭─[ test_latencies.sus:445:81 ]
+     │
+ 445 │ module latency_conflict_through_many_ports : int#(0..100) i'0 -> int#(0..100) o'3 {
+     │                                                           ┬                     ┬  
+     │                                                           ╰──────────────────────── 'i' declared here
+     │                                                                                 │  
+     │                                                                                 ╰── Conflicting specified latency
+
+i'0
+-> _mp_c'0 (+0)
+-> _mp_z'4 (+4)
+-> o'4 (+0)
+
+But this was specified as o'3
+─────╯
+Warning: Unused port 'x'
+     ╭─[ test_latencies.sus:446:26 ]
+     │
+ 446 │     latency_path_many_ports mp
+     │                             ─┬  
+     │                              ╰── Unused port 'x'
+     │
+     ├─[ test_latencies.sus:446:26 ]
+     │
+ 421 │     output int#(0..100) x'3 = a
+     │                         ┬  
+     │                         ╰── Port 'x' declared here
+     │ 
+ 446 │     latency_path_many_ports mp
+     │                             ─┬  
+     │                              ╰── mp declared here
+─────╯
+Warning: Unused port 'y'
+     ╭─[ test_latencies.sus:446:26 ]
+     │
+ 446 │     latency_path_many_ports mp
+     │                             ─┬  
+     │                              ╰── Unused port 'y'
+     │
+     ├─[ test_latencies.sus:446:26 ]
+     │
+ 422 │     output bool y'4 = b
+     │                 ┬  
+     │                 ╰── Port 'y' declared here
+     │ 
+ 446 │     latency_path_many_ports mp
+     │                             ─┬  
+     │                              ╰── mp declared here
+─────╯
 [INFO  sus_compiler::codegen] Code generated for IntToBool #() as "IntToBool"
 [INFO  sus_compiler::codegen] Code generated for BoolToInt #() as "BoolToInt"
 [INFO  sus_compiler::codegen] Code generated for no_port_module #() as "no_port_module"
@@ -8073,3 +8262,4 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 [INFO  sus_compiler::codegen] Code generated for TestNexts #() as "TestNexts"
 [INFO  sus_compiler::codegen] Code generated for LocalFunctionLatency #() as "LocalFunctionLatency"
 [INFO  sus_compiler::codegen] Code generated for LocalFunctionCalledFromTwoLatencies #() as "LocalFunctionCalledFromTwoLatencies"
+[INFO  sus_compiler::codegen] Code generated for latency_path_many_ports #() as "latency_path_many_ports"

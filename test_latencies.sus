@@ -413,3 +413,39 @@ module LocalFunctionCalledFromTwoLatencies {
 	reg int#(0..100) a_delayed = a
 	r2 = add_one(a_delayed)
 }
+
+module latency_path_many_ports {
+	input int#(0..100) a'0
+	input bool b'1
+	input int#(0..100) c'2
+	output int#(0..100) x'3 = a
+	output bool y'4 = b
+	output int#(0..100) z'6 = c
+}
+
+// The latency path should only show the ports where it enters and leaves the submodule
+module latency_cycle_through_many_ports : int#(0..100) i -> int#(0..100) o {
+	state int#(0..100) acc
+	initial acc = 0
+	latency_path_many_ports mp
+	mp.a = acc
+	mp.b = true
+	mp.c = i
+	acc = mp.z
+	o = mp.x
+}
+
+module latency_cycle_only_submodule_ports {
+	latency_path_many_ports mp
+	mp.a = mp.z
+	mp.b = mp.y
+	mp.c = mp.x
+}
+
+module latency_conflict_through_many_ports : int#(0..100) i'0 -> int#(0..100) o'3 {
+	latency_path_many_ports mp
+	mp.a = i
+	mp.b = true
+	mp.c = i
+	o = mp.z
+}

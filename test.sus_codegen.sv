@@ -1,3 +1,32 @@
+// latency_path_many_ports #()
+module latency_path_many_ports(
+	/* clock */ input clk,
+	input wire[6:0] a,
+	input wire b,
+	input wire[6:0] c,
+	output /*latency*/ logic[6:0] x,
+	output /*latency*/ logic y,
+	output /*latency*/ logic[6:0] z
+);
+
+/*latency*/ logic[6:0] _a_D1; always_ff @(posedge clk) begin _a_D1 <= a; end
+/*latency*/ logic[6:0] _a_D2; always_ff @(posedge clk) begin _a_D2 <= _a_D1; end
+/*latency*/ logic _b_D2; always_ff @(posedge clk) begin _b_D2 <= b; end
+/*latency*/ logic _b_D3; always_ff @(posedge clk) begin _b_D3 <= _b_D2; end
+/*latency*/ logic[6:0] _c_D3; always_ff @(posedge clk) begin _c_D3 <= c; end
+/*latency*/ logic[6:0] _c_D4; always_ff @(posedge clk) begin _c_D4 <= _c_D3; end
+/*latency*/ logic[6:0] _c_D5; always_ff @(posedge clk) begin _c_D5 <= _c_D4; end
+always_ff @(posedge clk) begin // latency x
+	x <= _a_D2;
+end
+always_ff @(posedge clk) begin // latency y
+	y <= _b_D3;
+end
+always_ff @(posedge clk) begin // latency z
+	z <= _c_D5;
+end
+endmodule // latency_path_many_ports #()
+
 // LocalFunctionCalledFromTwoLatencies #()
 module LocalFunctionCalledFromTwoLatencies(
 	/* clock */ input clk,
